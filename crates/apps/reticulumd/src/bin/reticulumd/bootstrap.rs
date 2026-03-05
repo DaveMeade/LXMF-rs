@@ -253,13 +253,25 @@ pub(super) async fn bootstrap(args: Args) -> BootstrapContext {
                             });
                         }
                     },
-                    "ble_gatt" => match ble::startup(iface).await {
-                        Ok(()) => {
+                    "ble_gatt" => match ble::spawn(iface_manager.clone(), iface).await {
+                        Ok(ble_iface) => {
+                            eprintln!(
+                                "[daemon] ble_gatt enabled iface={} name={} peripheral_id={}",
+                                ble_iface,
+                                label,
+                                iface.peripheral_id.as_deref().unwrap_or("<unset>")
+                            );
+                            let runtime_iface = ble_iface.to_string();
                             mark_interface_startup_status(
                                 &mut configured_interfaces[index],
-                                "active",
+                                "spawned",
                                 None,
-                                None,
+                                Some(runtime_iface.as_str()),
+                            );
+                            mark_interface_runtime_fields(
+                                &mut configured_interfaces[index],
+                                "running",
+                                0,
                             );
                             startup_successes += 1;
                         }
@@ -273,6 +285,11 @@ pub(super) async fn bootstrap(args: Args) -> BootstrapContext {
                                 "failed",
                                 Some(err.as_str()),
                                 None,
+                            );
+                            mark_interface_runtime_fields(
+                                &mut configured_interfaces[index],
+                                "degraded",
+                                0,
                             );
                             startup_failures.push(InterfaceStartupFailure {
                                 label,
@@ -490,6 +507,32 @@ pub(super) fn mark_interface_startup_status(
         runtime.insert("iface".to_string(), JsonValue::String(runtime_iface.to_string()));
     }
 
+    settings.insert("_runtime".to_string(), JsonValue::Object(runtime));
+    record.settings = Some(JsonValue::Object(settings));
+}
+
+pub(super) fn mark_interface_runtime_fields(
+    record: &mut InterfaceRecord,
+    runtime_status: &str,
+    reconnect_attempts: u64,
+) {
+    let mut settings = match record.settings.take() {
+        Some(JsonValue::Object(existing)) => existing,
+        Some(other) => {
+            let mut wrapped = JsonMap::new();
+            wrapped.insert("configured_settings".to_string(), other);
+            wrapped
+        }
+        None => JsonMap::new(),
+    };
+
+    let mut runtime = match settings.remove("_runtime") {
+        Some(JsonValue::Object(existing)) => existing,
+        _ => JsonMap::new(),
+    };
+
+    runtime.insert("runtime_status".to_string(), JsonValue::String(runtime_status.to_string()));
+    runtime.insert("reconnect_attempts".to_string(), JsonValue::Number(reconnect_attempts.into()));
     settings.insert("_runtime".to_string(), JsonValue::Object(runtime));
     record.settings = Some(JsonValue::Object(settings));
 }
