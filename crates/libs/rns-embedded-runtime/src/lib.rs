@@ -19,7 +19,12 @@ use rns_embedded_core::{
     transport::{EmbeddedTransport, LinkState},
 };
 pub use constants::*;
-pub use node::{CaptureDefaults, NodeLifecycleState, NodeTransportMode};
+pub use node::{
+    BleNodeBackendConfig, BroadcastOptions, CaptureDefaults, EmbeddedNode, EventSubscription,
+    NodeBackendConfig, NodeConfig, NodeError, NodeEvent, NodeEventKind, NodeLifecycleState,
+    NodeLogLevel, NodeOperationKind, NodeOperationReceipt, NodeRunState, NodeStatus,
+    NodeTransportMode, PollResult, SendOptions, TcpClientConfig, TcpServerConfig,
+};
 
 #[derive(Debug, Clone, Copy, Eq, PartialEq)]
 pub struct RuntimeConfig {
@@ -46,7 +51,7 @@ impl Default for RuntimeConfig {
     }
 }
 
-#[derive(Debug, Clone, Copy, Eq, PartialEq)]
+#[derive(Debug, Clone, Copy, Eq, PartialEq, Default)]
 pub struct RuntimeStats {
     pub announces_queued: u32,
     pub outbound_sent: u32,
@@ -189,6 +194,10 @@ impl EmbeddedNodeRuntime {
 
     pub fn pending_outbound_len(&self) -> usize {
         self.outbound.len()
+    }
+
+    pub fn config(&self) -> RuntimeConfig {
+        self.config
     }
 
     pub fn lifecycle_state(&self) -> NodeLifecycleState {
@@ -397,6 +406,8 @@ impl EmbeddedNodeRuntime {
 
 #[cfg(test)]
 mod tests {
+    use alloc::vec;
+
     use super::{
         CaptureDefaults, EmbeddedNodeRuntime, FRAME_KIND_ANNOUNCE, FRAME_KIND_LXMF_MESSAGE,
         FRAME_KIND_TEST_PING, FRAME_KIND_TEST_PONG, NodeLifecycleState, NodeTransportMode,
