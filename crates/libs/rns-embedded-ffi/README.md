@@ -5,7 +5,13 @@
 - legacy compatibility entrypoints for manual tick plus raw wire ingress/egress
 - the `v1` node-centric API for lifecycle, status, send/broadcast, and event subscriptions
 
-The public header is [include/rns_embedded_ffi.h](/Users/tommy/Documents/TAK/LXMF-rs/crates/libs/rns-embedded-ffi/include/rns_embedded_ffi.h).
+The public header is [include/rns_embedded_ffi.h](./include/rns_embedded_ffi.h).
+
+Surface labels:
+
+- stable core: v1 lifecycle, status, send/broadcast, capability probe, subscriptions, structured errors
+- compatibility surface: legacy manual tick + raw wire ingress/egress
+- extension surface: `RnsEmbeddedV1EventKind::Extension` with numeric IDs validated against [docs/fixtures/embedded/public-node-api-v1/extension-ids.json](../../../docs/fixtures/embedded/public-node-api-v1/extension-ids.json)
 
 ## v1 API Summary
 
@@ -29,6 +35,18 @@ The `v1` structs are self-describing:
 - every public struct starts with `struct_size`
 - every public struct carries `struct_version`
 - callers should zero-init or use the provided default-producing functions before passing structs in
+
+Capability probe rules:
+
+- `capability_schema_version` versions the meaning of the capability payload itself
+- `known_capability_bits` is the full bit registry this build understands
+- `compile_time_capability_bits` is the feature set compiled into the library artifact
+- `capability_bits` is the effective runtime-safe subset for the current build/profile
+- wrappers must ignore unknown bits by masking with `known_capability_bits`
+- `max_blocking_timeout_ms == 0` means blocking `next(timeout_ms>0)` is not available
+- `driver_tick_target_ms` and `driver_tick_max_ms` are only non-zero in managed `std` builds
+
+The stable node-error registry is generated from [docs/contracts/node-error-codes-v1.json](../../../docs/contracts/node-error-codes-v1.json) and documented in [docs/contracts/node-error-codes-v1.md](../../../docs/contracts/node-error-codes-v1.md).
 
 ## Minimal Flow
 
@@ -109,6 +127,12 @@ int main(void) {
     return 0;
 }
 ```
+
+Reference artifacts:
+
+- managed host flow: [std_managed_node.rs](../rns-embedded-runtime/examples/std_managed_node.rs)
+- manual-tick runtime flow: [manual_tick_runtime.rs](../rns-embedded-runtime/examples/manual_tick_runtime.rs)
+- mobile/wrapper FFI flow: [mobile_wrapper_v1.c](./examples/mobile_wrapper_v1.c)
 
 ## Legacy Compatibility Surface
 
