@@ -161,11 +161,7 @@ impl fmt::Display for RegistryError {
             Self::DuplicateOperationId { id } => {
                 write!(f, "duplicate operation id '{}'", id.as_str())
             }
-            Self::DuplicateAlias {
-                alias,
-                existing_id,
-                conflicting_id,
-            } => write!(
+            Self::DuplicateAlias { alias, existing_id, conflicting_id } => write!(
                 f,
                 "duplicate alias '{}' for '{}' and '{}'",
                 alias,
@@ -300,11 +296,7 @@ impl<'de> Deserialize<'de> for OperationRegistry {
         let wire = WireRegistry::deserialize(deserializer)?;
         let (by_id, aliases) =
             OperationRegistry::build_indexes(&wire.entries).map_err(serde::de::Error::custom)?;
-        Ok(Self {
-            entries: wire.entries,
-            by_id,
-            aliases,
-        })
+        Ok(Self { entries: wire.entries, by_id, aliases })
     }
 }
 
@@ -431,6 +423,222 @@ fn built_in_entries() -> Vec<OperationEntry> {
         .with_alias("sdk_identity_bootstrap_v2")
         .with_required_capability("sdk.capability.contact_management"),
         OperationEntry::new(
+            "app.topic.create",
+            "topics",
+            OperationKind::Command,
+            TransportVariant::Rpc,
+            "Create a topic record for collaborative app flows.",
+        )
+        .with_alias("sdk_topic_create_v2")
+        .with_required_capability("sdk.capability.topics"),
+        OperationEntry::new(
+            "app.topic.get",
+            "topics",
+            OperationKind::Query,
+            TransportVariant::Rpc,
+            "Fetch one topic record by id.",
+        )
+        .with_alias("sdk_topic_get_v2")
+        .with_required_capability("sdk.capability.topics"),
+        OperationEntry::new(
+            "app.topic.list",
+            "topics",
+            OperationKind::Query,
+            TransportVariant::Rpc,
+            "List known topics with cursor pagination.",
+        )
+        .with_alias("sdk_topic_list_v2")
+        .with_required_capability("sdk.capability.topics"),
+        OperationEntry::new(
+            "app.topic.subscribe",
+            "topics",
+            OperationKind::Command,
+            TransportVariant::Rpc,
+            "Subscribe the runtime to topic updates.",
+        )
+        .with_alias("sdk_topic_subscribe_v2")
+        .with_required_capability("sdk.capability.topic_subscriptions"),
+        OperationEntry::new(
+            "app.topic.unsubscribe",
+            "topics",
+            OperationKind::Command,
+            TransportVariant::Rpc,
+            "Remove a topic subscription from the runtime.",
+        )
+        .with_alias("sdk_topic_unsubscribe_v2")
+        .with_required_capability("sdk.capability.topic_subscriptions"),
+        OperationEntry::new(
+            "app.topic.publish",
+            "topics",
+            OperationKind::Command,
+            TransportVariant::Rpc,
+            "Publish one payload fanout to a topic.",
+        )
+        .with_alias("sdk_topic_publish_v2")
+        .with_required_capability("sdk.capability.topic_fanout"),
+        OperationEntry::new(
+            "app.telemetry.query",
+            "telemetry",
+            OperationKind::Query,
+            TransportVariant::Rpc,
+            "Query telemetry points filtered by peer, topic, and time bounds.",
+        )
+        .with_alias("sdk_telemetry_query_v2")
+        .with_required_capability("sdk.capability.telemetry_query"),
+        OperationEntry::new(
+            "app.telemetry.subscribe",
+            "telemetry",
+            OperationKind::Command,
+            TransportVariant::Rpc,
+            "Subscribe the runtime to telemetry stream updates.",
+        )
+        .with_alias("sdk_telemetry_subscribe_v2")
+        .with_required_capability("sdk.capability.telemetry_stream"),
+        OperationEntry::new(
+            "app.attachment.store",
+            "attachments",
+            OperationKind::Command,
+            TransportVariant::Rpc,
+            "Store one attachment payload with optional topic associations.",
+        )
+        .with_alias("sdk_attachment_store_v2")
+        .with_required_capability("sdk.capability.attachments"),
+        OperationEntry::new(
+            "app.attachment.get",
+            "attachments",
+            OperationKind::Query,
+            TransportVariant::Rpc,
+            "Fetch one attachment metadata record by id.",
+        )
+        .with_alias("sdk_attachment_get_v2")
+        .with_required_capability("sdk.capability.attachments"),
+        OperationEntry::new(
+            "app.attachment.list",
+            "attachments",
+            OperationKind::Query,
+            TransportVariant::Rpc,
+            "List stored attachments with topic filtering and cursor pagination.",
+        )
+        .with_alias("sdk_attachment_list_v2")
+        .with_required_capability("sdk.capability.attachments"),
+        OperationEntry::new(
+            "app.attachment.delete",
+            "attachments",
+            OperationKind::Command,
+            TransportVariant::Rpc,
+            "Delete one stored attachment by id.",
+        )
+        .with_alias("sdk_attachment_delete_v2")
+        .with_required_capability("sdk.capability.attachment_delete"),
+        OperationEntry::new(
+            "app.attachment.associate_topic",
+            "attachments",
+            OperationKind::Command,
+            TransportVariant::Rpc,
+            "Associate an existing attachment with an additional topic.",
+        )
+        .with_alias("sdk_attachment_associate_topic_v2")
+        .with_required_capability("sdk.capability.attachments"),
+        OperationEntry::new(
+            "app.attachment.upload_start",
+            "attachments",
+            OperationKind::Command,
+            TransportVariant::Rpc,
+            "Open a chunked attachment upload session.",
+        )
+        .with_alias("sdk_attachment_upload_start_v2")
+        .with_required_capability("sdk.capability.attachment_streaming"),
+        OperationEntry::new(
+            "app.attachment.upload_chunk",
+            "attachments",
+            OperationKind::Command,
+            TransportVariant::Rpc,
+            "Append one chunk to an attachment upload session.",
+        )
+        .with_alias("sdk_attachment_upload_chunk_v2")
+        .with_required_capability("sdk.capability.attachment_streaming"),
+        OperationEntry::new(
+            "app.attachment.upload_commit",
+            "attachments",
+            OperationKind::Command,
+            TransportVariant::Rpc,
+            "Commit a completed attachment upload session.",
+        )
+        .with_alias("sdk_attachment_upload_commit_v2")
+        .with_required_capability("sdk.capability.attachment_streaming"),
+        OperationEntry::new(
+            "app.attachment.download_chunk",
+            "attachments",
+            OperationKind::Query,
+            TransportVariant::Rpc,
+            "Read one chunk from a stored attachment payload.",
+        )
+        .with_alias("sdk_attachment_download_chunk_v2")
+        .with_required_capability("sdk.capability.attachment_streaming"),
+        OperationEntry::new(
+            "app.marker.create",
+            "markers",
+            OperationKind::Command,
+            TransportVariant::Rpc,
+            "Create a shared marker anchored to an optional topic.",
+        )
+        .with_alias("sdk_marker_create_v2")
+        .with_required_capability("sdk.capability.markers"),
+        OperationEntry::new(
+            "app.marker.list",
+            "markers",
+            OperationKind::Query,
+            TransportVariant::Rpc,
+            "List markers with topic filtering and cursor pagination.",
+        )
+        .with_alias("sdk_marker_list_v2")
+        .with_required_capability("sdk.capability.markers"),
+        OperationEntry::new(
+            "app.marker.update_position",
+            "markers",
+            OperationKind::Command,
+            TransportVariant::Rpc,
+            "Move an existing marker while enforcing revision checks.",
+        )
+        .with_alias("sdk_marker_update_position_v2")
+        .with_required_capability("sdk.capability.markers"),
+        OperationEntry::new(
+            "app.marker.delete",
+            "markers",
+            OperationKind::Command,
+            TransportVariant::Rpc,
+            "Delete an existing marker while enforcing revision checks.",
+        )
+        .with_alias("sdk_marker_delete_v2")
+        .with_required_capability("sdk.capability.markers"),
+        OperationEntry::new(
+            "app.voice.session.open",
+            "voice",
+            OperationKind::Command,
+            TransportVariant::Rpc,
+            "Open a voice signaling session for a peer.",
+        )
+        .with_alias("sdk_voice_session_open_v2")
+        .with_required_capability("sdk.capability.voice_signaling"),
+        OperationEntry::new(
+            "app.voice.session.update",
+            "voice",
+            OperationKind::Command,
+            TransportVariant::Rpc,
+            "Advance the state of a voice signaling session.",
+        )
+        .with_alias("sdk_voice_session_update_v2")
+        .with_required_capability("sdk.capability.voice_signaling"),
+        OperationEntry::new(
+            "app.voice.session.close",
+            "voice",
+            OperationKind::Command,
+            TransportVariant::Rpc,
+            "Close a voice signaling session.",
+        )
+        .with_alias("sdk_voice_session_close_v2")
+        .with_required_capability("sdk.capability.voice_signaling"),
+        OperationEntry::new(
             "app.message.history.list",
             "messaging",
             OperationKind::Query,
@@ -521,10 +729,7 @@ mod tests {
         let registry: OperationRegistry = serde_json::from_str(&json).expect("deserialize");
 
         assert_eq!(
-            registry
-                .canonicalize("sdk_status_v2")
-                .expect("canonical delivery status id")
-                .as_str(),
+            registry.canonicalize("sdk_status_v2").expect("canonical delivery status id").as_str(),
             "app.delivery.status"
         );
         assert!(registry.supports("sdk_snapshot_v2"));
@@ -549,11 +754,41 @@ mod tests {
         let grouped = registry.entries_by_group();
 
         assert!(grouped.get("runtime").is_some());
+        assert!(grouped.get("attachments").is_some());
+        assert!(grouped.get("markers").is_some());
+        assert!(grouped.get("telemetry").is_some());
+        assert!(grouped.get("topics").is_some());
+        assert!(grouped.get("voice").is_some());
         assert!(grouped
             .get("identity")
             .expect("identity group")
             .iter()
             .any(|entry| entry.id.as_str() == "app.identity.list"));
+        assert!(grouped
+            .get("attachments")
+            .expect("attachments group")
+            .iter()
+            .any(|entry| entry.id.as_str() == "app.attachment.store"));
+        assert!(grouped
+            .get("topics")
+            .expect("topics group")
+            .iter()
+            .any(|entry| entry.id.as_str() == "app.topic.create"));
+        assert!(grouped
+            .get("telemetry")
+            .expect("telemetry group")
+            .iter()
+            .any(|entry| entry.id.as_str() == "app.telemetry.query"));
+        assert!(grouped
+            .get("markers")
+            .expect("markers group")
+            .iter()
+            .any(|entry| entry.id.as_str() == "app.marker.create"));
+        assert!(grouped
+            .get("voice")
+            .expect("voice group")
+            .iter()
+            .any(|entry| entry.id.as_str() == "app.voice.session.open"));
     }
 
     #[test]

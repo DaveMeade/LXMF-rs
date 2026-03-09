@@ -524,6 +524,16 @@ enum Severity { debug, info, warn, error, critical, unknown }
 
 enum TrustLevel { unknown, untrusted, trusted, blocked }
 
+enum VoiceSessionState {
+  newState,
+  ringing,
+  active,
+  holding,
+  closed,
+  failed,
+  unknown,
+}
+
 @immutable
 class IdentityBundle {
   const IdentityBundle({
@@ -570,6 +580,248 @@ class ContactListPage {
   });
 
   final List<ContactRecord> contacts;
+  final String? nextCursor;
+}
+
+@immutable
+class PresenceRecord {
+  const PresenceRecord({
+    required this.peerId,
+    required this.lastSeenTsMs,
+    required this.firstSeenTsMs,
+    required this.seenCount,
+    this.displayName,
+    this.nameSource,
+    this.trustLevel,
+    this.bootstrap,
+    this.extensions = const <String, Object?>{},
+  });
+
+  final String peerId;
+  final int lastSeenTsMs;
+  final int firstSeenTsMs;
+  final int seenCount;
+  final String? displayName;
+  final String? nameSource;
+  final TrustLevel? trustLevel;
+  final bool? bootstrap;
+  final Map<String, Object?> extensions;
+}
+
+@immutable
+class PresencePage {
+  const PresencePage({
+    required this.peers,
+    this.nextCursor,
+  });
+
+  final List<PresenceRecord> peers;
+  final String? nextCursor;
+}
+
+@immutable
+class PeerDirectoryEntry {
+  const PeerDirectoryEntry({
+    required this.peerId,
+    required this.bootstrap,
+    required this.online,
+    required this.seenCount,
+    this.displayName,
+    this.nameSource,
+    this.trustLevel,
+    this.lastSeenTsMs,
+    this.firstSeenTsMs,
+    this.metadata = const <String, Object?>{},
+    this.extensions = const <String, Object?>{},
+  });
+
+  final String peerId;
+  final String? displayName;
+  final String? nameSource;
+  final TrustLevel? trustLevel;
+  final bool bootstrap;
+  final bool online;
+  final int? lastSeenTsMs;
+  final int? firstSeenTsMs;
+  final int seenCount;
+  final Map<String, Object?> metadata;
+  final Map<String, Object?> extensions;
+}
+
+@immutable
+class AttachmentRecord {
+  const AttachmentRecord({
+    required this.attachmentId,
+    required this.name,
+    required this.contentType,
+    required this.byteLen,
+    required this.checksumSha256,
+    required this.createdTsMs,
+    this.expiresTsMs,
+    this.topicIds = const <String>[],
+    this.extensions = const <String, Object?>{},
+  });
+
+  final String attachmentId;
+  final String name;
+  final String contentType;
+  final int byteLen;
+  final String checksumSha256;
+  final int createdTsMs;
+  final int? expiresTsMs;
+  final List<String> topicIds;
+  final Map<String, Object?> extensions;
+}
+
+@immutable
+class AttachmentListPage {
+  const AttachmentListPage({
+    required this.attachments,
+    this.nextCursor,
+  });
+
+  final List<AttachmentRecord> attachments;
+  final String? nextCursor;
+}
+
+@immutable
+class AttachmentUploadSession {
+  const AttachmentUploadSession({
+    required this.uploadId,
+    required this.attachmentId,
+    required this.chunkSizeHint,
+    required this.nextOffset,
+  });
+
+  final String uploadId;
+  final String attachmentId;
+  final int chunkSizeHint;
+  final int nextOffset;
+}
+
+@immutable
+class AttachmentUploadChunkAck {
+  const AttachmentUploadChunkAck({
+    required this.accepted,
+    required this.nextOffset,
+    required this.complete,
+  });
+
+  final bool accepted;
+  final int nextOffset;
+  final bool complete;
+}
+
+@immutable
+class AttachmentDownloadChunk {
+  const AttachmentDownloadChunk({
+    required this.attachmentId,
+    required this.offset,
+    required this.nextOffset,
+    required this.totalSize,
+    required this.done,
+    required this.checksumSha256,
+    required this.bytesBase64,
+  });
+
+  final String attachmentId;
+  final int offset;
+  final int nextOffset;
+  final int totalSize;
+  final bool done;
+  final String checksumSha256;
+  final String bytesBase64;
+}
+
+@immutable
+class TopicRecord {
+  const TopicRecord({
+    required this.topicId,
+    required this.createdTsMs,
+    this.topicPath,
+    this.metadata = const <String, Object?>{},
+    this.extensions = const <String, Object?>{},
+  });
+
+  final String topicId;
+  final int createdTsMs;
+  final String? topicPath;
+  final Map<String, Object?> metadata;
+  final Map<String, Object?> extensions;
+}
+
+@immutable
+class TopicListPage {
+  const TopicListPage({
+    required this.topics,
+    this.nextCursor,
+  });
+
+  final List<TopicRecord> topics;
+  final String? nextCursor;
+}
+
+@immutable
+class TelemetryPointRecord {
+  const TelemetryPointRecord({
+    required this.tsMs,
+    required this.key,
+    required this.value,
+    this.unit,
+    this.tags = const <String, String>{},
+    this.extensions = const <String, Object?>{},
+  });
+
+  final int tsMs;
+  final String key;
+  final Object? value;
+  final String? unit;
+  final Map<String, String> tags;
+  final Map<String, Object?> extensions;
+}
+
+@immutable
+class GeoPoint {
+  const GeoPoint({
+    required this.lat,
+    required this.lon,
+    this.altM,
+  });
+
+  final double lat;
+  final double lon;
+  final double? altM;
+}
+
+@immutable
+class MarkerRecord {
+  const MarkerRecord({
+    required this.markerId,
+    required this.label,
+    required this.position,
+    required this.revision,
+    required this.updatedTsMs,
+    this.topicId,
+    this.extensions = const <String, Object?>{},
+  });
+
+  final String markerId;
+  final String label;
+  final GeoPoint position;
+  final String? topicId;
+  final int revision;
+  final int updatedTsMs;
+  final Map<String, Object?> extensions;
+}
+
+@immutable
+class MarkerListPage {
+  const MarkerListPage({
+    required this.markers,
+    this.nextCursor,
+  });
+
+  final List<MarkerRecord> markers;
   final String? nextCursor;
 }
 
@@ -713,4 +965,210 @@ class AppEvent {
   final Object? details;
   final Map<String, Object?> extensions;
   final StreamGapDetails? streamGap;
+}
+
+enum OperationKind { query, command }
+
+enum TransportVariant { app, rpc, legacyRpc, extension }
+
+enum TransportFamily { local, rpc, legacy, extension }
+
+@immutable
+class OperationEntry {
+  const OperationEntry({
+    required this.id,
+    required this.group,
+    required this.kind,
+    required this.transportVariant,
+    required this.description,
+    this.aliases = const <String>[],
+    this.requiredCapabilities = const <String>[],
+  });
+
+  final String id;
+  final String group;
+  final OperationKind kind;
+  final TransportVariant transportVariant;
+  final String description;
+  final List<String> aliases;
+  final List<String> requiredCapabilities;
+
+  EnvelopeKind get expectedEnvelopeKind {
+    return switch (kind) {
+      OperationKind.query => EnvelopeKind.query,
+      OperationKind.command => EnvelopeKind.command,
+    };
+  }
+
+  bool acceptsEnvelopeKind(EnvelopeKind kind) {
+    return switch ((this.kind, kind)) {
+      (OperationKind.query, EnvelopeKind.query) => true,
+      (OperationKind.command, EnvelopeKind.command) => true,
+      _ => false,
+    };
+  }
+
+  TransportFamily get transportFamily {
+    return switch (transportVariant) {
+      TransportVariant.app => TransportFamily.local,
+      TransportVariant.rpc => TransportFamily.rpc,
+      TransportVariant.legacyRpc => TransportFamily.legacy,
+      TransportVariant.extension => TransportFamily.extension,
+    };
+  }
+}
+
+@immutable
+class ResolvedOperation {
+  const ResolvedOperation({
+    required this.entry,
+    required this.canonicalId,
+    this.alias,
+  });
+
+  final OperationEntry entry;
+  final String canonicalId;
+  final String? alias;
+}
+
+@immutable
+class OperationRegistry {
+  OperationRegistry({
+    required List<OperationEntry> entries,
+  })  : entries = List<OperationEntry>.unmodifiable(entries),
+        _byId = Map<String, OperationEntry>.unmodifiable({
+          for (final entry in entries) entry.id: entry,
+        }),
+        _aliases = Map<String, String>.unmodifiable({
+          for (final entry in entries)
+            for (final alias in entry.aliases) alias: entry.id,
+        });
+
+  final List<OperationEntry> entries;
+  final Map<String, OperationEntry> _byId;
+  final Map<String, String> _aliases;
+
+  String? canonicalize(String idOrAlias) {
+    if (_byId.containsKey(idOrAlias)) {
+      return idOrAlias;
+    }
+    return _aliases[idOrAlias];
+  }
+
+  OperationEntry? get(String idOrAlias) {
+    final canonical = canonicalize(idOrAlias);
+    if (canonical == null) {
+      return null;
+    }
+    return _byId[canonical];
+  }
+
+  ResolvedOperation? resolve(String idOrAlias) {
+    final canonical = canonicalize(idOrAlias);
+    if (canonical == null) {
+      return null;
+    }
+    final entry = _byId[canonical];
+    if (entry == null) {
+      return null;
+    }
+    return ResolvedOperation(
+      entry: entry,
+      canonicalId: canonical,
+      alias: idOrAlias == canonical ? null : idOrAlias,
+    );
+  }
+
+  Map<String, List<OperationEntry>> entriesByGroup() {
+    final grouped = <String, List<OperationEntry>>{};
+    for (final entry in entries) {
+      grouped.putIfAbsent(entry.group, () => <OperationEntry>[]).add(entry);
+    }
+    return grouped.map(
+      (group, items) =>
+          MapEntry(group, List<OperationEntry>.unmodifiable(items)),
+    );
+  }
+
+  bool supports(String idOrAlias) => canonicalize(idOrAlias) != null;
+}
+
+enum EnvelopeKind { query, command, result, error }
+
+@immutable
+class Envelope {
+  const Envelope({
+    required this.operationId,
+    required this.kind,
+    required this.payload,
+    this.target,
+    this.correlationId,
+    this.timeoutMs,
+    this.extensions = const <String, Object?>{},
+  });
+
+  const Envelope.query(this.operationId, this.payload)
+      : kind = EnvelopeKind.query,
+        target = null,
+        correlationId = null,
+        timeoutMs = null,
+        extensions = const <String, Object?>{};
+
+  const Envelope.command(this.operationId, this.payload)
+      : kind = EnvelopeKind.command,
+        target = null,
+        correlationId = null,
+        timeoutMs = null,
+        extensions = const <String, Object?>{};
+
+  final String operationId;
+  final EnvelopeKind kind;
+  final String? target;
+  final String? correlationId;
+  final int? timeoutMs;
+  final Object? payload;
+  final Map<String, Object?> extensions;
+
+  Envelope copyWith({
+    String? operationId,
+    EnvelopeKind? kind,
+    Object? payload,
+    String? target,
+    bool clearTarget = false,
+    String? correlationId,
+    bool clearCorrelationId = false,
+    int? timeoutMs,
+    bool clearTimeoutMs = false,
+    Map<String, Object?>? extensions,
+  }) {
+    return Envelope(
+      operationId: operationId ?? this.operationId,
+      kind: kind ?? this.kind,
+      payload: payload ?? this.payload,
+      target: clearTarget ? null : (target ?? this.target),
+      correlationId:
+          clearCorrelationId ? null : (correlationId ?? this.correlationId),
+      timeoutMs: clearTimeoutMs ? null : (timeoutMs ?? this.timeoutMs),
+      extensions: extensions ?? this.extensions,
+    );
+  }
+}
+
+@immutable
+class EnvelopeResponse {
+  const EnvelopeResponse({
+    required this.operationId,
+    required this.kind,
+    required this.accepted,
+    required this.payload,
+    this.correlationId,
+    this.extensions = const <String, Object?>{},
+  });
+
+  final String operationId;
+  final EnvelopeKind kind;
+  final bool accepted;
+  final Object? payload;
+  final String? correlationId;
+  final Map<String, Object?> extensions;
 }

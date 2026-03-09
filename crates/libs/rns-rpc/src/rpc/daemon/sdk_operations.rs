@@ -102,6 +102,246 @@ const SDK_OPERATION_SPECS: &[SdkOperationSpec] = &[
         rpc_method: "sdk_identity_bootstrap_v2",
     },
     SdkOperationSpec {
+        id: "app.topic.create",
+        group: "topics",
+        kind: "command",
+        transport_variant: "rpc",
+        description: "Create a topic record for collaborative app flows.",
+        aliases: &["sdk_topic_create_v2"],
+        required_capabilities: &["sdk.capability.topics"],
+        rpc_method: "sdk_topic_create_v2",
+    },
+    SdkOperationSpec {
+        id: "app.topic.get",
+        group: "topics",
+        kind: "query",
+        transport_variant: "rpc",
+        description: "Fetch one topic record by id.",
+        aliases: &["sdk_topic_get_v2"],
+        required_capabilities: &["sdk.capability.topics"],
+        rpc_method: "sdk_topic_get_v2",
+    },
+    SdkOperationSpec {
+        id: "app.topic.list",
+        group: "topics",
+        kind: "query",
+        transport_variant: "rpc",
+        description: "List known topics with cursor pagination.",
+        aliases: &["sdk_topic_list_v2"],
+        required_capabilities: &["sdk.capability.topics"],
+        rpc_method: "sdk_topic_list_v2",
+    },
+    SdkOperationSpec {
+        id: "app.topic.subscribe",
+        group: "topics",
+        kind: "command",
+        transport_variant: "rpc",
+        description: "Subscribe the runtime to topic updates.",
+        aliases: &["sdk_topic_subscribe_v2"],
+        required_capabilities: &["sdk.capability.topic_subscriptions"],
+        rpc_method: "sdk_topic_subscribe_v2",
+    },
+    SdkOperationSpec {
+        id: "app.topic.unsubscribe",
+        group: "topics",
+        kind: "command",
+        transport_variant: "rpc",
+        description: "Remove a topic subscription from the runtime.",
+        aliases: &["sdk_topic_unsubscribe_v2"],
+        required_capabilities: &["sdk.capability.topic_subscriptions"],
+        rpc_method: "sdk_topic_unsubscribe_v2",
+    },
+    SdkOperationSpec {
+        id: "app.topic.publish",
+        group: "topics",
+        kind: "command",
+        transport_variant: "rpc",
+        description: "Publish one payload fanout to a topic.",
+        aliases: &["sdk_topic_publish_v2"],
+        required_capabilities: &["sdk.capability.topic_fanout"],
+        rpc_method: "sdk_topic_publish_v2",
+    },
+    SdkOperationSpec {
+        id: "app.telemetry.query",
+        group: "telemetry",
+        kind: "query",
+        transport_variant: "rpc",
+        description: "Query telemetry points filtered by peer, topic, and time bounds.",
+        aliases: &["sdk_telemetry_query_v2"],
+        required_capabilities: &["sdk.capability.telemetry_query"],
+        rpc_method: "sdk_telemetry_query_v2",
+    },
+    SdkOperationSpec {
+        id: "app.telemetry.subscribe",
+        group: "telemetry",
+        kind: "command",
+        transport_variant: "rpc",
+        description: "Subscribe the runtime to telemetry stream updates.",
+        aliases: &["sdk_telemetry_subscribe_v2"],
+        required_capabilities: &["sdk.capability.telemetry_stream"],
+        rpc_method: "sdk_telemetry_subscribe_v2",
+    },
+    SdkOperationSpec {
+        id: "app.attachment.store",
+        group: "attachments",
+        kind: "command",
+        transport_variant: "rpc",
+        description: "Store one attachment payload with optional topic associations.",
+        aliases: &["sdk_attachment_store_v2"],
+        required_capabilities: &["sdk.capability.attachments"],
+        rpc_method: "sdk_attachment_store_v2",
+    },
+    SdkOperationSpec {
+        id: "app.attachment.get",
+        group: "attachments",
+        kind: "query",
+        transport_variant: "rpc",
+        description: "Fetch one attachment metadata record by id.",
+        aliases: &["sdk_attachment_get_v2"],
+        required_capabilities: &["sdk.capability.attachments"],
+        rpc_method: "sdk_attachment_get_v2",
+    },
+    SdkOperationSpec {
+        id: "app.attachment.list",
+        group: "attachments",
+        kind: "query",
+        transport_variant: "rpc",
+        description: "List stored attachments with topic filtering and cursor pagination.",
+        aliases: &["sdk_attachment_list_v2"],
+        required_capabilities: &["sdk.capability.attachments"],
+        rpc_method: "sdk_attachment_list_v2",
+    },
+    SdkOperationSpec {
+        id: "app.attachment.delete",
+        group: "attachments",
+        kind: "command",
+        transport_variant: "rpc",
+        description: "Delete one stored attachment by id.",
+        aliases: &["sdk_attachment_delete_v2"],
+        required_capabilities: &["sdk.capability.attachment_delete"],
+        rpc_method: "sdk_attachment_delete_v2",
+    },
+    SdkOperationSpec {
+        id: "app.attachment.associate_topic",
+        group: "attachments",
+        kind: "command",
+        transport_variant: "rpc",
+        description: "Associate an existing attachment with an additional topic.",
+        aliases: &["sdk_attachment_associate_topic_v2"],
+        required_capabilities: &["sdk.capability.attachments"],
+        rpc_method: "sdk_attachment_associate_topic_v2",
+    },
+    SdkOperationSpec {
+        id: "app.attachment.upload_start",
+        group: "attachments",
+        kind: "command",
+        transport_variant: "rpc",
+        description: "Open a chunked attachment upload session.",
+        aliases: &["sdk_attachment_upload_start_v2"],
+        required_capabilities: &["sdk.capability.attachment_streaming"],
+        rpc_method: "sdk_attachment_upload_start_v2",
+    },
+    SdkOperationSpec {
+        id: "app.attachment.upload_chunk",
+        group: "attachments",
+        kind: "command",
+        transport_variant: "rpc",
+        description: "Append one chunk to an attachment upload session.",
+        aliases: &["sdk_attachment_upload_chunk_v2"],
+        required_capabilities: &["sdk.capability.attachment_streaming"],
+        rpc_method: "sdk_attachment_upload_chunk_v2",
+    },
+    SdkOperationSpec {
+        id: "app.attachment.upload_commit",
+        group: "attachments",
+        kind: "command",
+        transport_variant: "rpc",
+        description: "Commit a completed attachment upload session.",
+        aliases: &["sdk_attachment_upload_commit_v2"],
+        required_capabilities: &["sdk.capability.attachment_streaming"],
+        rpc_method: "sdk_attachment_upload_commit_v2",
+    },
+    SdkOperationSpec {
+        id: "app.attachment.download_chunk",
+        group: "attachments",
+        kind: "query",
+        transport_variant: "rpc",
+        description: "Read one chunk from a stored attachment payload.",
+        aliases: &["sdk_attachment_download_chunk_v2"],
+        required_capabilities: &["sdk.capability.attachment_streaming"],
+        rpc_method: "sdk_attachment_download_chunk_v2",
+    },
+    SdkOperationSpec {
+        id: "app.marker.create",
+        group: "markers",
+        kind: "command",
+        transport_variant: "rpc",
+        description: "Create a shared marker anchored to an optional topic.",
+        aliases: &["sdk_marker_create_v2"],
+        required_capabilities: &["sdk.capability.markers"],
+        rpc_method: "sdk_marker_create_v2",
+    },
+    SdkOperationSpec {
+        id: "app.marker.list",
+        group: "markers",
+        kind: "query",
+        transport_variant: "rpc",
+        description: "List markers with topic filtering and cursor pagination.",
+        aliases: &["sdk_marker_list_v2"],
+        required_capabilities: &["sdk.capability.markers"],
+        rpc_method: "sdk_marker_list_v2",
+    },
+    SdkOperationSpec {
+        id: "app.marker.update_position",
+        group: "markers",
+        kind: "command",
+        transport_variant: "rpc",
+        description: "Move an existing marker while enforcing revision checks.",
+        aliases: &["sdk_marker_update_position_v2"],
+        required_capabilities: &["sdk.capability.markers"],
+        rpc_method: "sdk_marker_update_position_v2",
+    },
+    SdkOperationSpec {
+        id: "app.marker.delete",
+        group: "markers",
+        kind: "command",
+        transport_variant: "rpc",
+        description: "Delete an existing marker while enforcing revision checks.",
+        aliases: &["sdk_marker_delete_v2"],
+        required_capabilities: &["sdk.capability.markers"],
+        rpc_method: "sdk_marker_delete_v2",
+    },
+    SdkOperationSpec {
+        id: "app.voice.session.open",
+        group: "voice",
+        kind: "command",
+        transport_variant: "rpc",
+        description: "Open a voice signaling session for a peer.",
+        aliases: &["sdk_voice_session_open_v2"],
+        required_capabilities: &["sdk.capability.voice_signaling"],
+        rpc_method: "sdk_voice_session_open_v2",
+    },
+    SdkOperationSpec {
+        id: "app.voice.session.update",
+        group: "voice",
+        kind: "command",
+        transport_variant: "rpc",
+        description: "Advance the state of a voice signaling session.",
+        aliases: &["sdk_voice_session_update_v2"],
+        required_capabilities: &["sdk.capability.voice_signaling"],
+        rpc_method: "sdk_voice_session_update_v2",
+    },
+    SdkOperationSpec {
+        id: "app.voice.session.close",
+        group: "voice",
+        kind: "command",
+        transport_variant: "rpc",
+        description: "Close a voice signaling session.",
+        aliases: &["sdk_voice_session_close_v2"],
+        required_capabilities: &["sdk.capability.voice_signaling"],
+        rpc_method: "sdk_voice_session_close_v2",
+    },
+    SdkOperationSpec {
         id: "app.message.history.list",
         group: "messaging",
         kind: "query",
@@ -154,11 +394,7 @@ impl RpcDaemon {
     }
 
     fn envelope_invalid(&self, request_id: u64, message: impl AsRef<str>) -> RpcResponse {
-        self.sdk_error_response(
-            request_id,
-            "SDK_VALIDATION_INVALID_ARGUMENT",
-            message.as_ref(),
-        )
+        self.sdk_error_response(request_id, "SDK_VALIDATION_INVALID_ARGUMENT", message.as_ref())
     }
 
     fn handle_sdk_operation_registry_v2(
@@ -203,23 +439,27 @@ impl RpcDaemon {
                 method: method.to_owned(),
                 params: Some(params),
             })?,
-            "sdk_identity_announce_now_v2" => self.handle_sdk_identity_announce_now_v2(RpcRequest {
-                id: request_id,
-                method: method.to_owned(),
-                params: Some(params),
-            })?,
-            "sdk_identity_presence_list_v2" => self.handle_sdk_identity_presence_list_v2(
-                RpcRequest {
+            "sdk_identity_announce_now_v2" => {
+                self.handle_sdk_identity_announce_now_v2(RpcRequest {
                     id: request_id,
                     method: method.to_owned(),
                     params: Some(params),
-                },
-            )?,
-            "sdk_identity_contact_list_v2" => self.handle_sdk_identity_contact_list_v2(RpcRequest {
-                id: request_id,
-                method: method.to_owned(),
-                params: Some(params),
-            })?,
+                })?
+            }
+            "sdk_identity_presence_list_v2" => {
+                self.handle_sdk_identity_presence_list_v2(RpcRequest {
+                    id: request_id,
+                    method: method.to_owned(),
+                    params: Some(params),
+                })?
+            }
+            "sdk_identity_contact_list_v2" => {
+                self.handle_sdk_identity_contact_list_v2(RpcRequest {
+                    id: request_id,
+                    method: method.to_owned(),
+                    params: Some(params),
+                })?
+            }
             "sdk_identity_contact_update_v2" => {
                 self.handle_sdk_identity_contact_update_v2(RpcRequest {
                     id: request_id,
@@ -228,6 +468,140 @@ impl RpcDaemon {
                 })?
             }
             "sdk_identity_bootstrap_v2" => self.handle_sdk_identity_bootstrap_v2(RpcRequest {
+                id: request_id,
+                method: method.to_owned(),
+                params: Some(params),
+            })?,
+            "sdk_topic_create_v2" => self.handle_sdk_topic_create_v2(RpcRequest {
+                id: request_id,
+                method: method.to_owned(),
+                params: Some(params),
+            })?,
+            "sdk_topic_get_v2" => self.handle_sdk_topic_get_v2(RpcRequest {
+                id: request_id,
+                method: method.to_owned(),
+                params: Some(params),
+            })?,
+            "sdk_topic_list_v2" => self.handle_sdk_topic_list_v2(RpcRequest {
+                id: request_id,
+                method: method.to_owned(),
+                params: Some(params),
+            })?,
+            "sdk_topic_subscribe_v2" => self.handle_sdk_topic_subscribe_v2(RpcRequest {
+                id: request_id,
+                method: method.to_owned(),
+                params: Some(params),
+            })?,
+            "sdk_topic_unsubscribe_v2" => self.handle_sdk_topic_unsubscribe_v2(RpcRequest {
+                id: request_id,
+                method: method.to_owned(),
+                params: Some(params),
+            })?,
+            "sdk_topic_publish_v2" => self.handle_sdk_topic_publish_v2(RpcRequest {
+                id: request_id,
+                method: method.to_owned(),
+                params: Some(params),
+            })?,
+            "sdk_telemetry_query_v2" => self.handle_sdk_telemetry_query_v2(RpcRequest {
+                id: request_id,
+                method: method.to_owned(),
+                params: Some(params),
+            })?,
+            "sdk_telemetry_subscribe_v2" => self.handle_sdk_telemetry_subscribe_v2(RpcRequest {
+                id: request_id,
+                method: method.to_owned(),
+                params: Some(params),
+            })?,
+            "sdk_attachment_store_v2" => self.handle_sdk_attachment_store_v2(RpcRequest {
+                id: request_id,
+                method: method.to_owned(),
+                params: Some(params),
+            })?,
+            "sdk_attachment_get_v2" => self.handle_sdk_attachment_get_v2(RpcRequest {
+                id: request_id,
+                method: method.to_owned(),
+                params: Some(params),
+            })?,
+            "sdk_attachment_list_v2" => self.handle_sdk_attachment_list_v2(RpcRequest {
+                id: request_id,
+                method: method.to_owned(),
+                params: Some(params),
+            })?,
+            "sdk_attachment_delete_v2" => self.handle_sdk_attachment_delete_v2(RpcRequest {
+                id: request_id,
+                method: method.to_owned(),
+                params: Some(params),
+            })?,
+            "sdk_attachment_associate_topic_v2" => {
+                self.handle_sdk_attachment_associate_topic_v2(RpcRequest {
+                    id: request_id,
+                    method: method.to_owned(),
+                    params: Some(params),
+                })?
+            }
+            "sdk_attachment_upload_start_v2" => {
+                self.handle_sdk_attachment_upload_start_v2(RpcRequest {
+                    id: request_id,
+                    method: method.to_owned(),
+                    params: Some(params),
+                })?
+            }
+            "sdk_attachment_upload_chunk_v2" => {
+                self.handle_sdk_attachment_upload_chunk_v2(RpcRequest {
+                    id: request_id,
+                    method: method.to_owned(),
+                    params: Some(params),
+                })?
+            }
+            "sdk_attachment_upload_commit_v2" => {
+                self.handle_sdk_attachment_upload_commit_v2(RpcRequest {
+                    id: request_id,
+                    method: method.to_owned(),
+                    params: Some(params),
+                })?
+            }
+            "sdk_attachment_download_chunk_v2" => {
+                self.handle_sdk_attachment_download_chunk_v2(RpcRequest {
+                    id: request_id,
+                    method: method.to_owned(),
+                    params: Some(params),
+                })?
+            }
+            "sdk_marker_create_v2" => self.handle_sdk_marker_create_v2(RpcRequest {
+                id: request_id,
+                method: method.to_owned(),
+                params: Some(params),
+            })?,
+            "sdk_marker_list_v2" => self.handle_sdk_marker_list_v2(RpcRequest {
+                id: request_id,
+                method: method.to_owned(),
+                params: Some(params),
+            })?,
+            "sdk_marker_update_position_v2" => {
+                self.handle_sdk_marker_update_position_v2(RpcRequest {
+                    id: request_id,
+                    method: method.to_owned(),
+                    params: Some(params),
+                })?
+            }
+            "sdk_marker_delete_v2" => self.handle_sdk_marker_delete_v2(RpcRequest {
+                id: request_id,
+                method: method.to_owned(),
+                params: Some(params),
+            })?,
+            "sdk_voice_session_open_v2" => self.handle_sdk_voice_session_open_v2(RpcRequest {
+                id: request_id,
+                method: method.to_owned(),
+                params: Some(params),
+            })?,
+            "sdk_voice_session_update_v2" => {
+                self.handle_sdk_voice_session_update_v2(RpcRequest {
+                    id: request_id,
+                    method: method.to_owned(),
+                    params: Some(params),
+                })?
+            }
+            "sdk_voice_session_close_v2" => self.handle_sdk_voice_session_close_v2(RpcRequest {
                 id: request_id,
                 method: method.to_owned(),
                 params: Some(params),
@@ -275,6 +649,42 @@ impl RpcDaemon {
             "sdk_identity_contact_update_v2" | "sdk_identity_bootstrap_v2" => {
                 raw.get("contact").cloned().unwrap_or(JsonValue::Null)
             }
+            "sdk_topic_create_v2" => raw.get("topic").cloned().unwrap_or(JsonValue::Null),
+            "sdk_topic_get_v2" => raw.get("topic").cloned().unwrap_or(JsonValue::Null),
+            "sdk_topic_list_v2" => raw,
+            "sdk_topic_subscribe_v2" => raw,
+            "sdk_topic_unsubscribe_v2" => raw,
+            "sdk_topic_publish_v2" => raw,
+            "sdk_telemetry_query_v2" => raw.get("points").cloned().unwrap_or(JsonValue::Null),
+            "sdk_telemetry_subscribe_v2" => raw,
+            "sdk_attachment_store_v2" => raw.get("attachment").cloned().unwrap_or(JsonValue::Null),
+            "sdk_attachment_get_v2" => raw.get("attachment").cloned().unwrap_or(JsonValue::Null),
+            "sdk_attachment_list_v2" => raw,
+            "sdk_attachment_delete_v2" => raw,
+            "sdk_attachment_associate_topic_v2" => raw,
+            "sdk_attachment_upload_start_v2" => {
+                raw.get("upload").cloned().unwrap_or(JsonValue::Null)
+            }
+            "sdk_attachment_upload_chunk_v2" => {
+                raw.get("upload_chunk").cloned().unwrap_or(JsonValue::Null)
+            }
+            "sdk_attachment_upload_commit_v2" => {
+                raw.get("attachment").cloned().unwrap_or(JsonValue::Null)
+            }
+            "sdk_attachment_download_chunk_v2" => {
+                raw.get("download_chunk").cloned().unwrap_or(JsonValue::Null)
+            }
+            "sdk_marker_create_v2" => raw.get("marker").cloned().unwrap_or(JsonValue::Null),
+            "sdk_marker_list_v2" => raw,
+            "sdk_marker_update_position_v2" => {
+                raw.get("marker").cloned().unwrap_or(JsonValue::Null)
+            }
+            "sdk_marker_delete_v2" => raw,
+            "sdk_voice_session_open_v2" => {
+                raw.get("session_id").cloned().unwrap_or(JsonValue::Null)
+            }
+            "sdk_voice_session_update_v2" => raw.get("state").cloned().unwrap_or(JsonValue::Null),
+            "sdk_voice_session_close_v2" => raw,
             "sdk_command_invoke_v2" => raw.get("response").cloned().unwrap_or(raw),
             _ => raw,
         };
@@ -302,10 +712,7 @@ impl RpcDaemon {
         };
         let kind = parsed.kind.trim().to_ascii_lowercase();
         if !matches!(kind.as_str(), "query" | "command") {
-            return Ok(self.envelope_invalid(
-                request.id,
-                "kind must be query or command",
-            ));
+            return Ok(self.envelope_invalid(request.id, "kind must be query or command"));
         }
 
         let spec = Self::operation_spec(operation_id.as_str());
@@ -338,6 +745,38 @@ impl RpcDaemon {
             "sdk_identity_contact_list_v2" => parsed.payload,
             "sdk_identity_contact_update_v2" => parsed.payload,
             "sdk_identity_bootstrap_v2" => parsed.payload,
+            "sdk_topic_create_v2" => parsed.payload,
+            "sdk_topic_get_v2" => json!({
+                "topic_id": parsed.payload,
+            }),
+            "sdk_topic_list_v2" => parsed.payload,
+            "sdk_topic_subscribe_v2" => parsed.payload,
+            "sdk_topic_unsubscribe_v2" => json!({
+                "topic_id": parsed.payload,
+            }),
+            "sdk_topic_publish_v2" => parsed.payload,
+            "sdk_telemetry_query_v2" => parsed.payload,
+            "sdk_telemetry_subscribe_v2" => parsed.payload,
+            "sdk_attachment_store_v2" => parsed.payload,
+            "sdk_attachment_get_v2" => json!({
+                "attachment_id": parsed.payload,
+            }),
+            "sdk_attachment_list_v2" => parsed.payload,
+            "sdk_attachment_delete_v2" => json!({
+                "attachment_id": parsed.payload,
+            }),
+            "sdk_attachment_associate_topic_v2" => parsed.payload,
+            "sdk_attachment_upload_start_v2" => parsed.payload,
+            "sdk_attachment_upload_chunk_v2" => parsed.payload,
+            "sdk_attachment_upload_commit_v2" => parsed.payload,
+            "sdk_attachment_download_chunk_v2" => parsed.payload,
+            "sdk_marker_create_v2" => parsed.payload,
+            "sdk_marker_list_v2" => parsed.payload,
+            "sdk_marker_update_position_v2" => parsed.payload,
+            "sdk_marker_delete_v2" => parsed.payload,
+            "sdk_voice_session_open_v2" => parsed.payload,
+            "sdk_voice_session_update_v2" => parsed.payload,
+            "sdk_voice_session_close_v2" => parsed.payload,
             "list_messages" => json!({
                 "limit": parsed.payload.get("limit").cloned().unwrap_or(JsonValue::from(100_u64)),
                 "offset": parsed.payload.get("offset").cloned().unwrap_or(JsonValue::from(0_u64)),
@@ -353,7 +792,8 @@ impl RpcDaemon {
             _ => JsonValue::Null,
         };
 
-        let delegated = self.envelope_execute_delegated(request.id, rpc_method, delegated_params)?;
+        let delegated =
+            self.envelope_execute_delegated(request.id, rpc_method, delegated_params)?;
         if let Some(error) = delegated.error {
             return Ok(RpcResponse { id: request.id, result: None, error: Some(error) });
         }
@@ -361,19 +801,14 @@ impl RpcDaemon {
             .result
             .and_then(|value| value.get("response").cloned())
             .unwrap_or(JsonValue::Null);
-        let accepted = delegated_payload
-            .get("accepted")
-            .and_then(JsonValue::as_bool)
-            .unwrap_or(true);
+        let accepted =
+            delegated_payload.get("accepted").and_then(JsonValue::as_bool).unwrap_or(true);
         let extensions = delegated_payload
             .get("extensions")
             .and_then(JsonValue::as_object)
             .cloned()
             .unwrap_or_default();
-        let payload = delegated_payload
-            .get("payload")
-            .cloned()
-            .unwrap_or(delegated_payload);
+        let payload = delegated_payload.get("payload").cloned().unwrap_or(delegated_payload);
         Ok(RpcResponse {
             id: request.id,
             result: Some(json!({

@@ -1,24 +1,29 @@
-use super::discovery::{
-    BootstrapRequest, Contact, ContactPage, ContactUpdate, Identity, PeerDirectoryEntry, Presence,
-    PresencePage,
-};
 use super::capabilities::CapabilitySummary;
 use super::delivery::{
     AttemptDecision, AttemptDisposition, DeliveryAttempt, DeliveryOptions, DeliveryPlan, SendReport,
+};
+use super::discovery::{
+    BootstrapRequest, Contact, ContactPage, ContactUpdate, Identity, PeerDirectoryEntry, Presence,
+    PresencePage,
 };
 use super::envelope::{Envelope, EnvelopeKind, EnvelopeResponse};
 use super::errors::Error;
 #[cfg(feature = "sdk-async")]
 use super::events::{map_event_batch, subscription_cursor, EventBatch, SubscriptionStart};
 use super::operations::{OperationEntry, OperationRegistry, RegistryError};
+use crate::domain::{
+    AttachmentDownloadChunkRequest, AttachmentId, AttachmentListRequest, AttachmentStoreRequest,
+    AttachmentUploadChunkRequest, AttachmentUploadCommitRequest, AttachmentUploadStartRequest,
+    ContactListRequest, ContactUpdateRequest, IdentityBootstrapRequest, MarkerCreateRequest,
+    MarkerDeleteRequest, MarkerListRequest, MarkerUpdatePositionRequest, PresenceListRequest,
+    RemoteCommandRequest, TelemetryQuery, TopicCreateRequest, TopicId, TopicListRequest,
+    TopicPublishRequest, TopicSubscriptionRequest, VoiceSessionId, VoiceSessionOpenRequest,
+    VoiceSessionUpdateRequest,
+};
 use crate::{
     Client as CoreClient, ClientHandle, DeliverySnapshot, DeliveryState as RawDeliveryState,
     EventCursor, LxmfSdk, Profile as CoreProfile, RuntimeSnapshot, RuntimeState, SdkBackend,
     SdkConfig, SendRequest as RawSendRequest, ShutdownMode, StartRequest,
-};
-use crate::domain::{
-    ContactListRequest, ContactUpdateRequest, IdentityBootstrapRequest, PresenceListRequest,
-    RemoteCommandRequest,
 };
 #[cfg(feature = "sdk-async")]
 use crate::{LxmfSdkAsync, SdkBackendAsyncEvents};
@@ -68,6 +73,12 @@ pub struct Config {
     pub event_batch_size: Option<usize>,
     #[serde(default)]
     pub custom_operations: Vec<OperationEntry>,
+}
+
+#[derive(Clone, Debug, Deserialize)]
+struct AttachmentAssociateTopicPayload {
+    attachment_id: AttachmentId,
+    topic_id: TopicId,
 }
 
 impl Config {
@@ -453,10 +464,14 @@ impl<B: SdkBackend> Client<B> {
                     })?
                     .unwrap_or(ShutdownMode::Graceful);
                 self.stop(mode.clone())?;
-                Ok(envelope_result(canonical_id, correlation_id, serde_json::json!({
-                    "accepted": true,
-                    "mode": mode,
-                })))
+                Ok(envelope_result(
+                    canonical_id,
+                    correlation_id,
+                    serde_json::json!({
+                        "accepted": true,
+                        "mode": mode,
+                    }),
+                ))
             }
             "app.runtime.status" => Ok(envelope_result(
                 canonical_id,
@@ -478,16 +493,15 @@ impl<B: SdkBackend> Client<B> {
                 ))
             }
             "app.delivery.status" => {
-                let message_id =
-                    payload
-                        .get("message_id")
-                        .and_then(|value| value.as_str())
-                        .ok_or_else(|| {
-                            invalid_envelope(
-                                "delivery status envelope requires payload.message_id",
-                                canonical_id.as_str(),
-                            )
-                        })?;
+                let message_id = payload
+                    .get("message_id")
+                    .and_then(|value| value.as_str())
+                    .ok_or_else(|| {
+                        invalid_envelope(
+                            "delivery status envelope requires payload.message_id",
+                            canonical_id.as_str(),
+                        )
+                    })?;
                 let status = self.delivery_status(message_id.to_owned())?;
                 Ok(envelope_result(
                     canonical_id,
@@ -528,13 +542,12 @@ impl<B: SdkBackend> Client<B> {
                 ))
             }
             "app.identity.presence.list" => {
-                let req: PresenceListRequest =
-                    serde_json::from_value(payload).map_err(|err| {
-                        invalid_envelope(
-                            format!("invalid presence list payload: {err}"),
-                            canonical_id.as_str(),
-                        )
-                    })?;
+                let req: PresenceListRequest = serde_json::from_value(payload).map_err(|err| {
+                    invalid_envelope(
+                        format!("invalid presence list payload: {err}"),
+                        canonical_id.as_str(),
+                    )
+                })?;
                 let result = self.backend.identity_presence_list(req).map_err(Error::from)?;
                 Ok(envelope_result(
                     canonical_id,
@@ -543,13 +556,12 @@ impl<B: SdkBackend> Client<B> {
                 ))
             }
             "app.contact.list" => {
-                let req: ContactListRequest =
-                    serde_json::from_value(payload).map_err(|err| {
-                        invalid_envelope(
-                            format!("invalid contact list payload: {err}"),
-                            canonical_id.as_str(),
-                        )
-                    })?;
+                let req: ContactListRequest = serde_json::from_value(payload).map_err(|err| {
+                    invalid_envelope(
+                        format!("invalid contact list payload: {err}"),
+                        canonical_id.as_str(),
+                    )
+                })?;
                 let result = self.backend.identity_contact_list(req).map_err(Error::from)?;
                 Ok(envelope_result(
                     canonical_id,
@@ -558,13 +570,12 @@ impl<B: SdkBackend> Client<B> {
                 ))
             }
             "app.contact.update" => {
-                let req: ContactUpdateRequest =
-                    serde_json::from_value(payload).map_err(|err| {
-                        invalid_envelope(
-                            format!("invalid contact update payload: {err}"),
-                            canonical_id.as_str(),
-                        )
-                    })?;
+                let req: ContactUpdateRequest = serde_json::from_value(payload).map_err(|err| {
+                    invalid_envelope(
+                        format!("invalid contact update payload: {err}"),
+                        canonical_id.as_str(),
+                    )
+                })?;
                 let result = self.backend.identity_contact_update(req).map_err(Error::from)?;
                 Ok(envelope_result(
                     canonical_id,
@@ -585,6 +596,366 @@ impl<B: SdkBackend> Client<B> {
                     canonical_id,
                     correlation_id,
                     serde_json::to_value(result).expect("bootstrap should serialize"),
+                ))
+            }
+            "app.attachment.store" => {
+                let req: AttachmentStoreRequest =
+                    serde_json::from_value(payload).map_err(|err| {
+                        invalid_envelope(
+                            format!("invalid attachment store payload: {err}"),
+                            canonical_id.as_str(),
+                        )
+                    })?;
+                let result = self.backend.attachment_store(req).map_err(Error::from)?;
+                Ok(envelope_result(
+                    canonical_id,
+                    correlation_id,
+                    serde_json::to_value(result).expect("attachment store should serialize"),
+                ))
+            }
+            "app.attachment.get" => {
+                let attachment_id: AttachmentId =
+                    serde_json::from_value(payload).map_err(|err| {
+                        invalid_envelope(
+                            format!("invalid attachment get payload: {err}"),
+                            canonical_id.as_str(),
+                        )
+                    })?;
+                let result = self.backend.attachment_get(attachment_id).map_err(Error::from)?;
+                Ok(envelope_result(
+                    canonical_id,
+                    correlation_id,
+                    serde_json::to_value(result).expect("attachment get should serialize"),
+                ))
+            }
+            "app.attachment.list" => {
+                let req: AttachmentListRequest =
+                    serde_json::from_value(payload).map_err(|err| {
+                        invalid_envelope(
+                            format!("invalid attachment list payload: {err}"),
+                            canonical_id.as_str(),
+                        )
+                    })?;
+                let result = self.backend.attachment_list(req).map_err(Error::from)?;
+                Ok(envelope_result(
+                    canonical_id,
+                    correlation_id,
+                    serde_json::to_value(result).expect("attachment list should serialize"),
+                ))
+            }
+            "app.attachment.delete" => {
+                let attachment_id: AttachmentId =
+                    serde_json::from_value(payload).map_err(|err| {
+                        invalid_envelope(
+                            format!("invalid attachment delete payload: {err}"),
+                            canonical_id.as_str(),
+                        )
+                    })?;
+                let result = self.backend.attachment_delete(attachment_id).map_err(Error::from)?;
+                Ok(envelope_result(
+                    canonical_id,
+                    correlation_id,
+                    serde_json::to_value(result).expect("attachment delete should serialize"),
+                ))
+            }
+            "app.attachment.associate_topic" => {
+                let req: AttachmentAssociateTopicPayload = serde_json::from_value(payload)
+                    .map_err(|err| {
+                        invalid_envelope(
+                            format!("invalid attachment associate payload: {err}"),
+                            canonical_id.as_str(),
+                        )
+                    })?;
+                let result = self
+                    .backend
+                    .attachment_associate_topic(req.attachment_id, req.topic_id)
+                    .map_err(Error::from)?;
+                Ok(envelope_result(
+                    canonical_id,
+                    correlation_id,
+                    serde_json::to_value(result).expect("attachment associate should serialize"),
+                ))
+            }
+            "app.attachment.upload_start" => {
+                let req: AttachmentUploadStartRequest =
+                    serde_json::from_value(payload).map_err(|err| {
+                        invalid_envelope(
+                            format!("invalid attachment upload start payload: {err}"),
+                            canonical_id.as_str(),
+                        )
+                    })?;
+                let result = self.backend.attachment_upload_start(req).map_err(Error::from)?;
+                Ok(envelope_result(
+                    canonical_id,
+                    correlation_id,
+                    serde_json::to_value(result)
+                        .expect("attachment upload session should serialize"),
+                ))
+            }
+            "app.attachment.upload_chunk" => {
+                let req: AttachmentUploadChunkRequest =
+                    serde_json::from_value(payload).map_err(|err| {
+                        invalid_envelope(
+                            format!("invalid attachment upload chunk payload: {err}"),
+                            canonical_id.as_str(),
+                        )
+                    })?;
+                let result = self.backend.attachment_upload_chunk(req).map_err(Error::from)?;
+                Ok(envelope_result(
+                    canonical_id,
+                    correlation_id,
+                    serde_json::to_value(result)
+                        .expect("attachment upload chunk ack should serialize"),
+                ))
+            }
+            "app.attachment.upload_commit" => {
+                let req: AttachmentUploadCommitRequest =
+                    serde_json::from_value(payload).map_err(|err| {
+                        invalid_envelope(
+                            format!("invalid attachment upload commit payload: {err}"),
+                            canonical_id.as_str(),
+                        )
+                    })?;
+                let result = self.backend.attachment_upload_commit(req).map_err(Error::from)?;
+                Ok(envelope_result(
+                    canonical_id,
+                    correlation_id,
+                    serde_json::to_value(result)
+                        .expect("attachment upload commit should serialize"),
+                ))
+            }
+            "app.attachment.download_chunk" => {
+                let req: AttachmentDownloadChunkRequest =
+                    serde_json::from_value(payload).map_err(|err| {
+                        invalid_envelope(
+                            format!("invalid attachment download chunk payload: {err}"),
+                            canonical_id.as_str(),
+                        )
+                    })?;
+                let result = self.backend.attachment_download_chunk(req).map_err(Error::from)?;
+                Ok(envelope_result(
+                    canonical_id,
+                    correlation_id,
+                    serde_json::to_value(result)
+                        .expect("attachment download chunk should serialize"),
+                ))
+            }
+            "app.topic.create" => {
+                let req: TopicCreateRequest = serde_json::from_value(payload).map_err(|err| {
+                    invalid_envelope(
+                        format!("invalid topic create payload: {err}"),
+                        canonical_id.as_str(),
+                    )
+                })?;
+                let result = self.backend.topic_create(req).map_err(Error::from)?;
+                Ok(envelope_result(
+                    canonical_id,
+                    correlation_id,
+                    serde_json::to_value(result).expect("topic create should serialize"),
+                ))
+            }
+            "app.topic.get" => {
+                let topic_id: TopicId = serde_json::from_value(payload).map_err(|err| {
+                    invalid_envelope(
+                        format!("invalid topic get payload: {err}"),
+                        canonical_id.as_str(),
+                    )
+                })?;
+                let result = self.backend.topic_get(topic_id).map_err(Error::from)?;
+                Ok(envelope_result(
+                    canonical_id,
+                    correlation_id,
+                    serde_json::to_value(result).expect("topic get should serialize"),
+                ))
+            }
+            "app.topic.list" => {
+                let req: TopicListRequest = serde_json::from_value(payload).map_err(|err| {
+                    invalid_envelope(
+                        format!("invalid topic list payload: {err}"),
+                        canonical_id.as_str(),
+                    )
+                })?;
+                let result = self.backend.topic_list(req).map_err(Error::from)?;
+                Ok(envelope_result(
+                    canonical_id,
+                    correlation_id,
+                    serde_json::to_value(result).expect("topic list should serialize"),
+                ))
+            }
+            "app.topic.subscribe" => {
+                let req: TopicSubscriptionRequest =
+                    serde_json::from_value(payload).map_err(|err| {
+                        invalid_envelope(
+                            format!("invalid topic subscribe payload: {err}"),
+                            canonical_id.as_str(),
+                        )
+                    })?;
+                let result = self.backend.topic_subscribe(req).map_err(Error::from)?;
+                Ok(envelope_result(
+                    canonical_id,
+                    correlation_id,
+                    serde_json::to_value(result).expect("topic subscribe should serialize"),
+                ))
+            }
+            "app.topic.unsubscribe" => {
+                let topic_id: TopicId = serde_json::from_value(payload).map_err(|err| {
+                    invalid_envelope(
+                        format!("invalid topic unsubscribe payload: {err}"),
+                        canonical_id.as_str(),
+                    )
+                })?;
+                let result = self.backend.topic_unsubscribe(topic_id).map_err(Error::from)?;
+                Ok(envelope_result(
+                    canonical_id,
+                    correlation_id,
+                    serde_json::to_value(result).expect("topic unsubscribe should serialize"),
+                ))
+            }
+            "app.topic.publish" => {
+                let req: TopicPublishRequest = serde_json::from_value(payload).map_err(|err| {
+                    invalid_envelope(
+                        format!("invalid topic publish payload: {err}"),
+                        canonical_id.as_str(),
+                    )
+                })?;
+                let result = self.backend.topic_publish(req).map_err(Error::from)?;
+                Ok(envelope_result(
+                    canonical_id,
+                    correlation_id,
+                    serde_json::to_value(result).expect("topic publish should serialize"),
+                ))
+            }
+            "app.telemetry.query" => {
+                let req: TelemetryQuery = serde_json::from_value(payload).map_err(|err| {
+                    invalid_envelope(
+                        format!("invalid telemetry query payload: {err}"),
+                        canonical_id.as_str(),
+                    )
+                })?;
+                let result = self.backend.telemetry_query(req).map_err(Error::from)?;
+                Ok(envelope_result(
+                    canonical_id,
+                    correlation_id,
+                    serde_json::to_value(result).expect("telemetry query should serialize"),
+                ))
+            }
+            "app.telemetry.subscribe" => {
+                let req: TelemetryQuery = serde_json::from_value(payload).map_err(|err| {
+                    invalid_envelope(
+                        format!("invalid telemetry subscribe payload: {err}"),
+                        canonical_id.as_str(),
+                    )
+                })?;
+                let result = self.backend.telemetry_subscribe(req).map_err(Error::from)?;
+                Ok(envelope_result(
+                    canonical_id,
+                    correlation_id,
+                    serde_json::to_value(result).expect("telemetry subscribe should serialize"),
+                ))
+            }
+            "app.marker.create" => {
+                let req: MarkerCreateRequest = serde_json::from_value(payload).map_err(|err| {
+                    invalid_envelope(
+                        format!("invalid marker create payload: {err}"),
+                        canonical_id.as_str(),
+                    )
+                })?;
+                let result = self.backend.marker_create(req).map_err(Error::from)?;
+                Ok(envelope_result(
+                    canonical_id,
+                    correlation_id,
+                    serde_json::to_value(result).expect("marker create should serialize"),
+                ))
+            }
+            "app.marker.list" => {
+                let req: MarkerListRequest = serde_json::from_value(payload).map_err(|err| {
+                    invalid_envelope(
+                        format!("invalid marker list payload: {err}"),
+                        canonical_id.as_str(),
+                    )
+                })?;
+                let result = self.backend.marker_list(req).map_err(Error::from)?;
+                Ok(envelope_result(
+                    canonical_id,
+                    correlation_id,
+                    serde_json::to_value(result).expect("marker list should serialize"),
+                ))
+            }
+            "app.marker.update_position" => {
+                let req: MarkerUpdatePositionRequest =
+                    serde_json::from_value(payload).map_err(|err| {
+                        invalid_envelope(
+                            format!("invalid marker update payload: {err}"),
+                            canonical_id.as_str(),
+                        )
+                    })?;
+                let result = self.backend.marker_update_position(req).map_err(Error::from)?;
+                Ok(envelope_result(
+                    canonical_id,
+                    correlation_id,
+                    serde_json::to_value(result).expect("marker update should serialize"),
+                ))
+            }
+            "app.marker.delete" => {
+                let req: MarkerDeleteRequest = serde_json::from_value(payload).map_err(|err| {
+                    invalid_envelope(
+                        format!("invalid marker delete payload: {err}"),
+                        canonical_id.as_str(),
+                    )
+                })?;
+                let result = self.backend.marker_delete(req).map_err(Error::from)?;
+                Ok(envelope_result(
+                    canonical_id,
+                    correlation_id,
+                    serde_json::to_value(result).expect("marker delete should serialize"),
+                ))
+            }
+            "app.voice.session.open" => {
+                let req: VoiceSessionOpenRequest =
+                    serde_json::from_value(payload).map_err(|err| {
+                        invalid_envelope(
+                            format!("invalid voice session open payload: {err}"),
+                            canonical_id.as_str(),
+                        )
+                    })?;
+                let session_id = self.backend.voice_session_open(req).map_err(Error::from)?;
+                Ok(envelope_result(
+                    canonical_id,
+                    correlation_id,
+                    serde_json::to_value(session_id).expect("voice session id should serialize"),
+                ))
+            }
+            "app.voice.session.update" => {
+                let req: VoiceSessionUpdateRequest =
+                    serde_json::from_value(payload).map_err(|err| {
+                        invalid_envelope(
+                            format!("invalid voice session update payload: {err}"),
+                            canonical_id.as_str(),
+                        )
+                    })?;
+                let state = self.backend.voice_session_update(req).map_err(Error::from)?;
+                Ok(envelope_result(
+                    canonical_id,
+                    correlation_id,
+                    serde_json::to_value(state).expect("voice state should serialize"),
+                ))
+            }
+            "app.voice.session.close" => {
+                let session_id: VoiceSessionId =
+                    serde_json::from_value(payload).map_err(|err| {
+                        invalid_envelope(
+                            format!("invalid voice session close payload: {err}"),
+                            canonical_id.as_str(),
+                        )
+                    })?;
+                self.backend.voice_session_close(session_id.clone()).map_err(Error::from)?;
+                Ok(envelope_result(
+                    canonical_id,
+                    correlation_id,
+                    serde_json::json!({
+                        "accepted": true,
+                        "session_id": session_id.0,
+                    }),
                 ))
             }
             _ if matches!(entry.kind, super::operations::OperationKind::Query) => self
@@ -843,19 +1214,20 @@ impl<B: SdkBackend> Client<B> {
         }
 
         for presence in self.collect_presence(limit)? {
-            let entry = entries.entry(presence.peer_id.clone()).or_insert_with(|| PeerDirectoryEntry {
-                peer_id: presence.peer_id.clone(),
-                display_name: presence.display_name.clone(),
-                name_source: presence.name_source.clone(),
-                trust_level: presence.trust_level.clone(),
-                bootstrap: presence.bootstrap.unwrap_or(false),
-                online: true,
-                last_seen_ts_ms: Some(presence.last_seen_ts_ms),
-                first_seen_ts_ms: Some(presence.first_seen_ts_ms),
-                seen_count: presence.seen_count,
-                metadata: BTreeMap::new(),
-                extensions: presence.extensions.clone(),
-            });
+            let entry =
+                entries.entry(presence.peer_id.clone()).or_insert_with(|| PeerDirectoryEntry {
+                    peer_id: presence.peer_id.clone(),
+                    display_name: presence.display_name.clone(),
+                    name_source: presence.name_source.clone(),
+                    trust_level: presence.trust_level.clone(),
+                    bootstrap: presence.bootstrap.unwrap_or(false),
+                    online: true,
+                    last_seen_ts_ms: Some(presence.last_seen_ts_ms),
+                    first_seen_ts_ms: Some(presence.first_seen_ts_ms),
+                    seen_count: presence.seen_count,
+                    metadata: BTreeMap::new(),
+                    extensions: presence.extensions.clone(),
+                });
             entry.online = true;
             entry.last_seen_ts_ms = Some(presence.last_seen_ts_ms);
             entry.first_seen_ts_ms = Some(presence.first_seen_ts_ms);
@@ -1097,10 +1469,7 @@ fn map_delivery_snapshot(snapshot: DeliverySnapshot) -> DeliveryStatus {
 
 fn invalid_envelope(message: impl Into<String>, operation_id: impl Into<String>) -> Error {
     let mut details = BTreeMap::new();
-    details.insert(
-        "operation_id".to_owned(),
-        JsonValue::String(operation_id.into()),
-    );
+    details.insert("operation_id".to_owned(), JsonValue::String(operation_id.into()));
     Error {
         code: super::errors::ErrorCode::ValidationInvalidArgument,
         category: super::errors::ErrorCategory::Validation,
@@ -1163,8 +1532,10 @@ mod tests {
         shutdown_results: Mutex<VecDeque<Result<Ack, SdkError>>>,
         remote_command_results:
             Mutex<VecDeque<Result<crate::domain::RemoteCommandResponse, SdkError>>>,
-        envelope_results:
-            Mutex<VecDeque<Result<crate::app::EnvelopeResponse, SdkError>>>,
+        envelope_results: Mutex<VecDeque<Result<crate::app::EnvelopeResponse, SdkError>>>,
+        voice_open_results: Mutex<VecDeque<Result<crate::domain::VoiceSessionId, SdkError>>>,
+        voice_update_results: Mutex<VecDeque<Result<crate::domain::VoiceSessionState, SdkError>>>,
+        voice_close_results: Mutex<VecDeque<Result<Ack, SdkError>>>,
     }
 
     impl MockBackend {
@@ -1179,6 +1550,9 @@ mod tests {
                 shutdown_results: Mutex::new(VecDeque::new()),
                 remote_command_results: Mutex::new(VecDeque::new()),
                 envelope_results: Mutex::new(VecDeque::new()),
+                voice_open_results: Mutex::new(VecDeque::new()),
+                voice_update_results: Mutex::new(VecDeque::new()),
+                voice_close_results: Mutex::new(VecDeque::new()),
             }
         }
 
@@ -1202,17 +1576,26 @@ mod tests {
             &self,
             result: Result<crate::domain::RemoteCommandResponse, SdkError>,
         ) {
-            self.remote_command_results
-                .lock()
-                .expect("remote command results")
-                .push_back(result);
+            self.remote_command_results.lock().expect("remote command results").push_back(result);
         }
 
-        fn queue_envelope_result(
-            &self,
-            result: Result<crate::app::EnvelopeResponse, SdkError>,
-        ) {
+        fn queue_envelope_result(&self, result: Result<crate::app::EnvelopeResponse, SdkError>) {
             self.envelope_results.lock().expect("envelope results").push_back(result);
+        }
+
+        fn queue_voice_open_result(&self, result: Result<crate::domain::VoiceSessionId, SdkError>) {
+            self.voice_open_results.lock().expect("voice open results").push_back(result);
+        }
+
+        fn queue_voice_update_result(
+            &self,
+            result: Result<crate::domain::VoiceSessionState, SdkError>,
+        ) {
+            self.voice_update_results.lock().expect("voice update results").push_back(result);
+        }
+
+        fn queue_voice_close_result(&self, result: Result<Ack, SdkError>) {
+            self.voice_close_results.lock().expect("voice close results").push_back(result);
         }
     }
 
@@ -1375,10 +1758,9 @@ mod tests {
                         )],
                         next_cursor: None,
                     },
-                    _ => crate::domain::ContactListResult {
-                        contacts: Vec::new(),
-                        next_cursor: None,
-                    },
+                    _ => {
+                        crate::domain::ContactListResult { contacts: Vec::new(), next_cursor: None }
+                    }
                 });
             }
             Ok(crate::domain::ContactListResult {
@@ -1429,20 +1811,13 @@ mod tests {
                         peers: vec![bob],
                         next_cursor: Some("presence:1".to_owned()),
                     },
-                    Some("presence:1") => crate::domain::PresenceListResult {
-                        peers: vec![eve],
-                        next_cursor: None,
-                    },
-                    _ => crate::domain::PresenceListResult {
-                        peers: Vec::new(),
-                        next_cursor: None,
-                    },
+                    Some("presence:1") => {
+                        crate::domain::PresenceListResult { peers: vec![eve], next_cursor: None }
+                    }
+                    _ => crate::domain::PresenceListResult { peers: Vec::new(), next_cursor: None },
                 });
             }
-            Ok(crate::domain::PresenceListResult {
-                peers: vec![bob, eve],
-                next_cursor: None,
-            })
+            Ok(crate::domain::PresenceListResult { peers: vec![bob, eve], next_cursor: None })
         }
 
         fn identity_contact_update(
@@ -1475,6 +1850,295 @@ mod tests {
             })
         }
 
+        fn attachment_store(
+            &self,
+            req: crate::domain::AttachmentStoreRequest,
+        ) -> Result<crate::domain::AttachmentMeta, SdkError> {
+            Ok(crate::domain::AttachmentMeta {
+                attachment_id: crate::domain::AttachmentId("attachment-1".to_owned()),
+                name: req.name,
+                content_type: req.content_type,
+                byte_len: 11,
+                checksum_sha256: "64ec88ca00b268e5ba1a35678a1b5316d212f4f366b2477232534a8aeca37f3c"
+                    .to_owned(),
+                created_ts_ms: 650,
+                expires_ts_ms: req.expires_ts_ms,
+                topic_ids: req.topic_ids,
+                extensions: req.extensions,
+            })
+        }
+
+        fn attachment_get(
+            &self,
+            attachment_id: crate::domain::AttachmentId,
+        ) -> Result<Option<crate::domain::AttachmentMeta>, SdkError> {
+            Ok(Some(crate::domain::AttachmentMeta {
+                attachment_id,
+                name: "sample.txt".to_owned(),
+                content_type: "text/plain".to_owned(),
+                byte_len: 11,
+                checksum_sha256: "64ec88ca00b268e5ba1a35678a1b5316d212f4f366b2477232534a8aeca37f3c"
+                    .to_owned(),
+                created_ts_ms: 651,
+                expires_ts_ms: None,
+                topic_ids: vec![crate::domain::TopicId("topic-1".to_owned())],
+                extensions: BTreeMap::new(),
+            }))
+        }
+
+        fn attachment_list(
+            &self,
+            req: crate::domain::AttachmentListRequest,
+        ) -> Result<crate::domain::AttachmentListResult, SdkError> {
+            Ok(crate::domain::AttachmentListResult {
+                attachments: vec![crate::domain::AttachmentMeta {
+                    attachment_id: crate::domain::AttachmentId("attachment-1".to_owned()),
+                    name: "sample.txt".to_owned(),
+                    content_type: "text/plain".to_owned(),
+                    byte_len: 11,
+                    checksum_sha256:
+                        "64ec88ca00b268e5ba1a35678a1b5316d212f4f366b2477232534a8aeca37f3c"
+                            .to_owned(),
+                    created_ts_ms: 652,
+                    expires_ts_ms: None,
+                    topic_ids: req.topic_id.into_iter().collect(),
+                    extensions: BTreeMap::new(),
+                }],
+                next_cursor: None,
+            })
+        }
+
+        fn attachment_delete(
+            &self,
+            _attachment_id: crate::domain::AttachmentId,
+        ) -> Result<Ack, SdkError> {
+            Ok(Ack { accepted: true, revision: None })
+        }
+
+        fn attachment_upload_start(
+            &self,
+            _req: crate::domain::AttachmentUploadStartRequest,
+        ) -> Result<crate::domain::AttachmentUploadSession, SdkError> {
+            Ok(crate::domain::AttachmentUploadSession {
+                upload_id: crate::domain::AttachmentUploadId("upload-1".to_owned()),
+                attachment_id: crate::domain::AttachmentId("attachment-2".to_owned()),
+                chunk_size_hint: 65_536,
+                next_offset: 0,
+            })
+        }
+
+        fn attachment_upload_chunk(
+            &self,
+            req: crate::domain::AttachmentUploadChunkRequest,
+        ) -> Result<crate::domain::AttachmentUploadChunkAck, SdkError> {
+            let complete = req.offset.saturating_add(5) >= 11;
+            Ok(crate::domain::AttachmentUploadChunkAck {
+                accepted: true,
+                next_offset: req.offset.saturating_add(5),
+                complete,
+            })
+        }
+
+        fn attachment_upload_commit(
+            &self,
+            req: crate::domain::AttachmentUploadCommitRequest,
+        ) -> Result<crate::domain::AttachmentMeta, SdkError> {
+            Ok(crate::domain::AttachmentMeta {
+                attachment_id: crate::domain::AttachmentId(
+                    req.upload_id.0.replace("upload", "attachment"),
+                ),
+                name: "chunked.bin".to_owned(),
+                content_type: "application/octet-stream".to_owned(),
+                byte_len: 11,
+                checksum_sha256: "64ec88ca00b268e5ba1a35678a1b5316d212f4f366b2477232534a8aeca37f3c"
+                    .to_owned(),
+                created_ts_ms: 653,
+                expires_ts_ms: None,
+                topic_ids: vec![crate::domain::TopicId("topic-1".to_owned())],
+                extensions: req.extensions,
+            })
+        }
+
+        fn attachment_download_chunk(
+            &self,
+            req: crate::domain::AttachmentDownloadChunkRequest,
+        ) -> Result<crate::domain::AttachmentDownloadChunk, SdkError> {
+            let done = req.offset > 0;
+            Ok(crate::domain::AttachmentDownloadChunk {
+                attachment_id: req.attachment_id,
+                offset: req.offset,
+                next_offset: if done { 11 } else { 5 },
+                total_size: 11,
+                done,
+                checksum_sha256: "64ec88ca00b268e5ba1a35678a1b5316d212f4f366b2477232534a8aeca37f3c"
+                    .to_owned(),
+                bytes_base64: if done { "IHdvcmxk".to_owned() } else { "aGVsbG8=".to_owned() },
+            })
+        }
+
+        fn attachment_associate_topic(
+            &self,
+            _attachment_id: crate::domain::AttachmentId,
+            _topic_id: crate::domain::TopicId,
+        ) -> Result<Ack, SdkError> {
+            Ok(Ack { accepted: true, revision: None })
+        }
+
+        fn topic_create(
+            &self,
+            req: crate::domain::TopicCreateRequest,
+        ) -> Result<crate::domain::TopicRecord, SdkError> {
+            Ok(crate::domain::TopicRecord {
+                topic_id: crate::domain::TopicId("topic-1".to_owned()),
+                topic_path: req.topic_path,
+                created_ts_ms: 700,
+                metadata: req.metadata,
+                extensions: req.extensions,
+            })
+        }
+
+        fn topic_get(
+            &self,
+            topic_id: crate::domain::TopicId,
+        ) -> Result<Option<crate::domain::TopicRecord>, SdkError> {
+            Ok(Some(crate::domain::TopicRecord {
+                topic_id,
+                topic_path: Some(crate::domain::TopicPath("ops/alerts".to_owned())),
+                created_ts_ms: 700,
+                metadata: BTreeMap::from([("kind".to_owned(), serde_json::json!("ops"))]),
+                extensions: BTreeMap::new(),
+            }))
+        }
+
+        fn topic_list(
+            &self,
+            req: crate::domain::TopicListRequest,
+        ) -> Result<crate::domain::TopicListResult, SdkError> {
+            Ok(match req.cursor.as_deref() {
+                Some("topic:1") => crate::domain::TopicListResult {
+                    topics: vec![crate::domain::TopicRecord {
+                        topic_id: crate::domain::TopicId("topic-2".to_owned()),
+                        topic_path: Some(crate::domain::TopicPath("ops/secondary".to_owned())),
+                        created_ts_ms: 701,
+                        metadata: BTreeMap::new(),
+                        extensions: BTreeMap::new(),
+                    }],
+                    next_cursor: None,
+                },
+                _ => crate::domain::TopicListResult {
+                    topics: vec![crate::domain::TopicRecord {
+                        topic_id: crate::domain::TopicId("topic-1".to_owned()),
+                        topic_path: Some(crate::domain::TopicPath("ops/alerts".to_owned())),
+                        created_ts_ms: 700,
+                        metadata: BTreeMap::from([("kind".to_owned(), serde_json::json!("ops"))]),
+                        extensions: BTreeMap::new(),
+                    }],
+                    next_cursor: Some("topic:1".to_owned()),
+                },
+            })
+        }
+
+        fn topic_subscribe(
+            &self,
+            req: crate::domain::TopicSubscriptionRequest,
+        ) -> Result<Ack, SdkError> {
+            let _ = req;
+            Ok(Ack { accepted: true, revision: None })
+        }
+
+        fn topic_unsubscribe(&self, _topic_id: crate::domain::TopicId) -> Result<Ack, SdkError> {
+            Ok(Ack { accepted: true, revision: None })
+        }
+
+        fn topic_publish(&self, req: crate::domain::TopicPublishRequest) -> Result<Ack, SdkError> {
+            let _ = req;
+            Ok(Ack { accepted: true, revision: None })
+        }
+
+        fn telemetry_query(
+            &self,
+            query: crate::domain::TelemetryQuery,
+        ) -> Result<Vec<crate::domain::TelemetryPoint>, SdkError> {
+            Ok(vec![crate::domain::TelemetryPoint {
+                ts_ms: query.from_ts_ms.unwrap_or(900),
+                key: "topic_publish".to_owned(),
+                value: serde_json::json!({ "message": "hello topic" }),
+                unit: None,
+                tags: BTreeMap::from([
+                    (
+                        "topic_id".to_owned(),
+                        query.topic_id.map(|value| value.0).unwrap_or_else(|| "topic-1".to_owned()),
+                    ),
+                    ("peer_id".to_owned(), query.peer_id.unwrap_or_else(|| "node-b".to_owned())),
+                ]),
+                extensions: query.extensions,
+            }])
+        }
+
+        fn telemetry_subscribe(
+            &self,
+            _query: crate::domain::TelemetryQuery,
+        ) -> Result<Ack, SdkError> {
+            Ok(Ack { accepted: true, revision: None })
+        }
+
+        fn marker_create(
+            &self,
+            req: crate::domain::MarkerCreateRequest,
+        ) -> Result<crate::domain::MarkerRecord, SdkError> {
+            Ok(crate::domain::MarkerRecord {
+                marker_id: crate::domain::MarkerId("marker-1".to_owned()),
+                label: req.label,
+                position: req.position,
+                topic_id: req.topic_id,
+                revision: 1,
+                updated_ts_ms: 950,
+                extensions: req.extensions,
+            })
+        }
+
+        fn marker_list(
+            &self,
+            req: crate::domain::MarkerListRequest,
+        ) -> Result<crate::domain::MarkerListResult, SdkError> {
+            Ok(crate::domain::MarkerListResult {
+                markers: vec![crate::domain::MarkerRecord {
+                    marker_id: crate::domain::MarkerId("marker-1".to_owned()),
+                    label: "Alpha".to_owned(),
+                    position: crate::domain::GeoPoint {
+                        lat: 35.0,
+                        lon: -115.0,
+                        alt_m: Some(1200.0),
+                    },
+                    topic_id: req.topic_id.or(Some(crate::domain::TopicId("topic-1".to_owned()))),
+                    revision: 2,
+                    updated_ts_ms: 960,
+                    extensions: BTreeMap::new(),
+                }],
+                next_cursor: None,
+            })
+        }
+
+        fn marker_update_position(
+            &self,
+            req: crate::domain::MarkerUpdatePositionRequest,
+        ) -> Result<crate::domain::MarkerRecord, SdkError> {
+            Ok(crate::domain::MarkerRecord {
+                marker_id: req.marker_id,
+                label: "Alpha".to_owned(),
+                position: req.position,
+                topic_id: Some(crate::domain::TopicId("topic-1".to_owned())),
+                revision: req.expected_revision.saturating_add(1),
+                updated_ts_ms: 970,
+                extensions: req.extensions,
+            })
+        }
+
+        fn marker_delete(&self, req: crate::domain::MarkerDeleteRequest) -> Result<Ack, SdkError> {
+            let _ = req;
+            Ok(Ack { accepted: true, revision: None })
+        }
+
         fn command_invoke(
             &self,
             req: crate::domain::RemoteCommandRequest,
@@ -1500,11 +2164,8 @@ mod tests {
             &self,
             envelope: crate::app::Envelope,
         ) -> Result<crate::app::EnvelopeResponse, SdkError> {
-            self.envelope_results
-                .lock()
-                .expect("envelope results")
-                .pop_front()
-                .unwrap_or_else(|| {
+            self.envelope_results.lock().expect("envelope results").pop_front().unwrap_or_else(
+                || {
                     Ok(crate::app::EnvelopeResponse {
                         operation_id: envelope.operation_id,
                         kind: crate::app::EnvelopeKind::Result,
@@ -1516,7 +2177,41 @@ mod tests {
                         }),
                         extensions: envelope.extensions,
                     })
-                })
+                },
+            )
+        }
+
+        fn voice_session_open(
+            &self,
+            _req: crate::domain::VoiceSessionOpenRequest,
+        ) -> Result<crate::domain::VoiceSessionId, SdkError> {
+            self.voice_open_results
+                .lock()
+                .expect("voice open results")
+                .pop_front()
+                .unwrap_or_else(|| Ok(crate::domain::VoiceSessionId("voice-1".to_owned())))
+        }
+
+        fn voice_session_update(
+            &self,
+            _req: crate::domain::VoiceSessionUpdateRequest,
+        ) -> Result<crate::domain::VoiceSessionState, SdkError> {
+            self.voice_update_results
+                .lock()
+                .expect("voice update results")
+                .pop_front()
+                .unwrap_or_else(|| Ok(crate::domain::VoiceSessionState::Active))
+        }
+
+        fn voice_session_close(
+            &self,
+            _session_id: crate::domain::VoiceSessionId,
+        ) -> Result<Ack, SdkError> {
+            self.voice_close_results
+                .lock()
+                .expect("voice close results")
+                .pop_front()
+                .unwrap_or(Ok(Ack { accepted: true, revision: None }))
         }
     }
 
@@ -1609,9 +2304,8 @@ mod tests {
     #[test]
     fn execute_envelope_routes_runtime_status_locally() {
         let app = Client::new(MockBackend::new());
-        let response = app
-            .query("app.runtime.status", serde_json::json!({}))
-            .expect("runtime status");
+        let response =
+            app.query("app.runtime.status", serde_json::json!({})).expect("runtime status");
         assert_eq!(response.kind, EnvelopeKind::Result);
         assert_eq!(response.operation_id.as_str(), "app.runtime.status");
         assert_eq!(response.payload.get("state").and_then(|value| value.as_str()), Some("new"));
@@ -1620,15 +2314,12 @@ mod tests {
     #[test]
     fn execute_envelope_routes_identity_queries_to_backend() {
         let app = Client::new(MockBackend::new());
-        let response = app
-            .query("app.identity.list", serde_json::json!({}))
-            .expect("identity list");
+        let response =
+            app.query("app.identity.list", serde_json::json!({})).expect("identity list");
         let identities = response.payload.as_array().expect("identity array");
         assert_eq!(identities.len(), 1);
         assert_eq!(
-            identities[0]
-                .get("display_name")
-                .and_then(|value| value.as_str()),
+            identities[0].get("display_name").and_then(|value| value.as_str()),
             Some("Alice")
         );
     }
@@ -1648,9 +2339,8 @@ mod tests {
     fn execute_envelope_routes_discovery_operations_locally() {
         let app = Client::new(MockBackend::new());
 
-        let announce = app
-            .command("sdk_identity_announce_now_v2", serde_json::json!({}))
-            .expect("announce");
+        let announce =
+            app.command("sdk_identity_announce_now_v2", serde_json::json!({})).expect("announce");
         assert_eq!(announce.operation_id.as_str(), "app.identity.announce");
         assert_eq!(announce.payload["accepted"], json!(true));
 
@@ -1685,6 +2375,251 @@ mod tests {
     }
 
     #[test]
+    fn execute_envelope_routes_topic_operations_locally() {
+        let app = Client::new(MockBackend::new());
+
+        let topic = app
+            .command(
+                "sdk_topic_create_v2",
+                serde_json::json!({
+                    "topic_path": "ops/alerts",
+                    "metadata": { "kind": "ops" }
+                }),
+            )
+            .expect("topic create");
+        assert_eq!(topic.operation_id.as_str(), "app.topic.create");
+        assert_eq!(topic.payload["topic_id"], json!("topic-1"));
+
+        let fetched =
+            app.query("sdk_topic_get_v2", serde_json::json!("topic-1")).expect("topic get");
+        assert_eq!(fetched.operation_id.as_str(), "app.topic.get");
+        assert_eq!(fetched.payload["topic_path"], json!("ops/alerts"));
+
+        let listed =
+            app.query("app.topic.list", serde_json::json!({ "limit": 10 })).expect("topic list");
+        assert_eq!(listed.payload["topics"].as_array().expect("topic list").len(), 1);
+        assert_eq!(listed.payload["next_cursor"], json!("topic:1"));
+
+        let subscribed = app
+            .command("sdk_topic_subscribe_v2", serde_json::json!({ "topic_id": "topic-1" }))
+            .expect("topic subscribe");
+        assert_eq!(subscribed.operation_id.as_str(), "app.topic.subscribe");
+        assert_eq!(subscribed.payload["accepted"], json!(true));
+
+        let published = app
+            .command(
+                "app.topic.publish",
+                serde_json::json!({
+                    "topic_id": "topic-1",
+                    "payload": { "message": "hello topic" },
+                    "correlation_id": "topic-corr-1"
+                }),
+            )
+            .expect("topic publish");
+        assert_eq!(published.operation_id.as_str(), "app.topic.publish");
+        assert_eq!(published.payload["accepted"], json!(true));
+    }
+
+    #[test]
+    fn execute_envelope_routes_telemetry_operations_locally() {
+        let app = Client::new(MockBackend::new());
+
+        let telemetry = app
+            .query(
+                "sdk_telemetry_query_v2",
+                serde_json::json!({
+                    "topic_id": "topic-1",
+                    "peer_id": "node-b",
+                    "from_ts_ms": 100,
+                    "limit": 10,
+                }),
+            )
+            .expect("telemetry query");
+        assert_eq!(telemetry.operation_id.as_str(), "app.telemetry.query");
+        assert_eq!(telemetry.payload.as_array().expect("telemetry rows").len(), 1);
+        assert_eq!(telemetry.payload[0]["tags"]["topic_id"], json!("topic-1"));
+
+        let subscribed = app
+            .command(
+                "app.telemetry.subscribe",
+                serde_json::json!({
+                    "topic_id": "topic-1",
+                    "from_ts_ms": 100,
+                    "limit": 20,
+                }),
+            )
+            .expect("telemetry subscribe");
+        assert_eq!(subscribed.operation_id.as_str(), "app.telemetry.subscribe");
+        assert_eq!(subscribed.payload["accepted"], json!(true));
+    }
+
+    #[test]
+    fn execute_envelope_routes_attachment_operations_locally() {
+        let app = Client::new(MockBackend::new());
+
+        let stored = app
+            .command(
+                "sdk_attachment_store_v2",
+                serde_json::json!({
+                    "name": "sample.txt",
+                    "content_type": "text/plain",
+                    "bytes_base64": "aGVsbG8gd29ybGQ=",
+                    "topic_ids": ["topic-1"],
+                }),
+            )
+            .expect("attachment store");
+        assert_eq!(stored.operation_id.as_str(), "app.attachment.store");
+        assert_eq!(stored.payload["attachment_id"], json!("attachment-1"));
+
+        let fetched = app
+            .query("sdk_attachment_get_v2", serde_json::json!("attachment-1"))
+            .expect("attachment get");
+        assert_eq!(fetched.operation_id.as_str(), "app.attachment.get");
+        assert_eq!(fetched.payload["name"], json!("sample.txt"));
+
+        let listed = app
+            .query(
+                "app.attachment.list",
+                serde_json::json!({
+                    "topic_id": "topic-1",
+                    "limit": 10,
+                }),
+            )
+            .expect("attachment list");
+        assert_eq!(listed.payload["attachments"].as_array().expect("attachment rows").len(), 1);
+
+        let associated = app
+            .command(
+                "sdk_attachment_associate_topic_v2",
+                serde_json::json!({
+                    "attachment_id": "attachment-1",
+                    "topic_id": "topic-2",
+                }),
+            )
+            .expect("attachment associate");
+        assert_eq!(associated.operation_id.as_str(), "app.attachment.associate_topic");
+        assert_eq!(associated.payload["accepted"], json!(true));
+
+        let deleted = app
+            .command("app.attachment.delete", serde_json::json!("attachment-1"))
+            .expect("attachment delete");
+        assert_eq!(deleted.operation_id.as_str(), "app.attachment.delete");
+        assert_eq!(deleted.payload["accepted"], json!(true));
+    }
+
+    #[test]
+    fn execute_envelope_routes_attachment_streaming_operations_locally() {
+        let app = Client::new(MockBackend::new());
+
+        let upload = app
+            .command(
+                "sdk_attachment_upload_start_v2",
+                serde_json::json!({
+                    "name": "chunked.bin",
+                    "content_type": "application/octet-stream",
+                    "total_size": 11,
+                    "checksum_sha256": "64ec88ca00b268e5ba1a35678a1b5316d212f4f366b2477232534a8aeca37f3c",
+                    "topic_ids": ["topic-1"],
+                }),
+            )
+            .expect("attachment upload start");
+        assert_eq!(upload.operation_id.as_str(), "app.attachment.upload_start");
+        assert_eq!(upload.payload["upload_id"], json!("upload-1"));
+
+        let chunk = app
+            .command(
+                "app.attachment.upload_chunk",
+                serde_json::json!({
+                    "upload_id": "upload-1",
+                    "offset": 0,
+                    "bytes_base64": "aGVsbG8=",
+                }),
+            )
+            .expect("attachment upload chunk");
+        assert_eq!(chunk.operation_id.as_str(), "app.attachment.upload_chunk");
+        assert_eq!(chunk.payload["accepted"], json!(true));
+
+        let committed = app
+            .command(
+                "sdk_attachment_upload_commit_v2",
+                serde_json::json!({
+                    "upload_id": "upload-1",
+                }),
+            )
+            .expect("attachment upload commit");
+        assert_eq!(committed.operation_id.as_str(), "app.attachment.upload_commit");
+        assert_eq!(committed.payload["attachment_id"], json!("attachment-1"));
+
+        let downloaded = app
+            .query(
+                "sdk_attachment_download_chunk_v2",
+                serde_json::json!({
+                    "attachment_id": "attachment-1",
+                    "offset": 0,
+                    "max_bytes": 5,
+                }),
+            )
+            .expect("attachment download chunk");
+        assert_eq!(downloaded.operation_id.as_str(), "app.attachment.download_chunk");
+        assert_eq!(downloaded.payload["next_offset"], json!(5));
+        assert_eq!(downloaded.payload["done"], json!(false));
+    }
+
+    #[test]
+    fn execute_envelope_routes_marker_operations_locally() {
+        let app = Client::new(MockBackend::new());
+
+        let created = app
+            .command(
+                "sdk_marker_create_v2",
+                serde_json::json!({
+                    "label": "Alpha",
+                    "position": { "lat": 35.0, "lon": -115.0, "alt_m": 1200.0 },
+                    "topic_id": "topic-1",
+                }),
+            )
+            .expect("marker create");
+        assert_eq!(created.operation_id.as_str(), "app.marker.create");
+        assert_eq!(created.payload["marker_id"], json!("marker-1"));
+
+        let listed = app
+            .query(
+                "app.marker.list",
+                serde_json::json!({
+                    "topic_id": "topic-1",
+                    "limit": 10,
+                }),
+            )
+            .expect("marker list");
+        assert_eq!(listed.payload["markers"].as_array().expect("marker rows").len(), 1);
+
+        let updated = app
+            .command(
+                "sdk_marker_update_position_v2",
+                serde_json::json!({
+                    "marker_id": "marker-1",
+                    "expected_revision": 2,
+                    "position": { "lat": 36.0, "lon": -116.0, "alt_m": null },
+                }),
+            )
+            .expect("marker update");
+        assert_eq!(updated.operation_id.as_str(), "app.marker.update_position");
+        assert_eq!(updated.payload["revision"], json!(3));
+
+        let deleted = app
+            .command(
+                "app.marker.delete",
+                serde_json::json!({
+                    "marker_id": "marker-1",
+                    "expected_revision": 3,
+                }),
+            )
+            .expect("marker delete");
+        assert_eq!(deleted.operation_id.as_str(), "app.marker.delete");
+        assert_eq!(deleted.payload["accepted"], json!(true));
+    }
+
+    #[test]
     fn execute_envelope_routes_runtime_start_and_stop_locally() {
         let app = Client::new(MockBackend::new());
         let start = app
@@ -1703,10 +2638,7 @@ mod tests {
             .command("app.runtime.stop", serde_json::json!({ "mode": "graceful" }))
             .expect("runtime stop");
         assert_eq!(stop.operation_id.as_str(), "app.runtime.stop");
-        assert_eq!(
-            stop.payload.get("accepted").and_then(|value| value.as_bool()),
-            Some(true)
-        );
+        assert_eq!(stop.payload.get("accepted").and_then(|value| value.as_bool()), Some(true));
     }
 
     #[test]
@@ -1743,15 +2675,13 @@ mod tests {
             extensions: BTreeMap::from([("transport".to_owned(), serde_json::json!("remote"))]),
         }));
         let app = Client::new(backend);
-        app.start(
-            Config::desktop_default().with_custom_operation(OperationEntry::new(
-                "vendor.example.custom",
-                "custom",
-                OperationKind::Command,
-                TransportVariant::Extension,
-                "Custom vendor command.",
-            )),
-        )
+        app.start(Config::desktop_default().with_custom_operation(OperationEntry::new(
+            "vendor.example.custom",
+            "custom",
+            OperationKind::Command,
+            TransportVariant::Extension,
+            "Custom vendor command.",
+        )))
         .expect("start");
         let response = app
             .command("vendor.example.custom", serde_json::json!({ "value": 1 }))
@@ -1759,10 +2689,7 @@ mod tests {
         assert_eq!(response.operation_id.as_str(), "vendor.example.custom");
         assert_eq!(response.payload.get("ok").and_then(|value| value.as_bool()), Some(true));
         assert_eq!(
-            response
-                .extensions
-                .get("transport")
-                .and_then(|value| value.as_str()),
+            response.extensions.get("transport").and_then(|value| value.as_str()),
             Some("remote")
         );
     }
@@ -1799,6 +2726,51 @@ mod tests {
     }
 
     #[test]
+    fn execute_envelope_routes_voice_operations_locally() {
+        let backend = MockBackend::new();
+        backend.queue_voice_open_result(Ok(crate::domain::VoiceSessionId("voice-9".to_owned())));
+        backend.queue_voice_update_result(Ok(crate::domain::VoiceSessionState::Active));
+        backend.queue_voice_close_result(Ok(Ack { accepted: true, revision: None }));
+        let app = Client::new(backend);
+
+        let opened = app
+            .command(
+                "app.voice.session.open",
+                serde_json::json!({ "peer_id": "node-b", "codec_hint": "opus" }),
+            )
+            .expect("voice open");
+        assert_eq!(opened.operation_id.as_str(), "app.voice.session.open");
+        assert_eq!(
+            serde_json::from_value::<crate::domain::VoiceSessionId>(opened.payload)
+                .expect("voice id"),
+            crate::domain::VoiceSessionId("voice-9".to_owned())
+        );
+
+        let updated = app
+            .command(
+                "app.voice.session.update",
+                serde_json::json!({ "session_id": "voice-9", "state": "active" }),
+            )
+            .expect("voice update");
+        assert_eq!(updated.operation_id.as_str(), "app.voice.session.update");
+        assert_eq!(
+            serde_json::from_value::<crate::domain::VoiceSessionState>(updated.payload)
+                .expect("voice state"),
+            crate::domain::VoiceSessionState::Active
+        );
+
+        let closed = app
+            .command("app.voice.session.close", serde_json::json!("voice-9"))
+            .expect("voice close");
+        assert_eq!(closed.operation_id.as_str(), "app.voice.session.close");
+        assert_eq!(closed.payload.get("accepted").and_then(|value| value.as_bool()), Some(true));
+        assert_eq!(
+            closed.payload.get("session_id").and_then(|value| value.as_str()),
+            Some("voice-9")
+        );
+    }
+
+    #[test]
     fn discovery_helpers_map_backend_identity_contact_and_presence_models() {
         let app = Client::new(MockBackend::new());
 
@@ -1812,10 +2784,7 @@ mod tests {
         assert_eq!(contacts.contacts[0].identity, "bob");
         assert_eq!(contacts.contacts[0].trust_level, TrustLevel::Trusted);
         assert_eq!(
-            contacts.contacts[0]
-                .extensions
-                .get("cursor")
-                .and_then(|value| value.as_str()),
+            contacts.contacts[0].extensions.get("cursor").and_then(|value| value.as_str()),
             Some("cursor-1")
         );
 
