@@ -1,3 +1,7 @@
+use super::discovery::{
+    BootstrapRequest, Contact, ContactPage, ContactUpdate, Identity, PeerDirectoryEntry, Presence,
+    PresencePage,
+};
 use super::capabilities::CapabilitySummary;
 use super::delivery::{
     AttemptDecision, AttemptDisposition, DeliveryAttempt, DeliveryOptions, DeliveryPlan, SendReport,
@@ -12,7 +16,7 @@ use crate::{
     EventCursor, LxmfSdk, Profile as CoreProfile, RuntimeSnapshot, RuntimeState, SdkBackend,
     SdkConfig, SendRequest as RawSendRequest, ShutdownMode, StartRequest,
 };
-use crate::domain::{ContactListRequest, RemoteCommandRequest};
+use crate::domain::{ContactListRequest, PresenceListRequest, RemoteCommandRequest};
 #[cfg(feature = "sdk-async")]
 use crate::{LxmfSdkAsync, SdkBackendAsyncEvents};
 use serde::{Deserialize, Serialize};
@@ -708,6 +712,170 @@ impl<B: SdkBackend> Client<B> {
         Ok(snapshot.map(map_delivery_snapshot))
     }
 
+    pub fn identities(&self) -> Result<Vec<Identity>, Error> {
+        let identities = self.backend.identity_list().map_err(Error::from)?;
+        Ok(identities.into_iter().map(Identity::from).collect())
+    }
+
+    pub fn announce_now(&self) -> Result<(), Error> {
+        self.backend.identity_announce_now().map_err(Error::from)?;
+        Ok(())
+    }
+
+    pub fn contacts(
+        &self,
+        cursor: Option<String>,
+        limit: Option<usize>,
+    ) -> Result<ContactPage, Error> {
+        let result = self
+            .backend
+            .identity_contact_list(ContactListRequest {
+                cursor,
+                limit,
+                extensions: BTreeMap::new(),
+            })
+            .map_err(Error::from)?;
+        Ok(ContactPage::from(result))
+    }
+
+    pub fn presence(
+        &self,
+        cursor: Option<String>,
+        limit: Option<usize>,
+    ) -> Result<PresencePage, Error> {
+        let result = self
+            .backend
+            .identity_presence_list(PresenceListRequest {
+                cursor,
+                limit,
+                extensions: BTreeMap::new(),
+            })
+            .map_err(Error::from)?;
+        Ok(PresencePage::from(result))
+    }
+
+    pub fn update_contact(&self, update: ContactUpdate) -> Result<Contact, Error> {
+        let contact = self.backend.identity_contact_update(update.into()).map_err(Error::from)?;
+        Ok(Contact::from(contact))
+    }
+
+    pub fn bootstrap_identity(&self, request: BootstrapRequest) -> Result<Contact, Error> {
+        let contact = self.backend.identity_bootstrap(request.into()).map_err(Error::from)?;
+        Ok(Contact::from(contact))
+    }
+
+    pub fn peer_directory(&self, limit: Option<usize>) -> Result<Vec<PeerDirectoryEntry>, Error> {
+        let mut entries = BTreeMap::<String, PeerDirectoryEntry>::new();
+
+        for contact in self.collect_contacts(limit)? {
+            entries.insert(
+                contact.identity.clone(),
+                PeerDirectoryEntry {
+                    peer_id: contact.identity.clone(),
+                    display_name: contact.display_name.clone(),
+                    name_source: Some("contact".to_owned()),
+                    trust_level: Some(contact.trust_level.clone()),
+                    bootstrap: contact.bootstrap,
+                    online: false,
+                    last_seen_ts_ms: None,
+                    first_seen_ts_ms: None,
+                    seen_count: 0,
+                    metadata: contact.metadata.clone(),
+                    extensions: contact.extensions.clone(),
+                },
+            );
+        }
+
+        for presence in self.collect_presence(limit)? {
+            let entry = entries.entry(presence.peer_id.clone()).or_insert_with(|| PeerDirectoryEntry {
+                peer_id: presence.peer_id.clone(),
+                display_name: presence.display_name.clone(),
+                name_source: presence.name_source.clone(),
+                trust_level: presence.trust_level.clone(),
+                bootstrap: presence.bootstrap.unwrap_or(false),
+                online: true,
+                last_seen_ts_ms: Some(presence.last_seen_ts_ms),
+                first_seen_ts_ms: Some(presence.first_seen_ts_ms),
+                seen_count: presence.seen_count,
+                metadata: BTreeMap::new(),
+                extensions: presence.extensions.clone(),
+            });
+            entry.online = true;
+            entry.last_seen_ts_ms = Some(presence.last_seen_ts_ms);
+            entry.first_seen_ts_ms = Some(presence.first_seen_ts_ms);
+            entry.seen_count = presence.seen_count;
+            if entry.display_name.is_none() {
+                entry.display_name = presence.display_name.clone();
+            }
+            if entry.name_source.is_none() {
+                entry.name_source = presence.name_source.clone();
+            }
+            if entry.trust_level.is_none() {
+                entry.trust_level = presence.trust_level.clone();
+            }
+            if !entry.bootstrap {
+                entry.bootstrap = presence.bootstrap.unwrap_or(false);
+            }
+            for (key, value) in presence.extensions {
+                entry.extensions.entry(key).or_insert(value);
+            }
+        }
+
+        let mut values = entries.into_values().collect::<Vec<_>>();
+        if let Some(limit) = limit {
+            values.truncate(limit);
+        }
+        Ok(values)
+    }
+
+    fn collect_contacts(&self, limit: Option<usize>) -> Result<Vec<Contact>, Error> {
+        let mut contacts = Vec::new();
+        let mut cursor = None;
+
+        loop {
+            let page = self.contacts(cursor.clone(), limit)?;
+            contacts.extend(page.contacts);
+            if let Some(limit) = limit {
+                if contacts.len() >= limit {
+                    contacts.truncate(limit);
+                    break;
+                }
+            }
+            match page.next_cursor {
+                Some(next_cursor) if cursor.as_deref() != Some(next_cursor.as_str()) => {
+                    cursor = Some(next_cursor);
+                }
+                _ => break,
+            }
+        }
+
+        Ok(contacts)
+    }
+
+    fn collect_presence(&self, limit: Option<usize>) -> Result<Vec<Presence>, Error> {
+        let mut peers = Vec::new();
+        let mut cursor = None;
+
+        loop {
+            let page = self.presence(cursor.clone(), limit)?;
+            peers.extend(page.peers);
+            if let Some(limit) = limit {
+                if peers.len() >= limit {
+                    peers.truncate(limit);
+                    break;
+                }
+            }
+            match page.next_cursor {
+                Some(next_cursor) if cursor.as_deref() != Some(next_cursor.as_str()) => {
+                    cursor = Some(next_cursor);
+                }
+                _ => break,
+            }
+        }
+
+        Ok(peers)
+    }
+
     pub fn status(&self) -> Result<RuntimeStatus, Error> {
         let state = self.state.lock().expect("app client mutex poisoned");
         let Some(client) = state.client.as_ref() else {
@@ -912,6 +1080,7 @@ mod tests {
     };
     use crate::app::DeliveryOptions;
     use crate::app::{OperationEntry, OperationKind, TransportVariant};
+    use crate::domain::TrustLevel;
     use crate::error::{code, ErrorCategory as SdkErrorCategory, SdkError};
     use crate::event::{
         EventBatch as RawEventBatch, EventCursor, EventSubscription, SdkEvent,
@@ -931,6 +1100,7 @@ mod tests {
     struct MockBackend {
         runtime_seq: AtomicUsize,
         send_seq: AtomicUsize,
+        paginate_discovery: bool,
         poll_batches: Mutex<VecDeque<RawEventBatch>>,
         send_results: Mutex<VecDeque<Result<crate::MessageId, SdkError>>>,
         shutdown_calls: AtomicUsize,
@@ -946,6 +1116,7 @@ mod tests {
             Self {
                 runtime_seq: AtomicUsize::new(1),
                 send_seq: AtomicUsize::new(1),
+                paginate_discovery: false,
                 poll_batches: Mutex::new(VecDeque::new()),
                 send_results: Mutex::new(VecDeque::new()),
                 shutdown_calls: AtomicUsize::new(0),
@@ -953,6 +1124,10 @@ mod tests {
                 remote_command_results: Mutex::new(VecDeque::new()),
                 envelope_results: Mutex::new(VecDeque::new()),
             }
+        }
+
+        fn new_paginated() -> Self {
+            Self { paginate_discovery: true, ..Self::new() }
         }
 
         fn queue_batch(&self, batch: RawEventBatch) {
@@ -1101,21 +1276,137 @@ mod tests {
             &self,
             req: crate::domain::ContactListRequest,
         ) -> Result<crate::domain::ContactListResult, SdkError> {
-            let contact = crate::domain::ContactRecord {
-                identity: crate::domain::IdentityRef("bob".to_owned()),
-                display_name: Some("Bob".to_owned()),
+            let make_contact = |identity: &str, display_name: &str, trust_level, bootstrap| {
+                crate::domain::ContactRecord {
+                    identity: crate::domain::IdentityRef(identity.to_owned()),
+                    display_name: Some(display_name.to_owned()),
+                    trust_level,
+                    bootstrap,
+                    updated_ts_ms: 100,
+                    metadata: BTreeMap::new(),
+                    extensions: BTreeMap::from([(
+                        "cursor".to_owned(),
+                        serde_json::json!(req.cursor),
+                    )]),
+                }
+            };
+            if self.paginate_discovery {
+                return Ok(match req.cursor.as_deref() {
+                    None => crate::domain::ContactListResult {
+                        contacts: vec![make_contact(
+                            "bob",
+                            "Bob",
+                            crate::domain::TrustLevel::Trusted,
+                            true,
+                        )],
+                        next_cursor: Some("contact:1".to_owned()),
+                    },
+                    Some("contact:1") => crate::domain::ContactListResult {
+                        contacts: vec![make_contact(
+                            "charlie",
+                            "Charlie",
+                            crate::domain::TrustLevel::Untrusted,
+                            false,
+                        )],
+                        next_cursor: None,
+                    },
+                    _ => crate::domain::ContactListResult {
+                        contacts: Vec::new(),
+                        next_cursor: None,
+                    },
+                });
+            }
+            Ok(crate::domain::ContactListResult {
+                contacts: vec![make_contact(
+                    "bob",
+                    "Bob",
+                    crate::domain::TrustLevel::Trusted,
+                    true,
+                )],
+                next_cursor: None,
+            })
+        }
+
+        fn identity_announce_now(&self) -> Result<Ack, SdkError> {
+            Ok(Ack { accepted: true, revision: None })
+        }
+
+        fn identity_presence_list(
+            &self,
+            _req: crate::domain::PresenceListRequest,
+        ) -> Result<crate::domain::PresenceListResult, SdkError> {
+            let req = _req;
+            let bob = crate::domain::PresenceRecord {
+                peer_id: "bob".to_owned(),
+                last_seen_ts_ms: 200,
+                first_seen_ts_ms: 120,
+                seen_count: 3,
+                name: Some("Bob Relay".to_owned()),
+                name_source: Some("announce".to_owned()),
+                trust_level: Some(crate::domain::TrustLevel::Trusted),
+                bootstrap: Some(true),
+                extensions: BTreeMap::from([("source".to_owned(), serde_json::json!("presence"))]),
+            };
+            let eve = crate::domain::PresenceRecord {
+                peer_id: "eve".to_owned(),
+                last_seen_ts_ms: 99,
+                first_seen_ts_ms: 90,
+                seen_count: 1,
+                name: Some("Eve".to_owned()),
+                name_source: Some("announce".to_owned()),
+                trust_level: Some(crate::domain::TrustLevel::Unknown),
+                bootstrap: Some(false),
+                extensions: BTreeMap::new(),
+            };
+            if self.paginate_discovery {
+                return Ok(match req.cursor.as_deref() {
+                    None => crate::domain::PresenceListResult {
+                        peers: vec![bob],
+                        next_cursor: Some("presence:1".to_owned()),
+                    },
+                    Some("presence:1") => crate::domain::PresenceListResult {
+                        peers: vec![eve],
+                        next_cursor: None,
+                    },
+                    _ => crate::domain::PresenceListResult {
+                        peers: Vec::new(),
+                        next_cursor: None,
+                    },
+                });
+            }
+            Ok(crate::domain::PresenceListResult {
+                peers: vec![bob, eve],
+                next_cursor: None,
+            })
+        }
+
+        fn identity_contact_update(
+            &self,
+            req: crate::domain::ContactUpdateRequest,
+        ) -> Result<crate::domain::ContactRecord, SdkError> {
+            Ok(crate::domain::ContactRecord {
+                identity: req.identity,
+                display_name: req.display_name,
+                trust_level: req.trust_level.unwrap_or(crate::domain::TrustLevel::Unknown),
+                bootstrap: req.bootstrap.unwrap_or(false),
+                updated_ts_ms: 500,
+                metadata: req.metadata,
+                extensions: req.extensions,
+            })
+        }
+
+        fn identity_bootstrap(
+            &self,
+            req: crate::domain::IdentityBootstrapRequest,
+        ) -> Result<crate::domain::ContactRecord, SdkError> {
+            Ok(crate::domain::ContactRecord {
+                identity: req.identity,
+                display_name: None,
                 trust_level: crate::domain::TrustLevel::Trusted,
                 bootstrap: true,
-                updated_ts_ms: 100,
+                updated_ts_ms: 600,
                 metadata: BTreeMap::new(),
-                extensions: BTreeMap::from([(
-                    "cursor".to_owned(),
-                    serde_json::json!(req.cursor),
-                )]),
-            };
-            Ok(crate::domain::ContactListResult {
-                contacts: vec![contact],
-                next_cursor: None,
+                extensions: req.extensions,
             })
         }
 
@@ -1389,6 +1680,96 @@ mod tests {
             response.extensions.get("via").and_then(|value| value.as_str()),
             Some("envelope")
         );
+    }
+
+    #[test]
+    fn discovery_helpers_map_backend_identity_contact_and_presence_models() {
+        let app = Client::new(MockBackend::new());
+
+        let identities = app.identities().expect("identities");
+        assert_eq!(identities.len(), 1);
+        assert_eq!(identities[0].identity, "alice");
+        assert_eq!(identities[0].display_name.as_deref(), Some("Alice"));
+
+        let contacts = app.contacts(Some("cursor-1".to_owned()), Some(5)).expect("contacts");
+        assert_eq!(contacts.contacts.len(), 1);
+        assert_eq!(contacts.contacts[0].identity, "bob");
+        assert_eq!(contacts.contacts[0].trust_level, TrustLevel::Trusted);
+        assert_eq!(
+            contacts.contacts[0]
+                .extensions
+                .get("cursor")
+                .and_then(|value| value.as_str()),
+            Some("cursor-1")
+        );
+
+        let presence = app.presence(None, Some(10)).expect("presence");
+        assert_eq!(presence.peers.len(), 2);
+        assert_eq!(presence.peers[0].peer_id, "bob");
+        assert_eq!(presence.peers[0].display_name.as_deref(), Some("Bob Relay"));
+        assert_eq!(presence.peers[0].trust_level, Some(TrustLevel::Trusted));
+        assert!(presence.peers[0].bootstrap.unwrap_or(false));
+    }
+
+    #[test]
+    fn discovery_helpers_update_contacts_and_bootstrap_identities() {
+        let app = Client::new(MockBackend::new());
+
+        let updated = app
+            .update_contact(
+                super::super::discovery::ContactUpdate::new("charlie")
+                    .with_display_name("Charlie")
+                    .with_trust_level(TrustLevel::Untrusted)
+                    .with_bootstrap(true),
+            )
+            .expect("contact update");
+        assert_eq!(updated.identity, "charlie");
+        assert_eq!(updated.display_name.as_deref(), Some("Charlie"));
+        assert_eq!(updated.trust_level, TrustLevel::Untrusted);
+        assert!(updated.bootstrap);
+
+        let bootstrapped = app
+            .bootstrap_identity(super::super::discovery::BootstrapRequest::new("delta"))
+            .expect("bootstrap");
+        assert_eq!(bootstrapped.identity, "delta");
+        assert_eq!(bootstrapped.trust_level, TrustLevel::Trusted);
+        assert!(bootstrapped.bootstrap);
+    }
+
+    #[test]
+    fn peer_directory_merges_contact_and_presence_views() {
+        let app = Client::new(MockBackend::new());
+        let peers = app.peer_directory(Some(10)).expect("peer directory");
+
+        assert_eq!(peers.len(), 2);
+
+        let bob = peers.iter().find(|entry| entry.peer_id == "bob").expect("bob entry");
+        assert_eq!(bob.display_name.as_deref(), Some("Bob"));
+        assert_eq!(bob.name_source.as_deref(), Some("contact"));
+        assert_eq!(bob.trust_level, Some(TrustLevel::Trusted));
+        assert!(bob.online);
+        assert!(bob.bootstrap);
+        assert_eq!(bob.last_seen_ts_ms, Some(200));
+        assert_eq!(bob.first_seen_ts_ms, Some(120));
+        assert_eq!(bob.seen_count, 3);
+
+        let eve = peers.iter().find(|entry| entry.peer_id == "eve").expect("eve entry");
+        assert_eq!(eve.display_name.as_deref(), Some("Eve"));
+        assert_eq!(eve.name_source.as_deref(), Some("announce"));
+        assert_eq!(eve.trust_level, Some(TrustLevel::Unknown));
+        assert!(eve.online);
+        assert!(!eve.bootstrap);
+    }
+
+    #[test]
+    fn peer_directory_consumes_all_contact_and_presence_pages() {
+        let app = Client::new(MockBackend::new_paginated());
+        let peers = app.peer_directory(None).expect("peer directory");
+
+        assert_eq!(peers.len(), 3);
+        assert!(peers.iter().any(|entry| entry.peer_id == "bob"));
+        assert!(peers.iter().any(|entry| entry.peer_id == "charlie"));
+        assert!(peers.iter().any(|entry| entry.peer_id == "eve"));
     }
 
     #[test]
