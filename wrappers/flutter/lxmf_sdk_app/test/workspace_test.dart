@@ -76,6 +76,46 @@ void main() {
     expect(note.marker?.markerId, 'marker-1');
     expect(note.attachment?.attachmentId, 'attachment-1');
   });
+
+  test('WorkspaceFlows discover peers and prepare conversations', () async {
+    final binding = _FakeWorkspaceBinding();
+    final workspace = WorkspaceClient.fromBinding(binding);
+
+    final allPeers = await workspace.flows.discoverPeers(limit: 10);
+    final onlinePeers =
+        await workspace.flows.discoverPeers(limit: 10, onlineOnly: true);
+    final ready = await workspace.flows.ensureConversation('peer-known');
+    final sent = await workspace.flows.sendConversationText(
+      'peer-new',
+      'hello there',
+      correlationId: 'conv-1',
+    );
+
+    expect(allPeers, hasLength(2));
+    expect(onlinePeers.map((peer) => peer.peerId), contains('peer-known'));
+    expect(onlinePeers.map((peer) => peer.peerId),
+        isNot(contains('peer-offline')));
+
+    expect(ready.peer.identity, 'peer-known');
+    expect(ready.snapshot.selfAddress, 'self-1');
+    expect(ready.snapshot.peerAddress, 'peer-known');
+    expect(ready.snapshot.messages.single.content, 'previous hello');
+
+    expect(sent.peer.identity, 'peer-new');
+    expect(sent.receipt.messageId, 'msg-1');
+  });
+
+  test('WorkspaceFlows discoverPeers filters before applying the limit',
+      () async {
+    final binding = _FilteredPeerWorkspaceBinding();
+    final workspace = WorkspaceClient.fromBinding(binding);
+
+    final peers =
+        await workspace.flows.discoverPeers(limit: 1, bootstrapOnly: true);
+
+    expect(peers, hasLength(1));
+    expect(peers.single.peerId, 'peer-bootstrap');
+  });
 }
 
 class _FakeWorkspaceBinding implements AppBinding {
@@ -190,6 +230,20 @@ class _FakeWorkspaceBinding implements AppBinding {
           description: 'List topics.',
         ),
         OperationEntry(
+          id: 'app.identity.presence.list',
+          group: 'identity',
+          kind: OperationKind.query,
+          transportVariant: TransportVariant.rpc,
+          description: 'List peer presence.',
+        ),
+        OperationEntry(
+          id: 'app.message.history.list',
+          group: 'messaging',
+          kind: OperationKind.query,
+          transportVariant: TransportVariant.rpc,
+          description: 'List message history.',
+        ),
+        OperationEntry(
           id: 'app.topic.create',
           group: 'topics',
           kind: OperationKind.command,
@@ -275,6 +329,15 @@ class _FakeWorkspaceBinding implements AppBinding {
                     'metadata': <String, Object?>{},
                     'extensions': <String, Object?>{},
                   },
+                  <String, Object?>{
+                    'identity': 'peer-offline',
+                    'display_name': 'Offline Peer',
+                    'trust_level': 'unknown',
+                    'bootstrap': false,
+                    'updated_ts_ms': 11,
+                    'metadata': <String, Object?>{},
+                    'extensions': <String, Object?>{},
+                  },
                 ],
                 'next_cursor': 'after-known',
               },
@@ -292,6 +355,47 @@ class _FakeWorkspaceBinding implements AppBinding {
             'updated_ts_ms': 20,
             'metadata': <String, Object?>{},
             'extensions': <String, Object?>{},
+          },
+        ),
+      'app.identity.presence.list' => const EnvelopeResponse(
+          operationId: 'app.identity.presence.list',
+          kind: EnvelopeKind.result,
+          accepted: true,
+          payload: <String, Object?>{
+            'peers': <Object?>[
+              <String, Object?>{
+                'peer_id': 'peer-known',
+                'last_seen_ts_ms': 200,
+                'first_seen_ts_ms': 100,
+                'seen_count': 4,
+                'name': 'Known Peer',
+                'name_source': 'announce',
+                'trust_level': 'trusted',
+                'bootstrap': true,
+                'extensions': <String, Object?>{},
+              },
+            ],
+            'next_cursor': null,
+          },
+        ),
+      'app.message.history.list' => EnvelopeResponse(
+          operationId: 'app.message.history.list',
+          kind: EnvelopeKind.result,
+          accepted: true,
+          payload: <String, Object?>{
+            'messages': <Object?>[
+              <String, Object?>{
+                'id': 'msg-prev',
+                'source': 'peer-known',
+                'destination': 'self-1',
+                'title': '',
+                'content': 'previous hello',
+                'timestamp': 1710000000,
+                'direction': 'in',
+                'fields': null,
+                'receipt_status': null,
+              },
+            ],
           },
         ),
       'app.contact.update' => EnvelopeResponse(
@@ -402,4 +506,60 @@ class _FakeWorkspaceBinding implements AppBinding {
 
   @override
   Stream<AppEvent> subscribeEvents() => const Stream<AppEvent>.empty();
+}
+
+class _FilteredPeerWorkspaceBinding extends _FakeWorkspaceBinding {
+  @override
+  Future<EnvelopeResponse> executeEnvelope(Envelope envelope) async {
+    switch (envelope.operationId) {
+      case 'app.contact.list':
+        return EnvelopeResponse(
+          operationId: 'app.contact.list',
+          kind: EnvelopeKind.result,
+          accepted: true,
+          payload: switch ((envelope.payload as Map<Object?, Object?>)['cursor']) {
+            'after-page-1' => const <String, Object?>{
+                'contacts': <Object?>[
+                  <String, Object?>{
+                    'identity': 'peer-bootstrap',
+                    'display_name': 'Bootstrap Peer',
+                    'trust_level': 'trusted',
+                    'bootstrap': true,
+                    'updated_ts_ms': 20,
+                    'metadata': <String, Object?>{},
+                    'extensions': <String, Object?>{},
+                  },
+                ],
+                'next_cursor': null,
+              },
+            _ => const <String, Object?>{
+                'contacts': <Object?>[
+                  <String, Object?>{
+                    'identity': 'peer-non-bootstrap',
+                    'display_name': 'Non Bootstrap Peer',
+                    'trust_level': 'unknown',
+                    'bootstrap': false,
+                    'updated_ts_ms': 10,
+                    'metadata': <String, Object?>{},
+                    'extensions': <String, Object?>{},
+                  },
+                ],
+                'next_cursor': 'after-page-1',
+              },
+          },
+        );
+      case 'app.identity.presence.list':
+        return const EnvelopeResponse(
+          operationId: 'app.identity.presence.list',
+          kind: EnvelopeKind.result,
+          accepted: true,
+          payload: <String, Object?>{
+            'peers': <Object?>[],
+            'next_cursor': null,
+          },
+        );
+      default:
+        return super.executeEnvelope(envelope);
+    }
+  }
 }
