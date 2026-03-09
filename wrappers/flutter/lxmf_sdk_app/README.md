@@ -81,6 +81,26 @@ final status = await workspace.status();
 print('runtime=${status.runtimeId} identities=${identities.length}');
 ```
 
+Workspace workflow flow:
+
+```dart
+final workspace = WorkspaceClient.rpc(
+  RpcConnectionOptions(
+    endpoint: Uri.parse('http://127.0.0.1:4243/rpc'),
+  ),
+);
+
+await workspace.start(const Config(profile: Profile.desktopDefault));
+final peer = await workspace.flows.ensurePeerReady('peer-demo');
+final topic = await workspace.flows.ensureTopic('ops/demo');
+final note = await workspace.flows.publishFieldNote(
+  topicPath: 'ops/demo',
+  payload: const <String, Object?>{'body': 'field note'},
+);
+
+print('peer=${peer.identity} topic=${topic.topic.topicId} note=${note.published}');
+```
+
 Operation-catalog flow:
 
 ```dart
@@ -313,6 +333,26 @@ await app.start(
 );
 ```
 
+Workspace flow helpers need the broader domain capabilities they compose, for
+example:
+
+```dart
+await workspace.start(
+  const Config(
+    profile: Profile.desktopDefault,
+    requestedCapabilities: <String>[
+      'sdk.capability.identity_multi',
+      'sdk.capability.identity_discovery',
+      'sdk.capability.contact_management',
+      'sdk.capability.topics',
+      'sdk.capability.topic_fanout',
+      'sdk.capability.markers',
+      'sdk.capability.attachments',
+    ],
+  ),
+);
+```
+
 Current next steps:
 
 1. validate the RPC binding against local `reticulumd` smoke runs
@@ -346,6 +386,7 @@ dart run example/attachment_operations_smoke.dart http://127.0.0.1:4243/rpc [top
 dart run example/attachment_streaming_smoke.dart http://127.0.0.1:4243/rpc
 dart run example/discovery_operations_smoke.dart http://127.0.0.1:4243/rpc
 dart run example/workspace_smoke.dart http://127.0.0.1:4243/rpc
+dart run example/workspace_flows_smoke.dart http://127.0.0.1:4243/rpc
 ```
 
 Repo-level smoke from the project root:
