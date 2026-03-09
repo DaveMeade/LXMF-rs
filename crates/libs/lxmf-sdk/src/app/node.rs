@@ -16,7 +16,10 @@ use crate::{
     EventCursor, LxmfSdk, Profile as CoreProfile, RuntimeSnapshot, RuntimeState, SdkBackend,
     SdkConfig, SendRequest as RawSendRequest, ShutdownMode, StartRequest,
 };
-use crate::domain::{ContactListRequest, PresenceListRequest, RemoteCommandRequest};
+use crate::domain::{
+    ContactListRequest, ContactUpdateRequest, IdentityBootstrapRequest, PresenceListRequest,
+    RemoteCommandRequest,
+};
 #[cfg(feature = "sdk-async")]
 use crate::{LxmfSdkAsync, SdkBackendAsyncEvents};
 use serde::{Deserialize, Serialize};
@@ -380,22 +383,22 @@ impl<B: SdkBackend> Client<B> {
 
     pub fn execute_envelope(&self, envelope: Envelope) -> Result<EnvelopeResponse, Error> {
         let registry = self.operation_registry()?;
+        let envelope = envelope.normalized(&registry).map_err(|err| match err {
+            super::envelope::EnvelopeValidationError::UnknownOperation { operation_id } => {
+                invalid_envelope("unknown operation id", operation_id.as_str())
+            }
+            super::envelope::EnvelopeValidationError::KindMismatch { operation_id, .. } => {
+                invalid_envelope(
+                    "envelope kind does not match registered operation kind",
+                    operation_id.as_str(),
+                )
+            }
+        })?;
         let entry = registry
             .get(envelope.operation_id.as_str())
             .cloned()
-            .ok_or_else(|| invalid_envelope("unknown operation id", envelope.operation_id.as_str()))?;
+            .expect("normalized envelope should resolve to a registered operation");
         let canonical_id = entry.id.clone();
-        let kind_matches = matches!(
-            (&envelope.kind, &entry.kind),
-            (EnvelopeKind::Query, super::operations::OperationKind::Query)
-                | (EnvelopeKind::Command, super::operations::OperationKind::Command)
-        );
-        if !kind_matches {
-            return Err(invalid_envelope(
-                "envelope kind does not match registered operation kind",
-                canonical_id.as_str(),
-            ));
-        }
 
         let Envelope {
             operation_id: _,
@@ -516,6 +519,29 @@ impl<B: SdkBackend> Client<B> {
                 serde_json::to_value(self.backend.identity_list().map_err(Error::from)?)
                     .expect("identity list should serialize"),
             )),
+            "app.identity.announce" => {
+                self.backend.identity_announce_now().map_err(Error::from)?;
+                Ok(envelope_result(
+                    canonical_id,
+                    correlation_id,
+                    serde_json::json!({ "accepted": true }),
+                ))
+            }
+            "app.identity.presence.list" => {
+                let req: PresenceListRequest =
+                    serde_json::from_value(payload).map_err(|err| {
+                        invalid_envelope(
+                            format!("invalid presence list payload: {err}"),
+                            canonical_id.as_str(),
+                        )
+                    })?;
+                let result = self.backend.identity_presence_list(req).map_err(Error::from)?;
+                Ok(envelope_result(
+                    canonical_id,
+                    correlation_id,
+                    serde_json::to_value(result).expect("presence list should serialize"),
+                ))
+            }
             "app.contact.list" => {
                 let req: ContactListRequest =
                     serde_json::from_value(payload).map_err(|err| {
@@ -529,6 +555,36 @@ impl<B: SdkBackend> Client<B> {
                     canonical_id,
                     correlation_id,
                     serde_json::to_value(result).expect("contact list should serialize"),
+                ))
+            }
+            "app.contact.update" => {
+                let req: ContactUpdateRequest =
+                    serde_json::from_value(payload).map_err(|err| {
+                        invalid_envelope(
+                            format!("invalid contact update payload: {err}"),
+                            canonical_id.as_str(),
+                        )
+                    })?;
+                let result = self.backend.identity_contact_update(req).map_err(Error::from)?;
+                Ok(envelope_result(
+                    canonical_id,
+                    correlation_id,
+                    serde_json::to_value(result).expect("contact update should serialize"),
+                ))
+            }
+            "app.identity.bootstrap" => {
+                let req: IdentityBootstrapRequest =
+                    serde_json::from_value(payload).map_err(|err| {
+                        invalid_envelope(
+                            format!("invalid bootstrap payload: {err}"),
+                            canonical_id.as_str(),
+                        )
+                    })?;
+                let result = self.backend.identity_bootstrap(req).map_err(Error::from)?;
+                Ok(envelope_result(
+                    canonical_id,
+                    correlation_id,
+                    serde_json::to_value(result).expect("bootstrap should serialize"),
                 ))
             }
             _ if matches!(entry.kind, super::operations::OperationKind::Query) => self
@@ -1173,6 +1229,15 @@ mod tests {
             {
                 effective_capabilities.push("sdk.capability.async_events".to_owned());
             }
+            for capability in [
+                "sdk.capability.identity_multi",
+                "sdk.capability.identity_discovery",
+                "sdk.capability.contact_management",
+            ] {
+                if !effective_capabilities.iter().any(|current| current == capability) {
+                    effective_capabilities.push(capability.to_owned());
+                }
+            }
             Ok(NegotiationResponse {
                 runtime_id,
                 active_contract_version: 2,
@@ -1566,6 +1631,57 @@ mod tests {
                 .and_then(|value| value.as_str()),
             Some("Alice")
         );
+    }
+
+    #[test]
+    fn execute_envelope_accepts_registered_aliases() {
+        let app = Client::new(MockBackend::new());
+        let response = app
+            .query("sdk_identity_list_v2", serde_json::json!({}))
+            .expect("identity list via alias");
+        assert_eq!(response.operation_id.as_str(), "app.identity.list");
+        let identities = response.payload.as_array().expect("identity array");
+        assert_eq!(identities[0]["identity"], json!("alice"));
+    }
+
+    #[test]
+    fn execute_envelope_routes_discovery_operations_locally() {
+        let app = Client::new(MockBackend::new());
+
+        let announce = app
+            .command("sdk_identity_announce_now_v2", serde_json::json!({}))
+            .expect("announce");
+        assert_eq!(announce.operation_id.as_str(), "app.identity.announce");
+        assert_eq!(announce.payload["accepted"], json!(true));
+
+        let presence = app
+            .query("sdk_identity_presence_list_v2", serde_json::json!({ "limit": 10 }))
+            .expect("presence");
+        assert_eq!(presence.operation_id.as_str(), "app.identity.presence.list");
+        assert_eq!(presence.payload["peers"].as_array().expect("peer rows").len(), 2);
+
+        let contact = app
+            .command(
+                "sdk_identity_contact_update_v2",
+                serde_json::json!({
+                    "identity": "charlie",
+                    "display_name": "Charlie",
+                    "trust_level": "trusted",
+                    "bootstrap": true
+                }),
+            )
+            .expect("contact update");
+        assert_eq!(contact.operation_id.as_str(), "app.contact.update");
+        assert_eq!(contact.payload["identity"], json!("charlie"));
+
+        let bootstrap = app
+            .command(
+                "sdk_identity_bootstrap_v2",
+                serde_json::json!({ "identity": "delta", "auto_sync": true }),
+            )
+            .expect("bootstrap");
+        assert_eq!(bootstrap.operation_id.as_str(), "app.identity.bootstrap");
+        assert_eq!(bootstrap.payload["identity"], json!("delta"));
     }
 
     #[test]
