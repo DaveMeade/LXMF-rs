@@ -910,6 +910,7 @@ impl RpcDaemon {
             .unwrap_or(JsonValue::Null);
         let accepted =
             delegated_payload.get("accepted").and_then(JsonValue::as_bool).unwrap_or(true);
+        let response_correlation_id = parsed.correlation_id;
         let extensions = delegated_payload
             .get("extensions")
             .and_then(JsonValue::as_object)
@@ -923,7 +924,7 @@ impl RpcDaemon {
                     "operation_id": canonical_id,
                     "kind": "result",
                     "accepted": accepted,
-                    "correlation_id": parsed.correlation_id,
+                    "correlation_id": response_correlation_id,
                     "payload": payload,
                     "extensions": extensions,
                 }
