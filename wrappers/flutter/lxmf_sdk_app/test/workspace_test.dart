@@ -145,9 +145,103 @@ void main() {
     expect(report.attachment.attachmentId, 'attachment-1');
     expect(report.published, isTrue);
   });
+
+  test('WorkspaceFlows send mission updates with topic and attachments',
+      () async {
+    final binding = _FakeWorkspaceBinding();
+    final workspace = WorkspaceClient.fromBinding(binding);
+
+    final result = await workspace.flows.sendMissionUpdate(
+      const MissionUpdateDraft(
+        peerIdentity: 'peer-new',
+        content: 'mission update',
+        topicPath: 'ops.mission.alpha',
+        attachments: <AttachmentDraft>[
+          AttachmentDraft(
+            name: 'sitrep.txt',
+            contentType: 'text/plain',
+            bytesBase64: 'c2l0cmVw',
+          ),
+        ],
+        metadata: <String, Object?>{'priority': 'high'},
+        correlationId: 'mission-1',
+      ),
+    );
+
+    expect(result.peer.identity, 'peer-new');
+    expect(result.topic?.topicId, 'topic-created');
+    expect(result.attachments.single.attachmentId, 'attachment-1');
+    expect(result.receipt.messageId, 'msg-1');
+
+    final payload = binding.lastSendRequest?.payload as Map<String, Object?>?;
+    expect(payload?['content'], 'mission update');
+    expect(payload?['topic_id'], 'topic-created');
+    expect(payload?['group_id'], 'topic-created');
+    expect(payload?['priority'], 'high');
+    final files = payload?['file_attachments'] as List<Object?>?;
+    expect(files, isNotNull);
+    final firstFile = files!.single as Map<String, Object?>;
+    expect(firstFile['attachment_id'], 'attachment-1');
+    expect(firstFile['name'], 'sitrep.txt');
+  });
+
+  test('WorkspaceFlows send mission updates store attachments without topics',
+      () async {
+    final binding = _FakeWorkspaceBinding();
+    final workspace = WorkspaceClient.fromBinding(binding);
+
+    final result = await workspace.flows.sendMissionUpdate(
+      const MissionUpdateDraft(
+        peerIdentity: 'peer-new',
+        content: 'untagged mission update',
+        attachments: <AttachmentDraft>[
+          AttachmentDraft(
+            name: 'untagged.txt',
+            contentType: 'text/plain',
+            bytesBase64: 'dW50YWdnZWQ=',
+          ),
+        ],
+        correlationId: 'mission-untagged-1',
+      ),
+    );
+
+    expect(result.topic, isNull);
+    expect(result.attachments.single.attachmentId, 'attachment-1');
+
+    final payload = binding.lastSendRequest?.payload as Map<String, Object?>?;
+    expect(payload?['topic_id'], isNull);
+    expect(payload?['group_id'], isNull);
+    final files = payload?['file_attachments'] as List<Object?>?;
+    expect(files, isNotNull);
+    expect(files!.single, isA<Map<String, Object?>>());
+  });
+
+  test('WorkspaceFlows reject reserved mission metadata keys', () async {
+    final binding = _FakeWorkspaceBinding();
+    final workspace = WorkspaceClient.fromBinding(binding);
+
+    expect(
+      () => workspace.flows.sendMissionUpdate(
+        const MissionUpdateDraft(
+          peerIdentity: 'peer-new',
+          content: 'mission update',
+          metadata: <String, Object?>{'content': 'override'},
+        ),
+      ),
+      throwsA(
+        isA<ArgumentError>().having(
+          (error) => error.name,
+          'name',
+          'draft.metadata',
+        ),
+      ),
+    );
+  });
 }
 
 class _FakeWorkspaceBinding implements AppBinding {
+  SendRequest? lastSendRequest;
+
   @override
   Future<Handle> start(Config config) async {
     return Handle(
@@ -180,6 +274,7 @@ class _FakeWorkspaceBinding implements AppBinding {
 
   @override
   Future<SendReceipt> send(SendRequest request) async {
+    lastSendRequest = request;
     return const SendReceipt(
       runtimeId: 'workspace-runtime',
       messageId: 'msg-1',

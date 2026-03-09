@@ -68,6 +68,40 @@ class AttachmentReportResult {
   final bool published;
 }
 
+class MissionUpdateDraft {
+  const MissionUpdateDraft({
+    required this.peerIdentity,
+    required this.content,
+    this.topicPath,
+    this.attachments = const <AttachmentDraft>[],
+    this.metadata = const <String, Object?>{},
+    this.correlationId,
+    this.idempotencyKey,
+  });
+
+  final String peerIdentity;
+  final String content;
+  final String? topicPath;
+  final List<AttachmentDraft> attachments;
+  final Map<String, Object?> metadata;
+  final String? correlationId;
+  final String? idempotencyKey;
+}
+
+class MissionUpdateResult {
+  const MissionUpdateResult({
+    required this.peer,
+    required this.receipt,
+    this.topic,
+    this.attachments = const <AttachmentRecord>[],
+  });
+
+  final PeerReadyResult peer;
+  final SendReceipt receipt;
+  final TopicRecord? topic;
+  final List<AttachmentRecord> attachments;
+}
+
 class ConversationReadyResult {
   const ConversationReadyResult({
     required this.peer,
@@ -138,6 +172,12 @@ class WorkspaceFlows {
   WorkspaceFlows(this._workspace);
 
   final WorkspaceClient _workspace;
+  static const Set<String> _missionReservedMetadataKeys = <String>{
+    'content',
+    'topic_id',
+    'group_id',
+    'file_attachments',
+  };
 
   Future<PeerReadyResult> ensurePeerReady(
     String identity, {
@@ -354,6 +394,84 @@ class WorkspaceFlows {
       topic: topicResult.topic,
       attachment: stored,
       published: published,
+    );
+  }
+
+  Future<MissionUpdateResult> sendMissionUpdate(
+    MissionUpdateDraft draft, {
+    String? displayName,
+    TrustLevel trustLevel = TrustLevel.trusted,
+    bool bootstrap = true,
+    bool announce = true,
+  }) async {
+    final conflictingMetadataKeys = draft.metadata.keys
+        .where(_missionReservedMetadataKeys.contains)
+        .toList(growable: false);
+    if (conflictingMetadataKeys.isNotEmpty) {
+      throw ArgumentError.value(
+        conflictingMetadataKeys,
+        'draft.metadata',
+        'mission metadata cannot override reserved fields',
+      );
+    }
+
+    final peer = await ensurePeerReady(
+      draft.peerIdentity,
+      displayName: displayName,
+      trustLevel: trustLevel,
+      bootstrap: bootstrap,
+      announce: announce,
+      metadata: draft.metadata,
+    );
+
+    TopicRecord? topic;
+    if (draft.topicPath != null) {
+      topic = (await ensureTopic(draft.topicPath!)).topic;
+    }
+
+    final storedAttachments = <AttachmentRecord>[];
+    for (final attachment in draft.attachments) {
+      storedAttachments.add(
+        await _workspace.attachments.store(
+          name: attachment.name,
+          contentType: attachment.contentType,
+          bytesBase64: attachment.bytesBase64,
+          topicIds: topic == null ? const <String>[] : <String>[topic.topicId],
+        ),
+      );
+    }
+
+    final receipt = await _workspace.app.send(
+      SendRequest(
+        source: await _workspace.conversations.selfAddress(),
+        destination: draft.peerIdentity,
+        payload: <String, Object?>{
+          'content': draft.content,
+          if (topic != null) 'topic_id': topic.topicId,
+          if (topic != null) 'group_id': topic.topicId,
+          if (storedAttachments.isNotEmpty)
+            'file_attachments': storedAttachments
+                .map(
+                  (attachment) => <String, Object?>{
+                    'attachment_id': attachment.attachmentId,
+                    'name': attachment.name,
+                    'content_type': attachment.contentType,
+                    'byte_len': attachment.byteLen,
+                  },
+                )
+                .toList(growable: false),
+          ...Map<String, Object?>.from(draft.metadata),
+        },
+        correlationId: draft.correlationId,
+        idempotencyKey: draft.idempotencyKey,
+      ),
+    );
+
+    return MissionUpdateResult(
+      peer: peer,
+      receipt: receipt,
+      topic: topic,
+      attachments: List<AttachmentRecord>.unmodifiable(storedAttachments),
     );
   }
 
