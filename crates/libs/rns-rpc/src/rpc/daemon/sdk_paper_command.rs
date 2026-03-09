@@ -1,4 +1,32 @@
 impl RpcDaemon {
+    fn sdk_command_event_payload_summary(payload: &JsonValue) -> JsonValue {
+        let byte_len = payload.to_string().len();
+        match payload {
+            JsonValue::Null | JsonValue::Bool(_) | JsonValue::Number(_) => payload.clone(),
+            JsonValue::String(value) if byte_len <= 512 => JsonValue::String(value.clone()),
+            JsonValue::String(value) => {
+                let preview = value.chars().take(128).collect::<String>();
+                json!({
+                    "kind": "string",
+                    "byte_len": byte_len,
+                    "preview": preview,
+                    "truncated": true,
+                })
+            }
+            JsonValue::Array(items) => json!({
+                "kind": "array",
+                "len": items.len(),
+                "byte_len": byte_len,
+            }),
+            JsonValue::Object(map) => json!({
+                "kind": "object",
+                "keys": map.keys().take(16).cloned().collect::<Vec<_>>(),
+                "byte_len": byte_len,
+                "truncated": byte_len > 512,
+            }),
+        }
+    }
+
     fn sdk_remote_command_record_to_value(record: &SdkRemoteCommandRecord) -> JsonValue {
         json!({
             "command_id": record.command_id,
@@ -188,6 +216,18 @@ impl RpcDaemon {
             .expect("sdk_remote_commands mutex poisoned")
             .insert(correlation_id.clone(), session.clone());
         self.persist_sdk_domain_snapshot()?;
+        self.publish_event(RpcEvent {
+            event_type: "command.dispatched".into(),
+            payload: json!({
+                "command_id": session.command_id,
+                "correlation_id": session.correlation_id,
+                "command": session.command,
+                "target": session.target,
+                "timeout_ms": session.timeout_ms,
+                "command_state": session.command_state,
+                "request_payload": Self::sdk_command_event_payload_summary(&session.request_payload),
+            }),
+        });
         let response = json!({
             "accepted": true,
             "payload": {
@@ -256,6 +296,26 @@ impl RpcDaemon {
             session.clone()
         };
         self.persist_sdk_domain_snapshot()?;
+        self.publish_event(RpcEvent {
+            event_type: if parsed.accepted {
+                "command.completed".into()
+            } else {
+                "command.failed".into()
+            },
+            payload: json!({
+                "command_id": updated_session.command_id,
+                "correlation_id": updated_session.correlation_id,
+                "command": updated_session.command,
+                "target": updated_session.target,
+                "command_state": updated_session.command_state,
+                "accepted": updated_session.accepted,
+                "response_payload": updated_session
+                    .response_payload
+                    .as_ref()
+                    .map(Self::sdk_command_event_payload_summary)
+                    .unwrap_or(JsonValue::Null),
+            }),
+        });
         Ok(RpcResponse {
             id: request.id,
             result: Some(json!({
