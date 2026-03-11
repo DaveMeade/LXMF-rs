@@ -3224,10 +3224,30 @@ fn capture_python_impl_environment() -> Result<PythonImplEnvironment> {
             "python3",
             &["-c", "import LXMF; print(getattr(LXMF, '__file__', 'unknown'))"],
         )?,
-        uname: capture_command_stdout("uname", &["-a"])?,
+        uname: capture_platform_descriptor()?,
         git_commit,
         benchmark_config_path: PYTHON_IMPL_BENCH_CONFIG_PATH.to_string(),
     })
+}
+
+fn capture_platform_descriptor() -> Result<String> {
+    #[cfg(target_family = "windows")]
+    {
+        let release = capture_command_stdout("cmd", &["/C", "ver"]).unwrap_or_else(|_| {
+            format!(
+                "Windows ({})",
+                std::env::var("OS").unwrap_or_else(|_| std::env::consts::OS.to_string())
+            )
+        });
+        let arch = std::env::var("PROCESSOR_ARCHITECTURE")
+            .unwrap_or_else(|_| std::env::consts::ARCH.to_string());
+        return Ok(format!("{release}; arch={arch}"));
+    }
+
+    #[cfg(not(target_family = "windows"))]
+    {
+        capture_command_stdout("uname", &["-a"])
+    }
 }
 
 fn collect_estimate_files(dir: &Path, out: &mut Vec<PathBuf>) -> Result<()> {
