@@ -37,9 +37,8 @@ impl RpcError {
         let code = code.into();
         let message = message.into();
         let category = Self::category_for_code(code.as_str());
-        let retryable = category
-            .as_deref()
-            .is_some_and(|value| value == "Transport" || value == "Timeout");
+        let retryable =
+            category.as_deref().is_some_and(|value| value == "Transport" || value == "Timeout");
         let is_user_actionable = category.as_deref().is_some_and(|value| {
             matches!(value, "Validation" | "Capability" | "Config" | "Policy" | "Security")
         });
@@ -116,11 +115,27 @@ pub struct DeliveryPolicy {
     pub prioritised_destinations: Vec<String>,
 }
 
-#[derive(Debug, Serialize, Deserialize, Clone, PartialEq, Default)]
+#[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
 pub struct PropagationState {
     pub enabled: bool,
     pub store_root: Option<String>,
     pub target_cost: u32,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub message_storage_limit_mb: Option<u64>,
+    #[serde(default = "default_true")]
+    pub autopeer: bool,
+    #[serde(default = "default_autopeer_maxdepth")]
+    pub autopeer_maxdepth: u32,
+    #[serde(default)]
+    pub static_peers: Vec<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub max_peers: Option<u32>,
+    #[serde(default)]
+    pub from_static_only: bool,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub peering_cost: Option<u32>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub remote_peering_cost_max: Option<u32>,
     pub total_ingested: usize,
     pub last_ingest_count: usize,
     pub sync_state: u32,
@@ -128,10 +143,51 @@ pub struct PropagationState {
     pub sync_progress: f64,
     pub messages_received: usize,
     pub max_messages: usize,
+    #[serde(default)]
+    pub client_propagation_messages_received: usize,
+    #[serde(default)]
+    pub client_propagation_messages_served: usize,
+    #[serde(default)]
+    pub unpeered_propagation_incoming: usize,
+    #[serde(default)]
+    pub unpeered_propagation_rx_bytes: u64,
     pub selected_node: Option<String>,
     pub last_sync_started: Option<i64>,
     pub last_sync_completed: Option<i64>,
     pub last_sync_error: Option<String>,
+}
+
+impl Default for PropagationState {
+    fn default() -> Self {
+        Self {
+            enabled: false,
+            store_root: None,
+            target_cost: 0,
+            message_storage_limit_mb: None,
+            autopeer: default_true(),
+            autopeer_maxdepth: default_autopeer_maxdepth(),
+            static_peers: Vec::new(),
+            max_peers: None,
+            from_static_only: false,
+            peering_cost: None,
+            remote_peering_cost_max: None,
+            total_ingested: 0,
+            last_ingest_count: 0,
+            sync_state: 0,
+            state_name: String::new(),
+            sync_progress: 0.0,
+            messages_received: 0,
+            max_messages: 0,
+            client_propagation_messages_received: 0,
+            client_propagation_messages_served: 0,
+            unpeered_propagation_incoming: 0,
+            unpeered_propagation_rx_bytes: 0,
+            selected_node: None,
+            last_sync_started: None,
+            last_sync_completed: None,
+            last_sync_error: None,
+        }
+    }
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone, PartialEq, Eq, Default)]
@@ -338,6 +394,7 @@ pub struct RpcDaemon {
     announce_bridge: Option<Arc<dyn AnnounceBridge>>,
     event_sink_bridges: Vec<Arc<dyn EventSinkBridge>>,
     interface_mutation_bridge: Mutex<Option<Arc<dyn InterfaceMutationBridge>>>,
+    remote_control_bridge: Mutex<Option<Arc<dyn RemoteControlBridge>>>,
 }
 
 pub trait OutboundBridge: Send + Sync {
@@ -354,6 +411,31 @@ pub trait AnnounceBridge: Send + Sync {
 
 pub trait InterfaceMutationBridge: Send + Sync {
     fn apply_interfaces(&self, interfaces: Vec<InterfaceRecord>) -> Result<(), std::io::Error>;
+}
+
+pub trait RemoteControlBridge: Send + Sync {
+    fn propagation_remote_status(
+        &self,
+        remote: &str,
+        identity_private_key_hex: Option<&str>,
+        timeout_secs: f64,
+    ) -> Result<JsonValue, std::io::Error>;
+
+    fn propagation_remote_sync(
+        &self,
+        remote: &str,
+        peer: &str,
+        identity_private_key_hex: Option<&str>,
+        timeout_secs: f64,
+    ) -> Result<JsonValue, std::io::Error>;
+
+    fn propagation_remote_unpeer(
+        &self,
+        remote: &str,
+        peer: &str,
+        identity_private_key_hex: Option<&str>,
+        timeout_secs: f64,
+    ) -> Result<JsonValue, std::io::Error>;
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
@@ -409,7 +491,41 @@ pub struct PeerRecord {
     #[serde(default)]
     pub name_source: Option<String>,
     #[serde(default)]
+    pub peer_type: Option<String>,
+    #[serde(default)]
+    pub alive: bool,
+    #[serde(default)]
+    pub last_sync_attempt: i64,
+    #[serde(default)]
+    pub next_sync_attempt: i64,
+    #[serde(default)]
+    pub sync_backoff: u32,
+    #[serde(default = "default_network_distance")]
+    pub network_distance: u32,
+    #[serde(default)]
+    pub rx_bytes: u64,
+    #[serde(default)]
+    pub tx_bytes: u64,
+    #[serde(default = "default_acceptance_rate")]
+    pub acceptance_rate: f64,
+    #[serde(default)]
     pub first_seen: i64,
     #[serde(default)]
     pub seen_count: u64,
+}
+
+fn default_true() -> bool {
+    true
+}
+
+fn default_autopeer_maxdepth() -> u32 {
+    6
+}
+
+fn default_network_distance() -> u32 {
+    1
+}
+
+fn default_acceptance_rate() -> f64 {
+    1.0
 }
