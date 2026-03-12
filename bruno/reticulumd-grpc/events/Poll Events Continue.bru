@@ -1,0 +1,23 @@
+meta {
+  name: Poll Events Continue
+  type: grpc
+  seq: 2
+}
+
+grpc {
+  url: {{grpc_host}}
+  method: /lxmf.events.v1.EventService/PollEvents
+  body: grpc
+  auth: inherit
+  methodType: unary
+}
+
+body:grpc {
+  name: message 1
+  content: '''
+    {
+      "cursor": "v2:25a7f532301e3129df02cc0f71c02609:sdk-events:3",
+      "max": 16
+    }
+  '''
+}

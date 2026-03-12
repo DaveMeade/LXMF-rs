@@ -1,0 +1,35 @@
+meta {
+  name: Unpeer
+  type: http
+  seq: 3
+}
+
+docs {
+  Removes one peer id from the peer table. Replace the placeholder with a real peer id from List Peers.
+}
+
+post {
+  url: {{rpc_base}}/rpc/json
+  body: json
+  auth: none
+}
+
+headers {
+  Content-Type: application/json
+  Accept: application/json
+}
+
+body:json {
+  {
+    "jsonrpc": "2.0",
+    "id": 72,
+    "method": "peer_unpeer",
+    "params": {
+      "peer": "{{peer_id}}"
+    }
+  }
+}
+
+assert {
+  res.status: eq 200
+}

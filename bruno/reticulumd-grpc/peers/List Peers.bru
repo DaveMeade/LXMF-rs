@@ -1,0 +1,20 @@
+meta {
+  name: List Peers
+  type: grpc
+  seq: 1
+}
+
+grpc {
+  url: {{grpc_host}}
+  method: /lxmf.peers.v1.PeerService/ListPeers
+  body: grpc
+  auth: inherit
+  methodType: unary
+}
+
+body:grpc {
+  name: message 1
+  content: '''
+    {}
+  '''
+}

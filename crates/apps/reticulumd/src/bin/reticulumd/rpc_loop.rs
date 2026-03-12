@@ -6,6 +6,7 @@ use rustls::{RootCertStore, ServerConfig};
 use rustls_pemfile::private_key;
 use serde_json::json;
 use std::fs::File;
+use std::io::IsTerminal;
 use std::io::{self, BufReader};
 use std::net::{IpAddr, SocketAddr};
 use std::path::Path;
@@ -250,6 +251,22 @@ fn emit_rpc_access_log(
     error_text: Option<&str>,
 ) {
     let status_code = parse_status_code(response).unwrap_or(0);
+    if pretty_console_logs_enabled() {
+        eprintln!(
+            "{} {} {} {} {}{}{}",
+            pretty_tag("rpc", 34),
+            pretty_status(&status_code.to_string(), status_code_color(status_code)),
+            pretty_elapsed(elapsed_ms),
+            pretty_method(&format!("{} {}", meta.http_method, meta.path)),
+            pretty_secondary(&format!("peer={peer_addr}")),
+            meta.rpc_method
+                .as_ref()
+                .map(|method| format!(" {}", pretty_secondary(&format!("rpc={method}"))))
+                .unwrap_or_default(),
+            error_text.map(|error| format!(" {}", pretty_error(error))).unwrap_or_default()
+        );
+        return;
+    }
     let payload = json!({
         "event": "rpc_request",
         "peer": peer_addr.to_string(),
@@ -264,6 +281,69 @@ fn emit_rpc_access_log(
         "error": error_text,
     });
     eprintln!("{}", payload);
+}
+
+fn pretty_console_logs_enabled() -> bool {
+    matches!(
+        std::env::var("LXMF_LOG_PRETTY").ok().as_deref(),
+        Some("1" | "true" | "TRUE" | "yes" | "YES" | "on" | "ON")
+    )
+}
+
+fn pretty_color_enabled() -> bool {
+    if matches!(
+        std::env::var("LXMF_LOG_COLOR").ok().as_deref(),
+        Some("1" | "true" | "TRUE" | "yes" | "YES" | "on" | "ON" | "always" | "ALWAYS")
+    ) {
+        return true;
+    }
+    if matches!(
+        std::env::var("LXMF_LOG_COLOR").ok().as_deref(),
+        Some("0" | "false" | "FALSE" | "no" | "NO" | "off" | "OFF" | "never" | "NEVER")
+    ) {
+        return false;
+    }
+    pretty_console_logs_enabled() && std::io::stderr().is_terminal()
+}
+
+fn ansi(text: &str, code: &str) -> String {
+    if pretty_color_enabled() {
+        format!("\x1b[{code}m{text}\x1b[0m")
+    } else {
+        text.to_string()
+    }
+}
+
+fn pretty_tag(label: &str, color: u8) -> String {
+    ansi(&format!("[{label:<4}]"), &color.to_string())
+}
+
+fn pretty_status(label: &str, color: u8) -> String {
+    ansi(&format!("{label:<4}"), &format!("1;{color}"))
+}
+
+fn pretty_elapsed(elapsed_ms: u64) -> String {
+    ansi(&format!("{elapsed_ms:>4}ms"), "2")
+}
+
+fn pretty_method(method: &str) -> String {
+    ansi(method, "1")
+}
+
+fn pretty_secondary(value: &str) -> String {
+    ansi(value, "2")
+}
+
+fn pretty_error(value: &str) -> String {
+    ansi(&format!("error={value}"), "31")
+}
+
+fn status_code_color(status_code: u16) -> u8 {
+    match status_code {
+        200..=299 => 32,
+        400..=499 => 33,
+        _ => 31,
+    }
 }
 
 fn build_tls_server_config(config: &RpcTlsConfig) -> io::Result<std::sync::Arc<ServerConfig>> {

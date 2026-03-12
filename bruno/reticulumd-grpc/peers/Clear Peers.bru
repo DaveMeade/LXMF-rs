@@ -1,0 +1,20 @@
+meta {
+  name: Clear Peers
+  type: grpc
+  seq: 4
+}
+
+grpc {
+  url: {{grpc_host}}
+  method: /lxmf.peers.v1.PeerService/ClearPeers
+  body: grpc
+  auth: inherit
+  methodType: unary
+}
+
+body:grpc {
+  name: message 1
+  content: '''
+    {}
+  '''
+}

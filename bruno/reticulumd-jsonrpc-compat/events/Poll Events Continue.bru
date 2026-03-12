@@ -1,0 +1,36 @@
+meta {
+  name: Poll Events Continue
+  type: http
+  seq: 2
+}
+
+docs {
+  A next_cursor-only response is normal when there are no pending events. Reuse that next_cursor here to continue polling.
+}
+
+post {
+  url: {{rpc_base}}/rpc/json
+  body: json
+  auth: none
+}
+
+headers {
+  Content-Type: application/json
+  Accept: application/json
+}
+
+body:json {
+  {
+    "jsonrpc": "2.0",
+    "id": 41,
+    "method": "sdk_poll_events_v2",
+    "params": {
+      "cursor": "{{next_cursor}}",
+      "max": 16
+    }
+  }
+}
+
+assert {
+  res.status: eq 200
+}

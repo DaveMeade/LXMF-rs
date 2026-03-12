@@ -1,0 +1,25 @@
+meta {
+  name: List Markers Continue
+  type: grpc
+  seq: 3
+}
+
+grpc {
+  url: {{grpc_host}}
+  method: /lxmf.markers.v1.MarkerService/ListMarkers
+  body: grpc
+  auth: inherit
+  methodType: unary
+}
+
+body:grpc {
+  name: message 1
+  content: '''
+    {
+      "page": {
+        "pageToken": "{{next_page_token}}",
+        "pageSize": 25
+      }
+    }
+  '''
+}

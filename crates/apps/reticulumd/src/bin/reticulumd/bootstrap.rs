@@ -20,6 +20,7 @@ use rns_transport::iface::tcp_server::TcpServer;
 use rns_transport::transport::{Transport, TransportConfig};
 use serde_json::{Map as JsonMap, Value as JsonValue};
 use std::collections::HashMap;
+use std::io::IsTerminal;
 use std::net::SocketAddr;
 use std::path::PathBuf;
 use std::sync::{Arc, Mutex};
@@ -36,8 +37,10 @@ pub(super) struct RpcTlsConfig {
 
 pub(super) struct BootstrapContext {
     pub(super) rpc_addr: SocketAddr,
+    pub(super) grpc_addr: Option<SocketAddr>,
     pub(super) daemon: Arc<RpcDaemon>,
     pub(super) rpc_tls: Option<RpcTlsConfig>,
+    pub(super) grpc_tls: Option<RpcTlsConfig>,
 }
 
 #[derive(Clone, Debug)]
@@ -57,18 +60,24 @@ pub(super) struct InterfaceStartupFailure {
 
 pub(super) async fn bootstrap(args: Args) -> BootstrapContext {
     let rpc_addr: SocketAddr = args.rpc.parse().expect("invalid rpc address");
-    let rpc_tls =
-        match (args.rpc_tls_cert.clone(), args.rpc_tls_key.clone(), args.rpc_tls_client_ca.clone())
-        {
-            (None, None, None) => None,
-            (Some(cert_chain_path), Some(private_key_path), client_ca_path) => {
-                Some(RpcTlsConfig { cert_chain_path, private_key_path, client_ca_path })
-            }
-            (None, None, Some(_)) => {
-                panic!("--rpc-tls-client-ca requires --rpc-tls-cert and --rpc-tls-key")
-            }
-            _ => panic!("--rpc-tls-cert and --rpc-tls-key must be provided together"),
-        };
+    let grpc_addr: Option<SocketAddr> =
+        args.grpc.as_ref().map(|addr| addr.parse().expect("invalid grpc address"));
+    let rpc_tls = parse_tls_args(
+        "--rpc-tls-cert",
+        "--rpc-tls-key",
+        "--rpc-tls-client-ca",
+        args.rpc_tls_cert.clone(),
+        args.rpc_tls_key.clone(),
+        args.rpc_tls_client_ca.clone(),
+    );
+    let grpc_tls = parse_tls_args(
+        "--grpc-tls-cert",
+        "--grpc-tls-key",
+        "--grpc-tls-client-ca",
+        args.grpc_tls_cert.clone(),
+        args.grpc_tls_key.clone(),
+        args.grpc_tls_client_ca.clone(),
+    );
     let store = MessagesStore::open(&args.db).expect("open sqlite");
 
     let identity_path = args.identity.clone().unwrap_or_else(|| {
@@ -132,6 +141,13 @@ pub(super) async fn bootstrap(args: Args) -> BootstrapContext {
     let node_announce_interval_secs = env_u64("LXMD_NODE_ANNOUNCE_INTERVAL_SECS");
 
     if let Some(addr) = args.transport.clone() {
+        println!(
+            "{}",
+            pretty_boot_line(
+                "transport",
+                &format!("reticulumd transport listening on reticulum://{}", addr)
+            )
+        );
         let transport_identity =
             rns_transport::identity_bridge::to_transport_private_identity(&identity);
         let config = TransportConfig::new("daemon", &transport_identity, true);
@@ -374,7 +390,7 @@ pub(super) async fn bootstrap(args: Args) -> BootstrapContext {
                 }
             }
         }
-        eprintln!("[daemon] transport enabled");
+        eprintln!("{}", pretty_daemon_line("transport enabled"));
         if let Some((host, port)) = addr.rsplit_once(':') {
             let mut server_record = InterfaceRecord {
                 kind: "tcp_server".into(),
@@ -403,8 +419,11 @@ pub(super) async fn bootstrap(args: Args) -> BootstrapContext {
             delivery_source_hash.copy_from_slice(dest.desc.address_hash.as_slice());
             delivery_destination_hash_hex = Some(hex::encode(dest.desc.address_hash.as_slice()));
             println!(
-                "[daemon] delivery destination hash={}",
-                hex::encode(dest.desc.address_hash.as_slice())
+                "{}",
+                pretty_daemon_line(&format!(
+                    "delivery destination hash={}",
+                    hex::encode(dest.desc.address_hash.as_slice())
+                ))
             );
         }
         announce_destination = Some(destination);
@@ -420,8 +439,11 @@ pub(super) async fn bootstrap(args: Args) -> BootstrapContext {
                 propagation_destination_hash_hex =
                     Some(hex::encode(dest.desc.address_hash.as_slice()));
                 println!(
-                    "[daemon] propagation destination hash={}",
-                    hex::encode(dest.desc.address_hash.as_slice())
+                    "{}",
+                    pretty_daemon_line(&format!(
+                        "propagation destination hash={}",
+                        hex::encode(dest.desc.address_hash.as_slice())
+                    ))
                 );
             }
             propagation_destination = Some(propagation);
@@ -436,14 +458,23 @@ pub(super) async fn bootstrap(args: Args) -> BootstrapContext {
                 let dest = control.lock().await;
                 control_destination_hash_hex = Some(hex::encode(dest.desc.address_hash.as_slice()));
                 println!(
-                    "[daemon] control destination hash={}",
-                    hex::encode(dest.desc.address_hash.as_slice())
+                    "{}",
+                    pretty_daemon_line(&format!(
+                        "control destination hash={}",
+                        hex::encode(dest.desc.address_hash.as_slice())
+                    ))
                 );
             }
             control_destination = Some(control);
         }
         transport = Some(Arc::new(transport_instance));
     } else if let Some(config) = daemon_config.as_ref() {
+        eprintln!(
+            "{}",
+            pretty_warn_line(
+                "transport disabled; configured interfaces will remain inactive until you start reticulumd with --transport HOST:PORT"
+            )
+        );
         for (index, iface) in config.interfaces.iter().enumerate() {
             if !iface.enabled() {
                 continue;
@@ -486,6 +517,24 @@ pub(super) async fn bootstrap(args: Args) -> BootstrapContext {
     {
         panic!("{policy_error}");
     }
+
+    let grpc_summary =
+        grpc_addr.map(|addr| addr.to_string()).unwrap_or_else(|| "disabled".to_string());
+    let transport_summary = args.transport.clone().unwrap_or_else(|| "disabled".to_string());
+    println!(
+        "{}",
+        pretty_boot_line(
+            "startup",
+            &format!(
+                "reticulumd startup summary: rpc={} grpc={} transport={} interfaces={} identity={}",
+                rpc_addr,
+                grpc_summary,
+                transport_summary,
+                configured_interfaces.len(),
+                identity_hash
+            )
+        )
+    );
 
     let bridge: Option<Arc<TransportBridge>> =
         transport.as_ref().zip(announce_destination.as_ref()).map(|(transport, destination)| {
@@ -619,7 +668,79 @@ pub(super) async fn bootstrap(args: Args) -> BootstrapContext {
         spawn_announce_worker(daemon.clone(), transport, peer_crypto);
     }
 
-    BootstrapContext { rpc_addr, daemon, rpc_tls }
+    BootstrapContext { rpc_addr, grpc_addr, daemon, rpc_tls, grpc_tls }
+}
+
+fn pretty_console_logs_enabled() -> bool {
+    matches!(
+        std::env::var("LXMF_LOG_PRETTY").ok().as_deref(),
+        Some("1" | "true" | "TRUE" | "yes" | "YES" | "on" | "ON")
+    )
+}
+
+fn pretty_color_enabled() -> bool {
+    if matches!(
+        std::env::var("LXMF_LOG_COLOR").ok().as_deref(),
+        Some("1" | "true" | "TRUE" | "yes" | "YES" | "on" | "ON" | "always" | "ALWAYS")
+    ) {
+        return true;
+    }
+    if matches!(
+        std::env::var("LXMF_LOG_COLOR").ok().as_deref(),
+        Some("0" | "false" | "FALSE" | "no" | "NO" | "off" | "OFF" | "never" | "NEVER")
+    ) {
+        return false;
+    }
+    pretty_console_logs_enabled() && std::io::stderr().is_terminal()
+}
+
+fn ansi(text: &str, code: &str) -> String {
+    if pretty_color_enabled() {
+        format!("\x1b[{code}m{text}\x1b[0m")
+    } else {
+        text.to_string()
+    }
+}
+
+fn pretty_boot_line(tag: &str, body: &str) -> String {
+    if !pretty_console_logs_enabled() {
+        return body.to_string();
+    }
+    format!("{} {}", ansi(&format!("[{tag}]"), "1;35"), body)
+}
+
+fn pretty_daemon_line(body: &str) -> String {
+    if !pretty_console_logs_enabled() {
+        return format!("[daemon] {body}");
+    }
+    format!("{} {}", ansi("[daemon]", "1;34"), body)
+}
+
+fn pretty_warn_line(body: &str) -> String {
+    if !pretty_console_logs_enabled() {
+        return format!("[warn] {body}");
+    }
+    format!("{} {}", ansi("[warn]", "1;33"), body)
+}
+
+fn parse_tls_args(
+    cert_flag: &str,
+    key_flag: &str,
+    client_ca_flag: &str,
+    cert_chain_path: Option<PathBuf>,
+    private_key_path: Option<PathBuf>,
+    client_ca_path: Option<PathBuf>,
+) -> Option<RpcTlsConfig> {
+    match (cert_chain_path, private_key_path, client_ca_path) {
+        (None, None, None) => None,
+        (Some(cert_chain_path), Some(private_key_path), client_ca_path) => {
+            Some(RpcTlsConfig { cert_chain_path, private_key_path, client_ca_path })
+        }
+        (None, None, Some(_)) => {
+            panic!("{client_ca_flag} requires {cert_flag} and {key_flag}")
+        }
+        _ => panic!("{cert_flag} and {key_flag} must be provided together"),
+    }
 }
 
 fn interface_record_from_config(iface: &InterfaceConfig) -> InterfaceRecord {

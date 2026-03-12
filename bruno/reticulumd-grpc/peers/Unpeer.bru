@@ -1,0 +1,22 @@
+meta {
+  name: Unpeer
+  type: grpc
+  seq: 3
+}
+
+grpc {
+  url: {{grpc_host}}
+  method: /lxmf.peers.v1.PeerService/Unpeer
+  body: grpc
+  auth: inherit
+  methodType: unary
+}
+
+body:grpc {
+  name: message 1
+  content: '''
+    {
+      "peerId": "{{peer_id}}"
+    }
+  '''
+}

@@ -1,0 +1,35 @@
+meta {
+  name: Sync Peer
+  type: http
+  seq: 2
+}
+
+docs {
+  Starts or refreshes sync for one peer id. Replace the placeholder peer with a real peer id from List Peers.
+}
+
+post {
+  url: {{rpc_base}}/rpc/json
+  body: json
+  auth: none
+}
+
+headers {
+  Content-Type: application/json
+  Accept: application/json
+}
+
+body:json {
+  {
+    "jsonrpc": "2.0",
+    "id": 71,
+    "method": "peer_sync",
+    "params": {
+      "peer": "{{peer_id}}"
+    }
+  }
+}
+
+assert {
+  res.status: eq 200
+}

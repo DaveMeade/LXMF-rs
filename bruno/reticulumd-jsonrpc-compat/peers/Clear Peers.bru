@@ -1,0 +1,33 @@
+meta {
+  name: Clear Peers
+  type: http
+  seq: 4
+}
+
+docs {
+  Clears the daemon peer table. Use carefully.
+}
+
+post {
+  url: {{rpc_base}}/rpc/json
+  body: json
+  auth: none
+}
+
+headers {
+  Content-Type: application/json
+  Accept: application/json
+}
+
+body:json {
+  {
+    "jsonrpc": "2.0",
+    "id": 73,
+    "method": "clear_peers",
+    "params": {}
+  }
+}
+
+assert {
+  res.status: eq 200
+}
