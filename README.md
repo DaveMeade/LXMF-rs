@@ -80,6 +80,19 @@ host-native `lxmd` and `reticulumd` binaries, generates
 `target/release-bundles/`. The command emits `.zip` bundles on Windows and
 `.tar.gz` bundles on macOS/Linux.
 
+On macOS, Gatekeeper may quarantine a downloaded release bundle because the
+project does not currently ship signed/notarized binaries. If that happens,
+remove the quarantine attribute after extracting the archive:
+
+```bash
+xattr -dr com.apple.quarantine /path/to/lxmd-daemon-<version>-macos-arm64
+chmod +x /path/to/lxmd-daemon-<version>-macos-arm64/lxmd
+chmod +x /path/to/lxmd-daemon-<version>-macos-arm64/reticulumd
+```
+
+You can also remove the attribute on just one binary, for example
+`xattr -d com.apple.quarantine ./lxmd`.
+
 If `sccache` is installed and you want to use it, set `RUSTC_WRAPPER=sccache`
 in your shell before building. The workspace no longer hardcodes a Unix-only
 wrapper path, so native Windows builds work without extra Cargo config.
