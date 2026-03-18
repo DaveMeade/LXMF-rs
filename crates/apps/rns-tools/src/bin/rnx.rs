@@ -1,3 +1,5 @@
+#![allow(clippy::too_many_arguments)]
+
 use base64::engine::general_purpose::STANDARD as BASE64_STANDARD;
 use base64::Engine as _;
 #[cfg(any(target_os = "linux", target_os = "macos", target_os = "windows"))]
@@ -705,6 +707,7 @@ fn capture_camera_over_ble(
                     }
                     #[cfg(not(target_os = "macos"))]
                     {
+                        let _ = &error;
                         find_camera_peripheral_by_profile(
                             &adapter,
                             peripheral_id,
@@ -886,7 +889,7 @@ fn run_ble_scan(
                 continue;
             };
             if let Some(expected_service) = service_filter {
-                if !properties.services.iter().any(|service| *service == expected_service) {
+                if !properties.services.contains(&expected_service) {
                     continue;
                 }
             }
@@ -983,13 +986,12 @@ fn run_ble_find_camera(
             for (_, rssi, peripheral, name) in candidates {
                 let id = peripheral.id().to_string();
                 let connected = peripheral.is_connected().await.map_err(io::Error::other)?;
-                if !connected {
-                    if tokio::time::timeout(Duration::from_millis(650), peripheral.connect())
+                if !connected
+                    && tokio::time::timeout(Duration::from_millis(650), peripheral.connect())
                         .await
                         .is_err()
-                    {
-                        continue;
-                    }
+                {
+                    continue;
                 }
                 if peripheral.discover_services().await.is_err() {
                     let _ = peripheral.disconnect().await;
@@ -1964,13 +1966,12 @@ async fn find_camera_peripheral_by_profile(
         candidates.sort_by_key(|(rank, _)| *rank);
         for (_, peripheral) in candidates {
             let connected = peripheral.is_connected().await.map_err(io::Error::other)?;
-            if !connected {
-                if tokio::time::timeout(Duration::from_millis(700), peripheral.connect())
+            if !connected
+                && tokio::time::timeout(Duration::from_millis(700), peripheral.connect())
                     .await
                     .is_err()
-                {
-                    continue;
-                }
+            {
+                continue;
             }
             if peripheral.discover_services().await.is_err() {
                 let _ = peripheral.disconnect().await;

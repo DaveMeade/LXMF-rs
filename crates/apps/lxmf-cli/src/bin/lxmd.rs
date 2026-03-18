@@ -556,7 +556,7 @@ fn show_remote_status_and_peers(
     )?);
     let status = response.get("status").cloned().unwrap_or(response.clone());
 
-    if args.status || (!args.status && !args.peers) {
+    if args.status || !args.peers {
         print_remote_status_summary(&status);
     }
     if args.peers {
@@ -1847,7 +1847,7 @@ fn parse_python_reticulum_interfaces(input: &str) -> Vec<SingleTomlInterface> {
     push_current(&mut parsed, current.take());
     for iface in &mut parsed {
         if iface.interface_type == "tcp_server"
-            && iface.host.as_deref().map(str::trim).is_none_or(|value| value.is_empty())
+            && iface.host.as_deref().map(str::trim).map_or(true, |value| value.is_empty())
         {
             iface.host = Some("0.0.0.0".to_string());
         }
