@@ -1,10 +1,11 @@
 use crate::bootstrap::{
     enforce_startup_policy, mark_interface_runtime_fields, mark_interface_startup_status,
-    InterfaceStartupFailure,
+    select_tcp_server_bind, InterfaceStartupFailure,
 };
 use crate::bridge_helpers::opportunistic_payload;
 use crate::interfaces::{lora, serial};
 use crate::{bootstrap, Args};
+use futures::FutureExt;
 use reticulum_daemon::config::InterfaceConfig;
 use rns_rpc::{InterfaceRecord, RpcRequest};
 use rns_transport::delivery::send_outcome_status;
@@ -186,6 +187,77 @@ fn strict_startup_policy_rejects_interface_failures() {
 }
 
 #[test]
+fn select_tcp_server_bind_uses_single_enabled_interface_when_transport_not_set() {
+    let args = test_args(PathBuf::from("/tmp/db"), None, None, false);
+    let config = reticulum_daemon::config::DaemonConfig {
+        interfaces: vec![InterfaceConfig {
+            kind: "tcp_server".to_string(),
+            enabled: Some(true),
+            host: None,
+            port: Some(4242),
+            ..InterfaceConfig::default()
+        }],
+    };
+
+    let selected = select_tcp_server_bind(&args, Some(&config)).expect("select server");
+    assert_eq!(selected.bind_addr.as_deref(), Some("0.0.0.0:4242"));
+    assert_eq!(selected.selected_index, Some(0));
+}
+
+#[test]
+fn select_tcp_server_bind_prefers_transport_override() {
+    let args = test_args(PathBuf::from("/tmp/db"), None, Some("127.0.0.1:4333".to_string()), false);
+    let config = reticulum_daemon::config::DaemonConfig {
+        interfaces: vec![
+            InterfaceConfig {
+                kind: "tcp_server".to_string(),
+                enabled: Some(true),
+                host: Some("0.0.0.0".to_string()),
+                port: Some(4242),
+                ..InterfaceConfig::default()
+            },
+            InterfaceConfig {
+                kind: "tcp_server".to_string(),
+                enabled: Some(true),
+                host: Some("127.0.0.1".to_string()),
+                port: Some(4243),
+                ..InterfaceConfig::default()
+            },
+        ],
+    };
+
+    let selected = select_tcp_server_bind(&args, Some(&config)).expect("transport override wins");
+    assert_eq!(selected.bind_addr.as_deref(), Some("127.0.0.1:4333"));
+    assert_eq!(selected.selected_index, None);
+}
+
+#[test]
+fn select_tcp_server_bind_rejects_multiple_enabled_servers_without_override() {
+    let args = test_args(PathBuf::from("/tmp/db"), None, None, false);
+    let config = reticulum_daemon::config::DaemonConfig {
+        interfaces: vec![
+            InterfaceConfig {
+                kind: "tcp_server".to_string(),
+                enabled: Some(true),
+                host: Some("0.0.0.0".to_string()),
+                port: Some(4242),
+                ..InterfaceConfig::default()
+            },
+            InterfaceConfig {
+                kind: "tcp_server".to_string(),
+                enabled: Some(true),
+                host: Some("127.0.0.1".to_string()),
+                port: Some(4243),
+                ..InterfaceConfig::default()
+            },
+        ],
+    };
+
+    let err = select_tcp_server_bind(&args, Some(&config)).expect_err("multiple servers must fail");
+    assert!(err.contains("multiple enabled tcp_server interfaces"));
+}
+
+#[test]
 fn bootstrap_best_effort_marks_interfaces_inactive_when_transport_is_disabled() {
     let temp = TempDir::new().expect("temp dir");
     let db_path = temp.path().join("reticulum.db");
@@ -226,6 +298,275 @@ interfaces = [
             .and_then(|value| value.as_str()),
         Some("inactive_transport_disabled")
     );
+}
+
+#[test]
+fn bootstrap_starts_tcp_server_from_config_without_transport_flag() {
+    let temp = TempDir::new().expect("temp dir");
+    let db_path = temp.path().join("reticulum.db");
+    let config_path = temp.path().join("daemon.toml");
+    fs::write(
+        &config_path,
+        r#"
+interfaces = [
+  { type = "tcp_server", enabled = true, name = "server-main", host = "127.0.0.1", port = 0 }
+]
+"#,
+    )
+    .expect("write config");
+
+    let runtime =
+        tokio::runtime::Builder::new_current_thread().enable_all().build().expect("runtime");
+    let context = runtime.block_on(async {
+        bootstrap::bootstrap(test_args(db_path.clone(), Some(config_path.clone()), None, false))
+            .await
+    });
+    let response = context
+        .daemon
+        .handle_rpc(RpcRequest { id: 1, method: "list_interfaces".to_string(), params: None })
+        .expect("list_interfaces");
+    let interfaces = response
+        .result
+        .expect("result")
+        .get("interfaces")
+        .and_then(|value| value.as_array())
+        .cloned()
+        .expect("interfaces array");
+
+    let tcp_server = interfaces
+        .iter()
+        .find(|entry| entry.get("type").and_then(|value| value.as_str()) == Some("tcp_server"))
+        .expect("tcp_server entry");
+    assert_eq!(
+        tcp_server
+            .get("settings")
+            .and_then(|value| value.get("_runtime"))
+            .and_then(|value| value.get("startup_status"))
+            .and_then(|value| value.as_str()),
+        Some("active")
+    );
+}
+
+#[test]
+fn bootstrap_transport_override_shadows_configured_tcp_servers_without_failure() {
+    let temp = TempDir::new().expect("temp dir");
+    let db_path = temp.path().join("reticulum.db");
+    let config_path = temp.path().join("daemon.toml");
+    fs::write(
+        &config_path,
+        r#"
+interfaces = [
+  { type = "tcp_server", enabled = true, name = "server-a", host = "127.0.0.1", port = 4242 },
+  { type = "tcp_server", enabled = true, name = "server-b", host = "127.0.0.1", port = 4243 }
+]
+"#,
+    )
+    .expect("write config");
+
+    let runtime =
+        tokio::runtime::Builder::new_current_thread().enable_all().build().expect("runtime");
+    let context = runtime.block_on(async {
+        bootstrap::bootstrap(test_args(
+            db_path.clone(),
+            Some(config_path.clone()),
+            Some("127.0.0.1:0".to_string()),
+            true,
+        ))
+        .await
+    });
+    let response = context
+        .daemon
+        .handle_rpc(RpcRequest { id: 1, method: "list_interfaces".to_string(), params: None })
+        .expect("list_interfaces");
+    let interfaces = response
+        .result
+        .expect("result")
+        .get("interfaces")
+        .and_then(|value| value.as_array())
+        .cloned()
+        .expect("interfaces array");
+
+    let shadowed = interfaces
+        .iter()
+        .filter(|entry| {
+            entry
+                .get("settings")
+                .and_then(|value| value.get("_runtime"))
+                .and_then(|value| value.get("startup_status"))
+                .and_then(|value| value.as_str())
+                == Some("shadowed_by_transport_override")
+        })
+        .count();
+    assert!(shadowed >= 2);
+}
+
+#[test]
+fn bootstrap_transport_override_shadows_missing_port_tcp_server_without_strict_failure() {
+    let temp = TempDir::new().expect("temp dir");
+    let db_path = temp.path().join("reticulum.db");
+    let config_path = temp.path().join("daemon.toml");
+    fs::write(
+        &config_path,
+        r#"
+interfaces = [
+  { type = "tcp_server", enabled = true, name = "server-a", host = "127.0.0.1", port = 4242 },
+  { type = "tcp_server", enabled = true, name = "server-b" }
+]
+"#,
+    )
+    .expect("write config");
+
+    let runtime =
+        tokio::runtime::Builder::new_current_thread().enable_all().build().expect("runtime");
+    let context = runtime.block_on(async {
+        bootstrap::bootstrap(test_args(
+            db_path.clone(),
+            Some(config_path.clone()),
+            Some("127.0.0.1:0".to_string()),
+            true,
+        ))
+        .await
+    });
+    let response = context
+        .daemon
+        .handle_rpc(RpcRequest { id: 1, method: "list_interfaces".to_string(), params: None })
+        .expect("list_interfaces");
+    let interfaces = response
+        .result
+        .expect("result")
+        .get("interfaces")
+        .and_then(|value| value.as_array())
+        .cloned()
+        .expect("interfaces array");
+
+    let shadowed_missing_port = interfaces.iter().any(|entry| {
+        entry.get("name").and_then(|value| value.as_str()) == Some("server-b")
+            && entry
+                .get("settings")
+                .and_then(|value| value.get("_runtime"))
+                .and_then(|value| value.get("startup_status"))
+                .and_then(|value| value.as_str())
+                == Some("shadowed_by_transport_override")
+    });
+
+    assert!(
+        shadowed_missing_port,
+        "shadowed tcp_server without a port should remain non-fatal under transport override"
+    );
+}
+
+#[test]
+fn reticulum_parity_matrix_mentions_config_driven_lxmd_tcp_server_startup() {
+    let text = fs::read_to_string("docs/plans/reticulum-parity-matrix.md")
+        .expect("read reticulum parity matrix");
+
+    assert!(
+        text.contains("Python-style interface-driven `tcp_server` startup now works from config")
+            && text.contains("without Rust-only transport overrides"),
+        "reticulum parity matrix should document config-driven lxmd tcp_server startup parity"
+    );
+}
+
+#[test]
+fn bootstrap_starts_udp_interface_from_config() {
+    let temp = TempDir::new().expect("temp dir");
+    let db_path = temp.path().join("reticulum.db");
+    let config_path = temp.path().join("daemon.toml");
+    fs::write(
+        &config_path,
+        r#"
+interfaces = [
+  { type = "udp", enabled = true, name = "udp-main", host = "127.0.0.1", port = 0, target_host = "127.0.0.1", target_port = 4242 }
+]
+"#,
+    )
+    .expect("write config");
+
+    let runtime =
+        tokio::runtime::Builder::new_current_thread().enable_all().build().expect("runtime");
+    let context = runtime.block_on(async {
+        bootstrap::bootstrap(test_args(db_path.clone(), Some(config_path.clone()), None, false))
+            .await
+    });
+    let response = context
+        .daemon
+        .handle_rpc(RpcRequest { id: 1, method: "list_interfaces".to_string(), params: None })
+        .expect("list_interfaces");
+    let interfaces = response
+        .result
+        .expect("result")
+        .get("interfaces")
+        .and_then(|value| value.as_array())
+        .cloned()
+        .expect("interfaces array");
+
+    let udp = interfaces
+        .iter()
+        .find(|entry| entry.get("type").and_then(|value| value.as_str()) == Some("udp"))
+        .expect("udp entry");
+    assert_eq!(udp.get("host").and_then(|value| value.as_str()), Some("127.0.0.1"));
+    assert_eq!(udp.get("port").and_then(|value| value.as_u64()), Some(0));
+    assert_eq!(
+        udp.get("settings")
+            .and_then(|value| value.get("target_host"))
+            .and_then(|value| value.as_str()),
+        Some("127.0.0.1")
+    );
+    assert_eq!(
+        udp.get("settings")
+            .and_then(|value| value.get("target_port"))
+            .and_then(|value| value.as_u64()),
+        Some(4242)
+    );
+    assert_eq!(
+        udp.get("settings")
+            .and_then(|value| value.get("_runtime"))
+            .and_then(|value| value.get("startup_status"))
+            .and_then(|value| value.as_str()),
+        Some("spawned")
+    );
+}
+
+#[test]
+fn bootstrap_strict_mode_rejects_unbindable_udp_interface() {
+    let runtime =
+        tokio::runtime::Builder::new_current_thread().enable_all().build().expect("runtime");
+    runtime.block_on(async {
+        let occupied = tokio::net::UdpSocket::bind("127.0.0.1:0").await.expect("bind port");
+        let occupied_addr = occupied.local_addr().expect("local addr");
+
+        let temp = TempDir::new().expect("temp dir");
+        let db_path = temp.path().join("reticulum.db");
+        let config_path = temp.path().join("daemon.toml");
+        fs::write(
+            &config_path,
+            format!(
+                "interfaces = [\n  {{ type = \"udp\", enabled = true, name = \"udp-main\", host = \"127.0.0.1\", port = {}, target_host = \"127.0.0.1\", target_port = 4242 }}\n]\n",
+                occupied_addr.port()
+            ),
+        )
+        .expect("write config");
+
+        let result = std::panic::AssertUnwindSafe(bootstrap::bootstrap(test_args(
+            db_path.clone(),
+            Some(config_path.clone()),
+            None,
+            true,
+        )))
+        .catch_unwind()
+        .await;
+
+        let panic_payload = result.expect_err("strict startup should panic on occupied udp port");
+        let panic_message = if let Some(message) = panic_payload.downcast_ref::<String>() {
+            message.clone()
+        } else if let Some(message) = panic_payload.downcast_ref::<&str>() {
+            (*message).to_string()
+        } else {
+            String::new()
+        };
+        assert!(panic_message.contains("strict interface startup policy rejected"));
+        assert!(panic_message.contains("udp-main"));
+    });
 }
 
 #[test]

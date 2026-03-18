@@ -45,6 +45,68 @@ fn filters_enabled_tcp_clients() {
 }
 
 #[test]
+fn filters_enabled_tcp_servers_with_default_host() {
+    let cfg = DaemonConfig {
+        interfaces: vec![
+            InterfaceConfig {
+                kind: "tcp_server".into(),
+                enabled: Some(true),
+                host: None,
+                port: Some(4242),
+                ..InterfaceConfig::default()
+            },
+            InterfaceConfig {
+                kind: "tcp_server".into(),
+                enabled: Some(true),
+                host: Some("127.0.0.1".into()),
+                port: Some(4243),
+                ..InterfaceConfig::default()
+            },
+            InterfaceConfig {
+                kind: "tcp_server".into(),
+                enabled: Some(false),
+                host: Some("192.0.2.1".into()),
+                port: Some(9999),
+                ..InterfaceConfig::default()
+            },
+        ],
+    };
+    let endpoints = cfg.tcp_server_endpoints();
+    assert_eq!(endpoints, vec![("0.0.0.0".to_string(), 4242), ("127.0.0.1".to_string(), 4243)]);
+}
+
+#[test]
+fn parses_udp_interface_with_target_settings() {
+    let input = r#"
+interfaces = [
+  { type = "udp", enabled = true, host = "127.0.0.1", port = 4242, target_host = "127.0.0.1", target_port = 4243, name = "udp-main" }
+]
+"#;
+    let cfg = DaemonConfig::from_toml(input).expect("parse udp config");
+    let iface = &cfg.interfaces[0];
+    assert_eq!(iface.kind, "udp");
+    assert_eq!(iface.host.as_deref(), Some("127.0.0.1"));
+    assert_eq!(iface.port, Some(4242));
+    assert_eq!(iface.target_host.as_deref(), Some("127.0.0.1"));
+    assert_eq!(iface.target_port, Some(4243));
+}
+
+#[test]
+fn rejects_udp_target_host_without_target_port() {
+    let input = r#"
+interfaces = [
+  { type = "udp", enabled = true, host = "127.0.0.1", port = 4242, target_host = "127.0.0.1" }
+]
+"#;
+    let err = DaemonConfig::from_toml(input).expect_err("partial udp target settings must fail");
+    let message = err.to_string();
+    assert!(
+        message.contains("target_host and target_port must be provided together for udp"),
+        "unexpected parse error: {message}"
+    );
+}
+
+#[test]
 fn parses_enabled_serial_interface_with_settings() {
     let input = r#"
 interfaces = [
