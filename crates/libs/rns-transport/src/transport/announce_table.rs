@@ -9,6 +9,10 @@ use crate::packet::{
     PropagationType,
 };
 
+const PATHFINDER_RETRY_GRACE: Duration = Duration::from_secs(5);
+const PATHFINDER_RETRY_WINDOW: Duration = Duration::from_millis(500);
+const PATH_RESPONSE_GRACE: Duration = Duration::from_millis(400);
+
 #[derive(Clone)]
 pub struct AnnounceEntry {
     pub packet: Packet,
@@ -35,11 +39,12 @@ impl AnnounceEntry {
     }
 
     pub fn retransmit(&mut self, transport_id: &AddressHash) -> Option<TxMessage> {
-        if self.retries == 0 || Instant::now() >= self.timeout {
+        if self.retries == 0 || Instant::now() < self.timeout {
             return None;
         }
 
         self.retries = self.retries.saturating_sub(1);
+        self.timeout = Instant::now() + PATHFINDER_RETRY_GRACE + PATHFINDER_RETRY_WINDOW;
 
         let context = if self.response_to_iface.is_some() {
             PacketContext::PathResponse
@@ -175,7 +180,7 @@ impl AnnounceTable {
         let entry = AnnounceEntry {
             packet: *announce,
             timestamp: now,
-            timeout: now + Duration::from_secs(60),
+            timeout: now + PATHFINDER_RETRY_WINDOW,
             received_from,
             retries: self.retry_limit,
             hops,
@@ -194,7 +199,7 @@ impl AnnounceTable {
     ) {
         response.retries = 1;
         response.hops = hops;
-        response.timeout = Instant::now() + Duration::from_secs(60);
+        response.timeout = Instant::now() + PATH_RESPONSE_GRACE;
         response.response_to_iface = Some(to_iface);
 
         self.responses.insert(destination, response);
@@ -237,14 +242,28 @@ impl AnnounceTable {
     pub fn to_retransmit(&mut self, transport_id: &AddressHash) -> Vec<TxMessage> {
         let mut messages = vec![];
         let mut completed = vec![];
+        let mut completed_responses = vec![];
+        let now = Instant::now();
 
         for (destination, ref mut entry) in &mut self.map {
             if self.responses.contains_key(destination) {
                 continue;
             }
 
+            if entry.retries == 0 {
+                completed.push(*destination);
+                continue;
+            }
+
+            if now < entry.timeout {
+                continue;
+            }
+
             if let Some(message) = entry.retransmit(transport_id) {
                 messages.push(message);
+                if entry.retries == 0 {
+                    completed.push(*destination);
+                }
             } else {
                 completed.push(*destination);
             }
@@ -252,15 +271,25 @@ impl AnnounceTable {
 
         let n_announces = messages.len();
 
-        for ref mut entry in self.responses.values_mut() {
+        for (destination, ref mut entry) in &mut self.responses {
+            if entry.retries == 0 {
+                completed_responses.push(*destination);
+                continue;
+            }
+            if now < entry.timeout {
+                continue;
+            }
             if let Some(message) = entry.retransmit(transport_id) {
                 messages.push(message);
+                if entry.retries == 0 {
+                    completed_responses.push(*destination);
+                }
+            } else {
+                completed_responses.push(*destination);
             }
         }
 
         let n_responses = messages.len() - n_announces;
-
-        self.responses.clear(); // every response is only retransmitted once
 
         if !(messages.is_empty() && completed.is_empty()) {
             log::trace!(
@@ -277,12 +306,73 @@ impl AnnounceTable {
             }
         }
 
+        for destination in completed_responses {
+            self.responses.remove(&destination);
+        }
+
         messages
     }
 }
 
 impl Default for AnnounceTable {
     fn default() -> Self {
-        Self::new(100_000, 5)
+        Self::new(100_000, 1)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use rand_core::OsRng;
+    use std::thread::sleep;
+    use std::time::Duration as StdDuration;
+
+    #[test]
+    fn announce_entries_wait_for_retry_window_and_retransmit_once() {
+        let mut table = AnnounceTable::new(16, 1);
+        let destination = AddressHash::new_from_rand(OsRng);
+        let received_from = AddressHash::new_from_rand(OsRng);
+        let transport_id = AddressHash::new_from_rand(OsRng);
+        let packet = Packet { destination, ..Packet::default() };
+
+        table.add(&packet, destination, received_from);
+        assert!(table.to_retransmit(&transport_id).is_empty());
+
+        sleep(StdDuration::from_millis(550));
+
+        let messages = table.to_retransmit(&transport_id);
+        assert_eq!(messages.len(), 1);
+        assert!(table.to_retransmit(&transport_id).is_empty());
+    }
+
+    #[test]
+    fn path_response_entries_use_shorter_window_than_normal_announces() {
+        let mut table = AnnounceTable::new(16, 1);
+        let destination = AddressHash::new_from_rand(OsRng);
+        let received_from = AddressHash::new_from_rand(OsRng);
+        let transport_id = AddressHash::new_from_rand(OsRng);
+        let to_iface = AddressHash::new_from_rand(OsRng);
+        let packet = Packet { destination, ..Packet::default() };
+
+        table.add(&packet, destination, received_from);
+        assert!(table.add_response(destination, to_iface, 3));
+        assert!(table.to_retransmit(&transport_id).is_empty());
+        assert_eq!(table.responses.len(), 1);
+
+        sleep(StdDuration::from_millis(450));
+
+        let messages = table.to_retransmit(&transport_id);
+        assert_eq!(messages.len(), 1);
+        assert!(matches!(messages[0].tx_type, TxMessageType::Direct(iface) if iface == to_iface));
+        assert!(table.responses.is_empty());
+
+        sleep(StdDuration::from_millis(125));
+
+        let messages = table.to_retransmit(&transport_id);
+        assert_eq!(messages.len(), 1);
+        assert!(matches!(
+            messages[0].tx_type,
+            TxMessageType::Broadcast(Some(iface)) if iface == received_from
+        ));
     }
 }
