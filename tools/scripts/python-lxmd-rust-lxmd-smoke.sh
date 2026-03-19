@@ -9,6 +9,7 @@ PYTHON_BIN="${PYTHON_BIN:-python3}"
 LOG_DIR="${LOG_DIR:-${REPO_ROOT}/target/interop/python-lxmd-rust-lxmd}"
 REPORT_PATH="${REPORT_PATH:-${LOG_DIR}/report.json}"
 TIMEOUT_SECS="${TIMEOUT_SECS:-45}"
+COMPAT_CASE="${COMPAT_CASE:-opportunistic_python_to_rust}"
 
 RUST_RPC_ADDR="${RUST_RPC_ADDR:-127.0.0.1:4243}"
 RUST_TRANSPORT_ADDR="${RUST_TRANSPORT_ADDR:-127.0.0.1:37429}"
@@ -361,11 +362,13 @@ done
 
 assert_contains "${RUST_REMOTE_STATUS_LOG}" "Remote LXMF Propagation Node status" "Rust remote status against Python node"
 
-PY_MESSAGE_CONTENT="python-smoke-message-$(date +%s)"
+PY_MESSAGE_CONTENT="python-smoke-message-${COMPAT_CASE}-$(date +%s)"
 "${PYTHON_BIN}" - <<'PY' \
+  "${COMPAT_CASE}" \
   "${PY_SENDER_RNS_DIR}" \
   "${PY_SENDER_DIR}" \
   "${RUST_DELIVERY_HASH}" \
+  "${RUST_PROPAGATION_HASH}" \
   "${PY_MESSAGE_CONTENT}" >"${PY_SEND_LOG}"
 import json
 import os
@@ -375,8 +378,9 @@ import time
 import RNS
 import LXMF
 
-rns_config, storage_dir, destination_hash_hex, content = sys.argv[1:5]
+case_id, rns_config, storage_dir, destination_hash_hex, propagation_hash_hex, content = sys.argv[1:7]
 destination_hash = bytes.fromhex(destination_hash_hex)
+propagation_hash = bytes.fromhex(propagation_hash_hex)
 
 RNS.Reticulum(configdir=rns_config, loglevel=0)
 identity = RNS.Identity()
@@ -410,11 +414,29 @@ destination = RNS.Destination(
     LXMF.APP_NAME,
     "delivery",
 )
+
+desired_method = LXMF.LXMessage.OPPORTUNISTIC
+if case_id == "direct_python_to_rust":
+    desired_method = LXMF.LXMessage.DIRECT
+elif case_id == "propagated_python_to_rust":
+    desired_method = LXMF.LXMessage.PROPAGATED
+    deadline = time.time() + 30
+    while time.time() < deadline:
+        if RNS.Transport.has_path(propagation_hash):
+            break
+        RNS.Transport.request_path(propagation_hash)
+        time.sleep(0.5)
+    else:
+        raise SystemExit("timed out waiting for Rust propagation path")
+    router.set_outbound_propagation_node(propagation_hash)
+elif case_id != "opportunistic_python_to_rust":
+    raise SystemExit(f"unsupported smoke case: {case_id}")
+
 message = LXMF.LXMessage(
     destination,
     source,
     content=content,
-    desired_method=LXMF.LXMessage.OPPORTUNISTIC,
+    desired_method=desired_method,
 )
 router.handle_outbound(message)
 
@@ -425,6 +447,7 @@ while time.time() < deadline:
             json.dumps(
                 {
                     "state": int(message.state),
+                    "case": case_id,
                     "destination": destination_hash_hex,
                     "source": RNS.hexrep(source.hash, delimit=False).lower(),
                 }
