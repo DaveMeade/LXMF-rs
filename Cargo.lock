@@ -2423,6 +2423,7 @@ dependencies = [
  "base64 0.22.1",
  "criterion",
  "hex",
+ "hkdf",
  "hmac",
  "prost",
  "prost-types",
