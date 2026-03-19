@@ -13,6 +13,7 @@ rmpv = { workspace = true, features = ["with-serde"] }
 sha2.workspace = true
 hmac.workspace = true
 hex.workspace = true
+hkdf.workspace = true
 base64.workspace = true
 serde_json.workspace = true
 serde_cbor.workspace = true
