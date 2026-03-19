@@ -680,14 +680,18 @@ fn high_cost_announce_does_not_remove_manual_peer() {
 
 #[test]
 fn propagation_counters_track_ingest_and_unpeered_attempts() {
+    use sha2::{Digest, Sha256};
+
     let daemon = RpcDaemon::test_instance();
+    let payload = [0x00_u8, 0x11_u8];
+    let transient_id = hex::encode(Sha256::digest(payload));
     daemon
         .handle_rpc(rpc_request(
             60,
             "propagation_ingest",
             json!({
-                "transient_id": "abcd",
-                "payload_hex": "0011",
+                "transient_id": transient_id,
+                "payload_hex": hex::encode(payload),
             }),
         ))
         .expect("propagation ingest");
@@ -709,7 +713,7 @@ fn propagation_counters_track_ingest_and_unpeered_attempts() {
             62,
             "propagation_fetch",
             json!({
-                "transient_id": "abcd",
+                "transient_id": hex::encode(Sha256::digest(payload)),
             }),
         ))
         .expect("propagation fetch");
@@ -755,7 +759,7 @@ fn propagation_ingest_rejects_missing_stamp_when_cost_required() {
 }
 
 #[test]
-fn propagation_ingest_accepts_valid_stamp_when_cost_required() {
+fn propagation_ingest_rejects_too_short_stamped_payload_when_cost_required() {
     let daemon = RpcDaemon::test_instance();
     daemon
         .handle_rpc(rpc_request(
@@ -768,10 +772,38 @@ fn propagation_ingest_accepts_valid_stamp_when_cost_required() {
         ))
         .expect("enable propagation");
 
-    let transient_data = stamped_propagation_payload(b"propagation-wire-payload", 1);
-    let response = daemon
+    let too_short_transient = vec![0xAA_u8; 112 + 32];
+    let err = daemon
         .handle_rpc(rpc_request(
             68,
+            "propagation_ingest",
+            json!({
+                "payload_hex": hex::encode(too_short_transient),
+            }),
+        ))
+        .expect_err("too-short stamped propagation payload must be rejected");
+    assert!(err.to_string().contains("invalid propagation stamp"));
+}
+
+#[test]
+fn propagation_ingest_accepts_valid_stamp_when_cost_required() {
+    let daemon = RpcDaemon::test_instance();
+    daemon
+        .handle_rpc(rpc_request(
+            69,
+            "propagation_enable",
+            json!({
+                "enabled": true,
+                "target_cost": 1,
+            }),
+        ))
+        .expect("enable propagation");
+
+    let lxm_data = vec![0x42_u8; 113];
+    let transient_data = stamped_propagation_payload(&lxm_data, 1);
+    let response = daemon
+        .handle_rpc(rpc_request(
+            70,
             "propagation_ingest",
             json!({
                 "payload_hex": hex::encode(&transient_data),
@@ -784,7 +816,7 @@ fn propagation_ingest_accepts_valid_stamp_when_cost_required() {
 
     let fetched = daemon
         .handle_rpc(rpc_request(
-            69,
+            71,
             "propagation_fetch",
             json!({
                 "transient_id": transient_id,
@@ -795,6 +827,56 @@ fn propagation_ingest_accepts_valid_stamp_when_cost_required() {
         .expect("fetch result");
     let expected_payload_hex = hex::encode(&transient_data);
     assert_eq!(fetched["payload_hex"].as_str(), Some(expected_payload_hex.as_str()));
+}
+
+#[test]
+fn propagation_ingest_derives_transient_id_from_payload_bytes() {
+    use sha2::{Digest, Sha256};
+
+    let daemon = RpcDaemon::test_instance();
+    let payload = b"unstamped-propagation-wire-payload";
+    let expected_transient_id = hex::encode(Sha256::digest(payload));
+
+    let response = daemon
+        .handle_rpc(rpc_request(
+            70,
+            "propagation_ingest",
+            json!({
+                "payload_hex": hex::encode(payload),
+            }),
+        ))
+        .expect("propagation ingest");
+    let result = response.result.expect("ingest result");
+    assert_eq!(result["transient_id"].as_str(), Some(expected_transient_id.as_str()));
+
+    let fetched = daemon
+        .handle_rpc(rpc_request(
+            71,
+            "propagation_fetch",
+            json!({
+                "transient_id": expected_transient_id,
+            }),
+        ))
+        .expect("fetch ingested propagation payload")
+        .result
+        .expect("fetch result");
+    assert_eq!(fetched["payload_hex"].as_str(), Some(hex::encode(payload).as_str()));
+}
+
+#[test]
+fn propagation_ingest_rejects_mismatched_transient_id() {
+    let daemon = RpcDaemon::test_instance();
+    let err = daemon
+        .handle_rpc(rpc_request(
+            72,
+            "propagation_ingest",
+            json!({
+                "transient_id": "deadbeef",
+                "payload_hex": hex::encode(b"propagation-wire-payload"),
+            }),
+        ))
+        .expect_err("mismatched transient_id must be rejected");
+    assert!(err.to_string().contains("transient_id does not match propagation payload"));
 }
 
 fn stamped_propagation_payload(lxm_data: &[u8], target_cost: u32) -> Vec<u8> {

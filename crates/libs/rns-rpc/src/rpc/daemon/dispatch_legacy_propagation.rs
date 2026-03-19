@@ -119,18 +119,27 @@ impl RpcDaemon {
                     .lock()
                     .expect("propagation mutex poisoned")
                     .target_cost;
-                let validated_transient_id = if target_cost > 0 && !payload_hex.is_empty() {
-                    Some(validate_propagation_transient_hex(payload_hex.as_str(), target_cost)?)
+                let canonical_transient_id = if !payload_hex.is_empty() {
+                    Some(canonical_propagation_transient_hex(payload_hex.as_str(), target_cost)?)
                 } else {
                     None
                 };
-                let transient_id = parsed.transient_id.unwrap_or_else(|| {
-                    if let Some(transient_id) = validated_transient_id.as_ref() {
-                        return transient_id.clone();
+                if let (Some(provided_transient_id), Some(canonical_transient_id)) =
+                    (parsed.transient_id.as_ref(), canonical_transient_id.as_ref())
+                {
+                    if !provided_transient_id.eq_ignore_ascii_case(canonical_transient_id) {
+                        return Err(std::io::Error::new(
+                            std::io::ErrorKind::InvalidInput,
+                            "transient_id does not match propagation payload",
+                        ));
                     }
-                    let mut hasher = Sha256::new();
-                    hasher.update(payload_hex.as_bytes());
-                    encode_hex(hasher.finalize())
+                }
+                let transient_id = parsed.transient_id.unwrap_or_else(|| {
+                    canonical_transient_id.unwrap_or_else(|| {
+                        let mut hasher = Sha256::new();
+                        hasher.update(payload_hex.as_bytes());
+                        encode_hex(hasher.finalize())
+                    })
                 });
 
                 if !payload_hex.is_empty() {
@@ -386,8 +395,11 @@ impl RpcDaemon {
 
 const PROPAGATION_STAMP_SIZE: usize = 32;
 const PROPAGATION_STAMP_WORKBLOCK_ROUNDS: usize = 1000;
+// Python rejects propagation-stamped payloads that cannot contain a minimally
+// structured LXMF message before validating the trailing stamp.
+const MIN_PROPAGATION_STAMPED_PAYLOAD_SIZE: usize = 112 + PROPAGATION_STAMP_SIZE;
 
-fn validate_propagation_transient_hex(
+fn canonical_propagation_transient_hex(
     payload_hex: &str,
     target_cost: u32,
 ) -> Result<String, std::io::Error> {
@@ -397,15 +409,22 @@ fn validate_propagation_transient_hex(
             format!("invalid propagation payload hex: {err}"),
         )
     })?;
-    let transient_id = validate_propagation_transient_bytes(&transient_data, target_cost)?;
+    let transient_id = canonical_propagation_transient_bytes(&transient_data, target_cost)?;
     Ok(hex::encode(transient_id))
 }
 
-fn validate_propagation_transient_bytes(
+fn canonical_propagation_transient_bytes(
     transient_data: &[u8],
     target_cost: u32,
 ) -> Result<[u8; 32], std::io::Error> {
-    if transient_data.len() <= PROPAGATION_STAMP_SIZE {
+    if target_cost == 0 {
+        let transient_hash = Sha256::digest(transient_data);
+        let mut transient_id = [0u8; 32];
+        transient_id.copy_from_slice(transient_hash.as_slice());
+        return Ok(transient_id);
+    }
+
+    if transient_data.len() <= MIN_PROPAGATION_STAMPED_PAYLOAD_SIZE {
         return Err(std::io::Error::new(
             std::io::ErrorKind::PermissionDenied,
             "invalid propagation stamp",
