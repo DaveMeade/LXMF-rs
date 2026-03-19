@@ -1,4 +1,92 @@
 impl RpcDaemon {
+    pub fn canonical_propagation_payload_hex(
+        &self,
+        payload_hex: &str,
+    ) -> Result<String, std::io::Error> {
+        let target_cost = self
+            .propagation_state
+            .lock()
+            .expect("propagation mutex poisoned")
+            .target_cost;
+        canonical_propagation_transient_hex(payload_hex, target_cost)
+    }
+
+    pub fn canonical_propagation_payload_bytes(
+        &self,
+        payload: &[u8],
+    ) -> Result<String, std::io::Error> {
+        let target_cost = self
+            .propagation_state
+            .lock()
+            .expect("propagation mutex poisoned")
+            .target_cost;
+        Ok(hex::encode(canonical_propagation_transient_bytes(
+            payload,
+            target_cost,
+        )?))
+    }
+
+    pub fn ingest_propagation_payload_hex(
+        &self,
+        payload_hex: &str,
+        transient_id: Option<&str>,
+    ) -> Result<String, std::io::Error> {
+        let canonical_transient_id = if !payload_hex.is_empty() {
+            Some(self.canonical_propagation_payload_hex(payload_hex)?)
+        } else {
+            None
+        };
+        if let (Some(provided_transient_id), Some(canonical_transient_id)) =
+            (transient_id, canonical_transient_id.as_ref())
+        {
+            if !provided_transient_id.eq_ignore_ascii_case(canonical_transient_id) {
+                return Err(std::io::Error::new(
+                    std::io::ErrorKind::InvalidInput,
+                    "transient_id does not match propagation payload",
+                ));
+            }
+        }
+        let transient_id = transient_id.map(str::to_string).unwrap_or_else(|| {
+            canonical_transient_id.unwrap_or_else(|| {
+                let mut hasher = Sha256::new();
+                hasher.update(payload_hex.as_bytes());
+                encode_hex(hasher.finalize())
+            })
+        });
+
+        if !payload_hex.is_empty() {
+            self.propagation_payloads
+                .lock()
+                .expect("propagation payload mutex poisoned")
+                .insert(transient_id.clone(), payload_hex.to_string());
+        }
+
+        let state = {
+            let mut guard = self.propagation_state.lock().expect("propagation mutex poisoned");
+            let ingested_count = usize::from(!transient_id.is_empty());
+            guard.last_ingest_count = ingested_count;
+            guard.total_ingested += ingested_count;
+            guard.client_propagation_messages_received = guard
+                .client_propagation_messages_received
+                .saturating_add(ingested_count);
+            guard.clone()
+        };
+        self.update_daemon_status_snapshot(|snapshot| {
+            snapshot.propagation = state;
+        });
+
+        Ok(transient_id)
+    }
+
+    pub fn ingest_propagation_payload_bytes(
+        &self,
+        payload: &[u8],
+        transient_id: Option<&str>,
+    ) -> Result<String, std::io::Error> {
+        let payload_hex = hex::encode(payload);
+        self.ingest_propagation_payload_hex(payload_hex.as_str(), transient_id)
+    }
+
     fn handle_rpc_legacy_propagation(&self, request: RpcRequest) -> Result<RpcResponse, std::io::Error> {
         match request.method.as_str() {
             "get_delivery_policy" => {
@@ -114,55 +202,10 @@ impl RpcDaemon {
                     .map_err(|err| std::io::Error::new(std::io::ErrorKind::InvalidInput, err))?;
 
                 let payload_hex = parsed.payload_hex.unwrap_or_default();
-                let target_cost = self
-                    .propagation_state
-                    .lock()
-                    .expect("propagation mutex poisoned")
-                    .target_cost;
-                let canonical_transient_id = if !payload_hex.is_empty() {
-                    Some(canonical_propagation_transient_hex(payload_hex.as_str(), target_cost)?)
-                } else {
-                    None
-                };
-                if let (Some(provided_transient_id), Some(canonical_transient_id)) =
-                    (parsed.transient_id.as_ref(), canonical_transient_id.as_ref())
-                {
-                    if !provided_transient_id.eq_ignore_ascii_case(canonical_transient_id) {
-                        return Err(std::io::Error::new(
-                            std::io::ErrorKind::InvalidInput,
-                            "transient_id does not match propagation payload",
-                        ));
-                    }
-                }
-                let transient_id = parsed.transient_id.unwrap_or_else(|| {
-                    canonical_transient_id.unwrap_or_else(|| {
-                        let mut hasher = Sha256::new();
-                        hasher.update(payload_hex.as_bytes());
-                        encode_hex(hasher.finalize())
-                    })
-                });
-
-                if !payload_hex.is_empty() {
-                    self.propagation_payloads
-                        .lock()
-                        .expect("propagation payload mutex poisoned")
-                        .insert(transient_id.clone(), payload_hex);
-                }
-
-                let state = {
-                    let mut guard =
-                        self.propagation_state.lock().expect("propagation mutex poisoned");
-                    let ingested_count = usize::from(!transient_id.is_empty());
-                    guard.last_ingest_count = ingested_count;
-                    guard.total_ingested += ingested_count;
-                    guard.client_propagation_messages_received = guard
-                        .client_propagation_messages_received
-                        .saturating_add(ingested_count);
-                    guard.clone()
-                };
-                self.update_daemon_status_snapshot(|snapshot| {
-                    snapshot.propagation = state.clone();
-                });
+                let transient_id = self
+                    .ingest_propagation_payload_hex(payload_hex.as_str(), parsed.transient_id.as_deref())?;
+                let state =
+                    self.propagation_state.lock().expect("propagation mutex poisoned").clone();
 
                 Ok(RpcResponse {
                     id: request.id,
