@@ -6,8 +6,14 @@ from pathlib import Path
 
 
 SUPPORTED_CASES = {
+    "direct_rust_to_python",
     "direct_python_to_rust",
+    "opportunistic_rust_to_python",
+    "opportunistic_python_to_rust",
+    "propagated_rust_to_python",
     "propagated_python_to_rust",
+    "resource_transfer",
+    "lxm_interchange",
 }
 
 

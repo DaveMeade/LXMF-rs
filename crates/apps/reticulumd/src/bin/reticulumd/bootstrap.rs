@@ -44,11 +44,13 @@ pub(super) struct BootstrapContext {
     pub(super) grpc_tls: Option<RpcTlsConfig>,
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone)]
 pub(super) struct PropagationControlContext {
     pub(super) enabled: bool,
     pub(super) propagation_destination_hash_hex: Option<String>,
     pub(super) control_destination_hash_hex: Option<String>,
+    pub(super) delivery_destination:
+        Option<Arc<tokio::sync::Mutex<rns_transport::destination::SingleInputDestination>>>,
     pub(super) allowed_control_identities: Vec<String>,
 }
 
@@ -566,6 +568,14 @@ pub(super) async fn bootstrap(args: Args) -> BootstrapContext {
             );
         }
         announce_destination = Some(destination);
+        transport_instance
+            .set_destination_announce_app_data(
+                announce_destination.as_ref().expect("delivery destination"),
+                local_display_name
+                    .as_deref()
+                    .and_then(encode_delivery_display_name_app_data),
+            )
+            .await;
         if propagation_control_enabled {
             let propagation = transport_instance
                 .add_destination(
@@ -586,6 +596,12 @@ pub(super) async fn bootstrap(args: Args) -> BootstrapContext {
                 );
             }
             propagation_destination = Some(propagation);
+            transport_instance
+                .set_destination_announce_app_data(
+                    propagation_destination.as_ref().expect("propagation destination"),
+                    encode_propagation_node_app_data(local_display_name.as_deref()),
+                )
+                .await;
 
             let control = transport_instance
                 .add_destination(
@@ -800,6 +816,7 @@ pub(super) async fn bootstrap(args: Args) -> BootstrapContext {
                 enabled: propagation_control_enabled,
                 propagation_destination_hash_hex,
                 control_destination_hash_hex,
+                delivery_destination: announce_destination.clone(),
                 allowed_control_identities: configured_control_identities,
             },
             receipt_tx.clone(),

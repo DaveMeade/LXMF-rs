@@ -10,6 +10,7 @@ use ed25519_dalek::Signature;
 use rand_core::CryptoRngCore;
 use rns_core::crypt::fernet::{Fernet, PlainText, FERNET_MAX_PADDING_SIZE, FERNET_OVERHEAD_SIZE};
 use rns_core::identity::{DerivedKey, Identity, PrivateIdentity, PUBLIC_KEY_LENGTH};
+use serde::Deserialize;
 use sha2::{Digest, Sha256};
 use x25519_dalek::{EphemeralSecret, PublicKey};
 
@@ -18,6 +19,11 @@ pub const LXM_URI_PREFIX: &str = "lxm://";
 const STORAGE_MAGIC: &[u8; 8] = b"LXMFSTR0";
 const STORAGE_VERSION: u8 = 1;
 const STORAGE_FLAG_HAS_SIGNATURE: u8 = 0x01;
+
+#[derive(Debug, Deserialize)]
+struct PythonStorageContainer {
+    lxmf_bytes: serde_bytes::ByteBuf,
+}
 
 #[derive(Debug, Clone)]
 pub struct WireMessage {
@@ -166,6 +172,10 @@ impl WireMessage {
             return Ok(Self { destination: dest, source: src, signature, payload });
         }
 
+        if let Ok(container) = rmp_serde::from_slice::<PythonStorageContainer>(bytes) {
+            return Self::unpack(container.lxmf_bytes.as_ref());
+        }
+
         Self::unpack(bytes)
     }
 
@@ -205,6 +215,17 @@ impl WireMessage {
         propagation_stamp: Option<&[u8]>,
         rng: R,
     ) -> Result<(Vec<u8>, [u8; 32]), LxmfError> {
+        let (lxmf_data, transient_id) =
+            self.pack_propagation_transient_with_rng(destination, rng)?;
+        let packed = Self::pack_propagation_envelope(timestamp, &lxmf_data, propagation_stamp)?;
+        Ok((packed, transient_id))
+    }
+
+    pub fn pack_propagation_transient_with_rng<R: CryptoRngCore + Copy>(
+        &self,
+        destination: &Identity,
+        rng: R,
+    ) -> Result<(Vec<u8>, [u8; 32]), LxmfError> {
         let packed = self.pack()?;
         let encrypted = encrypt_for_identity(destination, &packed[16..], rng)?;
 
@@ -212,17 +233,26 @@ impl WireMessage {
         lxmf_data.extend_from_slice(&packed[..16]);
         lxmf_data.extend_from_slice(&encrypted);
         let transient_id = Sha256::digest(&lxmf_data);
-        let mut transient_payload = lxmf_data;
+        let mut transient_id_bytes = [0u8; 32];
+        transient_id_bytes.copy_from_slice(transient_id.as_slice());
+        Ok((lxmf_data, transient_id_bytes))
+    }
+
+    pub fn pack_propagation_envelope(
+        timestamp: f64,
+        lxmf_data: &[u8],
+        propagation_stamp: Option<&[u8]>,
+    ) -> Result<Vec<u8>, LxmfError> {
+        let mut transient_payload = Vec::with_capacity(
+            lxmf_data.len() + propagation_stamp.map(|stamp| stamp.len()).unwrap_or(0),
+        );
+        transient_payload.extend_from_slice(lxmf_data);
         if let Some(stamp) = propagation_stamp {
             transient_payload.extend_from_slice(stamp);
         }
 
         let envelope = (timestamp, vec![serde_bytes::ByteBuf::from(transient_payload)]);
-        let packed =
-            rmp_serde::to_vec(&envelope).map_err(|e| LxmfError::Encode(e.to_string()))?;
-        let mut transient_id_bytes = [0u8; 32];
-        transient_id_bytes.copy_from_slice(transient_id.as_slice());
-        Ok((packed, transient_id_bytes))
+        rmp_serde::to_vec(&envelope).map_err(|e| LxmfError::Encode(e.to_string()))
     }
 
     pub fn pack_paper_with_rng<R: CryptoRngCore + Copy>(
@@ -294,9 +324,10 @@ mod tests {
     use super::WireMessage;
     use crate::message::Payload;
     use rand_core::OsRng;
-    use rns_core::identity::PrivateIdentity;
+    use rns_core::identity::{DecryptIdentity, PrivateIdentity, PUBLIC_KEY_LENGTH};
     use serde_bytes::ByteBuf;
     use sha2::{Digest, Sha256};
+    use x25519_dalek::PublicKey;
 
     fn address_hash_bytes(identity: &PrivateIdentity) -> [u8; 16] {
         let mut out = [0u8; 16];
@@ -351,5 +382,112 @@ mod tests {
         let lxm_data = &transient_payload[..transient_payload.len() - propagation_stamp.len()];
         let expected = Sha256::digest(lxm_data);
         assert_eq!(transient_id.as_slice(), expected.as_slice());
+    }
+
+    #[test]
+    fn propagation_transient_helper_matches_envelope_transient_id() {
+        let sender = PrivateIdentity::new_from_name("propagation-pack-helper-sender");
+        let receiver = PrivateIdentity::new_from_name("propagation-pack-helper-receiver");
+        let payload = Payload::new(1.0, Some(vec![0x11; 32]), Some(b"title".to_vec()), None, None);
+        let mut wire =
+            WireMessage::new(address_hash_bytes(&receiver), address_hash_bytes(&sender), payload);
+        wire.sign(&sender).expect("sign");
+
+        let (lxmf_data, transient_id) = wire
+            .pack_propagation_transient_with_rng(receiver.as_identity(), OsRng)
+            .expect("pack propagation transient");
+        let propagation_stamp = vec![0xCD; 32];
+        let envelope = WireMessage::pack_propagation_envelope(
+            4.0,
+            &lxmf_data,
+            Some(propagation_stamp.as_slice()),
+        )
+        .expect("pack propagation envelope");
+        let (_timestamp, entries): (f64, Vec<ByteBuf>) =
+            rmp_serde::from_slice(&envelope).expect("decode propagation envelope");
+        let transient_payload = entries[0].as_ref();
+
+        assert!(transient_payload.ends_with(propagation_stamp.as_slice()));
+        assert_eq!(
+            &transient_payload[..transient_payload.len() - propagation_stamp.len()],
+            lxmf_data.as_slice()
+        );
+        let expected = Sha256::digest(&lxmf_data);
+        assert_eq!(transient_id.as_slice(), expected.as_slice());
+    }
+
+    #[test]
+    fn propagation_transient_can_be_decrypted_by_recipient_identity() {
+        let sender = PrivateIdentity::new_from_name("propagation-pack-decrypt-sender");
+        let receiver = PrivateIdentity::new_from_name("propagation-pack-decrypt-receiver");
+        let payload =
+            Payload::new(1.0, Some(b"content".to_vec()), Some(b"title".to_vec()), None, None);
+        let mut wire =
+            WireMessage::new(address_hash_bytes(&receiver), address_hash_bytes(&sender), payload);
+        wire.sign(&sender).expect("sign");
+
+        let packed = wire.pack().expect("pack");
+        let (lxmf_data, _transient_id) = wire
+            .pack_propagation_transient_with_rng(receiver.as_identity(), OsRng)
+            .expect("pack propagation transient");
+        let encrypted = &lxmf_data[16..];
+        let mut ephemeral_pub = [0u8; PUBLIC_KEY_LENGTH];
+        ephemeral_pub.copy_from_slice(&encrypted[..PUBLIC_KEY_LENGTH]);
+        let derived = receiver.derive_key(
+            &PublicKey::from(ephemeral_pub),
+            Some(receiver.address_hash().as_slice()),
+        );
+        let mut plaintext = vec![0u8; packed.len()];
+        let decrypted = receiver
+            .decrypt(OsRng, &encrypted[PUBLIC_KEY_LENGTH..], &derived, &mut plaintext)
+            .expect("decrypt propagation payload");
+
+        assert_eq!(&lxmf_data[..16], &packed[..16]);
+        assert_eq!(decrypted, &packed[16..]);
+    }
+
+    #[test]
+    fn unpack_storage_accepts_python_msgpack_container() {
+        let sender = PrivateIdentity::new_from_name("python-storage-sender");
+        let receiver = PrivateIdentity::new_from_name("python-storage-receiver");
+        let payload =
+            Payload::new(1_773_999_123.25, Some(b"content".to_vec()), Some(b"title".to_vec()), None, None);
+        let mut wire =
+            WireMessage::new(address_hash_bytes(&receiver), address_hash_bytes(&sender), payload);
+        wire.sign(&sender).expect("sign");
+
+        let packed_wire = wire.pack().expect("pack");
+        let python_container = rmp_serde::to_vec(&rmpv::Value::Map(vec![
+            (
+                rmpv::Value::String("state".into()),
+                rmpv::Value::Integer(4_i64.into()),
+            ),
+            (
+                rmpv::Value::String("lxmf_bytes".into()),
+                rmpv::Value::Binary(packed_wire.clone()),
+            ),
+            (
+                rmpv::Value::String("transport_encrypted".into()),
+                rmpv::Value::Boolean(true),
+            ),
+            (
+                rmpv::Value::String("transport_encryption".into()),
+                rmpv::Value::String("Curve25519".into()),
+            ),
+            (
+                rmpv::Value::String("method".into()),
+                rmpv::Value::Integer(2_i64.into()),
+            ),
+        ]))
+        .expect("pack python container");
+
+        let unpacked = WireMessage::unpack_storage(&python_container).expect("unpack storage");
+        assert_eq!(unpacked.destination, wire.destination);
+        assert_eq!(unpacked.source, wire.source);
+        assert_eq!(unpacked.signature, wire.signature);
+        assert_eq!(
+            unpacked.payload.to_msgpack().expect("payload msgpack"),
+            wire.payload.to_msgpack().expect("payload msgpack")
+        );
     }
 }

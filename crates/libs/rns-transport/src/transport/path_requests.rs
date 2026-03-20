@@ -30,6 +30,7 @@ pub fn create_path_request_destination() -> PlainInputDestination {
 pub type TagBytes = Vec<u8>;
 type DuplicateKey = (AddressHash, TagBytes);
 type DiscoveryKey = (AddressHash, Option<AddressHash>);
+type LocalResponseKey = (AddressHash, Option<AddressHash>, AddressHash);
 
 pub fn create_random_tag() -> TagBytes {
     AddressHash::new_from_rand(OsRng).as_slice().into()
@@ -88,6 +89,9 @@ pub struct PathRequests {
     announce_cap: usize,
     request_timeout: Duration,
     queue: VecDeque<(DiscoveryKey, Instant)>,
+    local_response_cache: BTreeMap<LocalResponseKey, Instant>,
+    local_response_queue: VecDeque<(LocalResponseKey, Instant)>,
+    local_response_cooldown: Duration,
 }
 
 impl PathRequests {
@@ -110,6 +114,9 @@ impl PathRequests {
             announce_cap,
             request_timeout: Duration::from_secs(request_timeout_secs.max(1)),
             queue: alloc::collections::VecDeque::new(),
+            local_response_cache: BTreeMap::new(),
+            local_response_queue: VecDeque::new(),
+            local_response_cooldown: super::LOCAL_PATH_RESPONSE_COOLDOWN,
         }
     }
 
@@ -132,6 +139,16 @@ impl PathRequests {
             if self.discovery.remove(&queued_key).is_some() {
                 self.decrement_pending_recursive_count(queued_key.1);
             }
+        }
+    }
+
+    fn prune_local_responses(&mut self, now: Instant) {
+        while let Some((key, timeout)) = self.local_response_queue.front().copied() {
+            if timeout > now {
+                break;
+            }
+            self.local_response_queue.pop_front();
+            self.local_response_cache.remove(&key);
         }
     }
 
@@ -190,6 +207,38 @@ impl PathRequests {
             context: PacketContext::None,
             data,
         }
+    }
+
+    pub fn allow_local_response(
+        &mut self,
+        destination: &AddressHash,
+        requesting_transport: Option<AddressHash>,
+        on_iface: AddressHash,
+    ) -> bool {
+        self.allow_local_response_at(destination, requesting_transport, on_iface, Instant::now())
+    }
+
+    fn allow_local_response_at(
+        &mut self,
+        destination: &AddressHash,
+        requesting_transport: Option<AddressHash>,
+        on_iface: AddressHash,
+        now: Instant,
+    ) -> bool {
+        self.prune_local_responses(now);
+
+        let key = (*destination, requesting_transport, on_iface);
+        if let Some(timeout) = self.local_response_cache.get(&key) {
+            if *timeout > now {
+                return false;
+            }
+            self.local_response_cache.remove(&key);
+        }
+
+        let expiry = now + self.local_response_cooldown;
+        self.local_response_cache.insert(key, expiry);
+        self.local_response_queue.push_back((key, expiry));
+        true
     }
 
     fn allow_recursive(
@@ -348,6 +397,52 @@ mod tests {
         assert!(testee.generate_recursive(&destination, Some(iface_a), None).is_some());
         assert!(testee.generate_recursive(&destination, Some(iface_a), None).is_none());
         assert!(testee.generate_recursive(&destination, Some(iface_b), None).is_some());
+    }
+
+    #[test]
+    fn local_responses_are_throttled_per_interface() {
+        let mut testee = PathRequests::new("", None, 16, 16, 30);
+        let destination = AddressHash::new_from_rand(OsRng);
+        let iface_a = AddressHash::new_from_rand(OsRng);
+        let iface_b = AddressHash::new_from_rand(OsRng);
+        let requester = Some(AddressHash::new_from_rand(OsRng));
+        let now = Instant::now();
+
+        assert!(testee.allow_local_response_at(&destination, requester, iface_a, now));
+        assert!(!testee.allow_local_response_at(&destination, requester, iface_a, now));
+        assert!(testee.allow_local_response_at(&destination, requester, iface_b, now));
+    }
+
+    #[test]
+    fn local_response_throttle_expires_after_cooldown() {
+        let mut testee = PathRequests::new("", None, 16, 16, 30);
+        let destination = AddressHash::new_from_rand(OsRng);
+        let iface = AddressHash::new_from_rand(OsRng);
+        let requester = Some(AddressHash::new_from_rand(OsRng));
+        let now = Instant::now();
+
+        assert!(testee.allow_local_response_at(&destination, requester, iface, now));
+        assert!(!testee.allow_local_response_at(&destination, requester, iface, now));
+        assert!(testee.allow_local_response_at(
+            &destination,
+            requester,
+            iface,
+            now + super::super::LOCAL_PATH_RESPONSE_COOLDOWN + Duration::from_millis(1)
+        ));
+    }
+
+    #[test]
+    fn local_response_throttle_is_scoped_per_requesting_transport() {
+        let mut testee = PathRequests::new("", None, 16, 16, 30);
+        let destination = AddressHash::new_from_rand(OsRng);
+        let requester_a = Some(AddressHash::new_from_rand(OsRng));
+        let requester_b = Some(AddressHash::new_from_rand(OsRng));
+        let iface = AddressHash::new_from_rand(OsRng);
+        let now = Instant::now();
+
+        assert!(testee.allow_local_response_at(&destination, requester_a, iface, now));
+        assert!(testee.allow_local_response_at(&destination, requester_b, iface, now));
+        assert!(!testee.allow_local_response_at(&destination, requester_a, iface, now));
     }
 
     #[test]

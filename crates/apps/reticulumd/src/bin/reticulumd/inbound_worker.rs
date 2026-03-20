@@ -2,15 +2,15 @@ use super::bootstrap::PropagationControlContext;
 use super::bridge_helpers::{diagnostics_enabled, payload_preview};
 use lxmf::inbound_decode::InboundPayloadMode;
 use reticulum_daemon::inbound_delivery::{
-    decode_inbound_payload, decode_inbound_payload_with_diagnostics,
-    inbound_stamp_policy_allows_payload,
+    annotate_inbound_record_stamp_status, decode_inbound_payload,
+    decode_inbound_payload_with_diagnostics, evaluate_inbound_stamp_policy,
 };
 use reticulum_daemon::receipt_bridge::ReceiptEvent;
 use rns_rpc::{RpcDaemon, RpcRequest};
 use rns_transport::destination::link::{Link, LinkEvent};
-use rns_transport::destination::{DestinationDesc, DestinationName};
+use rns_transport::destination::{DestinationDesc, DestinationName, SingleInputDestination};
 use rns_transport::hash::AddressHash;
-use rns_transport::identity::Identity;
+use rns_transport::identity::{DecryptIdentity, Identity};
 use rns_transport::packet::{
     ContextFlag, DestinationType, Header, HeaderType, IfacFlag, Packet, PacketContext,
     PacketDataBuffer, PacketType, PropagationType,
@@ -21,6 +21,7 @@ use serde_json::{json, Value};
 use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
 use std::time::SystemTime;
+use x25519_dalek::PublicKey;
 
 pub(super) const OUTBOUND_RESOURCE_SENT_STATUS: &str = "sent: link resource";
 
@@ -49,6 +50,7 @@ pub(super) fn spawn_inbound_worker(
     if control.enabled {
         spawn_control_worker(daemon.clone(), transport.clone(), control.clone());
     }
+    let resource_control = control.clone();
     spawn_packet_inbound_worker(daemon.clone(), transport.clone(), control);
     tokio::spawn(async move {
         let mut rx = transport.resource_events();
@@ -62,25 +64,32 @@ pub(super) fn spawn_inbound_worker(
                         {
                             match destination {
                                 InboundLxmfDestination::Delivery(destination) => {
-                                    if let Err(error) = inbound_stamp_policy_allows_payload(
+                                    let stamp_status = match evaluate_inbound_stamp_policy(
                                         daemon.as_ref(),
                                         destination,
                                         &complete.data,
                                         InboundPayloadMode::FullWire,
                                     ) {
-                                        if diagnostics_enabled() {
-                                            eprintln!(
-                                                "[daemon-rx] dropping inbound resource due to stamp policy: {}",
-                                                error
-                                            );
+                                        Ok(status) => status,
+                                        Err(error) => {
+                                            if diagnostics_enabled() {
+                                                eprintln!(
+                                                    "[daemon-rx] dropping inbound resource due to stamp policy: {}",
+                                                    error
+                                                );
+                                            }
+                                            continue;
                                         }
-                                        continue;
-                                    }
-                                    if let Some(record) = decode_inbound_payload(
+                                    };
+                                    if let Some(mut record) = decode_inbound_payload(
                                         destination,
                                         &complete.data,
                                         InboundPayloadMode::FullWire,
                                     ) {
+                                        annotate_inbound_record_stamp_status(
+                                            &mut record,
+                                            stamp_status,
+                                        );
                                         let _ =
                                             daemon.accept_inbound_with_raw(record, &complete.data);
                                     }
@@ -89,7 +98,10 @@ pub(super) fn spawn_inbound_worker(
                                     if let Err(error) = ingest_propagation_envelope(
                                         daemon.as_ref(),
                                         &complete.data,
-                                    ) {
+                                        resource_control.delivery_destination.as_ref(),
+                                    )
+                                    .await
+                                    {
                                         if diagnostics_enabled() {
                                             eprintln!(
                                                 "[daemon-rx] dropping inbound propagation resource: {}",
@@ -151,7 +163,12 @@ fn spawn_packet_inbound_worker(
                     );
                 }
                 if is_lxmf_propagation_destination(&event.destination, &control) {
-                    if let Err(error) = ingest_propagation_envelope(daemon_inbound.as_ref(), data)
+                    if let Err(error) = ingest_propagation_envelope(
+                        daemon_inbound.as_ref(),
+                        data,
+                        control.delivery_destination.as_ref(),
+                    )
+                    .await
                     {
                         if diagnostics_enabled() {
                             eprintln!(
@@ -188,24 +205,31 @@ fn spawn_packet_inbound_worker(
                 } else {
                     decode_inbound_payload(destination, data, payload_mode)
                 };
-                if record.is_some()
-                    && inbound_stamp_policy_allows_payload(
+                let stamp_status = if record.is_some() {
+                    match evaluate_inbound_stamp_policy(
                         daemon_inbound.as_ref(),
                         destination,
                         data,
                         payload_mode,
-                    )
-                    .is_err()
-                {
-                    if diagnostics_enabled() {
-                        eprintln!(
-                            "[daemon-rx] dropping inbound payload due to stamp policy: dst={}",
-                            destination_hex
-                        );
+                    ) {
+                        Ok(status) => Some(status),
+                        Err(_) => {
+                            if diagnostics_enabled() {
+                                eprintln!(
+                                    "[daemon-rx] dropping inbound payload due to stamp policy: dst={}",
+                                    destination_hex
+                                );
+                            }
+                            continue;
+                        }
                     }
-                    continue;
-                }
-                if let Some(record) = record {
+                } else {
+                    None
+                };
+                if let Some(mut record) = record {
+                    if let Some(stamp_status) = stamp_status {
+                        annotate_inbound_record_stamp_status(&mut record, stamp_status);
+                    }
                     daemon_inbound.record_inbound_peer_activity(&record.source, data.len());
                     let _ = daemon_inbound.accept_inbound_with_raw(record, data);
                 }
@@ -238,9 +262,10 @@ fn is_lxmf_propagation_destination(
     control.propagation_destination_hash_hex.as_deref() == Some(destination_hex.as_str())
 }
 
-fn ingest_propagation_envelope(
+async fn ingest_propagation_envelope(
     daemon: &RpcDaemon,
     payload: &[u8],
+    delivery_destination: Option<&Arc<tokio::sync::Mutex<SingleInputDestination>>>,
 ) -> Result<usize, std::io::Error> {
     let (_timestamp, messages): (f64, Vec<Vec<u8>>) = rmp_serde::from_slice(payload).map_err(
         |err| {
@@ -250,14 +275,113 @@ fn ingest_propagation_envelope(
             )
         },
     )?;
-    let transient_ids = messages
-        .iter()
-        .map(|message| daemon.canonical_propagation_payload_bytes(message))
-        .collect::<Result<Vec<_>, _>>()?;
-    for (message, transient_id) in messages.iter().zip(transient_ids.iter()) {
+    for message in messages.iter() {
+        let transient_id = daemon.canonical_propagation_payload_bytes(message)?;
+        if try_accept_local_propagated_message(daemon, delivery_destination, message).await? {
+            daemon.note_client_propagation_messages_received(1);
+            continue;
+        }
         daemon.ingest_propagation_payload_bytes(message, Some(transient_id.as_str()))?;
     }
     Ok(messages.len())
+}
+
+async fn try_accept_local_propagated_message(
+    daemon: &RpcDaemon,
+    delivery_destination: Option<&Arc<tokio::sync::Mutex<SingleInputDestination>>>,
+    transient_payload: &[u8],
+) -> Result<bool, std::io::Error> {
+    let Some(delivery_destination) = delivery_destination else {
+        return Ok(false);
+    };
+    if transient_payload.len() <= 16 + 32 {
+        return Ok(false);
+    }
+
+    let (destination_hash, wire) = {
+        let destination = delivery_destination.lock().await;
+        if &transient_payload[..16] != destination.desc.address_hash.as_slice() {
+            return Ok(false);
+        }
+        let wire = decrypt_local_propagated_wire(&destination, transient_payload)?;
+        let mut destination_hash = [0u8; 16];
+        destination_hash.copy_from_slice(destination.desc.address_hash.as_slice());
+        (destination_hash, wire)
+    };
+
+    let stamp_status = evaluate_inbound_stamp_policy(
+        daemon,
+        destination_hash,
+        &wire,
+        InboundPayloadMode::FullWire,
+    )
+    .map_err(|error| std::io::Error::new(std::io::ErrorKind::InvalidData, error))?;
+
+    let Some(mut record) =
+        decode_inbound_payload(destination_hash, &wire, InboundPayloadMode::FullWire)
+    else {
+        return Err(std::io::Error::new(
+            std::io::ErrorKind::InvalidData,
+            "failed to decode locally delivered propagated LXMF payload",
+        ));
+    };
+
+    annotate_inbound_record_stamp_status(&mut record, stamp_status);
+    daemon.record_inbound_peer_activity(&record.source, wire.len());
+    daemon.accept_inbound_with_raw(record, &wire)?;
+    Ok(true)
+}
+
+fn decrypt_local_propagated_wire(
+    destination: &SingleInputDestination,
+    transient_payload: &[u8],
+) -> Result<Vec<u8>, std::io::Error> {
+    if transient_payload.len() <= 16 + 32 {
+        return Err(std::io::Error::new(
+            std::io::ErrorKind::InvalidData,
+            "propagated LXMF payload too short",
+        ));
+    }
+
+    for strip_stamp in [false, true] {
+        let payload = if strip_stamp {
+            if transient_payload.len() <= 16 + 32 + 32 {
+                continue;
+            }
+            &transient_payload[..transient_payload.len() - 32]
+        } else {
+            transient_payload
+        };
+
+        let ciphertext = &payload[16..];
+        if ciphertext.len() <= 32 {
+            continue;
+        }
+        let Ok(ephemeral_key) = <[u8; 32]>::try_from(&ciphertext[..32]) else {
+            continue;
+        };
+        let public_key = PublicKey::from(ephemeral_key);
+        let derived_key = destination
+            .identity
+            .derive_key(&public_key, Some(destination.identity.address_hash().as_slice()));
+        let token = &ciphertext[32..];
+        let mut plaintext = vec![0u8; token.len()];
+        let Ok(decrypted) =
+            destination.identity.decrypt(rand_core::OsRng, token, &derived_key, &mut plaintext)
+        else {
+            continue;
+        };
+
+        let mut wire = Vec::with_capacity(16 + decrypted.len());
+        wire.extend_from_slice(destination.desc.address_hash.as_slice());
+        wire.extend_from_slice(decrypted);
+        return Ok(wire);
+    }
+
+    Err(std::io::Error::new(
+        std::io::ErrorKind::InvalidData,
+        "failed to decrypt propagated LXMF payload for local delivery",
+    ))
 }
 
 fn spawn_control_worker(
@@ -708,17 +832,22 @@ fn is_lxmf_propagation_link_destination(destination: &DestinationDesc) -> bool {
 
 #[cfg(test)]
 mod tests {
-    use reticulum_daemon::inbound_delivery;
     use super::{
         ingest_propagation_envelope, is_lxmf_delivery_destination,
         is_lxmf_propagation_link_destination,
     };
     use hkdf::Hkdf;
+    use lxmf::WireMessage;
     use rand_core::OsRng;
+    use reticulum_daemon::lxmf_bridge::build_wire_message_with_options;
+    use reticulum_daemon::inbound_delivery;
     use rns_rpc::{RpcDaemon, RpcRequest};
-    use rns_transport::destination::{DestinationDesc, DestinationName};
+    use rns_transport::destination::{DestinationDesc, DestinationName, SingleInputDestination};
     use rns_transport::identity::PrivateIdentity;
+    use rns_transport::identity_bridge::{to_core_identity, to_core_private_identity};
     use sha2::{Digest, Sha256};
+    use std::sync::Arc;
+    use tokio::sync::Mutex as TokioMutex;
 
     #[test]
     fn lxmf_delivery_destination_is_accepted_for_resource_decode() {
@@ -756,15 +885,16 @@ mod tests {
         assert!(is_lxmf_propagation_link_destination(&destination));
     }
 
-    #[test]
-    fn inbound_propagation_payload_is_ingested_and_counted() {
+    #[tokio::test]
+    async fn inbound_propagation_payload_is_ingested_and_counted() {
         let daemon = RpcDaemon::test_instance();
         let payload = b"plain-propagation-payload".to_vec();
         let transient_id = hex::encode(Sha256::digest(&payload));
         let envelope =
             rmp_serde::to_vec(&(1.0_f64, vec![payload.clone()])).expect("propagation envelope");
 
-        let ingested = ingest_propagation_envelope(&daemon, &envelope).expect("ingest envelope");
+        let ingested =
+            ingest_propagation_envelope(&daemon, &envelope, None).await.expect("ingest envelope");
         assert_eq!(ingested, 1);
 
         let fetched = daemon
@@ -790,8 +920,8 @@ mod tests {
         assert_eq!(status["propagation"]["client_propagation_messages_received"].as_u64(), Some(1));
     }
 
-    #[test]
-    fn inbound_propagation_invalid_entry_is_rejected() {
+    #[tokio::test]
+    async fn inbound_propagation_invalid_entry_is_rejected() {
         let daemon = RpcDaemon::test_instance();
         daemon
             .handle_rpc(RpcRequest {
@@ -807,7 +937,8 @@ mod tests {
             rmp_serde::to_vec(&(1.0_f64, vec![b"unstamped-propagation-payload".to_vec()]))
                 .expect("propagation envelope");
 
-        let err = ingest_propagation_envelope(&daemon, &envelope)
+        let err = ingest_propagation_envelope(&daemon, &envelope, None)
+            .await
             .expect_err("invalid propagation envelope should be rejected");
         assert!(err.to_string().contains("invalid propagation stamp"));
 
@@ -823,8 +954,8 @@ mod tests {
         assert_eq!(status["propagation"]["client_propagation_messages_received"].as_u64(), Some(0));
     }
 
-    #[test]
-    fn propagation_envelope_does_not_decode_as_normal_lxmf_delivery() {
+    #[tokio::test]
+    async fn propagation_envelope_does_not_decode_as_normal_lxmf_delivery() {
         let daemon = RpcDaemon::test_instance();
         daemon
             .handle_rpc(RpcRequest {
@@ -848,7 +979,73 @@ mod tests {
             )
             .is_none()
         );
-        assert!(ingest_propagation_envelope(&daemon, &envelope).is_ok());
+        assert!(ingest_propagation_envelope(&daemon, &envelope, None).await.is_ok());
+    }
+
+    #[tokio::test]
+    async fn local_propagation_payload_is_decrypted_and_accepted() {
+        let daemon = RpcDaemon::test_instance();
+        let delivery_private = PrivateIdentity::new_from_rand(OsRng);
+        let source_private = PrivateIdentity::new_from_rand(OsRng);
+        let delivery_destination = Arc::new(TokioMutex::new(SingleInputDestination::new(
+            delivery_private.clone(),
+            DestinationName::new("lxmf", "delivery"),
+        )));
+        let source_destination =
+            SingleInputDestination::new(source_private.clone(), DestinationName::new("lxmf", "delivery"));
+        let mut destination_hash = [0u8; 16];
+        {
+            let destination = delivery_destination.lock().await;
+            destination_hash.copy_from_slice(destination.desc.address_hash.as_slice());
+        }
+        daemon.set_delivery_destination_hash(Some(hex::encode(destination_hash)));
+        let mut source_hash = [0u8; 16];
+        source_hash.copy_from_slice(source_destination.desc.address_hash.as_slice());
+
+        let wire = build_wire_message_with_options(
+            source_hash,
+            destination_hash,
+            "propagated title",
+            "propagated content",
+            None,
+            &to_core_private_identity(&source_private),
+            None,
+            None,
+            None,
+        )
+        .expect("wire");
+        let envelope = {
+            let destination = delivery_destination.lock().await;
+            WireMessage::unpack(&wire)
+                .expect("wire unpack")
+                .pack_propagation_with_rng(
+                    &to_core_identity(destination.identity.as_identity()),
+                    1.0,
+                    OsRng,
+                )
+                .expect("propagation envelope")
+        };
+
+        let ingested = ingest_propagation_envelope(&daemon, &envelope, Some(&delivery_destination))
+            .await
+            .expect("ingest propagation envelope");
+        assert_eq!(ingested, 1);
+
+        let messages = daemon
+            .handle_rpc(RpcRequest {
+                id: 40,
+                method: "list_messages".to_string(),
+                params: None,
+            })
+            .expect("list messages")
+            .result
+            .expect("list messages result");
+        let items = messages["messages"].as_array().expect("message items");
+        assert_eq!(items.len(), 1);
+        assert_eq!(items[0]["direction"].as_str(), Some("in"));
+        assert_eq!(items[0]["destination"].as_str(), Some(hex::encode(destination_hash).as_str()));
+        assert_eq!(items[0]["title"].as_str(), Some("propagated title"));
+        assert_eq!(items[0]["content"].as_str(), Some("propagated content"));
     }
 
     fn stamped_propagation_payload(lxm_data: &[u8], target_cost: u32) -> Vec<u8> {

@@ -17,7 +17,7 @@ struct CompatibilityCase {
     description: &'static str,
 }
 
-const COMPATIBILITY_CASES: [CompatibilityCase; 7] = [
+const COMPATIBILITY_CASES: [CompatibilityCase; 8] = [
     CompatibilityCase {
         id: "direct_rust_to_python",
         mode: CompatibilityMode::Direct,
@@ -27,6 +27,11 @@ const COMPATIBILITY_CASES: [CompatibilityCase; 7] = [
         id: "direct_python_to_rust",
         mode: CompatibilityMode::Direct,
         description: "Python node can deliver to Rust node using direct mode",
+    },
+    CompatibilityCase {
+        id: "opportunistic_python_to_rust",
+        mode: CompatibilityMode::Opportunistic,
+        description: "Python node can deliver to Rust node using opportunistic mode",
     },
     CompatibilityCase {
         id: "opportunistic_rust_to_python",
@@ -58,11 +63,12 @@ const COMPATIBILITY_CASES: [CompatibilityCase; 7] = [
 #[test]
 fn compatibility_matrix_covers_required_modes() {
     assert!(
-        COMPATIBILITY_CASES.len() >= 7,
+        COMPATIBILITY_CASES.len() >= 8,
         "matrix should cover the documented required scenarios"
     );
     assert_case_present("direct_rust_to_python");
     assert_case_present("direct_python_to_rust");
+    assert_case_present("opportunistic_python_to_rust");
     assert_case_present("opportunistic_rust_to_python");
     assert_case_present("propagated_rust_to_python");
     assert_case_present("propagated_python_to_rust");
@@ -91,6 +97,12 @@ fn python_compat_direct_python_to_rust() {
 #[ignore = "requires live Python compatibility harness environment"]
 fn python_compat_opportunistic_rust_to_python() {
     run_case("opportunistic_rust_to_python");
+}
+
+#[test]
+#[ignore = "requires live Python compatibility harness environment"]
+fn python_compat_opportunistic_python_to_rust() {
+    run_case("opportunistic_python_to_rust");
 }
 
 #[test]
