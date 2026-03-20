@@ -8,70 +8,154 @@ use std::thread;
 use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 
 const TEST_TIMEOUT: Duration = Duration::from_secs(300);
+const WAIT_POLL_INTERVAL: Duration = Duration::from_millis(500);
+const REMOTE_PATH_RESPONSE_MIN: Duration = Duration::from_millis(900);
 const RPC_RATE_LIMIT_BACKOFF: Duration = Duration::from_secs(5);
 const RPC_MAX_ATTEMPTS: usize = 60;
 
 struct SpawnedNode {
     child: Child,
     stderr_log: PathBuf,
+    rpc_port: u16,
+}
+
+struct ReservedPort {
+    listener: Option<TcpListener>,
+    port: u16,
+}
+
+impl ReservedPort {
+    fn reserve() -> Self {
+        let listener = TcpListener::bind(("127.0.0.1", 0)).expect("bind ephemeral port");
+        let port = listener.local_addr().expect("ephemeral local addr").port();
+        Self { listener: Some(listener), port }
+    }
+
+    fn port(&self) -> u16 {
+        self.port
+    }
+
+    fn release(&mut self) {
+        self.listener.take();
+    }
 }
 
 #[test]
-fn lxmd_three_node_tcp_full_test_waits_for_announces_before_delivery() {
+fn lxmd_four_node_tcp_remote_path_response_uses_relayed_route() {
     let lxmd_bin = resolve_test_binary("lxmd", option_env!("CARGO_BIN_EXE_lxmd"));
     let reticulumd_bin = resolve_test_binary("reticulumd", option_env!("CARGO_BIN_EXE_reticulumd"));
 
     let temp = tempfile::tempdir().expect("tempdir");
-    let server_port = reserve_local_port();
-    let server_rpc = reserve_local_port();
-    let client_two_rpc = reserve_local_port();
-    let client_two_transport = reserve_local_port();
-    let client_three_rpc = reserve_local_port();
-    let client_three_transport = reserve_local_port();
+    let upstream_server_port = ReservedPort::reserve();
+    let upstream_server_rpc = ReservedPort::reserve();
+    let relay_rpc = ReservedPort::reserve();
+    let relay_transport = ReservedPort::reserve();
+    let client_two_rpc = ReservedPort::reserve();
+    let client_two_transport = ReservedPort::reserve();
+    let client_three_rpc = ReservedPort::reserve();
+    let client_three_transport = ReservedPort::reserve();
 
-    let server_dir = temp.path().join("server");
+    let upstream_server_dir = temp.path().join("upstream-server");
+    let relay_dir = temp.path().join("relay");
     let client_two_dir = temp.path().join("client-two");
     let client_three_dir = temp.path().join("client-three");
 
     write_config(
-        &server_dir,
-        &node_config("server", server_rpc, server_port, "tcp_server", server_port),
+        &upstream_server_dir,
+        &node_config(
+            "upstream-server",
+            upstream_server_rpc.port(),
+            Some(upstream_server_port.port()),
+            &[],
+        ),
+    );
+    write_config(
+        &relay_dir,
+        &node_config(
+            "relay",
+            relay_rpc.port(),
+            Some(relay_transport.port()),
+            &[tcp_client_interface("relay-uplink", upstream_server_port.port())],
+        ),
     );
     write_config(
         &client_two_dir,
-        &node_config("client-two", client_two_rpc, client_two_transport, "tcp_client", server_port),
+        &node_config(
+            "client-two",
+            client_two_rpc.port(),
+            Some(client_two_transport.port()),
+            &[tcp_client_interface("client-two-uplink", relay_transport.port())],
+        ),
     );
     write_config(
         &client_three_dir,
         &node_config(
             "client-three",
-            client_three_rpc,
-            client_three_transport,
-            "tcp_client",
-            server_port,
+            client_three_rpc.port(),
+            Some(client_three_transport.port()),
+            &[tcp_client_interface("client-three-uplink", upstream_server_port.port())],
         ),
     );
 
-    let mut server = Some(spawn_lxmd(&lxmd_bin, &reticulumd_bin, &server_dir));
+    let mut upstream_server = Some(spawn_lxmd(
+        &lxmd_bin,
+        &reticulumd_bin,
+        upstream_server_rpc.port(),
+        &upstream_server_dir,
+        &mut [upstream_server_port, upstream_server_rpc],
+    ));
+    let mut relay = None;
     let mut client_two = None;
     let mut client_three = None;
 
     let outcome: Result<(), String> = (|| {
-        wait_for_ready(server_rpc, server.as_mut().expect("server child"), "server")?;
-
-        client_two = Some(spawn_lxmd(&lxmd_bin, &reticulumd_bin, &client_two_dir));
         wait_for_ready(
-            client_two_rpc,
+            upstream_server.as_ref().expect("upstream server child").rpc_port(),
+            upstream_server.as_mut().expect("upstream server child"),
+            "upstream-server",
+        )?;
+
+        relay = Some(spawn_lxmd(
+            &lxmd_bin,
+            &reticulumd_bin,
+            relay_rpc.port(),
+            &relay_dir,
+            &mut [relay_rpc, relay_transport],
+        ));
+        wait_for_ready(
+            relay.as_ref().expect("relay child").rpc_port(),
+            relay.as_mut().expect("relay child"),
+            "relay",
+        )?;
+
+        client_two = Some(spawn_lxmd(
+            &lxmd_bin,
+            &reticulumd_bin,
+            client_two_rpc.port(),
+            &client_two_dir,
+            &mut [client_two_rpc, client_two_transport],
+        ));
+        wait_for_ready(
+            client_two.as_ref().expect("client-two child").rpc_port(),
             client_two.as_mut().expect("client-two child"),
             "client-two",
         )?;
 
-        client_three = Some(spawn_lxmd(&lxmd_bin, &reticulumd_bin, &client_three_dir));
+        client_three = Some(spawn_lxmd(
+            &lxmd_bin,
+            &reticulumd_bin,
+            client_three_rpc.port(),
+            &client_three_dir,
+            &mut [client_three_rpc, client_three_transport],
+        ));
         wait_for_ready(
-            client_three_rpc,
+            client_three.as_ref().expect("client-three child").rpc_port(),
             client_three.as_mut().expect("client-three child"),
             "client-three",
         )?;
+
+        let client_two_rpc = client_two.as_ref().expect("client-two child").rpc_port();
+        let client_three_rpc = client_three.as_ref().expect("client-three child").rpc_port();
 
         let client_two_status = daemon_status(client_two_rpc)?;
         let client_three_status = daemon_status(client_three_rpc)?;
@@ -81,15 +165,12 @@ fn lxmd_three_node_tcp_full_test_waits_for_announces_before_delivery() {
             .unwrap_or_else(|| panic!("client-three delivery hash: {client_three_status}"));
 
         rpc_call(client_two_rpc, "announce_now", None)?;
-        rpc_call(client_three_rpc, "announce_now", None)?;
-
-        wait_for_peer(client_two_rpc, &client_three_hash)?;
-        wait_for_peer(client_three_rpc, &client_two_hash)?;
 
         let message_id = format!(
-            "hello-world-{}",
+            "remote-path-{}",
             SystemTime::now().duration_since(UNIX_EPOCH).expect("time").as_millis()
         );
+        let delivery_started_at = Instant::now();
         rpc_call(
             client_three_rpc,
             "send_message_v2",
@@ -103,13 +184,32 @@ fn lxmd_three_node_tcp_full_test_waits_for_announces_before_delivery() {
             })),
         )?;
 
-        wait_for_inbound_message(client_two_rpc, "hello world")
+        wait_for_inbound_message(client_two_rpc, "hello world")?;
+
+        let delivery_elapsed = delivery_started_at.elapsed();
+        if delivery_elapsed < REMOTE_PATH_RESPONSE_MIN {
+            return Err(format!(
+                "remote path response completed too quickly: {:?} < {:?}",
+                delivery_elapsed, REMOTE_PATH_RESPONSE_MIN
+            ));
+        }
+
+        Ok(())
     })();
 
+    let upstream_server_rpc = upstream_server.as_ref().map_or(0, SpawnedNode::rpc_port);
+    let relay_rpc = relay.as_ref().map_or(0, SpawnedNode::rpc_port);
+    let client_two_rpc = client_two.as_ref().map_or(0, SpawnedNode::rpc_port);
+    let client_three_rpc = client_three.as_ref().map_or(0, SpawnedNode::rpc_port);
     let failure_details = if let Err(err) = &outcome {
         Some(format!(
-            "{err}\n\n{}\n\n{}\n\n{}",
-            collect_node_diagnostics("server", server_rpc, server.as_mut()),
+            "{err}\n\n{}\n\n{}\n\n{}\n\n{}",
+            collect_node_diagnostics(
+                "upstream-server",
+                upstream_server_rpc,
+                upstream_server.as_mut()
+            ),
+            collect_node_diagnostics("relay", relay_rpc, relay.as_mut()),
             collect_node_diagnostics("client-two", client_two_rpc, client_two.as_mut()),
             collect_node_diagnostics("client-three", client_three_rpc, client_three.as_mut()),
         ))
@@ -123,12 +223,15 @@ fn lxmd_three_node_tcp_full_test_waits_for_announces_before_delivery() {
     if let Some(node) = client_two.as_mut() {
         terminate_child(node);
     }
-    if let Some(node) = server.as_mut() {
+    if let Some(node) = relay.as_mut() {
+        terminate_child(node);
+    }
+    if let Some(node) = upstream_server.as_mut() {
         terminate_child(node);
     }
 
     if let Some(details) = failure_details {
-        panic!("three-node lxmd flow failed:\n{details}");
+        panic!("four-node lxmd remote path flow failed:\n{details}");
     }
 }
 
@@ -150,8 +253,14 @@ fn resolve_test_binary_if_present(name: &str, provided: Option<&str>) -> Option<
 }
 
 fn resolve_test_binary(name: &str, provided: Option<&str>) -> PathBuf {
-    if let Some(path) = resolve_test_binary_if_present(name, provided) {
-        return path;
+    if let Some(path) = provided.filter(|path| !path.is_empty()) {
+        return PathBuf::from(path);
+    }
+
+    if let Some(path) = std::env::var_os(format!("{}_BIN", name.to_ascii_uppercase()))
+        .filter(|path| !path.is_empty())
+    {
+        return PathBuf::from(path);
     }
 
     build_workspace_binary(name).unwrap_or_else(|err| panic!("failed to build {name}: {err}"));
@@ -212,17 +321,13 @@ fn binary_candidates(target_dir: &Path, name: &str) -> Vec<PathBuf> {
 fn node_config(
     name: &str,
     rpc_port: u16,
-    transport_port: u16,
-    interface_type: &str,
-    server_port: u16,
+    transport_port: Option<u16>,
+    interfaces: &[String],
 ) -> String {
-    let interface = match interface_type {
-        "tcp_server" => String::new(),
-        "tcp_client" => format!(
-            "[[interfaces]]\ntype = \"tcp_client\"\nenabled = true\nname = \"{name}-uplink\"\nhost = \"127.0.0.1\"\nport = {server_port}\n"
-        ),
-        other => panic!("unsupported interface type {other}"),
-    };
+    let interfaces = interfaces.join("\n");
+    let transport = transport_port
+        .map(|transport_port| format!("\n[transport]\nlisten = \"127.0.0.1:{transport_port}\"\n"))
+        .unwrap_or_default();
 
     format!(
         r#"[node]
@@ -230,9 +335,7 @@ display_name = "{name}"
 
 [rpc]
 listen = "127.0.0.1:{rpc_port}"
-
-[transport]
-listen = "127.0.0.1:{transport_port}"
+{transport}
 
 [storage]
 db = "./state/reticulum.db"
@@ -241,7 +344,13 @@ identity = "./state/identity"
 [lxmf]
 announce_at_start = false
 
-{interface}"#
+{interfaces}"#
+    )
+}
+
+fn tcp_client_interface(name: &str, server_port: u16) -> String {
+    format!(
+        "[[interfaces]]\ntype = \"tcp_client\"\nenabled = true\nname = \"{name}\"\nhost = \"127.0.0.1\"\nport = {server_port}\n"
     )
 }
 
@@ -250,20 +359,54 @@ fn write_config(dir: &Path, config: &str) {
     fs::write(dir.join("lxmd.toml"), config).expect("write config");
 }
 
-fn spawn_lxmd(lxmd_bin: &Path, reticulumd_bin: &Path, config_dir: &Path) -> SpawnedNode {
+fn spawn_lxmd(
+    lxmd_bin: &Path,
+    reticulumd_bin: &Path,
+    rpc_port: u16,
+    config_dir: &Path,
+    reserved_ports: &mut [ReservedPort],
+) -> SpawnedNode {
+    for port in reserved_ports {
+        port.release();
+    }
+    let live_logs = live_child_logs_enabled();
     let stderr_log = config_dir.join("lxmd.stderr.log");
-    let stderr = File::create(&stderr_log).expect("create stderr log");
-    let child = Command::new(lxmd_bin)
-        .arg("--config")
-        .arg(config_dir.join("lxmd.toml"))
-        .env("RETICULUMD_BIN", reticulumd_bin)
-        .env("RETICULUMD_DIAGNOSTICS", "1")
-        .env("RETICULUM_TRANSPORT_DIAGNOSTICS", "1")
-        .stdout(Stdio::null())
-        .stderr(Stdio::from(stderr))
-        .spawn()
-        .expect("spawn lxmd");
-    SpawnedNode { child, stderr_log }
+    let child = if live_logs {
+        eprintln!(
+            "[live-logs] spawning {} with config {}",
+            config_dir.display(),
+            config_dir.join("lxmd.toml").display()
+        );
+        Command::new(lxmd_bin)
+            .arg("--config")
+            .arg(config_dir.join("lxmd.toml"))
+            .env("RETICULUMD_BIN", reticulumd_bin)
+            .env("RETICULUMD_DIAGNOSTICS", "1")
+            .env("RETICULUM_TRANSPORT_DIAGNOSTICS", "1")
+            .stdout(Stdio::inherit())
+            .stderr(Stdio::inherit())
+            .spawn()
+            .expect("spawn lxmd")
+    } else {
+        let stderr = File::create(&stderr_log).expect("create stderr log");
+        Command::new(lxmd_bin)
+            .arg("--config")
+            .arg(config_dir.join("lxmd.toml"))
+            .env("RETICULUMD_BIN", reticulumd_bin)
+            .env("RETICULUMD_DIAGNOSTICS", "1")
+            .env("RETICULUM_TRANSPORT_DIAGNOSTICS", "1")
+            .stdout(Stdio::null())
+            .stderr(Stdio::from(stderr))
+            .spawn()
+            .expect("spawn lxmd")
+    };
+    SpawnedNode { child, stderr_log, rpc_port }
+}
+
+fn live_child_logs_enabled() -> bool {
+    std::env::var_os("LXMD_TEST_LOGS")
+        .and_then(|value| value.into_string().ok())
+        .is_some_and(|value| matches!(value.as_str(), "1" | "true" | "TRUE" | "yes" | "YES"))
 }
 
 fn wait_for_ready(rpc_port: u16, node: &mut SpawnedNode, label: &str) -> Result<(), String> {
@@ -278,7 +421,7 @@ fn wait_for_ready(rpc_port: u16, node: &mut SpawnedNode, label: &str) -> Result<
             Ok(false) => {}
             Err(_) => {}
         }
-        thread::sleep(Duration::from_millis(200));
+        thread::sleep(WAIT_POLL_INTERVAL);
     }
     let stderr = read_log(node.stderr_log.as_path());
     if stderr.is_empty() {
@@ -303,25 +446,6 @@ fn status_hash(status: &Value) -> Option<String> {
     None
 }
 
-fn wait_for_peer(rpc_port: u16, expected_peer: &str) -> Result<(), String> {
-    let deadline = Instant::now() + TEST_TIMEOUT;
-    while Instant::now() < deadline {
-        let peers = rpc_call(rpc_port, "list_peers", None)?;
-        let seen = peers["peers"].as_array().is_some_and(|items| {
-            items.iter().any(|peer| {
-                peer["peer"].as_str() == Some(expected_peer)
-                    || peer["destination"].as_str() == Some(expected_peer)
-                    || peer["source"].as_str() == Some(expected_peer)
-            })
-        });
-        if seen {
-            return Ok(());
-        }
-        thread::sleep(Duration::from_secs(2));
-    }
-    Err(format!("peer {expected_peer} was not discovered on rpc port {rpc_port}"))
-}
-
 fn wait_for_inbound_message(rpc_port: u16, expected_content: &str) -> Result<(), String> {
     let deadline = Instant::now() + TEST_TIMEOUT;
     while Instant::now() < deadline {
@@ -335,7 +459,7 @@ fn wait_for_inbound_message(rpc_port: u16, expected_content: &str) -> Result<(),
         if delivered {
             return Ok(());
         }
-        thread::sleep(Duration::from_secs(2));
+        thread::sleep(WAIT_POLL_INTERVAL);
     }
     Err(format!("inbound content '{expected_content}' did not arrive on rpc port {rpc_port}"))
 }
@@ -482,6 +606,12 @@ fn terminate_child(node: &mut SpawnedNode) {
     }
 }
 
+impl SpawnedNode {
+    fn rpc_port(&self) -> u16 {
+        self.rpc_port
+    }
+}
+
 fn read_log(path: &Path) -> String {
     fs::read_to_string(path).unwrap_or_default()
 }
@@ -494,12 +624,4 @@ fn trim_log(mut text: String, max_chars: usize) -> String {
     let split_at = text.len().saturating_sub(max_chars);
     text.drain(..split_at);
     format!("...<truncated>\n{text}")
-}
-
-fn reserve_local_port() -> u16 {
-    TcpListener::bind(("127.0.0.1", 0))
-        .expect("bind ephemeral port")
-        .local_addr()
-        .expect("ephemeral local addr")
-        .port()
 }

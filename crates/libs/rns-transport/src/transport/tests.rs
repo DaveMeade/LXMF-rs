@@ -508,6 +508,70 @@ async fn routed_link_request_proof_requires_matching_iface_and_signature() {
     }
 }
 
+#[test]
+fn link_request_proof_starts_with_zero_hops() {
+    let signer = PrivateIdentity::new_from_rand(OsRng);
+    let identity = *signer.as_identity();
+    let destination = crate::destination::DestinationDesc {
+        identity,
+        address_hash: identity.address_hash,
+        name: DestinationName::new("lxmf", "delivery"),
+    };
+    let (tx, _) = tokio::sync::broadcast::channel(4);
+    let mut outbound = Link::new(destination, tx.clone());
+    let mut request = outbound.request();
+    request.header.hops = 2;
+
+    let mut inbound =
+        Link::new_from_request(&request, signer.sign_key().clone(), destination, tx)
+            .expect("link request should parse");
+    let proof = inbound.prove();
+
+    assert_eq!(proof.context, PacketContext::LinkRequestProof);
+    assert_eq!(proof.header.hops, 0);
+}
+
+#[tokio::test]
+async fn routed_link_request_proof_preserves_wire_shape_when_forwarded_backwards() {
+    let remote_identity = PrivateIdentity::new_from_rand(OsRng);
+    let remote_destination =
+        SingleInputDestination::new(remote_identity, DestinationName::new("lxmf", "delivery"));
+
+    let received_from = AddressHash::new_from_slice(&[1u8; 16]);
+    let next_hop = AddressHash::new_from_slice(&[2u8; 16]);
+    let next_hop_iface = AddressHash::new_from_slice(&[3u8; 16]);
+
+    let mut link_table = LinkTable::new(Duration::from_secs(5), Duration::from_secs(30));
+    let (tx, _) = tokio::sync::broadcast::channel(4);
+    let mut outbound_link = Link::new(remote_destination.desc, tx.clone());
+    let mut request = outbound_link.request();
+    request.header.hops = 1;
+    link_table.add(
+        &request,
+        request.destination,
+        received_from,
+        next_hop,
+        next_hop_iface,
+    );
+
+    let mut inbound = Link::new_from_request(
+        &request,
+        remote_destination.sign_key().clone(),
+        remote_destination.desc,
+        tx,
+    )
+    .expect("link from request");
+    let proof = inbound.prove();
+    let (forwarded, target) = link_table.handle_proof(&proof).expect("forwarded proof");
+
+    assert_eq!(target, received_from);
+    assert_eq!(forwarded.context, PacketContext::LinkRequestProof);
+    assert_eq!(forwarded.header.header_type, HeaderType::Type1);
+    assert_eq!(forwarded.transport, None);
+    assert_eq!(forwarded.destination, proof.destination);
+    assert_eq!(forwarded.header.hops, proof.header.hops);
+}
+
 #[tokio::test]
 async fn transport_register_channel_handler_dispatches_inbound_channel_message() {
     let local_identity = PrivateIdentity::new_from_rand(OsRng);

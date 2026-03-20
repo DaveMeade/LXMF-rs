@@ -60,7 +60,7 @@ impl PathTable {
         transport_id: Option<AddressHash>,
         iface: AddressHash,
     ) {
-        let hops = announce.header.hops + 1;
+        let hops = announce.header.hops;
 
         if let Some(existing_entry) = self.map.get(&announce.destination) {
             if hops >= existing_entry.hops {
@@ -100,7 +100,43 @@ impl PathTable {
             None => return (*original_packet, None),
         };
 
-        (
+        let forwarded = if original_packet.header.header_type == HeaderType::Type2 {
+            if entry.hops <= 1 {
+                Packet {
+                    header: Header {
+                        ifac_flag: original_packet.header.ifac_flag,
+                        header_type: HeaderType::Type1,
+                        context_flag: original_packet.header.context_flag,
+                        propagation_type: PropagationType::Broadcast,
+                        destination_type: original_packet.header.destination_type,
+                        packet_type: original_packet.header.packet_type,
+                        hops: original_packet.header.hops,
+                    },
+                    ifac: None,
+                    destination: original_packet.destination,
+                    transport: None,
+                    context: original_packet.context,
+                    data: original_packet.data,
+                }
+            } else {
+                Packet {
+                    header: Header {
+                        ifac_flag: original_packet.header.ifac_flag,
+                        header_type: HeaderType::Type2,
+                        context_flag: original_packet.header.context_flag,
+                        propagation_type: PropagationType::Transport,
+                        destination_type: original_packet.header.destination_type,
+                        packet_type: original_packet.header.packet_type,
+                        hops: original_packet.header.hops,
+                    },
+                    ifac: None,
+                    destination: original_packet.destination,
+                    transport: Some(entry.received_from),
+                    context: original_packet.context,
+                    data: original_packet.data,
+                }
+            }
+        } else {
             Packet {
                 header: Header {
                     ifac_flag: original_packet.header.ifac_flag,
@@ -109,16 +145,17 @@ impl PathTable {
                     propagation_type: PropagationType::Transport,
                     destination_type: original_packet.header.destination_type,
                     packet_type: original_packet.header.packet_type,
-                    hops: original_packet.header.hops + 1,
+                    hops: original_packet.header.hops,
                 },
                 ifac: None,
                 destination: original_packet.destination,
                 transport: Some(entry.received_from),
                 context: original_packet.context,
                 data: original_packet.data,
-            },
-            Some(entry.iface),
-        )
+            }
+        };
+
+        (forwarded, Some(entry.iface))
     }
 
     pub fn refresh(&mut self, destination: &AddressHash) {
@@ -264,6 +301,90 @@ mod tests {
         assert_eq!(forwarded.header.ifac_flag, IfacFlag::Open);
         assert_eq!(forwarded.header.header_type, HeaderType::Type2);
         assert_eq!(forwarded.header.propagation_type, PropagationType::Transport);
+        assert_eq!(forwarded.transport, Some(next_hop));
+    }
+
+    #[test]
+    fn handle_inbound_packet_direct_hop_strips_transport_and_preserves_hops() {
+        let destination = AddressHash::new_from_hash(&Hash::new_from_slice(b"destination"));
+        let iface = AddressHash::new_from_hash(&Hash::new_from_slice(b"iface"));
+        let next_hop = AddressHash::new_from_hash(&Hash::new_from_slice(b"next_hop"));
+        let mut table = PathTable::new();
+        table.map.insert(
+            destination,
+            PathEntry {
+                timestamp: Instant::now(),
+                received_from: next_hop,
+                hops: 1,
+                iface,
+                packet_hash: Hash::new_from_slice(b"packet"),
+            },
+        );
+
+        let packet = Packet {
+            header: Header {
+                ifac_flag: IfacFlag::Open,
+                header_type: HeaderType::Type2,
+                context_flag: ContextFlag::Unset,
+                propagation_type: PropagationType::Transport,
+                destination_type: DestinationType::Single,
+                packet_type: PacketType::Data,
+                hops: 1,
+            },
+            ifac: None,
+            destination,
+            transport: Some(next_hop),
+            context: crate::packet::PacketContext::None,
+            data: StaticBuffer::new(),
+        };
+
+        let (forwarded, next_iface) = table.handle_inbound_packet(&packet, None);
+        assert_eq!(next_iface, Some(iface));
+        assert_eq!(forwarded.header.header_type, HeaderType::Type1);
+        assert_eq!(forwarded.header.propagation_type, PropagationType::Broadcast);
+        assert_eq!(forwarded.header.hops, 1);
+        assert_eq!(forwarded.transport, None);
+    }
+
+    #[test]
+    fn handle_inbound_packet_multihop_preserves_transport_hops() {
+        let destination = AddressHash::new_from_hash(&Hash::new_from_slice(b"destination"));
+        let iface = AddressHash::new_from_hash(&Hash::new_from_slice(b"iface"));
+        let next_hop = AddressHash::new_from_hash(&Hash::new_from_slice(b"next_hop"));
+        let mut table = PathTable::new();
+        table.map.insert(
+            destination,
+            PathEntry {
+                timestamp: Instant::now(),
+                received_from: next_hop,
+                hops: 2,
+                iface,
+                packet_hash: Hash::new_from_slice(b"packet"),
+            },
+        );
+
+        let packet = Packet {
+            header: Header {
+                ifac_flag: IfacFlag::Open,
+                header_type: HeaderType::Type2,
+                context_flag: ContextFlag::Unset,
+                propagation_type: PropagationType::Transport,
+                destination_type: DestinationType::Single,
+                packet_type: PacketType::Data,
+                hops: 1,
+            },
+            ifac: None,
+            destination,
+            transport: Some(AddressHash::new_from_hash(&Hash::new_from_slice(b"prior_hop"))),
+            context: crate::packet::PacketContext::None,
+            data: StaticBuffer::new(),
+        };
+
+        let (forwarded, next_iface) = table.handle_inbound_packet(&packet, None);
+        assert_eq!(next_iface, Some(iface));
+        assert_eq!(forwarded.header.header_type, HeaderType::Type2);
+        assert_eq!(forwarded.header.propagation_type, PropagationType::Transport);
+        assert_eq!(forwarded.header.hops, 1);
         assert_eq!(forwarded.transport, Some(next_hop));
     }
 }

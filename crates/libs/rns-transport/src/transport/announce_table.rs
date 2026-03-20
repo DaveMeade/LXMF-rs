@@ -6,8 +6,7 @@ use tokio::time::{Duration, Instant};
 use crate::hash::AddressHash;
 use crate::iface::{TxMessage, TxMessageType};
 use crate::packet::{
-    ContextFlag, DestinationType, Header, HeaderType, IfacFlag, Packet, PacketContext, PacketType,
-    PropagationType,
+    Header, HeaderType, Packet, PropagationType,
 };
 
 const PATHFINDER_RETRY_GRACE: Duration = Duration::from_secs(5);
@@ -47,26 +46,20 @@ impl AnnounceEntry {
         self.retries = self.retries.saturating_add(1);
         self.timeout = Instant::now() + PATHFINDER_RETRY_GRACE + retry_window();
 
-        let context = if self.response_to_iface.is_some() {
-            PacketContext::PathResponse
-        } else {
-            PacketContext::None
-        };
-
         let packet = Packet {
             header: Header {
-                ifac_flag: IfacFlag::Open,
+                ifac_flag: self.packet.header.ifac_flag,
                 header_type: HeaderType::Type2,
-                context_flag: ContextFlag::Unset,
+                context_flag: self.packet.header.context_flag,
                 propagation_type: PropagationType::Broadcast,
-                destination_type: DestinationType::Single,
-                packet_type: PacketType::Announce,
+                destination_type: self.packet.header.destination_type,
+                packet_type: self.packet.header.packet_type,
                 hops: self.hops,
             },
             ifac: None,
             destination: self.packet.destination,
             transport: Some(*transport_id),
-            context,
+            context: self.packet.context,
             data: self.packet.data,
         };
 
@@ -182,7 +175,7 @@ impl AnnounceTable {
         }
 
         let now = Instant::now();
-        let hops = announce.header.hops + 1;
+        let hops = announce.header.hops;
 
         let entry = AnnounceEntry {
             packet: *announce,
@@ -346,6 +339,7 @@ mod tests {
     use rand_core::OsRng;
     use std::thread::sleep;
     use std::time::Duration as StdDuration;
+    use crate::packet::PacketContext;
 
     #[test]
     fn announce_entries_use_random_window_and_grace_retry() {
@@ -390,7 +384,11 @@ mod tests {
         let received_from = AddressHash::new_from_rand(OsRng);
         let transport_id = AddressHash::new_from_rand(OsRng);
         let to_iface = AddressHash::new_from_rand(OsRng);
-        let packet = Packet { destination, ..Packet::default() };
+        let packet = Packet {
+            destination,
+            context: PacketContext::None,
+            ..Packet::default()
+        };
 
         table.add(&packet, destination, received_from);
         assert!(table.add_response(destination, to_iface, 3));
@@ -413,6 +411,7 @@ mod tests {
         let messages = table.to_retransmit(&transport_id);
         assert_eq!(messages.len(), 1);
         assert!(matches!(messages[0].tx_type, TxMessageType::Direct(iface) if iface == to_iface));
+        assert_eq!(messages[0].packet.context, PacketContext::None);
         assert!(table.responses.is_empty());
         assert!(table.to_retransmit(&transport_id).is_empty());
     }
