@@ -30,7 +30,7 @@ pub fn create_path_request_destination() -> PlainInputDestination {
 pub type TagBytes = Vec<u8>;
 type DuplicateKey = (AddressHash, TagBytes);
 type DiscoveryKey = (AddressHash, Option<AddressHash>);
-type LocalResponseKey = (AddressHash, Option<AddressHash>, AddressHash);
+type LocalResponseKey = (AddressHash, Option<AddressHash>, AddressHash, TagBytes);
 
 pub fn create_random_tag() -> TagBytes {
     AddressHash::new_from_rand(OsRng).as_slice().into()
@@ -143,12 +143,14 @@ impl PathRequests {
     }
 
     fn prune_local_responses(&mut self, now: Instant) {
-        while let Some((key, timeout)) = self.local_response_queue.front().copied() {
+        while let Some((key, timeout)) = self.local_response_queue.front().cloned() {
             if timeout > now {
                 break;
             }
             self.local_response_queue.pop_front();
-            self.local_response_cache.remove(&key);
+            if self.local_response_cache.get(&key).copied() == Some(timeout) {
+                self.local_response_cache.remove(&key);
+            }
         }
     }
 
@@ -214,8 +216,15 @@ impl PathRequests {
         destination: &AddressHash,
         requesting_transport: Option<AddressHash>,
         on_iface: AddressHash,
+        tag_bytes: &[u8],
     ) -> bool {
-        self.allow_local_response_at(destination, requesting_transport, on_iface, Instant::now())
+        self.allow_local_response_at(
+            destination,
+            requesting_transport,
+            on_iface,
+            tag_bytes,
+            Instant::now(),
+        )
     }
 
     fn allow_local_response_at(
@@ -223,11 +232,12 @@ impl PathRequests {
         destination: &AddressHash,
         requesting_transport: Option<AddressHash>,
         on_iface: AddressHash,
+        tag_bytes: &[u8],
         now: Instant,
     ) -> bool {
         self.prune_local_responses(now);
 
-        let key = (*destination, requesting_transport, on_iface);
+        let key = (*destination, requesting_transport, on_iface, tag_bytes.to_vec());
         if let Some(timeout) = self.local_response_cache.get(&key) {
             if *timeout > now {
                 return false;
@@ -236,7 +246,7 @@ impl PathRequests {
         }
 
         let expiry = now + self.local_response_cooldown;
-        self.local_response_cache.insert(key, expiry);
+        self.local_response_cache.insert(key.clone(), expiry);
         self.local_response_queue.push_back((key, expiry));
         true
     }
@@ -406,11 +416,30 @@ mod tests {
         let iface_a = AddressHash::new_from_rand(OsRng);
         let iface_b = AddressHash::new_from_rand(OsRng);
         let requester = Some(AddressHash::new_from_rand(OsRng));
+        let tag = AddressHash::new_from_rand(OsRng);
         let now = Instant::now();
 
-        assert!(testee.allow_local_response_at(&destination, requester, iface_a, now));
-        assert!(!testee.allow_local_response_at(&destination, requester, iface_a, now));
-        assert!(testee.allow_local_response_at(&destination, requester, iface_b, now));
+        assert!(testee.allow_local_response_at(
+            &destination,
+            requester,
+            iface_a,
+            tag.as_slice(),
+            now
+        ));
+        assert!(!testee.allow_local_response_at(
+            &destination,
+            requester,
+            iface_a,
+            tag.as_slice(),
+            now
+        ));
+        assert!(testee.allow_local_response_at(
+            &destination,
+            requester,
+            iface_b,
+            tag.as_slice(),
+            now
+        ));
     }
 
     #[test]
@@ -419,14 +448,28 @@ mod tests {
         let destination = AddressHash::new_from_rand(OsRng);
         let iface = AddressHash::new_from_rand(OsRng);
         let requester = Some(AddressHash::new_from_rand(OsRng));
+        let tag = AddressHash::new_from_rand(OsRng);
         let now = Instant::now();
 
-        assert!(testee.allow_local_response_at(&destination, requester, iface, now));
-        assert!(!testee.allow_local_response_at(&destination, requester, iface, now));
         assert!(testee.allow_local_response_at(
             &destination,
             requester,
             iface,
+            tag.as_slice(),
+            now
+        ));
+        assert!(!testee.allow_local_response_at(
+            &destination,
+            requester,
+            iface,
+            tag.as_slice(),
+            now
+        ));
+        assert!(testee.allow_local_response_at(
+            &destination,
+            requester,
+            iface,
+            tag.as_slice(),
             now + super::super::LOCAL_PATH_RESPONSE_COOLDOWN + Duration::from_millis(1)
         ));
     }
@@ -438,11 +481,99 @@ mod tests {
         let requester_a = Some(AddressHash::new_from_rand(OsRng));
         let requester_b = Some(AddressHash::new_from_rand(OsRng));
         let iface = AddressHash::new_from_rand(OsRng);
+        let tag = AddressHash::new_from_rand(OsRng);
         let now = Instant::now();
 
-        assert!(testee.allow_local_response_at(&destination, requester_a, iface, now));
-        assert!(testee.allow_local_response_at(&destination, requester_b, iface, now));
-        assert!(!testee.allow_local_response_at(&destination, requester_a, iface, now));
+        assert!(testee.allow_local_response_at(
+            &destination,
+            requester_a,
+            iface,
+            tag.as_slice(),
+            now
+        ));
+        assert!(testee.allow_local_response_at(
+            &destination,
+            requester_b,
+            iface,
+            tag.as_slice(),
+            now
+        ));
+        assert!(!testee.allow_local_response_at(
+            &destination,
+            requester_a,
+            iface,
+            tag.as_slice(),
+            now
+        ));
+    }
+
+    #[test]
+    fn local_response_throttle_is_scoped_per_request_tag() {
+        let mut testee = PathRequests::new("", None, 16, 16, 30);
+        let destination = AddressHash::new_from_rand(OsRng);
+        let requester = Some(AddressHash::new_from_rand(OsRng));
+        let iface = AddressHash::new_from_rand(OsRng);
+        let tag_a = AddressHash::new_from_rand(OsRng);
+        let tag_b = AddressHash::new_from_rand(OsRng);
+        let now = Instant::now();
+
+        assert!(testee.allow_local_response_at(
+            &destination,
+            requester,
+            iface,
+            tag_a.as_slice(),
+            now
+        ));
+        assert!(testee.allow_local_response_at(
+            &destination,
+            requester,
+            iface,
+            tag_b.as_slice(),
+            now
+        ));
+        assert!(!testee.allow_local_response_at(
+            &destination,
+            requester,
+            iface,
+            tag_a.as_slice(),
+            now
+        ));
+    }
+
+    #[test]
+    fn local_response_refresh_does_not_remove_newer_entry() {
+        let mut testee = PathRequests::new("", None, 16, 16, 30);
+        let destination = AddressHash::new_from_rand(OsRng);
+        let requester = Some(AddressHash::new_from_rand(OsRng));
+        let iface = AddressHash::new_from_rand(OsRng);
+        let tag = AddressHash::new_from_rand(OsRng);
+        let now = Instant::now();
+        let cooldown = super::super::LOCAL_PATH_RESPONSE_COOLDOWN;
+
+        assert!(testee.allow_local_response_at(
+            &destination,
+            requester,
+            iface,
+            tag.as_slice(),
+            now
+        ));
+        assert!(testee.allow_local_response_at(
+            &destination,
+            requester,
+            iface,
+            tag.as_slice(),
+            now + cooldown + Duration::from_millis(1)
+        ));
+        assert!(
+            !testee.allow_local_response_at(
+                &destination,
+                requester,
+                iface,
+                tag.as_slice(),
+                now + cooldown + Duration::from_millis(2)
+            ),
+            "refreshing the throttle should keep the replacement entry alive"
+        );
     }
 
     #[test]

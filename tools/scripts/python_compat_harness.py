@@ -18,19 +18,31 @@ SUPPORTED_CASES = {
 
 
 def main() -> int:
+    supported_cases = ", ".join(sorted(SUPPORTED_CASES))
     if len(sys.argv) != 2:
-        print("usage: python_compat_harness.py <case_id>", file=sys.stderr)
+        print(
+            f"usage: python_compat_harness.py <case_id> (one of: {supported_cases})",
+            file=sys.stderr,
+        )
         return 2
 
     case_id = sys.argv[1]
     if case_id not in SUPPORTED_CASES:
-        print(f"unsupported compatibility case: {case_id}", file=sys.stderr)
+        print(
+            f"unsupported compatibility case: {case_id}. Supported cases: {supported_cases}",
+            file=sys.stderr,
+        )
         return 2
 
     repo_root = Path(__file__).resolve().parents[2]
     smoke_script = repo_root / "tools" / "scripts" / "python-lxmd-rust-lxmd-smoke.sh"
+    if not smoke_script.is_file():
+        print(f"missing smoke script: {smoke_script}", file=sys.stderr)
+        return 2
     env = os.environ.copy()
     env["COMPAT_CASE"] = case_id
+    env.setdefault("LXMF_PYTHON_BIN", sys.executable)
+    env.setdefault("PYTHON_BIN", env["LXMF_PYTHON_BIN"])
 
     result = subprocess.run(
         [str(smoke_script)],
