@@ -737,8 +737,10 @@ fn build_propagation_payload(
         destination_identity.public_key_bytes(),
         destination_identity.verifying_key_bytes(),
     );
-    wire.pack_propagation_with_rng(&core_identity, now_secs_f64(), OsRng)
-        .map_err(std::io::Error::other)
+    let (payload, _transient_id) = wire
+        .pack_propagation_with_options_and_rng(&core_identity, now_secs_f64(), None, OsRng)
+        .map_err(std::io::Error::other)?;
+    Ok(payload)
 }
 
 fn now_secs_f64() -> f64 {

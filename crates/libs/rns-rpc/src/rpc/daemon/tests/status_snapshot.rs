@@ -961,6 +961,7 @@ fn propagation_ingest_without_payload_does_not_increment_counts_or_store_payload
         .expect_err("payload should not have been stored");
     assert!(err.to_string().contains("transient_id not found"));
 }
+
 fn stamped_propagation_payload(lxm_data: &[u8], target_cost: u32) -> Vec<u8> {
     use hkdf::Hkdf;
     use sha2::{Digest, Sha256};
