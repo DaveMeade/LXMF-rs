@@ -114,13 +114,32 @@ impl RpcDaemon {
                     .map_err(|err| std::io::Error::new(std::io::ErrorKind::InvalidInput, err))?;
 
                 let payload_hex = parsed.payload_hex.unwrap_or_default();
+                let target_cost = self
+                    .propagation_state
+                    .lock()
+                    .expect("propagation mutex poisoned")
+                    .target_cost;
+                let validated_payload = if target_cost > 0 && !payload_hex.is_empty() {
+                    Some(validate_and_strip_propagation_payload_hex(payload_hex.as_str(), target_cost)?)
+                } else {
+                    None
+                };
                 let transient_id = parsed.transient_id.unwrap_or_else(|| {
+                    if let Some((transient_id, _payload_hex)) = validated_payload.as_ref() {
+                        return transient_id.clone();
+                    }
                     let mut hasher = Sha256::new();
                     hasher.update(payload_hex.as_bytes());
                     encode_hex(hasher.finalize())
                 });
 
-                if !payload_hex.is_empty() {
+                if let Some(payload_hex) = validated_payload.map(|(_transient_id, payload_hex)| payload_hex).or_else(|| {
+                    if payload_hex.is_empty() {
+                        None
+                    } else {
+                        Some(payload_hex)
+                    }
+                }) {
                     self.propagation_payloads
                         .lock()
                         .expect("propagation payload mutex poisoned")
@@ -369,4 +388,102 @@ impl RpcDaemon {
         }
     }
 
+}
+
+const PROPAGATION_STAMP_SIZE: usize = 32;
+const PROPAGATION_STAMP_WORKBLOCK_ROUNDS: usize = 1000;
+
+fn validate_and_strip_propagation_payload_hex(
+    payload_hex: &str,
+    target_cost: u32,
+) -> Result<(String, String), std::io::Error> {
+    let transient_data = decode_propagation_payload_hex(payload_hex)?;
+    let (transient_id, payload) = validate_and_strip_propagation_payload_bytes(&transient_data, target_cost)?;
+    Ok((hex::encode(transient_id), hex::encode(payload)))
+}
+
+fn decode_propagation_payload_hex(payload_hex: &str) -> Result<Vec<u8>, std::io::Error> {
+    hex::decode(payload_hex.trim()).map_err(|err| {
+        std::io::Error::new(
+            std::io::ErrorKind::InvalidInput,
+            format!("invalid propagation payload hex: {err}"),
+        )
+    })
+}
+
+fn validate_and_strip_propagation_payload_bytes(
+    transient_data: &[u8],
+    target_cost: u32,
+) -> Result<([u8; 32], &[u8]), std::io::Error> {
+    validate_propagation_transient_bytes(transient_data, target_cost).map(|transient_id| {
+        let split_at = transient_data.len() - PROPAGATION_STAMP_SIZE;
+        (transient_id, &transient_data[..split_at])
+    })
+}
+
+fn validate_propagation_transient_bytes(
+    transient_data: &[u8],
+    target_cost: u32,
+) -> Result<[u8; 32], std::io::Error> {
+    if transient_data.len() <= PROPAGATION_STAMP_SIZE {
+        return Err(std::io::Error::new(
+            std::io::ErrorKind::PermissionDenied,
+            "invalid propagation stamp",
+        ));
+    }
+
+    let split_at = transient_data.len() - PROPAGATION_STAMP_SIZE;
+    let lxm_data = &transient_data[..split_at];
+    let stamp = &transient_data[split_at..];
+
+    let transient_hash = Sha256::digest(lxm_data);
+    let workblock = propagation_stamp_workblock(transient_hash.as_slice());
+    if !propagation_stamp_valid(stamp, target_cost, workblock.as_slice()) {
+        return Err(std::io::Error::new(
+            std::io::ErrorKind::PermissionDenied,
+            "invalid propagation stamp",
+        ));
+    }
+
+    let mut transient_id = [0u8; 32];
+    transient_id.copy_from_slice(transient_hash.as_slice());
+    Ok(transient_id)
+}
+
+fn propagation_stamp_workblock(material: &[u8]) -> Vec<u8> {
+    let mut workblock = Vec::with_capacity(PROPAGATION_STAMP_WORKBLOCK_ROUNDS * 256);
+    for round in 0..PROPAGATION_STAMP_WORKBLOCK_ROUNDS {
+        let mut salt_data = Vec::with_capacity(material.len() + 8);
+        salt_data.extend_from_slice(material);
+        let packed =
+            rmp_serde::to_vec(&(round as u32)).expect("msgpack encode propagation stamp round");
+        salt_data.extend_from_slice(&packed);
+        let salt_hash = Sha256::digest(&salt_data);
+        let hk = hkdf::Hkdf::<Sha256>::new(Some(salt_hash.as_slice()), material);
+        let mut okm = [0u8; 256];
+        hk.expand(&[], &mut okm).expect("hkdf expand propagation stamp workblock");
+        workblock.extend_from_slice(&okm);
+    }
+    workblock
+}
+
+fn propagation_stamp_valid(stamp: &[u8], target_cost: u32, workblock: &[u8]) -> bool {
+    propagation_stamp_value(workblock, stamp) >= target_cost
+}
+
+fn propagation_stamp_value(workblock: &[u8], stamp: &[u8]) -> u32 {
+    let mut material = Vec::with_capacity(workblock.len() + stamp.len());
+    material.extend_from_slice(workblock);
+    material.extend_from_slice(stamp);
+    let hash = Sha256::digest(&material);
+    let mut value = 0u32;
+    for byte in hash {
+        if byte == 0 {
+            value += 8;
+        } else {
+            value += byte.leading_zeros();
+            break;
+        }
+    }
+    value
 }
