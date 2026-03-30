@@ -1,4 +1,134 @@
 impl RpcDaemon {
+    pub fn canonical_propagation_payload_hex(
+        &self,
+        payload_hex: &str,
+    ) -> Result<String, std::io::Error> {
+        let target_cost = self
+            .propagation_state
+            .lock()
+            .expect("propagation mutex poisoned")
+            .target_cost;
+        canonical_propagation_transient_hex(payload_hex, target_cost)
+    }
+
+    pub fn canonical_propagation_payload_bytes(
+        &self,
+        payload: &[u8],
+    ) -> Result<String, std::io::Error> {
+        let target_cost = self
+            .propagation_state
+            .lock()
+            .expect("propagation mutex poisoned")
+            .target_cost;
+        Ok(hex::encode(canonical_propagation_transient_bytes(
+            payload,
+            target_cost,
+        )?))
+    }
+
+    pub fn propagation_target_cost(&self) -> u32 {
+        self.propagation_state
+            .lock()
+            .expect("propagation mutex poisoned")
+            .target_cost
+    }
+
+    pub fn ingest_propagation_payload_bytes_with_aliases(
+        &self,
+        payload: &[u8],
+        transient_id: &str,
+        aliases: &[String],
+    ) -> Result<String, std::io::Error> {
+        let payload_hex = hex::encode(payload);
+        if !payload_hex.is_empty() {
+            let mut guard = self
+                .propagation_payloads
+                .lock()
+                .expect("propagation payload mutex poisoned");
+            guard.insert(transient_id.to_string(), payload_hex.clone());
+            for alias in aliases {
+                guard.insert(alias.clone(), payload_hex.clone());
+            }
+        }
+
+        let state = {
+            let mut guard = self.propagation_state.lock().expect("propagation mutex poisoned");
+            let ingested_count = usize::from(!transient_id.is_empty());
+            guard.last_ingest_count = ingested_count;
+            guard.total_ingested += ingested_count;
+            guard.client_propagation_messages_received = guard
+                .client_propagation_messages_received
+                .saturating_add(ingested_count);
+            guard.clone()
+        };
+        self.update_daemon_status_snapshot(|snapshot| {
+            snapshot.propagation = state;
+        });
+
+        Ok(transient_id.to_string())
+    }
+
+    pub fn ingest_propagation_payload_hex(
+        &self,
+        payload_hex: &str,
+        transient_id: Option<&str>,
+    ) -> Result<String, std::io::Error> {
+        let canonical_transient_id = if !payload_hex.is_empty() {
+            Some(self.canonical_propagation_payload_hex(payload_hex)?)
+        } else {
+            None
+        };
+        if let (Some(provided_transient_id), Some(canonical_transient_id)) =
+            (transient_id, canonical_transient_id.as_ref())
+        {
+            if !provided_transient_id.eq_ignore_ascii_case(canonical_transient_id) {
+                return Err(std::io::Error::new(
+                    std::io::ErrorKind::InvalidInput,
+                    "transient_id does not match propagation payload",
+                ));
+            }
+        }
+        let transient_id = transient_id.map(str::to_string).unwrap_or_else(|| {
+            canonical_transient_id.unwrap_or_else(|| {
+                let mut hasher = Sha256::new();
+                hasher.update(payload_hex.as_bytes());
+                encode_hex(hasher.finalize())
+            })
+        });
+
+        if !payload_hex.is_empty() {
+            self.propagation_payloads
+                .lock()
+                .expect("propagation payload mutex poisoned")
+                .insert(transient_id.clone(), payload_hex.to_string());
+        }
+
+        let state = {
+            let mut guard = self.propagation_state.lock().expect("propagation mutex poisoned");
+            let ingested_count = usize::from(!transient_id.is_empty());
+            guard.last_ingest_count = ingested_count;
+            guard.total_ingested += ingested_count;
+            guard.client_propagation_messages_received = guard
+                .client_propagation_messages_received
+                .saturating_add(ingested_count);
+            guard.clone()
+        };
+        self.update_daemon_status_snapshot(|snapshot| {
+            snapshot.propagation = state;
+        });
+
+        Ok(transient_id)
+    }
+
+    pub fn ingest_propagation_payload_bytes(
+        &self,
+        payload: &[u8],
+        transient_id: Option<&str>,
+    ) -> Result<String, std::io::Error> {
+        let payload_hex = hex::encode(payload);
+        self.ingest_propagation_payload_hex(payload_hex.as_str(), transient_id)
+    }
+
     fn handle_rpc_legacy_propagation(&self, request: RpcRequest) -> Result<RpcResponse, std::io::Error> {
         match request.method.as_str() {
             "get_delivery_policy" => {
@@ -413,6 +543,15 @@ fn normalize_propagation_payload_hex(
     Ok((hex::encode(transient_id), hex::encode(payload)))
 }
 
+fn canonical_propagation_transient_hex(
+    payload_hex: &str,
+    target_cost: u32,
+) -> Result<String, std::io::Error> {
+    let transient_data = decode_propagation_payload_hex(payload_hex)?;
+    let transient_id = canonical_propagation_transient_bytes(&transient_data, target_cost)?;
+    Ok(hex::encode(transient_id))
+}
+
 fn decode_propagation_payload_hex(payload_hex: &str) -> Result<Vec<u8>, std::io::Error> {
     hex::decode(payload_hex.trim()).map_err(|err| {
         std::io::Error::new(
@@ -420,6 +559,42 @@ fn decode_propagation_payload_hex(payload_hex: &str) -> Result<Vec<u8>, std::io:
             format!("invalid propagation payload hex: {err}"),
         )
     })
+}
+
+fn canonical_propagation_transient_bytes(
+    transient_data: &[u8],
+    target_cost: u32,
+) -> Result<[u8; 32], std::io::Error> {
+    if target_cost == 0 {
+        let transient_hash = Sha256::digest(transient_data);
+        let mut transient_id = [0u8; 32];
+        transient_id.copy_from_slice(transient_hash.as_slice());
+        return Ok(transient_id);
+    }
+
+    if transient_data.len() <= MIN_PROPAGATION_STAMPED_PAYLOAD_SIZE {
+        return Err(std::io::Error::new(
+            std::io::ErrorKind::PermissionDenied,
+            "invalid propagation stamp",
+        ));
+    }
+
+    let split_at = transient_data.len() - PROPAGATION_STAMP_SIZE;
+    let lxm_data = &transient_data[..split_at];
+    let stamp = &transient_data[split_at..];
+
+    let transient_hash = Sha256::digest(lxm_data);
+    let workblock = propagation_stamp_workblock(transient_hash.as_slice());
+    if !propagation_stamp_valid(stamp, target_cost, workblock.as_slice()) {
+        return Err(std::io::Error::new(
+            std::io::ErrorKind::PermissionDenied,
+            "invalid propagation stamp",
+        ));
+    }
+
+    let mut transient_id = [0u8; 32];
+    transient_id.copy_from_slice(transient_hash.as_slice());
+    Ok(transient_id)
 }
 
 fn normalize_propagation_payload_bytes(
@@ -450,6 +625,7 @@ fn propagation_payload_hash_input(
             "invalid propagation stamp",
         )
     })?;
+
 
     let transient_hash = Sha256::digest(lxm_data);
     let workblock = propagation_stamp_workblock(transient_hash.as_slice());
