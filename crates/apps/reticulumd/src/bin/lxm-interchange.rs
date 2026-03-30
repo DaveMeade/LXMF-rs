@@ -1,0 +1,31 @@
+use std::path::PathBuf;
+use std::process::ExitCode;
+
+use clap::Parser;
+use reticulum_daemon::paper_interchange::decode_storage_file;
+
+#[derive(Debug, Parser)]
+struct Args {
+    #[arg(long)]
+    file: PathBuf,
+}
+
+fn main() -> ExitCode {
+    let args = Args::parse();
+    match decode_storage_file(&args.file) {
+        Ok(summary) => match serde_json::to_string(&summary) {
+            Ok(json) => {
+                println!("{json}");
+                ExitCode::SUCCESS
+            }
+            Err(error) => {
+                eprintln!("failed to encode interchange summary: {error}");
+                ExitCode::from(1)
+            }
+        },
+        Err(error) => {
+            eprintln!("failed to decode interchange file {}: {error}", args.file.display());
+            ExitCode::from(1)
+        }
+    }
+}

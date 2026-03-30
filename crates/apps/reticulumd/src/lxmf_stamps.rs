@@ -6,6 +6,8 @@ pub const FIELD_TICKET: i64 = 0x0C;
 pub const TICKET_LENGTH: usize = 16;
 pub const COST_TICKET: u32 = 0x100;
 const WORKBLOCK_EXPAND_ROUNDS: usize = 3000;
+pub const PROPAGATION_STAMP_SIZE: usize = 32;
+const PROPAGATION_WORKBLOCK_EXPAND_ROUNDS: usize = 1000;
 
 pub fn decode_ticket_hex(ticket_hex: &str) -> Result<Vec<u8>, String> {
     let bytes = hex::decode(ticket_hex.trim())
@@ -29,10 +31,31 @@ pub fn ticket_stamp(ticket: &[u8], message_id: &[u8; 32]) -> Vec<u8> {
 
 pub fn generate_stamp(message_id: &[u8; 32], stamp_cost: u32) -> Option<Vec<u8>> {
     let workblock = stamp_workblock(message_id, WORKBLOCK_EXPAND_ROUNDS);
+    let mut workblock_hasher = Sha256::new();
+    workblock_hasher.update(&workblock);
     let mut nonce = 0u64;
     loop {
         let stamp = nonce.to_le_bytes().to_vec();
-        if stamp_valid(&stamp, stamp_cost, &workblock) {
+        if stamp_value_with_prefix(&workblock_hasher, &stamp) >= stamp_cost {
+            return Some(stamp);
+        }
+        nonce = nonce.wrapping_add(1);
+        if nonce == 0 {
+            return None;
+        }
+    }
+}
+
+pub fn generate_propagation_stamp(transient_id: &[u8; 32], stamp_cost: u32) -> Option<Vec<u8>> {
+    let workblock = stamp_workblock(transient_id, PROPAGATION_WORKBLOCK_EXPAND_ROUNDS);
+    let mut workblock_hasher = Sha256::new();
+    workblock_hasher.update(&workblock);
+    let mut stamp = vec![0u8; PROPAGATION_STAMP_SIZE];
+    let mut nonce = 0u64;
+
+    loop {
+        stamp[..8].copy_from_slice(&nonce.to_le_bytes());
+        if stamp_value_with_prefix(&workblock_hasher, &stamp) >= stamp_cost {
             return Some(stamp);
         }
         nonce = nonce.wrapping_add(1);
@@ -85,13 +108,22 @@ pub fn stamp_valid(stamp: &[u8], target_cost: u32, workblock: &[u8]) -> bool {
 }
 
 pub fn stamp_value(workblock: &[u8], stamp: &[u8]) -> u32 {
-    let mut material = Vec::with_capacity(workblock.len() + stamp.len());
-    material.extend_from_slice(workblock);
-    material.extend_from_slice(stamp);
-    let hash = Sha256::digest(&material);
+    let mut hasher = Sha256::new();
+    hasher.update(workblock);
+    hasher.update(stamp);
+    stamp_value_from_hash(hasher.finalize().as_slice())
+}
+
+fn stamp_value_with_prefix(workblock_hasher: &Sha256, stamp: &[u8]) -> u32 {
+    let mut hasher = workblock_hasher.clone();
+    hasher.update(stamp);
+    stamp_value_from_hash(hasher.finalize().as_slice())
+}
+
+fn stamp_value_from_hash(hash: &[u8]) -> u32 {
     let mut value = 0u32;
     for byte in hash {
-        if byte == 0 {
+        if *byte == 0 {
             value += 8;
         } else {
             value += byte.leading_zeros();

@@ -3,7 +3,7 @@ use tokio::time::{Duration, Instant};
 
 use crate::destination::link::LinkId;
 use crate::hash::AddressHash;
-use crate::packet::{Header, HeaderType, IfacFlag, Packet};
+use crate::packet::Packet;
 
 #[allow(dead_code)]
 pub struct LinkEntry {
@@ -20,18 +20,10 @@ pub struct LinkEntry {
 
 fn send_backwards(packet: &Packet, entry: &LinkEntry) -> (Packet, AddressHash) {
     let propagated = Packet {
-        header: Header {
-            ifac_flag: IfacFlag::Authenticated,
-            header_type: HeaderType::Type2,
-            context_flag: packet.header.context_flag,
-            propagation_type: packet.header.propagation_type,
-            destination_type: packet.header.destination_type,
-            packet_type: packet.header.packet_type,
-            hops: packet.header.hops + 1,
-        },
+        header: packet.header,
         ifac: None,
         destination: packet.destination,
-        transport: Some(entry.next_hop),
+        transport: packet.transport,
         context: packet.context,
         data: packet.data,
     };

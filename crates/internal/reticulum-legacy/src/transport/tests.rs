@@ -145,6 +145,55 @@ async fn announce_retransmit_key_uses_destination_hash() {
 }
 
 #[tokio::test]
+async fn direct_path_responses_are_ready_immediately() {
+    let transport_id = AddressHash::new_from_rand(OsRng);
+    let destination = AddressHash::new_from_rand(OsRng);
+    let iface = AddressHash::new_from_rand(OsRng);
+    let received_from = AddressHash::new_from_rand(OsRng);
+
+    let mut table = AnnounceTable::new(8, 1);
+    let announce = Packet {
+        destination,
+        data: PacketDataBuffer::new_from_slice(b"announce"),
+        ..Default::default()
+    };
+    table.add(&announce, destination, received_from);
+    assert!(table.add_response(destination, iface, 1, Duration::ZERO));
+
+    let responses = table.take_ready_responses(&transport_id);
+    assert_eq!(responses.len(), 1, "direct path responses should be immediately flushable");
+    assert!(matches!(responses[0].tx_type, TxMessageType::Direct(target) if target == iface));
+    assert_eq!(responses[0].packet.context, PacketContext::PathResponse);
+}
+
+#[tokio::test]
+async fn multihop_path_responses_wait_for_grace_period() {
+    let transport_id = AddressHash::new_from_rand(OsRng);
+    let destination = AddressHash::new_from_rand(OsRng);
+    let iface = AddressHash::new_from_rand(OsRng);
+    let received_from = AddressHash::new_from_rand(OsRng);
+
+    let mut table = AnnounceTable::new(8, 1);
+    let announce = Packet {
+        destination,
+        data: PacketDataBuffer::new_from_slice(b"announce"),
+        ..Default::default()
+    };
+    table.add(&announce, destination, received_from);
+    assert!(table.add_response(destination, iface, 2, Duration::from_millis(25)));
+
+    assert!(
+        table.take_ready_responses(&transport_id).is_empty(),
+        "multihop responses should respect the grace period"
+    );
+
+    tokio::time::sleep(Duration::from_millis(30)).await;
+    let responses = table.take_ready_responses(&transport_id);
+    assert_eq!(responses.len(), 1, "response should be emitted after grace period");
+    assert_eq!(responses[0].packet.context, PacketContext::PathResponse);
+}
+
+#[tokio::test]
 async fn send_packet_with_outcome_reports_missing_identity() {
     let identity = PrivateIdentity::new_from_rand(OsRng);
     let config = TransportConfig::new("test", &identity, true);

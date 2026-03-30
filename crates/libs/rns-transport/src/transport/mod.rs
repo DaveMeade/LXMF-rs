@@ -118,6 +118,7 @@ const INTERVAL_IFACE_CLEANUP: Duration = Duration::from_secs(10);
 const INTERVAL_ANNOUNCES_RETRANSMIT: Duration = Duration::from_secs(1);
 const INTERVAL_KEEP_PACKET_CACHED: Duration = Duration::from_secs(180);
 const INTERVAL_PACKET_CACHE_CLEANUP: Duration = Duration::from_secs(90);
+const LOCAL_PATH_RESPONSE_COOLDOWN: Duration = Duration::from_millis(750);
 
 // Other constants
 const KEEP_ALIVE_REQUEST: u8 = 0xFF;
@@ -191,6 +192,7 @@ pub(crate) struct TransportHandler {
     announce_table: AnnounceTable,
     link_table: LinkTable,
     single_in_destinations: HashMap<AddressHash, Arc<Mutex<SingleInputDestination>>>,
+    single_in_destination_app_data: HashMap<AddressHash, Vec<u8>>,
     single_out_destinations: HashMap<AddressHash, Arc<Mutex<SingleOutputDestination>>>,
 
     announce_limits: AnnounceLimits,

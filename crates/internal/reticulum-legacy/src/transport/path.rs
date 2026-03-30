@@ -1,5 +1,7 @@
 use super::*;
 
+const PATH_RESPONSE_GRACE: Duration = Duration::from_secs(1);
+
 pub(super) async fn send_to_next_hop<'a>(
     packet: &Packet,
     handler: &MutexGuard<'a, TransportHandler>,
@@ -20,7 +22,6 @@ pub(super) async fn handle_path_request<'a>(
     iface: AddressHash,
 ) {
     if let Some(request) = handler.path_requests.decode(packet.data.as_slice()) {
-        eprintln!("[tp] path_request dest={} iface={}", request.destination, iface);
         if let Some(dest) = handler.single_in_destinations.get(&request.destination) {
             let response =
                 dest.lock().await.path_response(OsRng, None).expect("valid path response");
@@ -28,7 +29,6 @@ pub(super) async fn handle_path_request<'a>(
             handler
                 .send(TxMessage { tx_type: TxMessageType::Direct(iface), packet: response })
                 .await;
-            eprintln!("[tp] path_response dest={} iface={}", request.destination, iface);
 
             log::trace!("tp({}): send direct path response over {}", handler.config.name, iface);
 
@@ -49,8 +49,18 @@ pub(super) async fn handle_path_request<'a>(
                 }
 
                 let hops = entry.hops;
-
-                handler.announce_table.add_response(request.destination, iface, hops);
+                let response_delay = if hops <= 1 { Duration::ZERO } else { PATH_RESPONSE_GRACE };
+                if handler
+                    .announce_table
+                    .add_response(request.destination, iface, hops, response_delay)
+                    && response_delay.is_zero()
+                {
+                    let transport_id = *handler.config.identity.address_hash();
+                    let messages = handler.announce_table.take_ready_responses(&transport_id);
+                    for message in messages {
+                        handler.send(message).await;
+                    }
+                }
 
                 log::trace!(
                     "tp({}): scheduled remote path response to {} ({} hops) over {}",
@@ -110,11 +120,6 @@ pub(super) async fn handle_link_request_as_destination<'a>(
                 );
 
                 if let Ok(mut link) = link {
-                    eprintln!(
-                        "[tp] link_proof_tx dst={} link_id={}",
-                        packet.destination,
-                        link.id()
-                    );
                     // Link-request proofs must go back over the interface that delivered
                     // the request so multi-hop requestors can activate the link.
                     handler
@@ -156,10 +161,6 @@ pub(super) async fn handle_link_request<'a>(
     iface: AddressHash,
     handler: MutexGuard<'a, TransportHandler>,
 ) {
-    eprintln!(
-        "[tp] link_request dst={} ctx={:02x} hops={}",
-        packet.destination, packet.context as u8, packet.header.hops
-    );
     if let Some(destination) = handler.single_in_destinations.get(&packet.destination).cloned() {
         log::trace!("tp({}): handle link request for {}", handler.config.name, packet.destination);
 

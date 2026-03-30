@@ -1,139 +1,159 @@
 use std::env;
-use std::path::{Path, PathBuf};
 use std::process::Command;
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum CompatibilityMode {
+    Direct,
+    Opportunistic,
+    Propagated,
+    Resource,
+    LxmInterchange,
+}
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 struct CompatibilityCase {
     id: &'static str,
+    mode: CompatibilityMode,
     description: &'static str,
 }
 
-const HARNESS_CASES: [CompatibilityCase; 3] = [
-    CompatibilityCase { id: "direct", description: "Direct mixed Rust/Python delivery path" },
+const COMPATIBILITY_CASES: [CompatibilityCase; 8] = [
     CompatibilityCase {
-        id: "opportunistic",
-        description: "Opportunistic mixed Rust/Python delivery path",
+        id: "direct_rust_to_python",
+        mode: CompatibilityMode::Direct,
+        description: "Rust node can deliver to Python node using direct mode",
     },
     CompatibilityCase {
-        id: "propagated_resource_lxm",
-        description: "Propagation path with resource-sized payload and .lxm lifecycle checks",
+        id: "direct_python_to_rust",
+        mode: CompatibilityMode::Direct,
+        description: "Python node can deliver to Rust node using direct mode",
+    },
+    CompatibilityCase {
+        id: "opportunistic_python_to_rust",
+        mode: CompatibilityMode::Opportunistic,
+        description: "Python node can deliver to Rust node using opportunistic mode",
+    },
+    CompatibilityCase {
+        id: "opportunistic_rust_to_python",
+        mode: CompatibilityMode::Opportunistic,
+        description: "Rust node can deliver to Python node using opportunistic mode",
+    },
+    CompatibilityCase {
+        id: "propagated_rust_to_python",
+        mode: CompatibilityMode::Propagated,
+        description: "Rust node can deliver to Python node through selected propagation node",
+    },
+    CompatibilityCase {
+        id: "propagated_python_to_rust",
+        mode: CompatibilityMode::Propagated,
+        description: "Python node can deliver to Rust node through a Rust propagation node",
+    },
+    CompatibilityCase {
+        id: "resource_transfer",
+        mode: CompatibilityMode::Resource,
+        description: "Rust and Python nodes can exchange resource payloads on shared links",
+    },
+    CompatibilityCase {
+        id: "lxm_interchange",
+        mode: CompatibilityMode::LxmInterchange,
+        description: "Python .lxm storage payload round-trips through Rust decode/encode path",
     },
 ];
 
 #[test]
-fn compatibility_matrix_covers_first_slice() {
-    assert_eq!(HARNESS_CASES.len(), 3);
-    assert_case_present("direct");
-    assert_case_present("opportunistic");
-    assert_case_present("propagated_resource_lxm");
+fn compatibility_matrix_covers_required_modes() {
+    assert!(
+        COMPATIBILITY_CASES.len() >= 8,
+        "matrix should cover the documented required scenarios"
+    );
+    assert_case_present("direct_rust_to_python");
+    assert_case_present("direct_python_to_rust");
+    assert_case_present("opportunistic_python_to_rust");
+    assert_case_present("opportunistic_rust_to_python");
+    assert_case_present("propagated_rust_to_python");
+    assert_case_present("propagated_python_to_rust");
+    assert_case_present("resource_transfer");
+    assert_case_present("lxm_interchange");
+    assert!(COMPATIBILITY_CASES.iter().any(|case| case.mode == CompatibilityMode::Direct));
+    assert!(COMPATIBILITY_CASES.iter().any(|case| case.mode == CompatibilityMode::Opportunistic));
+    assert!(COMPATIBILITY_CASES.iter().any(|case| case.mode == CompatibilityMode::Propagated));
+    assert!(COMPATIBILITY_CASES.iter().any(|case| case.mode == CompatibilityMode::Resource));
+    assert!(COMPATIBILITY_CASES.iter().any(|case| case.mode == CompatibilityMode::LxmInterchange));
 }
 
 #[test]
 #[ignore = "requires live Python compatibility harness environment"]
-fn python_compat_direct() {
-    run_case("direct");
+fn python_compat_direct_rust_to_python() {
+    run_case("direct_rust_to_python");
 }
 
 #[test]
 #[ignore = "requires live Python compatibility harness environment"]
-fn python_compat_opportunistic() {
-    run_case("opportunistic");
+fn python_compat_direct_python_to_rust() {
+    run_case("direct_python_to_rust");
 }
 
 #[test]
-#[ignore = "pending remaining propagation, resource, and .lxm parity work"]
-fn python_compat_propagated_resource_lxm() {
-    run_case("propagated_resource_lxm");
+#[ignore = "requires live Python compatibility harness environment"]
+fn python_compat_opportunistic_rust_to_python() {
+    run_case("opportunistic_rust_to_python");
+}
+
+#[test]
+#[ignore = "requires live Python compatibility harness environment"]
+fn python_compat_opportunistic_python_to_rust() {
+    run_case("opportunistic_python_to_rust");
+}
+
+#[test]
+#[ignore = "requires live Python compatibility harness environment"]
+fn python_compat_propagated_rust_to_python() {
+    run_case("propagated_rust_to_python");
+}
+
+#[test]
+#[ignore = "requires live Python compatibility harness environment"]
+fn python_compat_propagated_python_to_rust() {
+    run_case("propagated_python_to_rust");
+}
+
+#[test]
+#[ignore = "requires live Python compatibility harness environment"]
+fn python_compat_resource_transfer() {
+    run_case("resource_transfer");
+}
+
+#[test]
+#[ignore = "requires live Python compatibility harness environment"]
+fn python_compat_lxm_interchange() {
+    run_case("lxm_interchange");
 }
 
 fn run_case(case_id: &str) {
-    let script = smoke_script_path();
     let python_bin = env::var("LXMF_PYTHON_BIN").unwrap_or_else(|_| "python3".to_string());
-    let python_path = effective_python_path();
-    ensure_environment(&script, &python_bin, python_path.as_deref()).unwrap_or_else(|reason| {
-        panic!("python compatibility harness unavailable for '{case_id}': {reason}")
-    });
-
-    let mut cmd = Command::new("bash");
-    cmd.arg(&script).arg("--scenario").arg(case_id);
-    cmd.env("PYTHON_BIN", &python_bin);
-    cmd.env(
-        "TIMEOUT_SECS",
-        env::var("LXMF_PY_COMPAT_TIMEOUT").unwrap_or_else(|_| "90".to_string()),
+    let harness = env::var("LXMF_PY_COMPAT_HARNESS").expect(
+        "set LXMF_PY_COMPAT_HARNESS to a Python harness script path before running ignored tests",
     );
-    if let Some(path) = python_path {
-        cmd.env("PYTHONPATH", path);
-    }
 
-    let output = cmd.output().expect("failed to execute smoke script");
+    let output = Command::new(python_bin)
+        .arg(harness)
+        .arg(case_id)
+        .output()
+        .expect("failed to execute python compatibility harness");
+
     if !output.status.success() {
+        let stdout = String::from_utf8_lossy(&output.stdout);
+        let stderr = String::from_utf8_lossy(&output.stderr);
         panic!(
             "python compatibility case '{}' failed\nstdout:\n{}\nstderr:\n{}",
-            case_id,
-            String::from_utf8_lossy(&output.stdout),
-            String::from_utf8_lossy(&output.stderr)
+            case_id, stdout, stderr
         );
     }
-}
-
-fn smoke_script_path() -> PathBuf {
-    env::var("LXMF_PY_COMPAT_SMOKE").map(PathBuf::from).unwrap_or_else(|_| {
-        Path::new(env!("CARGO_MANIFEST_DIR"))
-            .join("../../../tools/scripts/python-lxmd-rust-lxmd-smoke.sh")
-    })
-}
-
-fn effective_python_path() -> Option<String> {
-    let from_env = env::var("PYTHONPATH").ok().filter(|v| !v.trim().is_empty());
-    let repo_root = match Path::new(env!("CARGO_MANIFEST_DIR")).join("../../..").canonicalize() {
-        Ok(path) => path,
-        Err(_) => return from_env,
-    };
-    let parent = match repo_root.parent() {
-        Some(parent) => parent,
-        None => return from_env,
-    };
-    let reticulum = parent.join("Reticulum");
-    let lxmf = parent.join("LXMF");
-    if !reticulum.exists() || !lxmf.exists() {
-        return from_env;
-    }
-    Some(match from_env {
-        Some(existing) => format!("{existing}:{}:{}", reticulum.display(), lxmf.display()),
-        None => format!("{}:{}", reticulum.display(), lxmf.display()),
-    })
-}
-
-fn ensure_environment(
-    script: &Path,
-    python_bin: &str,
-    python_path: Option<&str>,
-) -> Result<(), String> {
-    if !script.exists() {
-        return Err(format!("missing script at {}", script.display()));
-    }
-
-    let mut cmd = Command::new(python_bin);
-    cmd.arg("-c")
-        .arg("import importlib.util,sys;missing=[m for m in ('RNS','LXMF') if importlib.util.find_spec(m) is None];sys.exit(0 if not missing else 1)");
-    if let Some(path) = python_path {
-        cmd.env("PYTHONPATH", path);
-    }
-    let status = cmd
-        .status()
-        .map_err(|error| format!("unable to run python '{}': {}", python_bin, error))?;
-    if !status.success() {
-        return Err(
-            "missing Python modules RNS/LXMF; set PYTHONPATH or install editable checkouts"
-                .to_string(),
-        );
-    }
-    Ok(())
 }
 
 fn assert_case_present(case_id: &str) {
     assert!(
-        HARNESS_CASES.iter().any(|case| case.id == case_id && !case.description.is_empty()),
+        COMPATIBILITY_CASES.iter().any(|case| case.id == case_id && !case.description.is_empty()),
         "missing compatibility case '{}'",
         case_id
     );

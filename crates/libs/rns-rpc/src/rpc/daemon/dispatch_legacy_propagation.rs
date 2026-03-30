@@ -1,4 +1,19 @@
 impl RpcDaemon {
+    pub fn note_client_propagation_messages_received(&self, ingested_count: usize) {
+        let state = {
+            let mut guard = self.propagation_state.lock().expect("propagation mutex poisoned");
+            guard.last_ingest_count = ingested_count;
+            guard.total_ingested += ingested_count;
+            guard.client_propagation_messages_received = guard
+                .client_propagation_messages_received
+                .saturating_add(ingested_count);
+            guard.clone()
+        };
+        self.update_daemon_status_snapshot(|snapshot| {
+            snapshot.propagation = state;
+        });
+    }
+
     pub fn canonical_propagation_payload_hex(
         &self,
         payload_hex: &str,
@@ -103,19 +118,7 @@ impl RpcDaemon {
                 .insert(transient_id.clone(), payload_hex.to_string());
         }
 
-        let state = {
-            let mut guard = self.propagation_state.lock().expect("propagation mutex poisoned");
-            let ingested_count = usize::from(!transient_id.is_empty());
-            guard.last_ingest_count = ingested_count;
-            guard.total_ingested += ingested_count;
-            guard.client_propagation_messages_received = guard
-                .client_propagation_messages_received
-                .saturating_add(ingested_count);
-            guard.clone()
-        };
-        self.update_daemon_status_snapshot(|snapshot| {
-            snapshot.propagation = state;
-        });
+        self.note_client_propagation_messages_received(usize::from(!transient_id.is_empty()));
 
         Ok(transient_id)
     }

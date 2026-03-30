@@ -55,6 +55,7 @@ impl Transport {
             ),
             path_table: PathTable::new(),
             single_in_destinations: HashMap::new(),
+            single_in_destination_app_data: HashMap::new(),
             single_out_destinations: HashMap::new(),
             announce_limits: AnnounceLimits::new(),
             out_links: HashMap::new(),
@@ -195,6 +196,20 @@ impl Transport {
         let packet = destination.announce(OsRng, app_data).expect("valid announce packet");
         let mut handler = self.handler.lock().await;
         handler.send_packet(packet).await;
+    }
+
+    pub async fn set_destination_announce_app_data(
+        &self,
+        destination: &Arc<Mutex<SingleInputDestination>>,
+        app_data: Option<Vec<u8>>,
+    ) {
+        let address_hash = destination.lock().await.desc.address_hash;
+        let mut handler = self.handler.lock().await;
+        if let Some(app_data) = app_data {
+            handler.single_in_destination_app_data.insert(address_hash, app_data);
+        } else {
+            handler.single_in_destination_app_data.remove(&address_hash);
+        }
     }
 
     pub async fn set_receipt_handler(&mut self, handler: Box<dyn ReceiptHandler>) {

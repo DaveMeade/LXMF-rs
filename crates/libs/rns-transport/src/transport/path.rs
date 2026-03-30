@@ -20,18 +20,37 @@ pub(super) async fn handle_path_request<'a>(
     iface: AddressHash,
 ) {
     if let Some(request) = handler.path_requests.decode(packet.data.as_slice()) {
-        eprintln!("[tp] path_request dest={} iface={}", request.destination, iface);
-        if let Some(dest) = handler.single_in_destinations.get(&request.destination) {
+        if let Some(dest) = handler.single_in_destinations.get(&request.destination).cloned() {
+            let app_data =
+                handler.single_in_destination_app_data.get(&request.destination).cloned();
+            if !handler.path_requests.allow_local_response(
+                &request.destination,
+                request.requesting_transport,
+                &request.tag_bytes,
+                iface,
+            ) {
+                log::trace!(
+                    "tp({}): suppressing repeated local path response for {} on {}",
+                    handler.config.name,
+                    request.destination,
+                    iface
+                );
+                return;
+            }
+
             let response = dest
                 .lock()
                 .await
-                .path_response_with_tag(OsRng, None, Some(request.tag_bytes.as_slice()))
+                .path_response_with_tag(
+                    OsRng,
+                    app_data.as_deref(),
+                    Some(request.tag_bytes.as_slice()),
+                )
                 .expect("valid path response");
 
             handler
                 .send(TxMessage { tx_type: TxMessageType::Direct(iface), packet: response })
                 .await;
-            eprintln!("[tp] path_response dest={} iface={}", request.destination, iface);
 
             log::trace!("tp({}): send direct path response over {}", handler.config.name, iface);
 

@@ -17,7 +17,12 @@ SUPPORTED_CASES = {
 
 SMOKE_SCRIPT_CASES = {
     "direct_python_to_rust",
+    "opportunistic_rust_to_python",
+    "opportunistic_python_to_rust",
+    "propagated_rust_to_python",
     "propagated_python_to_rust",
+    "resource_transfer",
+    "lxm_interchange",
 }
 
 

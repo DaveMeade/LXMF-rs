@@ -114,21 +114,21 @@ fn validate_outbound_fields_strict(fields: Option<&JsonValue>) -> Result<(), Err
         return Ok(());
     };
 
-    if map.contains_key("files") {
+    let canonical = map.get("attachments");
+    let legacy = map.get("files");
+    let raw_wire = map.get("5");
+
+    let alias_count = usize::from(canonical.is_some())
+        + usize::from(legacy.is_some())
+        + usize::from(raw_wire.is_some());
+    if alias_count > 1 {
         return Err(Error::new(
             ErrorKind::InvalidInput,
-            "legacy field 'files' is not allowed; use 'attachments'",
+            "attachment aliases 'attachments', 'files', and '5' cannot be mixed in one payload",
         ));
     }
 
-    if map.contains_key("5") {
-        return Err(Error::new(
-            ErrorKind::InvalidInput,
-            "public field '5' is not allowed; use 'attachments'",
-        ));
-    }
-
-    let Some(attachments) = map.get("attachments") else {
+    let Some(attachments) = canonical.or(legacy) else {
         return Ok(());
     };
 
@@ -225,4 +225,70 @@ fn validate_attachment_text_data(text: &str) -> Result<(), Error> {
         ErrorKind::InvalidInput,
         "attachment text data must use explicit 'hex:' or 'base64:' prefix",
     ))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::parse_outbound_send_request;
+    use serde_json::json;
+
+    #[test]
+    fn send_request_accepts_legacy_files_alias() {
+        let request = parse_outbound_send_request(
+            "send_message_v2",
+            json!({
+                "id": "msg-1",
+                "source": "src",
+                "destination": "dst",
+                "title": "",
+                "content": "hello",
+                "fields": {
+                    "files": [
+                        {"name": "legacy.bin", "data": [1, 2, 3]}
+                    ]
+                }
+            }),
+        )
+        .expect("legacy files alias should parse");
+        assert!(request.fields.is_some());
+    }
+
+    #[test]
+    fn send_request_accepts_raw_wire_attachment_key() {
+        let request = parse_outbound_send_request(
+            "send_message_v2",
+            json!({
+                "id": "msg-2",
+                "source": "src",
+                "destination": "dst",
+                "title": "",
+                "content": "hello",
+                "fields": {
+                    "5": [["wire.bin", [1, 2, 3]]]
+                }
+            }),
+        )
+        .expect("raw attachment key should parse");
+        assert!(request.fields.is_some());
+    }
+
+    #[test]
+    fn send_request_rejects_mixed_attachment_aliases() {
+        let err = parse_outbound_send_request(
+            "send_message_v2",
+            json!({
+                "id": "msg-3",
+                "source": "src",
+                "destination": "dst",
+                "title": "",
+                "content": "hello",
+                "fields": {
+                    "attachments": [{"name": "canonical.bin", "data": [1, 2, 3]}],
+                    "5": [["wire.bin", [4, 5, 6]]]
+                }
+            }),
+        )
+        .expect_err("mixed aliases must fail");
+        assert!(err.to_string().contains("attachment aliases"));
+    }
 }

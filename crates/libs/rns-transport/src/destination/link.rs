@@ -330,6 +330,7 @@ impl Link {
             header: Header {
                 packet_type: PacketType::Proof,
                 destination_type: DestinationType::Link,
+                hops: 0,
                 ..Default::default()
             },
             ifac: None,

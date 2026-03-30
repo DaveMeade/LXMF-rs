@@ -71,6 +71,7 @@ pub struct Link {
     peer_identity: Identity,
     derived_key: DerivedKey,
     signalling: Option<[u8; LINK_MTU_SIZE]>,
+    proof_hops: u8,
     status: LinkStatus,
     request_time: Instant,
     rtt: Duration,
@@ -89,6 +90,7 @@ impl Link {
             peer_identity: Identity::default(),
             derived_key: DerivedKey::new_empty(),
             signalling: None,
+            proof_hops: 0,
             status: LinkStatus::Pending,
             request_time: Instant::now(),
             rtt: Duration::from_secs(0),
@@ -131,6 +133,7 @@ impl Link {
             peer_identity,
             derived_key: DerivedKey::new_empty(),
             signalling,
+            proof_hops: packet.header.hops,
             status: LinkStatus::Pending,
             request_time: Instant::now(),
             rtt: Duration::from_secs(0),
@@ -166,6 +169,7 @@ impl Link {
 
     pub fn prove(&mut self) -> Packet {
         log::debug!("link({}): prove", self.id);
+        log::trace!("[link] prove link_id={} proof_hops={}", self.id, self.proof_hops);
 
         if self.status != LinkStatus::Active {
             self.status = LinkStatus::Active;
@@ -194,6 +198,7 @@ impl Link {
             header: Header {
                 packet_type: PacketType::Proof,
                 destination_type: DestinationType::Link,
+                hops: self.proof_hops,
                 ..Default::default()
             },
             ifac: None,

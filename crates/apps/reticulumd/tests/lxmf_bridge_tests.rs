@@ -270,7 +270,7 @@ fn build_wire_message_rejects_invalid_attachment_entries() {
 }
 
 #[test]
-fn build_wire_message_rejects_legacy_files_alias() {
+fn build_wire_message_accepts_legacy_files_alias() {
     let identity = PrivateIdentity::new_from_name("legacy-files-alias");
     let mut source = [0u8; 16];
     source.copy_from_slice(identity.address_hash().as_slice());
@@ -285,13 +285,15 @@ fn build_wire_message_rejects_legacy_files_alias() {
         ],
     });
 
-    let err = build_wire_message(source, destination, "title", "content", Some(fields), &identity)
-        .expect_err("legacy files alias must fail");
-    assert!(err.to_string().contains("legacy field 'files' is not allowed"));
+    let wire = build_wire_message(source, destination, "title", "content", Some(fields), &identity)
+        .expect("legacy files alias should normalize");
+    let message = decode_wire_message(&wire).expect("decode");
+    let fields = message.fields.and_then(|value| rmpv_to_json(&value)).expect("fields");
+    assert_eq!(fields["5"], serde_json::json!([["good.bin", [1, 2, 3]]]));
 }
 
 #[test]
-fn build_wire_message_rejects_public_numeric_attachment_key() {
+fn build_wire_message_accepts_public_numeric_attachment_key() {
     let identity = PrivateIdentity::new_from_name("numeric-attachment-key");
     let mut source = [0u8; 16];
     source.copy_from_slice(identity.address_hash().as_slice());
@@ -303,7 +305,26 @@ fn build_wire_message_rejects_public_numeric_attachment_key() {
         ],
     });
 
+    let wire = build_wire_message(source, destination, "title", "content", Some(fields), &identity)
+        .expect("raw numeric key should pass through");
+    let message = decode_wire_message(&wire).expect("decode");
+    let fields = message.fields.and_then(|value| rmpv_to_json(&value)).expect("fields");
+    assert_eq!(fields["5"], serde_json::json!([["bad.bin", [1, 2, 3]]]));
+}
+
+#[test]
+fn build_wire_message_rejects_mixed_attachment_aliases() {
+    let identity = PrivateIdentity::new_from_name("mixed-attachment-aliases");
+    let mut source = [0u8; 16];
+    source.copy_from_slice(identity.address_hash().as_slice());
+    let destination = [0x68u8; 16];
+
+    let fields = serde_json::json!({
+        "attachments": [{"name": "good.bin", "data": [1, 2, 3]}],
+        "5": [["bad.bin", [4, 5, 6]]],
+    });
+
     let err = build_wire_message(source, destination, "title", "content", Some(fields), &identity)
-        .expect_err("public key '5' must fail");
-    assert!(err.to_string().contains("public field '5' is not allowed"));
+        .expect_err("mixed aliases must fail");
+    assert!(err.to_string().contains("attachment aliases"));
 }

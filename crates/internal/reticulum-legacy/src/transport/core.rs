@@ -183,11 +183,6 @@ impl Transport {
         app_data: Option<&[u8]>,
     ) {
         let mut destination = destination.lock().await;
-        eprintln!(
-            "[tp] announce_tx dst={} app_data_len={}",
-            destination.desc.address_hash,
-            app_data.map(|value| value.len()).unwrap_or(0)
-        );
         let packet = destination.announce(OsRng, app_data).expect("valid announce packet");
         let mut handler = self.handler.lock().await;
         handler.send_packet(packet).await;

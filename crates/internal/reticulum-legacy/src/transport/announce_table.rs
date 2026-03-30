@@ -39,6 +39,14 @@ impl AnnounceEntry {
             return None;
         }
 
+        self.make_tx_message(transport_id)
+    }
+
+    fn make_tx_message(&mut self, transport_id: &AddressHash) -> Option<TxMessage> {
+        if self.retries == 0 {
+            return None;
+        }
+
         self.retries = self.retries.saturating_sub(1);
 
         let context = if self.response_to_iface.is_some() {
@@ -191,10 +199,11 @@ impl AnnounceTable {
         destination: AddressHash,
         to_iface: AddressHash,
         hops: u8,
+        delay: Duration,
     ) {
         response.retries = 1;
         response.hops = hops;
-        response.timeout = Instant::now() + Duration::from_secs(60);
+        response.timeout = Instant::now() + delay;
         response.response_to_iface = Some(to_iface);
 
         self.responses.insert(destination, response);
@@ -205,14 +214,15 @@ impl AnnounceTable {
         destination: AddressHash,
         to_iface: AddressHash,
         hops: u8,
+        delay: Duration,
     ) -> bool {
         if let Some(entry) = self.map.get(&destination) {
-            self.do_add_response(entry.clone(), destination, to_iface, hops);
+            self.do_add_response(entry.clone(), destination, to_iface, hops, delay);
             return true;
         }
 
         if let Some(entry) = self.cache.get(&destination) {
-            self.do_add_response(entry.clone(), destination, to_iface, hops);
+            self.do_add_response(entry.clone(), destination, to_iface, hops, delay);
             return true;
         }
 
@@ -237,6 +247,8 @@ impl AnnounceTable {
     pub fn to_retransmit(&mut self, transport_id: &AddressHash) -> Vec<TxMessage> {
         let mut messages = vec![];
         let mut completed = vec![];
+        let mut completed_responses = vec![];
+        let now = Instant::now();
 
         for (destination, ref mut entry) in &mut self.map {
             if self.responses.contains_key(destination) {
@@ -252,15 +264,23 @@ impl AnnounceTable {
 
         let n_announces = messages.len();
 
-        for ref mut entry in self.responses.values_mut() {
-            if let Some(message) = entry.retransmit(transport_id) {
+        for (destination, entry) in &mut self.responses {
+            if now < entry.timeout {
+                continue;
+            }
+
+            if let Some(message) = entry.make_tx_message(transport_id) {
                 messages.push(message);
             }
+
+            completed_responses.push(*destination);
         }
 
         let n_responses = messages.len() - n_announces;
 
-        self.responses.clear(); // every response is only retransmitted once
+        for destination in completed_responses {
+            self.responses.remove(&destination);
+        }
 
         if !(messages.is_empty() && completed.is_empty()) {
             log::trace!(
@@ -275,6 +295,30 @@ impl AnnounceTable {
             if let Some(announce) = self.map.remove(&destination) {
                 self.cache.insert(destination, announce);
             }
+        }
+
+        messages
+    }
+
+    pub fn take_ready_responses(&mut self, transport_id: &AddressHash) -> Vec<TxMessage> {
+        let mut messages = vec![];
+        let mut completed = vec![];
+        let now = Instant::now();
+
+        for (destination, entry) in &mut self.responses {
+            if now < entry.timeout {
+                continue;
+            }
+
+            if let Some(message) = entry.make_tx_message(transport_id) {
+                messages.push(message);
+            }
+
+            completed.push(*destination);
+        }
+
+        for destination in completed {
+            self.responses.remove(&destination);
         }
 
         messages
