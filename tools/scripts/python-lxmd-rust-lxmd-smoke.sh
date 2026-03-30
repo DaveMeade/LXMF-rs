@@ -6,6 +6,7 @@ REPO_ROOT="$(cd "${SCRIPT_DIR}/../.." && pwd)"
 cd "${REPO_ROOT}"
 
 PYTHON_BIN="${PYTHON_BIN:-python3}"
+PYTHON_BIN="${LXMF_PYTHON_BIN:-${PYTHON_BIN}}"
 LOG_DIR="${LOG_DIR:-${REPO_ROOT}/target/interop/python-lxmd-rust-lxmd}"
 REPORT_PATH="${REPORT_PATH:-${LOG_DIR}/report.json}"
 TIMEOUT_SECS="${TIMEOUT_SECS:-45}"
@@ -201,11 +202,14 @@ for attempt in range(60):
     if isinstance(value, list):
         result = value[1] if len(value) > 1 else None
         error = value[2] if len(value) > 2 else None
-    else:
+    elif isinstance(value, dict):
         result = value.get("result", value)
         error = value.get("error")
         if error is None and isinstance(result, dict):
             error = result.get("error")
+    else:
+        result = value
+        error = None
     if error and is_rate_limited(error) and attempt + 1 < 60:
         time.sleep(5)
         continue
@@ -568,6 +572,7 @@ if [[ "${COMPAT_CASE}" == *_python_to_rust ]]; then
   "${PY_SENDER_DIR}" \
   "${RUST_DELIVERY_HASH}" \
   "${RUST_PROPAGATION_HASH}" \
+  "${TIMEOUT_SECS}" \
   "${SMOKE_MESSAGE_CONTENT}" >"${PY_SEND_LOG}"
 import json
 import os
@@ -577,8 +582,8 @@ import time
 import RNS
 import LXMF
 
-case_id, rns_config, storage_dir, destination_hash_hex, propagation_hash_hex, content, timeout_secs = sys.argv[1:8]
-timeout_secs = float(timeout_secs)
+case_id, rns_config, storage_dir, destination_hash_hex, propagation_hash_hex, timeout_secs, content = sys.argv[1:8]
+timeout_secs = max(float(timeout_secs), 1.0)
 destination_hash = bytes.fromhex(destination_hash_hex)
 propagation_hash = bytes.fromhex(propagation_hash_hex)
 
@@ -587,7 +592,7 @@ identity = RNS.Identity()
 router = LXMF.LXMRouter(identity=identity, storagepath=storage_dir)
 source = router.register_delivery_identity(identity, display_name="Python Smoke Sender")
 
-deadline = time.time() + 30
+deadline = time.time() + timeout_secs
 remote_identity = None
 desired_method = LXMF.LXMessage.OPPORTUNISTIC
 if case_id in ("direct_python_to_rust", "opportunistic_python_to_rust"):
@@ -622,7 +627,7 @@ elif case_id == "propagated_python_to_rust":
     else:
         raise SystemExit("timed out waiting for Rust propagation path")
 
-    deadline = time.time() + 15
+    deadline = time.time() + max(15.0, timeout_secs / 3.0)
     while time.time() < deadline:
         remote_identity = RNS.Identity.recall(propagation_hash)
         if remote_identity is not None:
@@ -776,36 +781,6 @@ EOF
   fi
 
   HOOK_MESSAGE_FILE="$("${PYTHON_BIN}" - <<'PY' "${PY_HOOK_LOG}"
-  "${PYTHON_BIN}" - <<'PY' "${RUST_RPC_ADDR}"
-import json
-import sys
-import urllib.request
-
-rpc_addr = sys.argv[1]
-req = urllib.request.Request(
-    f"http://{rpc_addr}/rpc",
-    data=json.dumps({"id": 1, "method": "propagation_status", "params": {}}).encode("utf-8"),
-    headers={"Content-Type": "application/json"},
-)
-with urllib.request.urlopen(req, timeout=5) as resp:
-    payload = json.load(resp)
-count = payload.get("result", {}).get("propagation", {}).get("client_propagation_messages_received", 0)
-if count < 1:
-    raise SystemExit(f"expected propagated message ingestion via propagation storage, got count={count}")
-PY
-else
-  for _ in $(seq 1 "${TIMEOUT_SECS}"); do
-    if [[ -f "${HOOK_LOG}" ]] && grep -q "${PY_MESSAGE_CONTENT}" "${HOOK_LOG}"; then
-      break
-    fi
-    sleep 1
-  done
-
-  assert_contains "${HOOK_LOG}" "${PY_MESSAGE_CONTENT}" "Rust lxmd on-inbound hook content"
-  assert_contains "${HOOK_LOG}" "${PY_SENDER_SOURCE_HASH}" "Rust lxmd on-inbound hook source hash"
-
-  HOOK_MESSAGE_FILE="$("${PYTHON_BIN}" - <<'PY' "${HOOK_LOG}"
-
 import sys
 from pathlib import Path
 
