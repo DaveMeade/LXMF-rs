@@ -428,6 +428,7 @@ elif [[ "${SCENARIO}" == "propagated_resource_lxm" ]]; then
   PY_MESSAGE_CONTENT="python-smoke-resource-lxm-$(date +%s)-$(head -c 8192 /dev/zero | tr '\0' 'r')"
 fi
 "${PYTHON_BIN}" - <<'PY' \
+  "${COMPAT_CASE}" \
   "${PY_SENDER_RNS_DIR}" \
   "${PY_SENDER_DIR}" \
   "${RUST_DELIVERY_HASH}" \
@@ -489,6 +490,24 @@ destination = RNS.Destination(
     LXMF.APP_NAME,
     "delivery",
 )
+
+desired_method = LXMF.LXMessage.OPPORTUNISTIC
+if case_id == "direct_python_to_rust":
+    desired_method = LXMF.LXMessage.DIRECT
+elif case_id == "propagated_python_to_rust":
+    desired_method = LXMF.LXMessage.PROPAGATED
+    deadline = time.time() + timeout_secs
+    while time.time() < deadline:
+        if RNS.Transport.has_path(propagation_hash):
+            break
+        RNS.Transport.request_path(propagation_hash)
+        time.sleep(0.5)
+    else:
+        raise SystemExit("timed out waiting for Rust propagation path")
+    router.set_outbound_propagation_node(propagation_hash)
+elif case_id != "opportunistic_python_to_rust":
+    raise SystemExit(f"unsupported smoke case: {case_id}")
+
 message = LXMF.LXMessage(
     destination,
     source,
@@ -504,6 +523,7 @@ while time.time() < deadline:
             json.dumps(
                 {
                     "state": int(message.state),
+                    "case": case_id,
                     "destination": destination_hash_hex,
                     "source": RNS.hexrep(source.hash, delimit=False).lower(),
                     "method": message_method,
@@ -526,17 +546,60 @@ print(payload["source"])
 PY
 )"
 
-for _ in $(seq 1 "${TIMEOUT_SECS}"); do
-  if [[ -f "${HOOK_LOG}" ]] && grep -q "${PY_MESSAGE_CONTENT}" "${HOOK_LOG}"; then
-    break
-  fi
-  sleep 1
-done
+HOOK_MESSAGE_FILE=""
+if [[ "${COMPAT_CASE}" == "propagated_python_to_rust" ]]; then
+  for _ in $(seq 1 "${TIMEOUT_SECS}"); do
+    if "${PYTHON_BIN}" - <<'PY' "${RUST_RPC_ADDR}" >/dev/null
+import json
+import sys
+import urllib.request
 
-assert_contains "${HOOK_LOG}" "${PY_MESSAGE_CONTENT}" "Rust lxmd on-inbound hook content"
-assert_contains "${HOOK_LOG}" "${PY_SENDER_SOURCE_HASH}" "Rust lxmd on-inbound hook source hash"
+rpc_addr = sys.argv[1]
+req = urllib.request.Request(
+    f"http://{rpc_addr}/rpc",
+    data=json.dumps({"id": 1, "method": "propagation_status", "params": {}}).encode("utf-8"),
+    headers={"Content-Type": "application/json"},
+)
+with urllib.request.urlopen(req, timeout=5) as resp:
+    payload = json.load(resp)
+count = payload.get("result", {}).get("propagation", {}).get("client_propagation_messages_received", 0)
+raise SystemExit(0 if count >= 1 else 1)
+PY
+    then
+      break
+    fi
+    sleep 1
+  done
 
-HOOK_MESSAGE_FILE="$("${PYTHON_BIN}" - <<'PY' "${HOOK_LOG}"
+  "${PYTHON_BIN}" - <<'PY' "${RUST_RPC_ADDR}"
+import json
+import sys
+import urllib.request
+
+rpc_addr = sys.argv[1]
+req = urllib.request.Request(
+    f"http://{rpc_addr}/rpc",
+    data=json.dumps({"id": 1, "method": "propagation_status", "params": {}}).encode("utf-8"),
+    headers={"Content-Type": "application/json"},
+)
+with urllib.request.urlopen(req, timeout=5) as resp:
+    payload = json.load(resp)
+count = payload.get("result", {}).get("propagation", {}).get("client_propagation_messages_received", 0)
+if count < 1:
+    raise SystemExit(f"expected propagated message ingestion via propagation storage, got count={count}")
+PY
+else
+  for _ in $(seq 1 "${TIMEOUT_SECS}"); do
+    if [[ -f "${HOOK_LOG}" ]] && grep -q "${PY_MESSAGE_CONTENT}" "${HOOK_LOG}"; then
+      break
+    fi
+    sleep 1
+  done
+
+  assert_contains "${HOOK_LOG}" "${PY_MESSAGE_CONTENT}" "Rust lxmd on-inbound hook content"
+  assert_contains "${HOOK_LOG}" "${PY_SENDER_SOURCE_HASH}" "Rust lxmd on-inbound hook source hash"
+
+  HOOK_MESSAGE_FILE="$("${PYTHON_BIN}" - <<'PY' "${HOOK_LOG}"
 import sys
 from pathlib import Path
 
@@ -548,9 +611,10 @@ raise SystemExit(1)
 PY
 )"
 
-if [[ ! -s "${HOOK_MESSAGE_FILE}" ]]; then
-  echo "expected inbound message file at ${HOOK_MESSAGE_FILE}" >&2
-  exit 1
+  if [[ ! -s "${HOOK_MESSAGE_FILE}" ]]; then
+    echo "expected inbound message file at ${HOOK_MESSAGE_FILE}" >&2
+    exit 1
+  fi
 fi
 
 "${PYTHON_BIN}" - <<'PY' \
