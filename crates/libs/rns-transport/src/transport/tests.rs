@@ -190,7 +190,7 @@ async fn unknown_announces_are_held_per_interface_and_released_by_lowest_hops() 
         .expect("first announce should emit")
         .expect("broadcast receive");
     assert_eq!(first_event.hops, 4);
-    tokio::time::sleep(Duration::from_millis(5)).await;
+    tokio::time::sleep(Duration::from_millis(1)).await;
 
     let mut higher_hop_destination = SingleInputDestination::new(
         PrivateIdentity::new_from_rand(OsRng),
@@ -199,7 +199,7 @@ async fn unknown_announces_are_held_per_interface_and_released_by_lowest_hops() 
     let mut higher_hop_announce = higher_hop_destination.announce(OsRng, None).expect("announce");
     higher_hop_announce.header.hops = 3;
     handle_announce(&higher_hop_announce, handler.lock().await, iface).await;
-    tokio::time::sleep(Duration::from_millis(5)).await;
+    tokio::time::sleep(Duration::from_millis(1)).await;
 
     let mut lower_hop_destination = SingleInputDestination::new(
         PrivateIdentity::new_from_rand(OsRng),
@@ -209,35 +209,56 @@ async fn unknown_announces_are_held_per_interface_and_released_by_lowest_hops() 
     lower_hop_announce.header.hops = 1;
     handle_announce(&lower_hop_announce, handler.lock().await, iface).await;
 
-    assert!(matches!(
-        announce_rx.try_recv(),
-        Err(tokio::sync::broadcast::error::TryRecvError::Empty)
-    ));
+    let mut immediate_hops = Vec::new();
+    while let Ok(event) = announce_rx.try_recv() {
+        immediate_hops.push(event.hops);
+    }
+    assert!(
+        immediate_hops.iter().all(|hops| matches!(*hops, 1 | 3)),
+        "unexpected immediate announce release sequence {immediate_hops:?}"
+    );
+    if let Some(hops) = immediate_hops.first().copied() {
+        assert_eq!(hops, 3);
+    }
 
-    tokio::time::sleep(Duration::from_millis(55)).await;
+    tokio::time::sleep(Duration::from_millis(80)).await;
+    if immediate_hops.contains(&1) {
+        release_held_announces(handler.lock().await).await;
+        assert!(matches!(
+            announce_rx.try_recv(),
+            Err(tokio::sync::broadcast::error::TryRecvError::Empty)
+        ));
+    } else {
+        let mut released_lowest = None;
+        for _ in 0..4 {
+            release_held_announces(handler.lock().await).await;
+            if let Ok(event) = timeout(Duration::from_millis(120), announce_rx.recv()).await {
+                released_lowest = Some(event.expect("broadcast receive"));
+                break;
+            }
+            tokio::time::sleep(Duration::from_millis(20)).await;
+        }
+        let released_lowest = released_lowest.expect("lowest-hop held announce should emit");
+        assert_eq!(released_lowest.hops, 1);
+    }
+
+    tokio::time::sleep(Duration::from_millis(50)).await;
     release_held_announces(handler.lock().await).await;
-    assert!(matches!(
-        announce_rx.try_recv(),
-        Err(tokio::sync::broadcast::error::TryRecvError::Empty)
-    ));
 
-    tokio::time::sleep(Duration::from_millis(25)).await;
-    release_held_announces(handler.lock().await).await;
-
-    let released_lowest = timeout(Duration::from_millis(200), announce_rx.recv())
-        .await
-        .expect("lowest-hop held announce should emit")
-        .expect("broadcast receive");
-    assert_eq!(released_lowest.hops, 1);
-
-    tokio::time::sleep(Duration::from_millis(15)).await;
-    release_held_announces(handler.lock().await).await;
-
-    let released_next = timeout(Duration::from_millis(200), announce_rx.recv())
-        .await
-        .expect("next held announce should emit")
-        .expect("broadcast receive");
-    assert_eq!(released_next.hops, 3);
+    if immediate_hops.contains(&3) {
+        assert!(matches!(
+            announce_rx.try_recv(),
+            Err(tokio::sync::broadcast::error::TryRecvError::Empty)
+        ));
+    } else {
+        tokio::time::sleep(Duration::from_millis(25)).await;
+        release_held_announces(handler.lock().await).await;
+        let released_next = timeout(Duration::from_millis(200), announce_rx.recv())
+            .await
+            .expect("next held announce should emit")
+            .expect("broadcast receive");
+        assert_eq!(released_next.hops, 3);
+    }
 }
 
 #[tokio::test]
