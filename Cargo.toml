@@ -2,6 +2,7 @@
 resolver = "2"
 members = [
   "crates/libs/lxmf-grpc-client",
+  "crates/libs/rns-embedded-mininode",
   "crates/libs/rns-embedded-core",
   "crates/libs/rns-embedded-ffi",
   "crates/libs/rns-embedded-runtime",
@@ -18,6 +19,7 @@ members = [
 ]
 default-members = [
   "crates/libs/lxmf-grpc-client",
+  "crates/libs/rns-embedded-mininode",
   "crates/libs/rns-embedded-core",
   "crates/libs/rns-embedded-ffi",
   "crates/libs/rns-embedded-runtime",
@@ -47,6 +49,8 @@ allowed_library_edges = [
   "lxmf-sdk->rns-rpc",
   "rns-embedded-ffi->rns-embedded-core",
   "rns-embedded-ffi->rns-embedded-runtime",
+  "rns-embedded-mininode->lxmf-core",
+  "rns-embedded-mininode->rns-core",
   "rns-embedded-runtime->rns-embedded-core",
   "rns-transport->rns-core",
   "test-support->lxmf-sdk",
