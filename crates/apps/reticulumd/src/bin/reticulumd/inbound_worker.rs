@@ -145,94 +145,166 @@ fn spawn_packet_inbound_worker(
     let daemon_inbound = daemon;
     let inbound_transport = transport;
     tokio::spawn(async move {
+        let local_delivery_destination =
+            local_delivery_destination_hash(control.delivery_destination.as_ref()).await;
         let mut rx = inbound_transport.received_data_events();
         loop {
-            if let Ok(event) = rx.recv().await {
-                if should_skip_control_payload(&event, &control) {
-                    continue;
-                }
-                let data = event.data.as_slice();
-                let destination_hex = hex::encode(event.destination.as_slice());
-                if diagnostics_enabled() {
-                    eprintln!(
-                        "[daemon-rx] dst={} len={} ratchet_used={} data_prefix={}",
-                        destination_hex,
-                        data.len(),
-                        event.ratchet_used,
-                        payload_preview(data, 16)
-                    );
-                }
-                if is_lxmf_propagation_destination(&event.destination, &control) {
-                    if let Err(error) = ingest_propagation_envelope(
-                        daemon_inbound.as_ref(),
-                        data,
-                        control.delivery_destination.as_ref(),
-                    )
-                    .await
-                    {
-                        if diagnostics_enabled() {
-                            eprintln!(
-                                "[daemon-rx] dropping inbound propagation payload: dst={} error={}",
-                                destination_hex, error
-                            );
+            match rx.recv().await {
+                Ok(event) => {
+                    if should_skip_control_payload(&event, &control) {
+                        continue;
+                    }
+                    let data = event.data.as_slice();
+                    let raw_destination_hex = hex::encode(event.destination.as_slice());
+                    let payload_mode = inbound_payload_mode(event.payload_mode);
+                    let resolved_destination = match event.payload_mode {
+                        ReceivedPayloadMode::DestinationStripped => {
+                            if let Some(destination) = resolve_inbound_lxmf_packet_destination(
+                                inbound_transport.as_ref(),
+                                &event.destination,
+                            )
+                            .await
+                            {
+                                destination
+                            } else if is_lxmf_propagation_destination(&event.destination, &control)
+                            {
+                                InboundLxmfDestination::Propagation
+                            } else {
+                                let mut destination = [0u8; 16];
+                                destination.copy_from_slice(event.destination.as_slice());
+                                InboundLxmfDestination::Delivery(destination)
+                            }
                         }
-                    }
-                    continue;
-                }
-                let mut destination = [0u8; 16];
-                destination.copy_from_slice(event.destination.as_slice());
-                let payload_mode = inbound_payload_mode(event.payload_mode);
-                let record = if diagnostics_enabled() {
-                    let (record, diagnostics) =
-                        decode_inbound_payload_with_diagnostics(destination, data, payload_mode);
-                    if let Some(ref decoded) = record {
+                        ReceivedPayloadMode::FullWire => {
+                            if let Some(destination) = resolve_inbound_lxmf_packet_destination(
+                                inbound_transport.as_ref(),
+                                &event.destination,
+                            )
+                            .await
+                            {
+                                destination
+                            } else if local_delivery_destination.as_ref().is_some_and(
+                                |destination| {
+                                    destination.as_slice() == event.destination.as_slice()
+                                },
+                            ) {
+                                InboundLxmfDestination::Delivery(
+                                    local_delivery_destination.expect("checked above"),
+                                )
+                            } else {
+                                if diagnostics_enabled() {
+                                    eprintln!(
+                                        "[daemon-rx] skipping unresolved full-wire payload: dst={} len={} ctx={:?}",
+                                        raw_destination_hex,
+                                        data.len(),
+                                        event.context
+                                    );
+                                }
+                                continue;
+                            }
+                        }
+                    };
+
+                    if diagnostics_enabled() {
                         eprintln!(
-                            "[daemon-rx] decoded msg_id={} src={} dst={} title_len={} content_len={}",
-                            decoded.id,
-                            decoded.source,
-                            decoded.destination,
-                            decoded.title.len(),
-                            decoded.content.len()
-                        );
-                    } else {
-                        eprintln!(
-                            "[daemon-rx] decode-failed dst={} attempts={}",
-                            destination_hex,
-                            diagnostics.summary()
+                            "[daemon-rx] dst={} resolved={:?} mode={:?} len={} ratchet_used={} data_prefix={}",
+                            raw_destination_hex,
+                            resolved_destination,
+                            event.payload_mode,
+                            data.len(),
+                            event.ratchet_used,
+                            payload_preview(data, 16)
                         );
                     }
-                    record
-                } else {
-                    decode_inbound_payload(destination, data, payload_mode)
-                };
-                let stamp_status = if record.is_some() {
-                    match evaluate_inbound_stamp_policy(
-                        daemon_inbound.as_ref(),
-                        destination,
-                        data,
-                        payload_mode,
-                    ) {
-                        Ok(status) => Some(status),
-                        Err(_) => {
-                            if diagnostics_enabled() {
-                                eprintln!(
-                                    "[daemon-rx] dropping inbound payload due to stamp policy: dst={}",
-                                    destination_hex
-                                );
+
+                    match resolved_destination {
+                        InboundLxmfDestination::Propagation => {
+                            if let Err(error) = ingest_propagation_envelope(
+                                daemon_inbound.as_ref(),
+                                data,
+                                control.delivery_destination.as_ref(),
+                            )
+                            .await
+                            {
+                                if diagnostics_enabled() {
+                                    eprintln!(
+                                        "[daemon-rx] dropping inbound propagation payload: dst={} error={}",
+                                        raw_destination_hex, error
+                                    );
+                                }
                             }
                             continue;
                         }
+                        InboundLxmfDestination::Delivery(destination) => {
+                            let record = if diagnostics_enabled() {
+                                let (record, diagnostics) = decode_inbound_payload_with_diagnostics(
+                                    destination,
+                                    data,
+                                    payload_mode,
+                                );
+                                if let Some(ref decoded) = record {
+                                    eprintln!(
+                                        "[daemon-rx] decoded msg_id={} src={} dst={} title_len={} content_len={}",
+                                        decoded.id,
+                                        decoded.source,
+                                        decoded.destination,
+                                        decoded.title.len(),
+                                        decoded.content.len()
+                                    );
+                                } else {
+                                    eprintln!(
+                                        "[daemon-rx] decode-failed raw_dst={} resolved_dst={} attempts={}",
+                                        raw_destination_hex,
+                                        hex::encode(destination),
+                                        diagnostics.summary()
+                                    );
+                                }
+                                record
+                            } else {
+                                decode_inbound_payload(destination, data, payload_mode)
+                            };
+                            let stamp_status = if record.is_some() {
+                                match evaluate_inbound_stamp_policy(
+                                    daemon_inbound.as_ref(),
+                                    destination,
+                                    data,
+                                    payload_mode,
+                                ) {
+                                    Ok(status) => Some(status),
+                                    Err(_) => {
+                                        if diagnostics_enabled() {
+                                            eprintln!(
+                                                "[daemon-rx] dropping inbound payload due to stamp policy: raw_dst={} resolved_dst={}",
+                                                raw_destination_hex,
+                                                hex::encode(destination)
+                                            );
+                                        }
+                                        continue;
+                                    }
+                                }
+                            } else {
+                                None
+                            };
+                            if let Some(mut record) = record {
+                                if let Some(stamp_status) = stamp_status {
+                                    annotate_inbound_record_stamp_status(&mut record, stamp_status);
+                                }
+                                daemon_inbound
+                                    .record_inbound_peer_activity(&record.source, data.len());
+                                let _ = daemon_inbound.accept_inbound_with_raw(record, data);
+                            }
+                        }
                     }
-                } else {
-                    None
-                };
-                if let Some(mut record) = record {
-                    if let Some(stamp_status) = stamp_status {
-                        annotate_inbound_record_stamp_status(&mut record, stamp_status);
-                    }
-                    daemon_inbound.record_inbound_peer_activity(&record.source, data.len());
-                    let _ = daemon_inbound.accept_inbound_with_raw(record, data);
                 }
+                Err(tokio::sync::broadcast::error::RecvError::Lagged(skipped)) => {
+                    if diagnostics_enabled() {
+                        eprintln!(
+                            "[daemon-rx] received-data channel lagged; skipped {} events",
+                            skipped
+                        );
+                    }
+                }
+                Err(tokio::sync::broadcast::error::RecvError::Closed) => break,
             }
         }
     });
@@ -819,6 +891,33 @@ async fn resolve_lxmf_resource_destination(
         }
     }
     None
+}
+
+async fn resolve_inbound_lxmf_packet_destination(
+    transport: &Transport,
+    link_id: &AddressHash,
+) -> Option<InboundLxmfDestination> {
+    let link = transport.find_in_link(link_id).await?;
+    let guard = link.lock().await;
+    if is_lxmf_delivery_destination(guard.destination()) {
+        let mut destination = [0u8; 16];
+        destination.copy_from_slice(guard.destination().address_hash.as_slice());
+        return Some(InboundLxmfDestination::Delivery(destination));
+    }
+    if is_lxmf_propagation_link_destination(guard.destination()) {
+        return Some(InboundLxmfDestination::Propagation);
+    }
+    None
+}
+
+async fn local_delivery_destination_hash(
+    destination: Option<&Arc<tokio::sync::Mutex<SingleInputDestination>>>,
+) -> Option<[u8; 16]> {
+    let destination = destination?;
+    let guard = destination.lock().await;
+    let mut hash = [0u8; 16];
+    hash.copy_from_slice(guard.desc.address_hash.as_slice());
+    Some(hash)
 }
 
 fn is_lxmf_delivery_destination(destination: &DestinationDesc) -> bool {

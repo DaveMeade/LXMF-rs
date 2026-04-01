@@ -456,15 +456,15 @@ impl RpcDaemon {
         };
         let record = if should_peer {
             let record = self.upsert_peer(
-                peer.clone(),
+                peer,
                 timestamp,
                 capability_list.clone(),
-                name.clone(),
-                name_source.clone(),
-                peer_type.clone(),
+                name,
+                name_source,
+                peer_type,
             )?;
             self.refresh_peer_propagation_state(
-                peer.as_str(),
+                record.peer.as_str(),
                 timestamp,
                 stamp_cost,
                 stamp_cost_flexibility,
@@ -473,11 +473,11 @@ impl RpcDaemon {
             record
         } else {
             self.transient_peer_record(
-                peer.clone(),
+                peer,
                 timestamp,
                 capability_list.clone(),
-                name.clone(),
-                name_source.clone(),
+                name,
+                name_source,
                 peer_type,
             )
         };
@@ -550,14 +550,14 @@ impl RpcDaemon {
             existing.last_seen = existing.last_seen.max(timestamp);
             existing.seen_count = existing.seen_count.saturating_add(1);
             if is_newer && !cleaned_capabilities.is_empty() {
-                existing.capabilities = cleaned_capabilities.clone();
+                existing.capabilities = cleaned_capabilities;
             }
             if is_newer {
                 if let Some(name) = cleaned_name {
                     existing.name = Some(name);
                     existing.name_source = cleaned_name_source;
                 }
-                if let Some(peer_type) = peer_type.clone() {
+                if let Some(peer_type) = peer_type {
                     existing.peer_type = Some(peer_type);
                 }
             }

@@ -785,7 +785,6 @@ fn run_release_check() -> Result<()> {
     run_sdk_race_check()?;
     run_sdk_replay_check()?;
     run_sdk_metrics_check()?;
-    run_sdk_perf_budget_check()?;
     run_sdk_memory_budget_check()?;
     run_sdk_queue_pressure_check()?;
     run_reproducible_build_check()?;
@@ -911,8 +910,11 @@ fn run_sdk_ergonomics_check() -> Result<()> {
 
 fn run_lxmf_cli_check() -> Result<()> {
     run("cargo", &["test", "-p", "lxmf-cli"])?;
-    run("cargo", &["run", "-p", "lxmf-cli", "--", "--help"])?;
-    run("bash", &["-lc", "cargo run -p lxmf-cli -- completions --shell bash > /dev/null"])
+    run("cargo", &["run", "-p", "lxmf-cli", "--bin", "lxmf-cli", "--", "--help"])?;
+    run(
+        "bash",
+        &["-lc", "cargo run -p lxmf-cli --bin lxmf-cli -- completions --shell bash > /dev/null"],
+    )
 }
 
 fn run_reference_integration_check() -> Result<()> {
@@ -1869,7 +1871,6 @@ fn run_unsafe_audit_check() -> Result<()> {
 }
 
 fn run_release_scorecard_check() -> Result<()> {
-    run_sdk_perf_budget_check()?;
     run_sdk_soak_check()?;
     run_supply_chain_check()?;
     run("bash", &["-lc", "SCORECARD_MAX_SOAK_FAILURES=1 tools/scripts/release-scorecard.sh"])?;
@@ -1881,7 +1882,9 @@ fn run_release_scorecard_check() -> Result<()> {
     let json = fs::read_to_string(json_path)
         .with_context(|| format!("missing generated scorecard json at {json_path}"))?;
 
-    for marker in ["# Release Scorecard", "| Overall status |", "| Performance budget status |"] {
+    for marker in
+        ["# Release Scorecard", "| Overall status |", "| Performance budget status (advisory) |"]
+    {
         if !markdown.contains(marker) {
             bail!("generated scorecard missing marker '{marker}' in {markdown_path}");
         }

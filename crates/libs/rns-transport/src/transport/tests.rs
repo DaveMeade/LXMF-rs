@@ -11,7 +11,7 @@ use crate::destination::link::{Link, LinkEvent, LinkEventData, LinkPayload};
 use crate::destination::{DestinationName, SingleInputDestination};
 use crate::error::RnsError;
 use crate::identity::PrivateIdentity;
-use crate::packet::{Header, HeaderType};
+use crate::packet::{Header, HeaderType, PacketContext};
 use rand_core::OsRng;
 use std::sync::Mutex as StdMutex;
 use std::sync::{
@@ -28,11 +28,12 @@ async fn link_in_payload_is_forwarded_to_received_data() {
 
     let mut rx = transport.received_data_events();
 
+    let link_id = AddressHash::new_from_rand(OsRng);
     let address_hash = AddressHash::new_from_rand(OsRng);
     let payload = LinkPayload::new_from_slice(b"hello");
 
     let _ = transport.link_in_event_tx.send(LinkEventData {
-        id: AddressHash::new_from_rand(OsRng),
+        id: link_id,
         address_hash,
         event: LinkEvent::Data(Box::new(payload)),
     });
@@ -42,7 +43,7 @@ async fn link_in_payload_is_forwarded_to_received_data() {
         .expect("expected forwarded payload")
         .expect("broadcast receive");
 
-    assert_eq!(received.destination, address_hash);
+    assert_eq!(received.destination, link_id);
     assert_eq!(received.data.as_slice(), b"hello");
     assert_eq!(received.payload_mode, ReceivedPayloadMode::FullWire);
 }
@@ -55,11 +56,12 @@ async fn link_out_payload_is_forwarded_to_received_data() {
 
     let mut rx = transport.received_data_events();
 
+    let link_id = AddressHash::new_from_rand(OsRng);
     let address_hash = AddressHash::new_from_rand(OsRng);
     let payload = LinkPayload::new_from_slice(b"outbound");
 
     let _ = transport.link_out_event_tx.send(LinkEventData {
-        id: AddressHash::new_from_rand(OsRng),
+        id: link_id,
         address_hash,
         event: LinkEvent::Data(Box::new(payload)),
     });
@@ -69,7 +71,7 @@ async fn link_out_payload_is_forwarded_to_received_data() {
         .expect("expected forwarded payload")
         .expect("broadcast receive");
 
-    assert_eq!(received.destination, address_hash);
+    assert_eq!(received.destination, link_id);
     assert_eq!(received.data.as_slice(), b"outbound");
     assert_eq!(received.payload_mode, ReceivedPayloadMode::FullWire);
 }
@@ -301,6 +303,42 @@ async fn learned_announces_are_not_held_after_route_is_known() {
         .expect("known announce should bypass ingress hold")
         .expect("broadcast receive");
     assert_eq!(repeated.hops, announce.header.hops);
+}
+
+#[tokio::test]
+async fn path_response_announces_are_not_held_by_rate_limits() {
+    let local_identity = PrivateIdentity::new_from_rand(OsRng);
+    let config = TransportConfig::new("test", &local_identity, true);
+    let transport = Transport::new(config);
+    let handler = transport.get_handler();
+    let mut announce_rx = transport.recv_announces().await;
+
+    handler.lock().await.announce_limits = AnnounceLimits::with_rate_limit(AnnounceRateLimit {
+        incoming_freq_samples: 1,
+        max_held_announces: 8,
+        new_time: Duration::from_secs(3600),
+        burst_freq_new: 0.0,
+        burst_freq: 0.0,
+        burst_hold: Duration::from_secs(60),
+        burst_penalty: Duration::from_secs(60),
+        held_release_interval: Duration::from_secs(60),
+    });
+
+    let iface = AddressHash::new_from_rand(OsRng);
+    let mut destination = SingleInputDestination::new(
+        PrivateIdentity::new_from_rand(OsRng),
+        DestinationName::new("lxmf", "propagation"),
+    );
+    let mut announce = destination.announce(OsRng, None).expect("announce");
+    announce.context = PacketContext::PathResponse;
+
+    handle_announce(&announce, handler.lock().await, iface).await;
+
+    let received = timeout(Duration::from_millis(200), announce_rx.recv())
+        .await
+        .expect("path response announce should emit immediately")
+        .expect("broadcast receive");
+    assert_eq!(received.destination.lock().await.desc.address_hash, announce.destination);
 }
 
 #[tokio::test]

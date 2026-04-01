@@ -1745,7 +1745,7 @@ impl<B: SdkBackend> Client<B> {
         let Some(session) = state.session.as_ref() else {
             return Err(Error::not_started());
         };
-        let subscription = client.subscribe_events(start.clone().into()).map_err(Error::from)?;
+        let subscription = client.subscribe_events(start.into()).map_err(Error::from)?;
         let session_guard = session.lock().expect("app session mutex poisoned");
         let max_batch_size = session_guard
             .config

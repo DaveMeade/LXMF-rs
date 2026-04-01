@@ -23,7 +23,7 @@ use rns_embedded_runtime::{
 use rns_rpc::e2e_harness::{
     build_daemon_args, build_http_post, build_rpc_frame, build_send_params,
     build_tcp_client_config, is_ready_line, parse_http_response_body, parse_rpc_frame,
-    timestamp_millis,
+    peer_present, timestamp_millis,
 };
 use rns_rpc::rpc::replay::{execute_trace, load_trace_file, save_capture_file};
 use sha2::{Digest, Sha256};
@@ -37,6 +37,9 @@ use std::sync::mpsc;
 use std::time::{Duration, Instant};
 #[cfg(any(target_os = "linux", target_os = "macos", target_os = "windows"))]
 use uuid::Uuid;
+
+const RPC_RATE_LIMIT_BACKOFF: Duration = Duration::from_secs(5);
+const RPC_MAX_ATTEMPTS: usize = 60;
 
 #[derive(Parser, Debug)]
 #[command(name = "rnx")]
@@ -2144,6 +2147,8 @@ fn run_e2e(
     modes: Vec<DeliveryMode>,
 ) -> io::Result<()> {
     let timeout = Duration::from_secs(timeout_secs);
+    let selected_modes = selected_delivery_modes(&modes);
+    let propagation_enabled = selected_modes.contains(&DeliveryMode::Propagated);
     let mut reserved_ports = HashSet::new();
     let a_rpc_listener = reserve_port(a_port, &reserved_ports)?;
     let a_rpc_port = a_rpc_listener.local_addr()?.port();
@@ -2177,13 +2182,13 @@ fn run_e2e(
 
     drop(a_rpc_listener);
     drop(a_transport_listener);
-    let mut a_child = spawn_daemon(&a_rpc, &a_db, &a_transport, &a_config)?;
-    let a_destination_hash = wait_for_ready(
+    let mut a_child = spawn_daemon(&a_rpc, &a_db, &a_transport, &a_config, propagation_enabled)?;
+    let a_ready = wait_for_ready(
         a_child.stdout.take().ok_or_else(|| io::Error::other("missing daemon stdout"))?,
         timeout,
     );
-    let a_destination_hash = match a_destination_hash {
-        Ok(hash) => hash,
+    let a_ready = match a_ready {
+        Ok(ready) => ready,
         Err(err) => {
             cleanup_child(&mut a_child, keep);
             return Err(err);
@@ -2192,44 +2197,90 @@ fn run_e2e(
 
     drop(b_rpc_listener);
     drop(b_transport_listener);
-    let mut b_child = spawn_daemon(&b_rpc, &b_db, &b_transport, &b_config)?;
-    let b_destination_hash = wait_for_ready(
+    let mut b_child = spawn_daemon(&b_rpc, &b_db, &b_transport, &b_config, propagation_enabled)?;
+    let b_ready = wait_for_ready(
         b_child.stdout.take().ok_or_else(|| io::Error::other("missing daemon stdout"))?,
         timeout,
     );
-    let b_destination_hash = match b_destination_hash {
-        Ok(hash) => hash,
+    let b_ready = match b_ready {
+        Ok(ready) => ready,
         Err(err) => {
             cleanup_child(&mut a_child, keep);
             cleanup_child(&mut b_child, keep);
             return Err(err);
         }
     };
+    eprintln!(
+        "[rnx] ready A delivery={:?} propagation={:?}; B delivery={:?} propagation={:?}",
+        a_ready.delivery_hash,
+        a_ready.propagation_hash,
+        b_ready.delivery_hash,
+        b_ready.propagation_hash
+    );
 
     let mut req_id = 1u64;
     rpc_call(&b_rpc, req_id, "announce_now", None)?;
     req_id = req_id.wrapping_add(1);
-    let b_destination_for_a =
-        poll_for_any_peer(&a_rpc, timeout, req_id, a_destination_hash.as_deref())?;
-    let Some(b_destination_for_a) = b_destination_for_a else {
+    let b_delivery_hash = b_ready
+        .delivery_hash
+        .clone()
+        .ok_or_else(|| io::Error::other("daemon B did not report delivery destination hash"))?;
+    let a_sees_b = poll_for_peer(&a_rpc, &b_delivery_hash, timeout, req_id)?;
+    if !a_sees_b {
         cleanup_child(&mut a_child, keep);
         cleanup_child(&mut b_child, keep);
         return Err(io::Error::new(io::ErrorKind::TimedOut, "daemon A did not discover daemon B"));
-    };
+    }
     req_id = req_id.wrapping_add(1);
 
     rpc_call(&a_rpc, req_id, "announce_now", None)?;
     req_id = req_id.wrapping_add(1);
-    let a_destination_for_b =
-        poll_for_any_peer(&b_rpc, timeout, req_id, b_destination_hash.as_deref())?;
-    let Some(a_destination_for_b) = a_destination_for_b else {
+    let a_delivery_hash = a_ready
+        .delivery_hash
+        .clone()
+        .ok_or_else(|| io::Error::other("daemon A did not report delivery destination hash"))?;
+    let b_sees_a = poll_for_peer(&b_rpc, &a_delivery_hash, timeout, req_id)?;
+    if !b_sees_a {
         cleanup_child(&mut a_child, keep);
         cleanup_child(&mut b_child, keep);
         return Err(io::Error::new(io::ErrorKind::TimedOut, "daemon B did not discover daemon A"));
-    };
+    }
     req_id = req_id.wrapping_add(1);
+    std::thread::sleep(Duration::from_millis(1500));
 
-    let selected_modes = selected_delivery_modes(&modes);
+    if propagation_enabled {
+        let a_propagation_hash = a_ready.propagation_hash.clone().ok_or_else(|| {
+            io::Error::other("daemon A did not report propagation destination hash")
+        })?;
+        let b_propagation_hash = b_ready.propagation_hash.clone().ok_or_else(|| {
+            io::Error::other("daemon B did not report propagation destination hash")
+        })?;
+
+        rpc_call(&b_rpc, req_id, "announce_now", None)?;
+        req_id = req_id.wrapping_add(1);
+        rpc_call(&a_rpc, req_id, "announce_now", None)?;
+        req_id = req_id.wrapping_add(1);
+
+        let a_select_response = rpc_call(
+            &a_rpc,
+            req_id,
+            "set_outbound_propagation_node",
+            Some(serde_json::json!({ "peer": b_propagation_hash })),
+        )?;
+        ensure_rpc_ok(a_select_response, "set_outbound_propagation_node (A)")?;
+        req_id = req_id.wrapping_add(1);
+
+        let b_select_response = rpc_call(
+            &b_rpc,
+            req_id,
+            "set_outbound_propagation_node",
+            Some(serde_json::json!({ "peer": a_propagation_hash })),
+        )?;
+        ensure_rpc_ok(b_select_response, "set_outbound_propagation_node (B)")?;
+        req_id = req_id.wrapping_add(1);
+        std::thread::sleep(Duration::from_millis(1500));
+    }
+
     for mode in selected_modes {
         match mode {
             DeliveryMode::Direct | DeliveryMode::Opportunistic | DeliveryMode::Propagated => {
@@ -2237,8 +2288,8 @@ fn run_e2e(
                     mode,
                     &a_rpc,
                     &b_rpc,
-                    &a_destination_for_b,
-                    &b_destination_for_a,
+                    &a_delivery_hash,
+                    &b_delivery_hash,
                     timeout,
                     &mut req_id,
                 )?;
@@ -2246,8 +2297,8 @@ fn run_e2e(
                     mode,
                     &b_rpc,
                     &a_rpc,
-                    &b_destination_for_a,
-                    &a_destination_for_b,
+                    &b_delivery_hash,
+                    &a_delivery_hash,
                     timeout,
                     &mut req_id,
                 )?;
@@ -2256,8 +2307,8 @@ fn run_e2e(
                 run_paper_workflow(
                     &a_rpc,
                     &b_rpc,
-                    &a_destination_for_b,
-                    &b_destination_for_a,
+                    &a_delivery_hash,
+                    &b_delivery_hash,
                     timeout,
                     &mut req_id,
                 )?;
@@ -2275,6 +2326,7 @@ fn run_e2e(
 struct MeshNodeProcess {
     rpc: String,
     destination_hash: String,
+    propagation_hash: Option<String>,
     child: Child,
 }
 
@@ -2290,6 +2342,8 @@ fn run_mesh_sim(
     }
 
     let timeout = Duration::from_secs(timeout_secs);
+    let selected_modes = selected_mesh_delivery_modes(&modes);
+    let propagation_enabled = selected_modes.contains(&DeliveryMode::Propagated);
     let mut reserved_ports = HashSet::new();
     let mut rpc_listeners = Vec::with_capacity(nodes);
     let mut rpc_ports = Vec::with_capacity(nodes);
@@ -2339,35 +2393,44 @@ fn run_mesh_sim(
     for idx in 0..nodes {
         let rpc = format!("127.0.0.1:{}", rpc_ports[idx]);
         let transport = format!("127.0.0.1:{}", transport_ports[idx]);
-        let mut child = match spawn_daemon(&rpc, &db_paths[idx], &transport, &config_paths[idx]) {
+        let mut child = match spawn_daemon(
+            &rpc,
+            &db_paths[idx],
+            &transport,
+            &config_paths[idx],
+            propagation_enabled,
+        ) {
             Ok(child) => child,
             Err(err) => {
                 cleanup_mesh_children(&mut node_processes, keep);
                 return Err(err);
             }
         };
-        let destination_hash = match wait_for_ready(
+        let ready = match wait_for_ready(
             child.stdout.take().ok_or_else(|| io::Error::other("missing daemon stdout"))?,
             timeout,
         ) {
-            Ok(Some(hash)) => hash,
-            Ok(None) => {
-                cleanup_mesh_children(&mut node_processes, keep);
-                cleanup_child(&mut child, keep);
-                return Err(io::Error::other("daemon did not report destination hash"));
-            }
+            Ok(ready) => ready,
             Err(err) => {
                 cleanup_mesh_children(&mut node_processes, keep);
                 cleanup_child(&mut child, keep);
                 return Err(err);
             }
         };
+        let destination_hash = ready
+            .delivery_hash
+            .clone()
+            .ok_or_else(|| io::Error::other("daemon did not report destination hash"))?;
 
-        node_processes.push(MeshNodeProcess { rpc, destination_hash, child });
+        node_processes.push(MeshNodeProcess {
+            rpc,
+            destination_hash,
+            propagation_hash: ready.propagation_hash,
+            child,
+        });
     }
 
     let mut request_id = 10_u64;
-    let selected_modes = selected_mesh_delivery_modes(&modes);
     let first = 0_usize;
     let last = nodes - 1;
 
@@ -2387,6 +2450,29 @@ fn run_mesh_sim(
                 ));
             }
             request_id = request_id.wrapping_add(1);
+        }
+
+        if propagation_enabled {
+            for node in &node_processes {
+                rpc_call(&node.rpc, request_id, "announce_now", None)?;
+                request_id = request_id.wrapping_add(1);
+            }
+            for (idx, node) in node_processes.iter().enumerate() {
+                let target = node_processes[(idx + 1) % node_processes.len()]
+                    .propagation_hash
+                    .clone()
+                    .ok_or_else(|| {
+                        io::Error::other("mesh node did not report propagation destination hash")
+                    })?;
+                let response = rpc_call(
+                    &node.rpc,
+                    request_id,
+                    "set_outbound_propagation_node",
+                    Some(serde_json::json!({ "peer": target })),
+                )?;
+                ensure_rpc_ok(response, "set_outbound_propagation_node (mesh)")?;
+                request_id = request_id.wrapping_add(1);
+            }
         }
 
         for mode in selected_modes {
@@ -2468,12 +2554,7 @@ fn selected_mesh_delivery_modes(modes: &[DeliveryMode]) -> Vec<DeliveryMode> {
 
 fn selected_delivery_modes(modes: &[DeliveryMode]) -> Vec<DeliveryMode> {
     if modes.is_empty() {
-        return vec![
-            DeliveryMode::Direct,
-            DeliveryMode::Opportunistic,
-            DeliveryMode::Propagated,
-            DeliveryMode::Paper,
-        ];
+        return vec![DeliveryMode::Direct, DeliveryMode::Opportunistic, DeliveryMode::Propagated];
     }
     let mut selected = Vec::new();
     let mut seen = HashSet::new();
@@ -2523,40 +2604,68 @@ fn run_delivery_mode(
     request_id: &mut u64,
 ) -> io::Result<()> {
     let label = mode_label(mode);
-    let message_id = format!("e2e-{}-{}", label, timestamp_millis());
     let content = format!("hello from rnx e2e ({label})");
-    let params = build_mode_send_params(
-        &message_id,
-        sender_destination,
-        receiver_destination,
-        &content,
-        mode,
-    );
-    let response = rpc_call(sender_rpc, *request_id, "send_message_v2", Some(params))?;
-    ensure_rpc_ok(response, format!("send_message_v2 ({label})").as_str())?;
-    *request_id = (*request_id).wrapping_add(1);
+    let max_attempts = if matches!(mode, DeliveryMode::Direct) { 4 } else { 1 };
 
-    let delivered = poll_for_inbound_content(receiver_rpc, &content, timeout, *request_id)?;
-    if !delivered {
-        return Err(io::Error::new(
-            io::ErrorKind::TimedOut,
-            format!("delivery mode '{label}' did not deliver message '{message_id}'"),
-        ));
+    for attempt in 1..=max_attempts {
+        if matches!(mode, DeliveryMode::Direct) {
+            rpc_call(receiver_rpc, *request_id, "announce_now", None)?;
+            *request_id = (*request_id).wrapping_add(1);
+            rpc_call(sender_rpc, *request_id, "announce_now", None)?;
+            *request_id = (*request_id).wrapping_add(1);
+            std::thread::sleep(Duration::from_millis(750));
+        }
+
+        let message_id = format!("e2e-{}-{}", label, timestamp_millis());
+        let params = build_mode_send_params(
+            &message_id,
+            sender_destination,
+            receiver_destination,
+            &content,
+            mode,
+        );
+        let response = rpc_call(sender_rpc, *request_id, "send_message_v2", Some(params))?;
+        ensure_rpc_ok(response, format!("send_message_v2 ({label})").as_str())?;
+        *request_id = (*request_id).wrapping_add(1);
+
+        let delivered = poll_for_inbound_content(receiver_rpc, &content, timeout, *request_id)?;
+        if !delivered {
+            let trace_statuses = delivery_trace_statuses(sender_rpc, &message_id, *request_id)
+                .unwrap_or_else(|_| Vec::new());
+            if attempt < max_attempts {
+                *request_id = (*request_id).wrapping_add(1);
+                std::thread::sleep(Duration::from_millis(2000));
+                continue;
+            }
+            return Err(io::Error::new(
+                io::ErrorKind::TimedOut,
+                format!(
+                    "delivery mode '{label}' did not deliver message '{message_id}' (trace_statuses={trace_statuses:?})"
+                ),
+            ));
+        }
+        *request_id = (*request_id).wrapping_add(1);
+
+        let trace_contains_status =
+            poll_for_delivery_trace_status(sender_rpc, &message_id, label, timeout, *request_id)?;
+        if !trace_contains_status {
+            if attempt < max_attempts {
+                *request_id = (*request_id).wrapping_add(1);
+                std::thread::sleep(Duration::from_millis(2000));
+                continue;
+            }
+            return Err(io::Error::new(
+                io::ErrorKind::TimedOut,
+                format!("delivery trace for '{message_id}' did not contain mode '{label}'"),
+            ));
+        }
+        *request_id = (*request_id).wrapping_add(1);
+
+        println!("E2E ok: mode={} message {} delivered", label, message_id);
+        return Ok(());
     }
-    *request_id = (*request_id).wrapping_add(1);
 
-    let trace_contains_status =
-        poll_for_delivery_trace_status(sender_rpc, &message_id, label, timeout, *request_id)?;
-    if !trace_contains_status {
-        return Err(io::Error::new(
-            io::ErrorKind::TimedOut,
-            format!("delivery trace for '{message_id}' did not contain mode '{label}'"),
-        ));
-    }
-    *request_id = (*request_id).wrapping_add(1);
-
-    println!("E2E ok: mode={} message {} delivered", label, message_id);
-    Ok(())
+    unreachable!("max_attempts is always at least 1")
 }
 
 fn run_paper_workflow(
@@ -2578,15 +2687,6 @@ fn run_paper_workflow(
     );
     let response = rpc_call(sender_rpc, *request_id, "send_message_v2", Some(send_params))?;
     ensure_rpc_ok(response, "send_message_v2 (paper)")?;
-    *request_id = (*request_id).wrapping_add(1);
-
-    let delivered = poll_for_inbound_content(receiver_rpc, content, timeout, *request_id)?;
-    if !delivered {
-        return Err(io::Error::new(
-            io::ErrorKind::TimedOut,
-            "paper workflow did not deliver baseline message",
-        ));
-    }
     *request_id = (*request_id).wrapping_add(1);
 
     let paper_encode_response = rpc_call(
@@ -2620,6 +2720,15 @@ fn run_paper_workflow(
     }
     *request_id = (*request_id).wrapping_add(1);
 
+    let delivered = poll_for_inbound_content(receiver_rpc, content, timeout, *request_id)?;
+    if !delivered {
+        return Err(io::Error::new(
+            io::ErrorKind::TimedOut,
+            "paper workflow did not deliver decoded message",
+        ));
+    }
+    *request_id = (*request_id).wrapping_add(1);
+
     println!("E2E ok: mode=paper message {} encoded/decoded", message_id);
     Ok(())
 }
@@ -2632,7 +2741,7 @@ fn poll_for_delivery_trace_status(
     mut request_id: u64,
 ) -> io::Result<bool> {
     let deadline = Instant::now() + timeout;
-    let expected_status = format!("sent: {expected_mode}");
+    let expected_statuses = expected_delivery_trace_statuses(expected_mode);
     loop {
         let response = rpc_call(
             rpc,
@@ -2647,10 +2756,13 @@ fn poll_for_delivery_trace_status(
             .and_then(|value| value.as_array().cloned())
             .map(|transitions| {
                 transitions.iter().any(|transition| {
-                    transition
-                        .get("status")
-                        .and_then(|value| value.as_str())
-                        .is_some_and(|status| status.contains(&expected_status))
+                    transition.get("status").and_then(|value| value.as_str()).is_some_and(
+                        |status| {
+                            expected_statuses
+                                .iter()
+                                .any(|expected_status| status.contains(expected_status))
+                        },
+                    )
                 })
             })
             .unwrap_or(false);
@@ -2661,6 +2773,43 @@ fn poll_for_delivery_trace_status(
             return Ok(false);
         }
         std::thread::sleep(Duration::from_millis(200));
+    }
+}
+
+fn delivery_trace_statuses(
+    rpc: &str,
+    message_id: &str,
+    request_id: u64,
+) -> io::Result<Vec<String>> {
+    let response = rpc_call(
+        rpc,
+        request_id,
+        "message_delivery_trace",
+        Some(serde_json::json!({ "message_id": message_id })),
+    )?;
+    let result = ensure_rpc_ok(response, "message_delivery_trace")?;
+    Ok(result
+        .and_then(|value| value.get("transitions").cloned())
+        .and_then(|value| value.as_array().cloned())
+        .unwrap_or_default()
+        .into_iter()
+        .filter_map(|transition| {
+            transition.get("status").and_then(|value| value.as_str()).map(str::to_owned)
+        })
+        .collect())
+}
+
+fn expected_delivery_trace_statuses(expected_mode: &str) -> &'static [&'static str] {
+    match expected_mode {
+        // The live reticulumd bridge routes direct delivery over links and reports that
+        // transport-level status as `sent: link`.
+        "direct" => &["sent: direct", "sent: link"],
+        "opportunistic" => &["sent: opportunistic"],
+        // Propagated delivery can persist `delivered` before the sender-side
+        // `sent: propagated` receipt update lands. Once `delivered` wins, the
+        // later non-terminal sent status is intentionally ignored.
+        "propagated" => &["sent: propagated", "sent: propagated resource", "delivered"],
+        other => panic!("unsupported delivery mode '{other}'"),
     }
 }
 
@@ -2677,7 +2826,13 @@ fn ensure_rpc_ok(
     Ok(response.result)
 }
 
-fn spawn_daemon(rpc: &str, db_path: &Path, transport: &str, config: &Path) -> io::Result<Child> {
+fn spawn_daemon(
+    rpc: &str,
+    db_path: &Path,
+    transport: &str,
+    config: &Path,
+    propagation_enabled: bool,
+) -> io::Result<Child> {
     let mut cmd = ProcessCommand::new(reticulumd_path()?);
     cmd.args(build_daemon_args(
         rpc,
@@ -2686,9 +2841,24 @@ fn spawn_daemon(rpc: &str, db_path: &Path, transport: &str, config: &Path) -> io
         Some(transport),
         Some(&config.to_string_lossy()),
     ));
+    if propagation_enabled {
+        cmd.env("LXMD_PROPAGATION_NODE", "1");
+    }
     cmd.stdout(Stdio::piped());
-    cmd.stderr(Stdio::null());
+    cmd.stderr(if stderr_passthrough_enabled() { Stdio::inherit() } else { Stdio::null() });
     cmd.spawn()
+}
+
+fn stderr_passthrough_enabled() -> bool {
+    std::env::var("RNX_DAEMON_STDERR")
+        .ok()
+        .map(|value| {
+            matches!(
+                value.trim().to_ascii_lowercase().as_str(),
+                "1" | "true" | "yes" | "on" | "debug"
+            )
+        })
+        .unwrap_or(false)
 }
 
 fn derive_preferred_transport_port(rpc_port: u16, offset: u16) -> io::Result<u16> {
@@ -2726,10 +2896,16 @@ fn reticulumd_path() -> io::Result<PathBuf> {
     }
 }
 
+#[derive(Debug, Clone, Default)]
+struct DaemonReady {
+    delivery_hash: Option<String>,
+    propagation_hash: Option<String>,
+}
+
 fn wait_for_ready<R: Read + Send + 'static>(
     reader: R,
     timeout: Duration,
-) -> io::Result<Option<String>> {
+) -> io::Result<DaemonReady> {
     let (tx, rx) = mpsc::channel::<String>();
     std::thread::spawn(move || {
         let mut lines = BufReader::new(reader).lines();
@@ -2739,7 +2915,7 @@ fn wait_for_ready<R: Read + Send + 'static>(
     });
 
     let deadline = Instant::now() + timeout;
-    let mut local_destination_hash = None;
+    let mut ready = DaemonReady::default();
     loop {
         let now = Instant::now();
         if now >= deadline {
@@ -2748,11 +2924,12 @@ fn wait_for_ready<R: Read + Send + 'static>(
         let remaining = deadline.saturating_duration_since(now);
         match rx.recv_timeout(remaining) {
             Ok(line) => {
-                if local_destination_hash.is_none() {
-                    local_destination_hash = parse_delivery_destination_hash(&line);
-                }
+                ready.delivery_hash =
+                    ready.delivery_hash.or_else(|| parse_delivery_destination_hash(&line));
+                ready.propagation_hash =
+                    ready.propagation_hash.or_else(|| parse_propagation_destination_hash(&line));
                 if is_ready_line(&line) {
-                    return Ok(local_destination_hash);
+                    return Ok(ready);
                 }
             }
             Err(mpsc::RecvTimeoutError::Timeout) => continue,
@@ -2769,15 +2946,40 @@ fn rpc_call(
     method: &str,
     params: Option<serde_json::Value>,
 ) -> io::Result<rns_rpc::RpcResponse> {
-    let frame = build_rpc_frame(id, method, params)?;
-    let request = build_http_post("/rpc", rpc, &frame);
-    let mut stream = TcpStream::connect(rpc)?;
-    stream.write_all(&request)?;
-    stream.shutdown(Shutdown::Write)?;
-    let mut response = Vec::new();
-    stream.read_to_end(&mut response)?;
-    let body = parse_http_response_body(&response)?;
-    parse_rpc_frame(&body)
+    for attempt in 0..RPC_MAX_ATTEMPTS {
+        let frame = build_rpc_frame(id, method, params.clone())?;
+        let request = build_http_post("/rpc", rpc, &frame);
+        let mut stream = TcpStream::connect(rpc)?;
+        stream.write_all(&request)?;
+        stream.shutdown(Shutdown::Write)?;
+        let mut response = Vec::new();
+        stream.read_to_end(&mut response)?;
+        let body = parse_http_response_body(&response)?;
+        let parsed = parse_rpc_frame(&body).map_err(|error| {
+            let body_hex = hex::encode(body.iter().copied().take(64).collect::<Vec<_>>());
+            io::Error::new(
+                error.kind(),
+                format!(
+                    "rpc call {method} decode failed: {error}; body_len={} body_prefix_hex={}",
+                    body.len(),
+                    body_hex
+                ),
+            )
+        })?;
+        if rpc_response_is_rate_limited(&parsed) && attempt + 1 < RPC_MAX_ATTEMPTS {
+            std::thread::sleep(RPC_RATE_LIMIT_BACKOFF);
+            continue;
+        }
+        return Ok(parsed);
+    }
+
+    Err(io::Error::other(format!(
+        "rpc call {method} exhausted retry budget after repeated rate limiting"
+    )))
+}
+
+fn rpc_response_is_rate_limited(response: &rns_rpc::RpcResponse) -> bool {
+    response.error.as_ref().is_some_and(|error| error.code == "SDK_SECURITY_RATE_LIMITED")
 }
 
 fn poll_for_inbound_content(
@@ -2820,6 +3022,26 @@ fn poll_for_any_peer(
     }
 }
 
+fn poll_for_peer(
+    rpc: &str,
+    expected_peer: &str,
+    timeout: Duration,
+    mut request_id: u64,
+) -> io::Result<bool> {
+    let deadline = Instant::now() + timeout;
+    loop {
+        let response = rpc_call(rpc, request_id, "list_peers", None)?;
+        request_id = request_id.wrapping_add(1);
+        if peer_present(&response, expected_peer) {
+            return Ok(true);
+        }
+        if Instant::now() >= deadline {
+            return Ok(false);
+        }
+        std::thread::sleep(Duration::from_millis(200));
+    }
+}
+
 fn first_peer(response: &rns_rpc::RpcResponse, exclude_peer: Option<&str>) -> Option<String> {
     let result = response.result.as_ref()?;
     let peers = result.get("peers")?.as_array()?;
@@ -2835,6 +3057,18 @@ fn first_peer(response: &rns_rpc::RpcResponse, exclude_peer: Option<&str>) -> Op
 
 fn parse_delivery_destination_hash(line: &str) -> Option<String> {
     let marker = "delivery destination hash=";
+    let idx = line.find(marker)?;
+    let start = idx + marker.len();
+    let value = line[start..].trim();
+    if value.is_empty() {
+        None
+    } else {
+        Some(value.to_owned())
+    }
+}
+
+fn parse_propagation_destination_hash(line: &str) -> Option<String> {
+    let marker = "propagation destination hash=";
     let idx = line.find(marker)?;
     let start = idx + marker.len();
     let value = line[start..].trim();

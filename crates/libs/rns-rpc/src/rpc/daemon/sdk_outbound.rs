@@ -76,7 +76,7 @@ impl RpcDaemon {
                     .map_err(std::io::Error::other)?
                     .unwrap_or_else(|| status.clone());
                 if resolved_status == status {
-                    self.append_delivery_trace(&id, status.clone());
+                    self.append_delivery_trace(&id, status);
                 }
                 resolved_status
             };
@@ -134,7 +134,7 @@ impl RpcDaemon {
                 .map_err(std::io::Error::other)?
                 .unwrap_or_else(|| sent_status.clone());
             if resolved_status == sent_status {
-                self.append_delivery_trace(&id, sent_status.clone());
+                self.append_delivery_trace(&id, sent_status);
             }
             resolved_status
         };

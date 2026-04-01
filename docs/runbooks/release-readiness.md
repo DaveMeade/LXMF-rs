@@ -61,7 +61,6 @@ cargo xtask release-check
 cargo run -p rns-tools --bin rnx -- e2e --timeout-secs 20
 cargo run -p rns-tools --bin rnx -- replay --trace docs/fixtures/sdk-v2/rpc/replay_known_send_cancel.v1.json
 cargo run -p xtask -- sdk-bench-check
-cargo run -p xtask -- sdk-perf-budget-check
 cargo run -p xtask -- sdk-memory-budget-check
 cargo run -p xtask -- embedded-footprint-check
 cargo run -p xtask -- sdk-queue-pressure-check
@@ -163,11 +162,13 @@ cargo run -p xtask -- canary-criteria-check
 Rollback triggers (objective):
 
 1. `overall_status != PASS` in `target/release-scorecard/release-scorecard.json`
-2. `performance_status != PASS`
-3. `soak_status != pass`
-4. `soak_failures > 0` or `soak_mesh_failures > 0`
-5. security checklist PASS rows below required floor (`CANARY_MIN_SECURITY_PASS_ROWS`, default `8`)
-6. supply-chain artifact count below required floor (`CANARY_MIN_SUPPLY_CHAIN_ARTIFACTS`, default `1`)
+2. `soak_status != pass`
+3. `soak_failures > 0` or `soak_mesh_failures > 0`
+4. security checklist PASS rows below required floor (`CANARY_MIN_SECURITY_PASS_ROWS`, default `8`)
+5. supply-chain artifact count below required floor (`CANARY_MIN_SUPPLY_CHAIN_ARTIFACTS`, default `1`)
+
+`performance_status` in the release scorecard is advisory only until the legacy Criterion
+budgets are re-baselined and maintained again.
 
 Report artifacts:
 

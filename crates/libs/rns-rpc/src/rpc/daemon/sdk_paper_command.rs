@@ -59,7 +59,7 @@ impl RpcDaemon {
             if let Some(accepted) = accepted {
                 session.accepted = Some(accepted);
             }
-            if let Some(payload) = payload.clone() {
+            if let Some(payload) = payload {
                 session.response_payload = Some(payload);
             }
             if let Some(delivery_state) = delivery_state {
@@ -97,8 +97,7 @@ impl RpcDaemon {
     ) -> Option<InboundSdkCommandUpdate> {
         let fields = record.fields.as_ref()?.as_object()?;
         let command = fields.get("sdk_command")?.as_object()?;
-        let correlation_id =
-            Self::normalize_non_empty(command.get("correlation_id")?.as_str()?)?.to_owned();
+        let correlation_id = Self::normalize_non_empty(command.get("correlation_id")?.as_str()?)?;
         let event = Self::normalize_non_empty(command.get("event")?.as_str()?)?;
         let accepted = command.get("accepted").and_then(JsonValue::as_bool);
         let payload = command.get("payload").cloned();

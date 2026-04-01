@@ -7,7 +7,7 @@ use tokio::time::Duration;
 use tokio::time::Instant;
 
 use crate::hash::AddressHash;
-use crate::packet::Packet;
+use crate::packet::{Packet, PacketContext};
 
 pub struct AnnounceRateLimit {
     pub incoming_freq_samples: usize,
@@ -224,6 +224,10 @@ impl AnnounceLimits {
         packet: &Packet,
         destination_known: bool,
     ) -> AnnounceLimitAction {
+        if packet.context == PacketContext::PathResponse {
+            return AnnounceLimitAction::Allow;
+        }
+
         let now = Instant::now();
         let entry = self.limits.entry(iface).or_insert_with(|| AnnounceLimitEntry::new(now));
         entry.record_announce(now, &self.rate_limit);

@@ -122,6 +122,7 @@ impl RpcDaemon {
                     ));
                 }
                 Self::validate_legacy_hot_apply_uniqueness(&parsed.interfaces)?;
+                let parsed_interfaces = parsed.interfaces;
 
                 let applied_interfaces = if let Some(bridge) = self
                     .interface_mutation_bridge
@@ -129,9 +130,9 @@ impl RpcDaemon {
                     .expect("interface mutation bridge mutex poisoned")
                     .clone()
                 {
-                    bridge.apply_interfaces(parsed.interfaces.clone())?
+                    bridge.apply_interfaces(parsed_interfaces)?
                 } else {
-                    parsed.interfaces.clone()
+                    parsed_interfaces
                 };
                 {
                     let mut guard = self.interfaces.lock().expect("interfaces mutex poisoned");
@@ -228,6 +229,7 @@ impl RpcDaemon {
                         ));
                     }
                     Self::validate_legacy_hot_apply_uniqueness(&parsed.interfaces)?;
+                    let parsed_interfaces = parsed.interfaces;
 
                     let applied_interfaces = if let Some(bridge) = self
                         .interface_mutation_bridge
@@ -235,9 +237,9 @@ impl RpcDaemon {
                         .expect("interface mutation bridge mutex poisoned")
                         .clone()
                     {
-                        bridge.apply_interfaces(parsed.interfaces.clone())?
+                        bridge.apply_interfaces(parsed_interfaces)?
                     } else {
-                        parsed.interfaces.clone()
+                        parsed_interfaces
                     };
                     {
                         let mut guard = self.interfaces.lock().expect("interfaces mutex poisoned");

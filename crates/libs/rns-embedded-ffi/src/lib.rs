@@ -48,9 +48,16 @@ struct NoopCriticalSection;
 critical_section::set_impl!(NoopCriticalSection);
 
 #[cfg(not(feature = "std"))]
+// SAFETY: this shim runs on single-threaded embedded builds where callers do not
+// rely on nested interrupt masking; the no-op critical section only gates local
+// allocator/runtime bootstrap paths in this crate.
 unsafe impl critical_section::Impl for NoopCriticalSection {
+    // SAFETY: acquire does not modify machine state and the paired restore token
+    // is the unit type, so callers can only observe the no-op contract above.
     unsafe fn acquire() -> RawRestoreState {}
 
+    // SAFETY: release is paired with the no-op acquire implementation and has no
+    // machine state to restore for this single-threaded shim.
     unsafe fn release(_restore_state: RawRestoreState) {}
 }
 
@@ -520,6 +527,8 @@ pub extern "C" fn rns_embedded_v1_get_capabilities(
     if out_capabilities.is_null() {
         return RnsEmbeddedStatus::InvalidArgument;
     }
+    // SAFETY: `out_capabilities` is validated non-null above and points to
+    // writable caller-provided storage for one `RnsEmbeddedV1Capabilities`.
     unsafe {
         *out_capabilities = RnsEmbeddedV1Capabilities::default();
     }
@@ -537,6 +546,8 @@ pub extern "C" fn rns_embedded_v1_node_free(node: *mut RnsEmbeddedV1Node) {
     if node.is_null() {
         return;
     }
+    // SAFETY: `node` is allocated by `rns_embedded_v1_node_new` with
+    // `Box::into_raw` and this function takes back ownership exactly once.
     unsafe {
         drop(Box::from_raw(node));
     }
@@ -762,6 +773,8 @@ pub extern "C" fn rns_embedded_v1_node_start(
     if config.is_null() {
         return set_v1_pointer_error(out_node_error, RnsEmbeddedV1NodeErrorCode::InvalidPointer);
     }
+    // SAFETY: `config` is validated non-null above and is only borrowed
+    // immutably for the duration of this conversion/start call.
     let config = unsafe { &*config };
     let node_config = match v1_node_config(config) {
         Ok(config) => config,
@@ -799,6 +812,8 @@ pub extern "C" fn rns_embedded_v1_node_restart(
     if config.is_null() {
         return set_v1_pointer_error(out_node_error, RnsEmbeddedV1NodeErrorCode::InvalidPointer);
     }
+    // SAFETY: `config` is validated non-null above and is only borrowed
+    // immutably while building the restart configuration.
     let config = unsafe { &*config };
     let node_config = match v1_node_config(config) {
         Ok(config) => config,
@@ -822,6 +837,8 @@ pub extern "C" fn rns_embedded_v1_node_get_status(
         return RnsEmbeddedStatus::InvalidArgument;
     }
     let status = node.node.get_status();
+    // SAFETY: `out_status` is validated non-null above and points to writable
+    // caller storage for one `RnsEmbeddedV1NodeStatus`.
     unsafe {
         *out_status = map_v1_status(status);
     }
@@ -846,11 +863,15 @@ pub extern "C" fn rns_embedded_v1_node_send(
     let Some(body) = byte_slice(body_ptr, body_len) else {
         return set_v1_pointer_error(out_node_error, RnsEmbeddedV1NodeErrorCode::InvalidPointer);
     };
+    // SAFETY: `destination_ptr` is validated non-null above and must reference
+    // exactly one 16-byte destination buffer for the duration of this call.
     let destination_slice = unsafe { core::slice::from_raw_parts(destination_ptr, 16) };
     let mut destination = [0_u8; 16];
     destination.copy_from_slice(destination_slice);
     match node.node.send(destination, body, SendOptions) {
         Ok(receipt) => {
+            // SAFETY: `out_receipt` is validated non-null above and points to
+            // writable caller storage for one mapped receipt.
             unsafe {
                 *out_receipt = map_v1_receipt(receipt);
             }
@@ -887,6 +908,8 @@ pub extern "C" fn rns_embedded_v1_node_broadcast(
     };
     match node.node.broadcast(body, BroadcastOptions { destinations }) {
         Ok(receipt) => {
+            // SAFETY: `out_receipt` is validated non-null above and points to
+            // writable caller storage for one mapped receipt.
             unsafe {
                 *out_receipt = map_v1_receipt(receipt);
             }
@@ -925,6 +948,8 @@ pub extern "C" fn rns_embedded_v1_node_subscribe_events(
     }
     match node.node.subscribe_events() {
         Ok(subscription) => {
+            // SAFETY: `out_subscription` is validated non-null above and points
+            // to writable caller storage for the newly allocated handle.
             unsafe {
                 *out_subscription =
                     Box::into_raw(Box::new(RnsEmbeddedEventSubscription { subscription }));
@@ -951,6 +976,8 @@ pub extern "C" fn rns_embedded_v1_subscription_next(
     }
     match subscription.subscription.next(timeout_ms) {
         Ok(result) => {
+            // SAFETY: both output pointers are validated non-null above and
+            // point to writable caller storage for this poll result.
             unsafe {
                 *out_poll_result = map_v1_poll_result(&result);
                 *out_event = match result {
@@ -972,6 +999,8 @@ pub extern "C" fn rns_embedded_v1_subscription_close(
     if subscription.is_null() {
         return clear_v1_node_error(out_node_error);
     }
+    // SAFETY: `subscription` comes from `Box::into_raw` in
+    // `rns_embedded_v1_node_subscribe_events` and is reclaimed exactly once here.
     let boxed = unsafe { Box::from_raw(subscription) };
     match boxed.subscription.close() {
         Ok(()) => clear_v1_node_error(out_node_error),
@@ -992,6 +1021,8 @@ fn v1_node_mut<'a>(node: *mut RnsEmbeddedV1Node) -> Option<&'a mut RnsEmbeddedV1
     if node.is_null() {
         return None;
     }
+    // SAFETY: callers pass handles allocated by this crate and this helper only
+    // creates a temporary exclusive borrow for the duration of the FFI call.
     Some(unsafe { &mut *node })
 }
 
@@ -1001,6 +1032,8 @@ fn v1_subscription_mut<'a>(
     if subscription.is_null() {
         return None;
     }
+    // SAFETY: callers pass handles allocated by this crate and this helper only
+    // creates a temporary exclusive borrow for the duration of the FFI call.
     Some(unsafe { &mut *subscription })
 }
 
@@ -1023,6 +1056,8 @@ fn destination_list(ptr: *const u8, count: usize) -> Option<alloc::vec::Vec<[u8;
     if ptr.is_null() {
         return None;
     }
+    // SAFETY: `ptr` is validated non-null above and the byte count is derived
+    // from the caller-provided destination count with fixed 16-byte entries.
     let bytes = unsafe { core::slice::from_raw_parts(ptr, count.saturating_mul(16)) };
     let mut out = alloc::vec::Vec::with_capacity(count);
     for chunk in bytes.chunks_exact(16) {
@@ -1235,6 +1270,8 @@ fn map_v1_log_level(level: RnsEmbeddedV1LogLevel) -> NodeLogLevel {
 
 fn clear_v1_node_error(out_node_error: *mut RnsEmbeddedV1NodeError) -> RnsEmbeddedStatus {
     if !out_node_error.is_null() {
+        // SAFETY: `out_node_error` is checked non-null above and points to
+        // writable caller storage for one sideband error struct.
         unsafe {
             *out_node_error = RnsEmbeddedV1NodeError::default();
         }
@@ -1255,6 +1292,8 @@ fn set_v1_poll_sideband_error(
             PollResult::NodeStopped => RnsEmbeddedV1NodeErrorCode::NotRunning,
             PollResult::Event(_) => RnsEmbeddedV1NodeErrorCode::Unknown,
         };
+        // SAFETY: `out_node_error` is checked non-null above and points to
+        // writable caller storage for one sideband error struct.
         unsafe {
             *out_node_error = RnsEmbeddedV1NodeError { code, ..RnsEmbeddedV1NodeError::default() };
         }
@@ -1267,6 +1306,8 @@ fn set_v1_pointer_error(
     code: RnsEmbeddedV1NodeErrorCode,
 ) -> RnsEmbeddedStatus {
     if !out_node_error.is_null() {
+        // SAFETY: `out_node_error` is checked non-null above and points to
+        // writable caller storage for one sideband error struct.
         unsafe {
             *out_node_error = RnsEmbeddedV1NodeError { code, ..RnsEmbeddedV1NodeError::default() };
         }
@@ -1279,6 +1320,8 @@ fn set_v1_node_error(
     error: NodeError,
 ) -> RnsEmbeddedStatus {
     if !out_node_error.is_null() {
+        // SAFETY: `out_node_error` is checked non-null above and points to
+        // writable caller storage for one sideband error struct.
         unsafe {
             *out_node_error = RnsEmbeddedV1NodeError {
                 code: map_v1_node_error_code(&error),

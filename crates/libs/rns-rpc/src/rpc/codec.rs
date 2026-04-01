@@ -94,4 +94,24 @@ mod tests {
             }
         }
     }
+
+    #[test]
+    fn rpc_error_roundtrips_when_optional_bool_fields_are_false() {
+        let response = RpcResponse {
+            id: 5,
+            result: None,
+            error: Some(crate::rpc::RpcError::new(
+                "DELIVERY_FAILED",
+                "no outbound propagation node selected",
+            )),
+        };
+
+        let encoded = encode_frame(&response).expect("encode frame");
+        let decoded: RpcResponse = decode_frame(&encoded).expect("decode frame");
+        let error = decoded.error.expect("error");
+        assert_eq!(error.code, "DELIVERY_FAILED");
+        assert_eq!(error.message, "no outbound propagation node selected");
+        assert_eq!(error.retryable, Some(false));
+        assert_eq!(error.is_user_actionable, Some(false));
+    }
 }

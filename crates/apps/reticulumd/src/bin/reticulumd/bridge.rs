@@ -718,11 +718,42 @@ impl DeliveryTask {
         statuses: LinkModeStatuses,
     ) -> Result<(), std::io::Error> {
         await_link_activation(self.transport.as_ref(), &link, Duration::from_secs(20)).await?;
+        let destination_desc = *link.lock().await.destination();
+        let link_id = *link.lock().await.id();
+        if trace_stage == "propagation" {
+            let resource_hash =
+                self.transport.send_resource(&link_id, payload.to_vec(), None).await.map_err(
+                    |err| std::io::Error::other(format!("link resource not sent: {err:?}")),
+                )?;
+            let resource_hash_hex = hex::encode(resource_hash.to_bytes());
+            track_outbound_resource(
+                &self.outbound_resource_map,
+                resource_hash_hex.clone(),
+                OutboundResourceTracking {
+                    message_id: self.message_id.clone(),
+                    peer: activity_peer.to_string(),
+                    bytes: payload.len(),
+                    sent_status: statuses.resource_sent.to_string(),
+                },
+            );
+            let detail = format!(
+                "resource_hash={} bytes={} peer={} destination={}",
+                resource_hash_hex,
+                payload.len(),
+                activity_peer,
+                destination_desc.address_hash
+            );
+            log_delivery_trace(&self.message_id, &self.destination_hex, trace_stage, &detail);
+            let _ = self.receipt_tx.send(ReceiptEvent {
+                message_id: self.message_id.clone(),
+                status: statuses.resource.to_string(),
+            });
+            return Ok(());
+        }
+
         let mut propagation_signal_rx =
             (trace_stage == "propagation").then(|| self.transport.received_data_events());
         let result = send_on_link(self.transport.as_ref(), &link, payload).await;
-        let destination_desc = *link.lock().await.destination();
-        let link_id = *link.lock().await.id();
         match result {
             Ok(LinkSendResult::Packet(packet)) => {
                 let packet_hash = hex::encode(packet.hash().to_bytes());

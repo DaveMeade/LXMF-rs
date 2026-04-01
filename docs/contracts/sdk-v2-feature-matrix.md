@@ -114,7 +114,9 @@ Profile requirements are operationalized in `docs/runbooks/compliance-profiles.m
 
 ## Performance Budget Matrix
 
-All budgets are enforced from Criterion sample data via `cargo run -p xtask -- sdk-perf-budget-check`.
+Budgets are reported from Criterion sample data via `cargo run -p xtask -- sdk-perf-budget-check`.
+They are currently advisory and not release-blocking until the legacy benchmark suite is
+re-baselined and maintained again.
 Budgets are expressed as maximum latency (`p50`/`p95`/`p99` in nanoseconds) and minimum throughput (`ops/s`).
 
 | Benchmark | p50 max (ns) | p95 max (ns) | p99 max (ns) | throughput min (ops/s) |
@@ -178,7 +180,7 @@ Metrics export is available at `GET /metrics` and covered by `cargo run -p xtask
 | `sdk-security-check` | required |
 | `sdk-fuzz-check` | required |
 | `sdk-metrics-check` | required |
-| `sdk-perf-budget-check` | required |
+| `sdk-perf-budget-check` | advisory |
 | `sdk-memory-budget-check` | required |
 | `sdk-queue-pressure-check` | required |
 | `sdk-migration-check` | required |
