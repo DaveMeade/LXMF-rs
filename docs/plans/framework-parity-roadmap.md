@@ -11,12 +11,16 @@ and current status tracking live in:
 
 This plan groups the currently known Reticulum and LXMF framework gaps into delivery waves. The intent is to finish behavior-level parity in the active workspace, not to expand RPC surface area without matching protocol/runtime behavior.
 
+Historical naming note: this roadmap predates the crates.io rename pass. Where
+it refers to `lxmf-core` and `rns-rpc`, the current published package names are
+`lxmf-wire` and `reticulum-rs-rpc`.
+
 ## Wave 1: Correctness And Core LXMF Behavior
 
 Focus:
 
 - Make the live daemon honor outbound delivery modes instead of ignoring `OutboundDeliveryOptions`.
-- Replace simplified paper-command behavior with real `lxmf-core` paper encode/decode flow.
+- Replace simplified paper-command behavior with real `lxmf-wire` paper encode/decode flow.
 - Move stamp and ticket behavior out of legacy-style RPC placeholders into active-workspace implementations.
 - Tighten the parity docs and test suite around what is actually implemented.
 
@@ -24,7 +28,7 @@ Deliverables:
 
 - `reticulumd` delivery bridge respects `direct`, `opportunistic`, `propagated`, and `paper`.
 - Active stamp generation/validation and ticket derivation APIs exist outside migration-only crates.
-- SDK paper encode/decode uses canonical wire helpers from `lxmf-core`.
+- SDK paper encode/decode uses canonical wire helpers from `lxmf-wire`.
 - New tests fail if the daemon silently falls back to a different delivery mode than requested.
 
 Exit criteria:

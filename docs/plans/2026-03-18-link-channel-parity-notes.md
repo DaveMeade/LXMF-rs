@@ -6,6 +6,9 @@ This note records the active `rns-transport` channel behavior implemented on the
 `codex/live-channel-integration` branch while bringing Rust closer to Python
 Reticulum `RNS/Channel.py` and `RNS/Link.py`.
 
+Historical naming note: this note uses the workspace crate name
+`rns-transport`; the published package name is `reticulum-rs-transport`.
+
 It is intentionally narrower than the full compatibility issue list. The purpose
 is to document the live transport/channel invariants that are easy to lose while
 iterating.

@@ -7,6 +7,11 @@ direct code inspection and parallel agent review against the reference Python
 implementations in `Reticulum` and
 `LXMF`.
 
+Historical naming note: this issue list keeps workspace paths like
+`crates/libs/rns-transport`, `crates/libs/rns-rpc`, and `crates/libs/lxmf-core`
+for code-navigation clarity. The corresponding published crate names are
+`reticulum-rs-transport`, `reticulum-rs-rpc`, and `lxmf-wire`.
+
 Scope:
 
 - `crates/libs/rns-transport`
