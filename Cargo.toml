@@ -81,7 +81,7 @@ lxmf-core = { package = "lxmf-wire", version = "0.2.0", path = "crates/libs/lxmf
 lxmf-grpc-client = { version = "0.1.0", path = "crates/libs/lxmf-grpc-client" }
 lxmf-sdk = { version = "0.2.0", path = "crates/libs/lxmf-sdk" }
 rns-core = { package = "reticulum-rs-core", version = "0.2.0", path = "crates/libs/rns-core" }
-rns-rpc = { package = "reticulum-rs-rpc", version = "0.2.0", path = "crates/libs/rns-rpc" }
+rns-rpc = { package = "reticulum-rs-rpc", version = "0.2.1", path = "crates/libs/rns-rpc" }
 rns-transport = { package = "reticulum-rs-transport", version = "0.2.0", path = "crates/libs/rns-transport" }
 aes = "0.8.4"
 base64 = "0.22"

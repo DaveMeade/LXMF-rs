@@ -17,7 +17,7 @@ sha2.workspace = true
 hex.workspace = true
 rns-embedded-core = { path = "../../libs/rns-embedded-core", version = "0.1.0" }
 rns-embedded-runtime = { path = "../../libs/rns-embedded-runtime", version = "0.1.0", features = ["std"] }
-rns_rpc = { package = "reticulum-rs-rpc", path = "../../libs/rns-rpc", version = "0.2.0" }
+rns_rpc = { package = "reticulum-rs-rpc", path = "../../libs/rns-rpc", version = "0.2.1" }
 lxmf-grpc-client.workspace = true
 
 [target.'cfg(any(target_os = "linux", target_os = "macos", target_os = "windows"))'.dependencies]

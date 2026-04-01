@@ -3,12 +3,18 @@ use std::path::{Path, PathBuf};
 
 fn main() {
     let manifest_dir = PathBuf::from(env::var("CARGO_MANIFEST_DIR").expect("CARGO_MANIFEST_DIR"));
-    let workspace_root = manifest_dir
+    let packaged_proto_root = manifest_dir.join("proto");
+    let workspace_proto_root = manifest_dir
         .parent()
         .and_then(Path::parent)
         .and_then(Path::parent)
-        .expect("workspace root");
-    let proto_root = workspace_root.join("api/proto");
+        .expect("workspace root")
+        .join("api/proto");
+    let proto_root = if packaged_proto_root.exists() {
+        packaged_proto_root
+    } else {
+        workspace_proto_root
+    };
     let protoc = protoc_bin_vendored::protoc_bin_path().expect("resolve vendored protoc");
 
     println!("cargo:rerun-if-changed={}", proto_root.display());
