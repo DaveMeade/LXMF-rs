@@ -60,7 +60,7 @@ not have to rewrite `use` paths just to complete the package rename.
 | Current workspace package | crates.io package | Rust crate name | Version target | Publish |
 | --- | --- | --- | --- | --- |
 | `lxmf-core` | `lxmf-wire` | `lxmf_core` | `0.2.0` | yes |
-| `lxmf-sdk` | `lxmf-sdk` | `lxmf_sdk` | `0.2.0` | yes |
+| `lxmf-sdk` | `lxmf-sdk` | `lxmf_sdk` | `0.2.1` | yes |
 | `rns-core` | `reticulum-rs-core` | `rns_core` | `0.2.0` | yes |
 | `rns-transport` | `reticulum-rs-transport` | `rns_transport` | `0.2.0` | yes |
 | `rns-rpc` | `reticulum-rs-rpc` | `rns_rpc` | `0.3.0` | yes |

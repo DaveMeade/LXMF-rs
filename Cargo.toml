@@ -85,7 +85,7 @@ clap_complete = "4.5"
 criterion = "0.5"
 lxmf = { version = "0.3.0", path = "crates/libs/lxmf" }
 lxmf-core = { package = "lxmf-wire", version = "0.2.0", path = "crates/libs/lxmf-core" }
-lxmf-sdk = { version = "0.2.0", path = "crates/libs/lxmf-sdk" }
+lxmf-sdk = { version = "0.2.1", path = "crates/libs/lxmf-sdk" }
 reticulum-rs = { version = "0.2.0", path = "crates/libs/reticulum-rs" }
 rns-core = { package = "reticulum-rs-core", version = "0.2.0", path = "crates/libs/rns-core" }
 rns-rpc = { package = "reticulum-rs-rpc", version = "0.3.0", path = "crates/libs/rns-rpc" }
