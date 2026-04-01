@@ -1,10 +1,8 @@
 # RPC Contract (`reticulumd`) - CLI Stable Set
 
-This document freezes the daemon RPC methods that `lxmf` relies on.
-
-For new non-browser integrations, gRPC is the preferred API. This document
-remains the compatibility contract for the JSON-RPC/MessagePack daemon surface.
-See `docs/contracts/grpc-adoption-and-migration.md`.
+This document freezes the daemon RPC methods that `lxmf-sdk`, `lxmf-cli`, and
+other operator-facing integrations rely on over the JSON-RPC/MessagePack daemon
+surface.
 
 Scope:
 - Transport: HTTP `POST /rpc` with framed MessagePack payloads.

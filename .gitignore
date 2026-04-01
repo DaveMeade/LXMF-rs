@@ -135,3 +135,6 @@ dmypy.json
 generated/clients/go/
 generated/clients/javascript/
 generated/clients/python/
+
+# Local scratch space
+.tmp/

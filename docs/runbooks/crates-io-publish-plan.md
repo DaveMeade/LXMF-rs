@@ -46,7 +46,7 @@ Example:
 [dependencies]
 lxmf-core = { package = "lxmf-wire", version = "0.2.0" }
 rns-core = { package = "reticulum-rs-core", version = "0.2.0" }
-rns-rpc = { package = "reticulum-rs-rpc", version = "0.2.0" }
+rns-rpc = { package = "reticulum-rs-rpc", version = "0.3.0" }
 ```
 
 For crates whose package names change, keep the Rust crate names stable with
@@ -63,7 +63,7 @@ not have to rewrite `use` paths just to complete the package rename.
 | `lxmf-sdk` | `lxmf-sdk` | `lxmf_sdk` | `0.2.0` | yes |
 | `rns-core` | `reticulum-rs-core` | `rns_core` | `0.2.0` | yes |
 | `rns-transport` | `reticulum-rs-transport` | `rns_transport` | `0.2.0` | yes |
-| `rns-rpc` | `reticulum-rs-rpc` | `rns_rpc` | `0.2.0` | yes |
+| `rns-rpc` | `reticulum-rs-rpc` | `rns_rpc` | `0.3.0` | yes |
 
 ### Wave 1.5: Facades after components exist
 
@@ -72,13 +72,7 @@ not have to rewrite `use` paths just to complete the package rename.
 | `lxmf` | curated high-level facade over `lxmf-sdk` and selected wire types | `0.3.0` | yes |
 | `reticulum-rs` | curated facade over core, with optional transport/RPC features | `0.2.0` | yes |
 
-### Wave 2: Additional client crate
-
-| Current workspace package | crates.io package | Version target | Publish |
-| --- | --- | --- | --- |
-| `lxmf-grpc-client` | `lxmf-grpc-client` | `0.2.0` | later |
-
-### Wave 3: Embedded family once support policy is explicit
+### Wave 2: Embedded family once support policy is explicit
 
 | Current workspace package | crates.io package | Version target | Publish |
 | --- | --- | --- | --- |
@@ -107,6 +101,7 @@ are not intended to carry a public support commitment.
 
 - Do not apply one blanket version to every existing published crate.
 - New component package names may start at `0.2.0`.
+- `reticulum-rs-rpc` moved to `0.3.0` when the gRPC/protobuf surface was removed from the public crate.
 - Already-published umbrella crates must continue forward monotonically from
   their crates.io history:
   - `lxmf`: next planned breaking line `0.3.0`
@@ -174,8 +169,6 @@ Recommended order:
 5. `lxmf-sdk`
 6. `reticulum-rs`
 7. `lxmf`
-8. `lxmf-grpc-client`
-
 Reason:
 
 - `lxmf-wire` depends on `reticulum-rs-core`
@@ -221,8 +214,9 @@ bundle release.
 
 Recommended follow-up automation:
 
-- add an `xtask` subcommand that validates publish order
-- add an `xtask` dry-run publisher for the Wave 1 crates
+- use `cargo xtask publish-crates --wave wave1 --dry-run --allow-dirty` for Wave 1 packaging validation
+- use `cargo xtask publish-crates --wave all --dry-run --allow-dirty` to validate facades too
+- use `cargo xtask yank-crate <package> <version>` if a bad crate needs to be yanked quickly
 - add a docs check that the publish matrix in this file stays aligned with
   actual package names and versions
 

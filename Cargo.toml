@@ -1,13 +1,14 @@
 [workspace]
 resolver = "2"
 members = [
-  "crates/libs/lxmf-grpc-client",
+  "crates/libs/lxmf",
   "crates/libs/rns-embedded-mininode",
   "crates/libs/rns-embedded-core",
   "crates/libs/rns-embedded-ffi",
   "crates/libs/rns-embedded-runtime",
   "crates/libs/lxmf-core",
   "crates/libs/lxmf-sdk",
+  "crates/libs/reticulum-rs",
   "crates/libs/rns-core",
   "crates/libs/rns-transport",
   "crates/libs/rns-rpc",
@@ -18,13 +19,14 @@ members = [
   "xtask",
 ]
 default-members = [
-  "crates/libs/lxmf-grpc-client",
+  "crates/libs/lxmf",
   "crates/libs/rns-embedded-mininode",
   "crates/libs/rns-embedded-core",
   "crates/libs/rns-embedded-ffi",
   "crates/libs/rns-embedded-runtime",
   "crates/libs/lxmf-core",
   "crates/libs/lxmf-sdk",
+  "crates/libs/reticulum-rs",
   "crates/libs/rns-core",
   "crates/libs/rns-transport",
   "crates/libs/rns-rpc",
@@ -45,7 +47,12 @@ repository = "https://github.com/FreeTAKTeam/LXMF-rs"
 # Exact workspace-local dependency edges allowed between crates.
 # `tools/scripts/check-boundaries.sh` treats this as a strict allowlist.
 allowed_library_edges = [
+  "lxmf->lxmf-sdk",
+  "lxmf->lxmf-wire",
   "lxmf-sdk->reticulum-rs-rpc",
+  "reticulum-rs->reticulum-rs-core",
+  "reticulum-rs->reticulum-rs-rpc",
+  "reticulum-rs->reticulum-rs-transport",
   "lxmf-wire->reticulum-rs-core",
   "rns-embedded-ffi->rns-embedded-core",
   "rns-embedded-ffi->rns-embedded-runtime",
@@ -63,7 +70,6 @@ allowed_app_edges = [
   "reticulumd->reticulum-rs-core",
   "reticulumd->reticulum-rs-rpc",
   "reticulumd->reticulum-rs-transport",
-  "rns-tools->lxmf-grpc-client",
   "rns-tools->rns-embedded-core",
   "rns-tools->rns-embedded-runtime",
   "rns-tools->reticulum-rs-rpc",
@@ -77,11 +83,12 @@ anyhow = "1"
 clap = { version = "4.5.29", features = ["derive"] }
 clap_complete = "4.5"
 criterion = "0.5"
+lxmf = { version = "0.3.0", path = "crates/libs/lxmf" }
 lxmf-core = { package = "lxmf-wire", version = "0.2.0", path = "crates/libs/lxmf-core" }
-lxmf-grpc-client = { version = "0.1.0", path = "crates/libs/lxmf-grpc-client" }
 lxmf-sdk = { version = "0.2.0", path = "crates/libs/lxmf-sdk" }
+reticulum-rs = { version = "0.2.0", path = "crates/libs/reticulum-rs" }
 rns-core = { package = "reticulum-rs-core", version = "0.2.0", path = "crates/libs/rns-core" }
-rns-rpc = { package = "reticulum-rs-rpc", version = "0.2.1", path = "crates/libs/rns-rpc" }
+rns-rpc = { package = "reticulum-rs-rpc", version = "0.3.0", path = "crates/libs/rns-rpc" }
 rns-transport = { package = "reticulum-rs-transport", version = "0.2.0", path = "crates/libs/rns-transport" }
 aes = "0.8.4"
 base64 = "0.22"
@@ -107,10 +114,6 @@ tempfile = "3"
 sha2 = "0.10"
 toml = "0.8"
 tokio = { version = "1.44.2", features = ["full"] }
-tonic = { version = "0.14.2", features = ["transport", "tls-ring"] }
-tonic-prost = "0.14.2"
-prost = "0.14.1"
-prost-types = "0.14.1"
 tokio-rustls = "0.26.2"
 tokio-serial = "5.4.4"
 rustls = "0.23.23"

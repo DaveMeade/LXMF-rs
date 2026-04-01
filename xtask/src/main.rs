@@ -105,9 +105,6 @@ const CANARY_CRITERIA_REPORT_JSON_PATH: &str =
     "target/release-readiness/canary-criteria-report.json";
 const GENERATED_MIGRATION_NOTES_PATH: &str =
     "target/release-readiness/generated-migration-notes.md";
-const PROTO_ROOT_PATH: &str = "api/proto";
-const GENERATED_GRPC_RUST_DIR: &str = "generated/grpc/rust";
-const GENERATED_GRPC_DESCRIPTOR_PATH: &str = "generated/grpc/lxmf-descriptor-set.bin";
 
 const RELEASE_BINARIES: &[&str] = &[
     "lxmf-cli",
@@ -151,6 +148,43 @@ const GOVERNANCE_REQUIRED_CODEOWNER_PATHS: &[&str] = &[
 
 const GOVERNANCE_FORBIDDEN_CODEOWNER_PATHS: &[&str] =
     &["/crates/libs/lxmf-router/", "/crates/libs/lxmf-runtime/"];
+
+#[derive(Copy, Clone, Debug)]
+struct PublishedCrate {
+    package: &'static str,
+    manifest_path: &'static str,
+}
+
+const WAVE1_PUBLIC_CRATES: &[PublishedCrate] = &[
+    PublishedCrate {
+        package: "reticulum-rs-core",
+        manifest_path: "crates/libs/rns-core/Cargo.toml",
+    },
+    PublishedCrate {
+        package: "lxmf-wire",
+        manifest_path: "crates/libs/lxmf-core/Cargo.toml",
+    },
+    PublishedCrate {
+        package: "reticulum-rs-transport",
+        manifest_path: "crates/libs/rns-transport/Cargo.toml",
+    },
+    PublishedCrate {
+        package: "reticulum-rs-rpc",
+        manifest_path: "crates/libs/rns-rpc/Cargo.toml",
+    },
+    PublishedCrate {
+        package: "lxmf-sdk",
+        manifest_path: "crates/libs/lxmf-sdk/Cargo.toml",
+    },
+];
+
+const FACADE_PUBLIC_CRATES: &[PublishedCrate] = &[
+    PublishedCrate {
+        package: "reticulum-rs",
+        manifest_path: "crates/libs/reticulum-rs/Cargo.toml",
+    },
+    PublishedCrate { package: "lxmf", manifest_path: "crates/libs/lxmf/Cargo.toml" },
+];
 
 #[derive(Copy, Clone)]
 struct PerfBudget {
@@ -351,8 +385,20 @@ enum XtaskCommand {
         #[arg(long)]
         check: bool,
     },
-    ProtoCheck,
-    ProtoGenerate,
+    PublishCrates {
+        #[arg(long, value_enum, default_value_t = PublishWave::Wave1)]
+        wave: PublishWave,
+        #[arg(long)]
+        dry_run: bool,
+        #[arg(long)]
+        allow_dirty: bool,
+    },
+    YankCrate {
+        package: String,
+        version: String,
+        #[arg(long)]
+        undo: bool,
+    },
     CompatKitCheck,
     E2eCompatibility,
     MeshSim,
@@ -449,7 +495,6 @@ enum CiStage {
     InteropCorpusCheck,
     InteropDriftCheck,
     SchemaClientCheck,
-    ProtoCheck,
     CompatKitCheck,
     E2eCompatibility,
     SdkProfileBuild,
@@ -513,6 +558,13 @@ enum PythonImplImplementation {
     Python,
 }
 
+#[derive(Copy, Clone, Debug, Eq, PartialEq, ValueEnum)]
+enum PublishWave {
+    Wave1,
+    Facades,
+    All,
+}
+
 fn main() -> Result<()> {
     let xtask = Xtask::parse();
     match xtask.command {
@@ -545,8 +597,12 @@ fn main() -> Result<()> {
         XtaskCommand::SchemaClientGenerate { check } => {
             run_schema_client_generate(check).map(|_| ())
         }
-        XtaskCommand::ProtoCheck => run_proto_check(),
-        XtaskCommand::ProtoGenerate => run_proto_generate(),
+        XtaskCommand::PublishCrates { wave, dry_run, allow_dirty } => {
+            run_publish_crates(wave, dry_run, allow_dirty)
+        }
+        XtaskCommand::YankCrate { package, version, undo } => {
+            run_yank_crate(&package, &version, undo)
+        }
         XtaskCommand::CompatKitCheck => run_compat_kit_check(),
         XtaskCommand::E2eCompatibility => run_e2e_compatibility(),
         XtaskCommand::MeshSim => run_mesh_sim(),
@@ -630,10 +686,9 @@ fn run_pr_core_ci() -> Result<()> {
     run("cargo", &["check", "--workspace", "--all-targets"])?;
     run("cargo", &["nextest", "run", "--workspace", "--lib", "--bins"])?;
     run("cargo", &["test", "--workspace", "--tests"])?;
-    run_proto_check()?;
     run_sdk_schema_check()?;
-    run("cargo", &["test", "-p", "reticulum-rs-rpc", "grpc::tests"])?;
-    run("cargo", &["check", "-p", "reticulumd", "-p", "rns-tools", "-p", "lxmf-grpc-client"])?;
+    run_publish_crates(PublishWave::All, true, true)?;
+    run("cargo", &["check", "-p", "reticulumd", "-p", "rns-tools"])?;
     run("bash", &["tools/scripts/check-boundaries.sh"])?;
     run_cargo_deny_policy_check()?;
     run_cargo_audit()?;
@@ -672,7 +727,6 @@ fn run_ci_stage(stage: CiStage) -> Result<()> {
         CiStage::InteropCorpusCheck => run_interop_corpus_check(),
         CiStage::InteropDriftCheck => run_interop_drift_check(false),
         CiStage::SchemaClientCheck => run_schema_client_check(),
-        CiStage::ProtoCheck => run_proto_check(),
         CiStage::CompatKitCheck => run_compat_kit_check(),
         CiStage::CertificationReportCheck => run_certification_report_check(),
         CiStage::E2eCompatibility => run_e2e_compatibility(),
@@ -5068,77 +5122,112 @@ fn run(cmd: &str, args: &[&str]) -> Result<()> {
     Ok(())
 }
 
-fn run_proto_check() -> Result<()> {
-    compile_proto_tree(None)
-}
-
-fn run_proto_generate() -> Result<()> {
-    let output_dir = Path::new(GENERATED_GRPC_RUST_DIR);
-    if output_dir.exists() {
-        fs::remove_dir_all(output_dir)
-            .with_context(|| format!("remove {}", output_dir.display()))?;
-    }
-    compile_proto_tree(Some(output_dir))
-}
-
-fn compile_proto_tree(output_dir: Option<&Path>) -> Result<()> {
-    let proto_root = Path::new(PROTO_ROOT_PATH);
-    let mut proto_files = Vec::new();
-    collect_proto_files(proto_root, &mut proto_files)?;
-    if proto_files.is_empty() {
-        bail!("no proto files found under {}", proto_root.display());
-    }
-
-    let out_dir = match output_dir {
-        Some(path) => path.to_path_buf(),
-        None => std::env::temp_dir().join("lxmf-rs-proto-check"),
-    };
-
-    if out_dir.exists() && output_dir.is_none() {
-        fs::remove_dir_all(&out_dir).with_context(|| format!("remove {}", out_dir.display()))?;
-    }
-    fs::create_dir_all(&out_dir).with_context(|| format!("create {}", out_dir.display()))?;
-
-    let descriptor_path = if output_dir.is_some() {
-        let descriptor = Path::new(GENERATED_GRPC_DESCRIPTOR_PATH);
-        if let Some(parent) = descriptor.parent() {
-            fs::create_dir_all(parent).with_context(|| format!("create {}", parent.display()))?;
+fn run_publish_crates(wave: PublishWave, dry_run: bool, allow_dirty: bool) -> Result<()> {
+    for krate in publish_wave_crates(wave) {
+        println!("publishing {} from {}", krate.package, krate.manifest_path);
+        if dry_run {
+            run_publish_dry_run_with_fallback(*krate, allow_dirty)?;
+        } else {
+            let mut args = vec!["publish"];
+            if allow_dirty {
+                args.push("--allow-dirty");
+            }
+            args.push("--manifest-path");
+            args.push(krate.manifest_path);
+            run("cargo", &args)?;
         }
-        descriptor.to_path_buf()
-    } else {
-        out_dir.join("lxmf-descriptor-set.bin")
-    };
-
-    let protoc = protoc_bin_vendored::protoc_bin_path().context("resolve vendored protoc")?;
-    std::env::set_var("PROTOC", &protoc);
-    tonic_prost_build::configure()
-        .build_client(true)
-        .build_server(true)
-        .build_transport(true)
-        .out_dir(&out_dir)
-        .file_descriptor_set_path(&descriptor_path)
-        .protoc_arg("--experimental_allow_proto3_optional")
-        .compile_protos(&proto_files, &[proto_root.to_path_buf()])
-        .with_context(|| format!("compile proto tree rooted at {}", proto_root.display()))?;
-
+    }
     Ok(())
 }
 
-fn collect_proto_files(dir: &Path, files: &mut Vec<PathBuf>) -> Result<()> {
-    let mut entries = fs::read_dir(dir)
-        .with_context(|| format!("read proto directory {}", dir.display()))?
-        .collect::<Result<Vec<_>, _>>()
-        .with_context(|| format!("read entries in {}", dir.display()))?;
-    entries.sort_by_key(|entry| entry.path());
+fn run_yank_crate(package: &str, version: &str, undo: bool) -> Result<()> {
+    let mut args = vec!["yank"];
+    if undo {
+        args.push("--undo");
+    }
+    args.push("--vers");
+    args.push(version);
+    args.push(package);
+    run("cargo", &args)
+}
 
-    for entry in entries {
-        let path = entry.path();
-        if path.is_dir() {
-            collect_proto_files(&path, files)?;
-        } else if path.extension().is_some_and(|ext| ext == "proto") {
-            files.push(path);
+fn publish_wave_crates(wave: PublishWave) -> &'static [PublishedCrate] {
+    match wave {
+        PublishWave::Wave1 => WAVE1_PUBLIC_CRATES,
+        PublishWave::Facades => FACADE_PUBLIC_CRATES,
+        PublishWave::All => {
+            static ALL_PUBLIC_CRATES: &[PublishedCrate] = &[
+                PublishedCrate {
+                    package: "reticulum-rs-core",
+                    manifest_path: "crates/libs/rns-core/Cargo.toml",
+                },
+                PublishedCrate {
+                    package: "lxmf-wire",
+                    manifest_path: "crates/libs/lxmf-core/Cargo.toml",
+                },
+                PublishedCrate {
+                    package: "reticulum-rs-transport",
+                    manifest_path: "crates/libs/rns-transport/Cargo.toml",
+                },
+                PublishedCrate {
+                    package: "reticulum-rs-rpc",
+                    manifest_path: "crates/libs/rns-rpc/Cargo.toml",
+                },
+                PublishedCrate {
+                    package: "lxmf-sdk",
+                    manifest_path: "crates/libs/lxmf-sdk/Cargo.toml",
+                },
+                PublishedCrate {
+                    package: "reticulum-rs",
+                    manifest_path: "crates/libs/reticulum-rs/Cargo.toml",
+                },
+                PublishedCrate { package: "lxmf", manifest_path: "crates/libs/lxmf/Cargo.toml" },
+            ];
+            ALL_PUBLIC_CRATES
         }
     }
+}
 
-    Ok(())
+fn run_publish_dry_run_with_fallback(krate: PublishedCrate, allow_dirty: bool) -> Result<()> {
+    let mut args = vec!["publish", "--dry-run"];
+    if allow_dirty {
+        args.push("--allow-dirty");
+    }
+    args.push("--manifest-path");
+    args.push(krate.manifest_path);
+
+    let output = Command::new("cargo")
+        .args(&args)
+        .output()
+        .with_context(|| format!("failed to spawn cargo publish for {}", krate.package))?;
+    print_cargo_output(&output);
+    if output.status.success() {
+        return Ok(());
+    }
+
+    let stderr = String::from_utf8_lossy(&output.stderr);
+    if stderr.contains("failed to select a version for the requirement") {
+        println!(
+            "dry-run fallback: {} depends on unpublished local versions; validating package contents instead",
+            krate.package
+        );
+        let mut package_args = vec!["package", "--list"];
+        if allow_dirty {
+            package_args.push("--allow-dirty");
+        }
+        package_args.push("--manifest-path");
+        package_args.push(krate.manifest_path);
+        return run("cargo", &package_args);
+    }
+
+    bail!("command failed: cargo {}", args.join(" "));
+}
+
+fn print_cargo_output(output: &std::process::Output) {
+    if !output.stdout.is_empty() {
+        print!("{}", String::from_utf8_lossy(&output.stdout));
+    }
+    if !output.stderr.is_empty() {
+        eprint!("{}", String::from_utf8_lossy(&output.stderr));
+    }
 }

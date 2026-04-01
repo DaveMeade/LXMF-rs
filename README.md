@@ -17,9 +17,10 @@ Rust monorepo for LXMF and Reticulum with strict library/app boundaries and ente
 LXMF-rs/
 ├── crates/
 │   ├── libs/
+│   │   ├── lxmf/
 │   │   ├── lxmf-core/
-│   │   ├── lxmf-grpc-client/
 │   │   ├── lxmf-sdk/
+│   │   ├── reticulum-rs/
 │   │   ├── rns-core/
 │   │   ├── rns-embedded-core/
 │   │   ├── rns-embedded-ffi/
@@ -42,7 +43,6 @@ LXMF-rs/
     ├── runbooks/
     ├── schemas/
     └── sdk/
-├── bruno/
 ├── examples/
 ├── tools/
 │   └── scripts/
@@ -57,11 +57,12 @@ directories are intentionally present on disk but excluded from the workspace.
 ## Active Libraries
 
 - `lxmf-wire` (`crates/libs/lxmf-core`): message/payload/identity primitives.
+- `lxmf`: umbrella crate for `lxmf-sdk` and `lxmf-wire`.
 - `lxmf-sdk`: host-facing client API (`start/send/cancel/status/configure/poll/snapshot/shutdown`).
-- `lxmf-grpc-client`: generated Rust client for the gRPC surface.
 - `rns-embedded-runtime`: node-centric embedded runtime facade with lifecycle, event, and managed `std` driver support.
 - `rns-embedded-ffi`: C ABI for embedded/manual-tick compatibility and the v1 node-centric API.
 - `rns-embedded-core`: shared embedded/runtime types and fixtures.
+- `reticulum-rs`: umbrella crate for the Reticulum stack crates.
 - `reticulum-rs-core` (`crates/libs/rns-core`): Reticulum cryptographic and packet primitives.
 - `reticulum-rs-transport` (`crates/libs/rns-transport`): transport + iface + receipt/resource API.
 - `reticulum-rs-rpc` (`crates/libs/rns-rpc`): RPC request/response/event contracts and bridges.
@@ -153,9 +154,7 @@ cargo run -p rns-tools --bin rnx -- e2e --timeout-secs 20
 - Extension registry: `docs/contracts/extension-registry.md`
 - RPC contract: `docs/contracts/rpc-contract.md`
 - Payload contract: `docs/contracts/payload-contract.md`
-- gRPC getting started: `docs/grpc-getting-started.md`
-- gRPC runbook: `docs/runbooks/grpc.md`
-- gRPC release notes: `docs/releases/2026-03-grpc-surface.md`
+- crates.io publish plan: `docs/runbooks/crates-io-publish-plan.md`
 - Release readiness: `docs/runbooks/release-readiness.md`
 
 ## SDK Guide

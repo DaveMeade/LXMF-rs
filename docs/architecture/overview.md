@@ -8,8 +8,10 @@
 - Protocol extension growth is versioned and governed by registry.
 
 ## Stable Public Crates
+- `lxmf`
 - `lxmf-core`
 - `lxmf-sdk`
+- `reticulum-rs`
 - `rns-core`
 - `rns-transport`
 - `rns-rpc`
@@ -17,9 +19,6 @@
 ## Extension Governance
 - Registry source of truth: `docs/contracts/extension-registry.md`
 - Governance ADR: `docs/adr/0005-extension-registry-governance.md`
-- Canonical internal API ADR: `docs/adr/0009-grpc-canonical-internal-api.md`
-- gRPC quickstart: `docs/grpc-getting-started.md`
-- gRPC operator runbook: `docs/runbooks/grpc.md`
 - CI gate: `extension-registry-check`
 
 ## SDK Integration Guide

@@ -19,7 +19,6 @@ crates/libs/lxmf-sdk/src/domain.rs
 crates/libs/rns-rpc/src/rpc/daemon/sdk_helpers.rs
 crates/libs/rns-rpc/src/rpc/daemon/sdk_negotiate_poll.rs
 crates/libs/rns-rpc/src/rpc/params/sdk.rs
-crates/libs/rns-rpc/src/grpc.rs
 crates/libs/rns-rpc/src/rpc/daemon/dispatch_legacy_messages.rs
 crates/libs/rns-rpc/src/rpc/daemon/dispatch_legacy_propagation.rs
 crates/libs/rns-rpc/src/rpc/daemon/init.rs

@@ -12,7 +12,7 @@ name = "reticulum_daemon"
 
 [dependencies]
 rns_transport = { package = "reticulum-rs-transport", path = "../../libs/rns-transport", version = "0.2.0" }
-rns_rpc = { package = "reticulum-rs-rpc", path = "../../libs/rns-rpc", version = "0.2.1" }
+rns_rpc = { package = "reticulum-rs-rpc", path = "../../libs/rns-rpc", version = "0.3.0" }
 lxmf = { package = "lxmf-wire", path = "../../libs/lxmf-core", version = "0.2.0", default-features = false, features = ["std"] }
 rns_core = { package = "reticulum-rs-core", path = "../../libs/rns-core", version = "0.2.0" }
 base64 = { workspace = true }

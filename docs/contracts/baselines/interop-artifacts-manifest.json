@@ -52,11 +52,6 @@
       "sha256": "c6d824ad59857be7f80056f915db6674e025ecb42fe9f8eb8684970cbd58c3f3"
     },
     {
-      "path": "docs/contracts/grpc-adoption-and-migration.md",
-      "bytes": 3110,
-      "sha256": "1e5c6e815502e4b3853f91a2db0a8a8d6d3257ce9891d2fad29a2cf981acbce2"
-    },
-    {
       "path": "docs/contracts/interop-revision-lock.example.json",
       "bytes": 305,
       "sha256": "58d9c79683fff56b9ce5eff7dba8f0acb3e56787998faa741bff64cc86d9a872"
@@ -118,8 +113,8 @@
     },
     {
       "path": "docs/contracts/rpc-contract.md",
-      "bytes": 6570,
-      "sha256": "5ffd3e662a451e624ce7a131f81bc538de65309902079bc38ee5fd7465a5456d"
+      "bytes": 6460,
+      "sha256": "8a73953ada7418555195aaba562219662c51b4cb8c9dd5eddb3d7d9f4bf2fcf5"
     },
     {
       "path": "docs/contracts/schema-driven-clients.md",
@@ -178,8 +173,8 @@
     },
     {
       "path": "docs/contracts/sdk-v2-feature-matrix.md",
-      "bytes": 10548,
-      "sha256": "753c639718366944e36b686adaacd11357618d2c74fa630e55f880823b8fed4e"
+      "bytes": 10566,
+      "sha256": "3b83156cd7c5d4faf5432db36b06b176030d4adc07fd26e7015696c37ecb9b6f"
     },
     {
       "path": "docs/contracts/sdk-v2-identity.md",
@@ -228,8 +223,8 @@
     },
     {
       "path": "docs/contracts/support-policy.md",
-      "bytes": 2079,
-      "sha256": "29c3dd0be63991780826415d791f5a8e150eb5601009355e555e4e8ac5ff3f70"
+      "bytes": 1950,
+      "sha256": "55f96e5445b57d0a4dd117bc472d2740cda48b560f745f651ee91b316faf14f7"
     },
     {
       "path": "docs/contracts/third-party-compatibility-kit.md",

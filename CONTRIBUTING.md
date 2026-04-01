@@ -16,9 +16,10 @@ CI or tests depend on.
 Active workspace members are defined in `Cargo.toml`.
 
 - Libraries:
+  - `lxmf`
   - `lxmf-core`
-  - `lxmf-grpc-client`
   - `lxmf-sdk`
+  - `reticulum-rs`
   - `rns-core`
   - `rns-embedded-core`
   - `rns-embedded-ffi`
@@ -87,7 +88,7 @@ Target one binary when you do not need the whole workspace:
 
 ```bash
 make check-bin PKG=lxmf-cli BIN=lxmf-cli
-make run-bin PKG=rns-tools BIN=rngrpc ARGS="--help"
+make run-bin PKG=rns-tools BIN=rnx ARGS="--help"
 ```
 
 ## Documentation Rules

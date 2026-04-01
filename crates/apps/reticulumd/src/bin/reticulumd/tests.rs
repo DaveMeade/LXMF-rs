@@ -1192,7 +1192,6 @@ fn test_args(
 ) -> Args {
     Args {
         rpc: "127.0.0.1:0".to_string(),
-        grpc: None,
         db,
         config,
         identity: None,
@@ -1202,8 +1201,5 @@ fn test_args(
         rpc_tls_cert: None,
         rpc_tls_key: None,
         rpc_tls_client_ca: None,
-        grpc_tls_cert: None,
-        grpc_tls_key: None,
-        grpc_tls_client_ca: None,
     }
 }

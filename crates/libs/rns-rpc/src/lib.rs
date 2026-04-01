@@ -1,7 +1,6 @@
 //! RPC boundary crate for protocol and daemon contracts.
 
 pub mod e2e_harness;
-pub mod grpc;
 pub mod rpc;
 mod storage;
 mod transport;

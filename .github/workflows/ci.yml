@@ -68,14 +68,12 @@ jobs:
         with:
           cache-targets: true
           cache-on-failure: false
-      - name: Proto contract check
-        run: cargo run -p xtask -- proto-check
       - name: SDK schema fixtures
         run: cargo xtask ci --stage sdk-schema-check
-      - name: gRPC transport tests
-        run: cargo test -p reticulum-rs-rpc grpc::tests
-      - name: gRPC clients and operator tools
-        run: cargo check -p reticulumd -p rns-tools -p lxmf-grpc-client
+      - name: Public crate packaging
+        run: cargo xtask publish-crates --wave all --dry-run --allow-dirty
+      - name: Operator tool compilation
+        run: cargo check -p reticulumd -p rns-tools
       - name: Boundary policy check
         run: bash tools/scripts/check-boundaries.sh
 

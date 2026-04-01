@@ -10,8 +10,8 @@ The hard-break public API is crate-based, not monolithic module fan-out.
 - `crates/libs/lxmf-core`
   - protocol/message/payload primitives
   - wire-field and payload-field encoding/decoding
-- `crates/libs/lxmf-grpc-client`
-  - generated Rust client for the daemon gRPC surface
+- `crates/libs/lxmf`
+  - umbrella crate re-exporting the supported LXMF library entry points
 - `crates/libs/lxmf-sdk`
   - host-facing client facade (`start/send/cancel/status/poll/configure/snapshot/shutdown/tick`)
   - capability negotiation, profile limits, lifecycle guardrails
@@ -28,6 +28,8 @@ The hard-break public API is crate-based, not monolithic module fan-out.
 - `crates/libs/rns-rpc`
   - daemon RPC contracts and runtime method surface (`sdk_*_v2`)
   - shared transport/auth/event contract types used by app crates
+- `crates/libs/reticulum-rs`
+  - umbrella crate re-exporting the supported Reticulum library entry points
 - `crates/libs/test-support`
   - test-only helpers and schema/fixture validation support
 

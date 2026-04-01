@@ -46,8 +46,6 @@ deleted or folded into a newer source-of-truth doc.
 - `docs/sdk/README.md`: starting point for SDK integrators
 - `docs/lxmf-rs-api.md`: API surface and stability summary
 - `docs/lxmf-cli.md`: operator CLI quick reference
-- `docs/grpc-getting-started.md`: short path for gRPC users
-- `docs/runbooks/grpc.md`: fuller gRPC operator reference
 - `docs/runbooks/release-readiness.md`: release gate checklist
 - `docs/runbooks/crates-io-publish-plan.md`: crates.io naming, versioning, and publish order
 - `docs/contracts/support-policy.md`: support and lifecycle guarantees
