@@ -78,6 +78,21 @@ Published crates.io entry points:
 - `reticulum-rs-transport`
 - `reticulum-rs-rpc`
 
+## Published Crates
+
+Main entry points:
+
+- [`lxmf`](https://crates.io/crates/lxmf) ![Crates.io Version](https://img.shields.io/crates/v/lxmf) ([docs.rs](https://docs.rs/lxmf)): umbrella crate for LXMF wire types and the high-level SDK.
+- [`reticulum-rs`](https://crates.io/crates/reticulum-rs) ![Crates.io Version](https://img.shields.io/crates/v/reticulum-rs) ([docs.rs](https://docs.rs/reticulum-rs)): umbrella crate for the Reticulum stack crates.
+
+Component crates:
+
+- [`lxmf-sdk`](https://crates.io/crates/lxmf-sdk) ![Crates.io Version](https://img.shields.io/crates/v/lxmf-sdk) ([docs.rs](https://docs.rs/lxmf-sdk)): high-level Rust SDK for LXMF clients.
+- [`lxmf-wire`](https://crates.io/crates/lxmf-wire) ![Crates.io Version](https://img.shields.io/crates/v/lxmf-wire) ([docs.rs](https://docs.rs/lxmf-wire)): LXMF wire format, message primitives, and identity helpers.
+- [`reticulum-rs-core`](https://crates.io/crates/reticulum-rs-core) ![Crates.io Version](https://img.shields.io/crates/v/reticulum-rs-core) ([docs.rs](https://docs.rs/reticulum-rs-core)): core Reticulum cryptographic and packet primitives.
+- [`reticulum-rs-transport`](https://crates.io/crates/reticulum-rs-transport) ![Crates.io Version](https://img.shields.io/crates/v/reticulum-rs-transport) ([docs.rs](https://docs.rs/reticulum-rs-transport)): transport, interface, receipt, and resource layers.
+- [`reticulum-rs-rpc`](https://crates.io/crates/reticulum-rs-rpc) ![Crates.io Version](https://img.shields.io/crates/v/reticulum-rs-rpc) ([docs.rs](https://docs.rs/reticulum-rs-rpc)): JSON-RPC request, response, event, and daemon bridge contracts.
+
 ## Active Applications
 
 - `lxmf-cli`
