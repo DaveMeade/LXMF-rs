@@ -9,12 +9,12 @@
 
 ## Stable Public Crates
 - `lxmf`
-- `lxmf-core`
+- `lxmf-wire`
 - `lxmf-sdk`
 - `reticulum-rs`
-- `rns-core`
-- `rns-transport`
-- `rns-rpc`
+- `reticulum-rs-core`
+- `reticulum-rs-transport`
+- `reticulum-rs-rpc`
 
 ## Extension Governance
 - Registry source of truth: `docs/contracts/extension-registry.md`
@@ -29,8 +29,8 @@
 
 ## Layering Rules
 - `crates/libs/*` must not depend on `crates/apps/*`.
-- `lxmf-core` must not directly depend on `tokio`, `clap`, `ureq`, or `serde_json`.
-- `rns-core` must not directly depend on `tokio` or `clap`.
+- `lxmf-wire` (`crates/libs/lxmf-core`) must not directly depend on `tokio`, `clap`, `ureq`, or `serde_json`.
+- `reticulum-rs-core` (`crates/libs/rns-core`) must not directly depend on `tokio` or `clap`.
 - CLI/daemon concerns live in `crates/apps/*`.
 - Module size policy and exception registry:
   - `docs/architecture/module-size-policy.md`

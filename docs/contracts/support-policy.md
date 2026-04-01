@@ -4,8 +4,9 @@ Status: Active
 Policy version: `1`
 
 ## Scope
-This policy defines support windows for `lxmf-sdk`, `rns-rpc`, the daemon RPC
-surface exposed by `reticulumd`, and shipped app binaries in this repository.
+This policy defines support windows for `lxmf-sdk`, `reticulum-rs-rpc`, the
+JSON-RPC daemon surface exposed by `reticulumd`, and shipped app binaries in
+this repository.
 
 ## Release Channels
 

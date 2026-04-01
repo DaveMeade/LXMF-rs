@@ -65,8 +65,18 @@ directories are intentionally present on disk but excluded from the workspace.
 - `reticulum-rs`: umbrella crate for the Reticulum stack crates.
 - `reticulum-rs-core` (`crates/libs/rns-core`): Reticulum cryptographic and packet primitives.
 - `reticulum-rs-transport` (`crates/libs/rns-transport`): transport + iface + receipt/resource API.
-- `reticulum-rs-rpc` (`crates/libs/rns-rpc`): RPC request/response/event contracts and bridges.
+- `reticulum-rs-rpc` (`crates/libs/rns-rpc`): JSON-RPC request/response/event contracts and bridges.
 - `test-support`: schema/fixture validation and integration-test helpers.
+
+Published crates.io entry points:
+
+- `lxmf`
+- `lxmf-sdk`
+- `lxmf-wire`
+- `reticulum-rs`
+- `reticulum-rs-core`
+- `reticulum-rs-transport`
+- `reticulum-rs-rpc`
 
 ## Active Applications
 
@@ -156,6 +166,25 @@ cargo run -p rns-tools --bin rnx -- e2e --timeout-secs 20
 - Payload contract: `docs/contracts/payload-contract.md`
 - crates.io publish plan: `docs/runbooks/crates-io-publish-plan.md`
 - Release readiness: `docs/runbooks/release-readiness.md`
+
+## crates.io Consumers
+
+For library consumers, prefer the published package names rather than the
+workspace directory names:
+
+```toml
+[dependencies]
+lxmf = "0.3.0"
+reticulum-rs = "0.2.0"
+```
+
+Or depend on the component crates directly:
+
+```toml
+[dependencies]
+lxmf-sdk = "0.2.1"
+reticulum-rs-rpc = "0.3.0"
+```
 
 ## SDK Guide
 

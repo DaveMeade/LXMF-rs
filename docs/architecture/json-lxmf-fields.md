@@ -1,7 +1,7 @@
 # JSON, LXMF Fields, and MessagePack
 
 This note explains how application JSON moves through the current `lxmf-sdk`
-and `lxmf-core` layers.
+and `lxmf-wire` layers.
 
 It supplements `docs/architecture/overview.md` with the data-path details that
 matter when callers need predictable LXMF field encoding.
@@ -13,7 +13,7 @@ matter when callers need predictable LXMF field encoding.
 - The active implementation uses `rmp-serde` for MessagePack serialization and
   `rmpv::Value` as the intermediate representation for flexible LXMF fields.
 - The SDK does not expose a first-class public MessagePack API.
-- If you need exact LXMF field control, use `lxmf-core`.
+- If you need exact LXMF field control, use `lxmf-wire`.
 
 ## Layer Responsibilities
 
@@ -32,9 +32,9 @@ In the RPC backend implementation:
 This behavior is implemented in
 `crates/libs/lxmf-sdk/src/backend/rpc/core_impl.rs`.
 
-### `lxmf-core`
+### `lxmf-wire`
 
-`lxmf-core` owns the LXMF payload and wire encoding rules.
+`lxmf-wire` owns the LXMF payload and wire encoding rules.
 
 - `Payload` stores `content`, `title`, `fields`, and `stamp`.
 - `Payload::to_msgpack()` serializes the payload tuple with `rmp_serde::to_vec`.
@@ -55,8 +55,8 @@ The current path is:
 1. Application code builds `SendRequest.payload` as JSON.
 2. `lxmf-sdk` derives `title` and `content` from that JSON.
 3. `lxmf-sdk` forwards the JSON object as LXMF `fields`.
-4. `lxmf-core` converts JSON field values into `rmpv::Value`.
-5. `lxmf-core` serializes the LXMF payload as MessagePack.
+4. `lxmf-wire` converts JSON field values into `rmpv::Value`.
+5. `lxmf-wire` serializes the LXMF payload as MessagePack.
 
 This means JSON is the host-facing representation, but MessagePack is the
 transport representation.
@@ -98,7 +98,7 @@ The canonical field mappings are defined in
 
 ## Commands Field Example
 
-`FIELD_COMMANDS` is a real LXMF field in `lxmf-core`, not a free-form JSON
+`FIELD_COMMANDS` is a real LXMF field in `lxmf-wire`, not a free-form JSON
 label. Its numeric field id is `0x09`.
 
 If callers need explicit command-field control, the canonical API is:
@@ -126,7 +126,7 @@ The current `lxmf-sdk` public API does not expose:
 - a public transport helper for `_lxmf_fields_msgpack_b64`
 
 Those concerns are currently internal to the lower-level implementation or
-belong to `lxmf-core`.
+belong to `lxmf-wire`.
 
 ## Practical Guidance
 
@@ -136,7 +136,7 @@ Use `lxmf-sdk` when:
 - default title/content/field mapping is acceptable
 - the host only needs JSON event payloads back from the runtime
 
-Use `lxmf-core` when:
+Use `lxmf-wire` when:
 
 - the caller must control exact LXMF field ids
 - the caller must inject binary command payloads

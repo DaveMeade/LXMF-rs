@@ -102,7 +102,7 @@ When `sdk.capability.attachment_streaming` is enabled:
 
 ## Event Sink Adapter Contract
 
-When `sdk.capability.event_sink_bridge` is enabled, `rns-rpc` supports optional sink adapters
+When `sdk.capability.event_sink_bridge` is enabled, `reticulum-rs-rpc` supports optional sink adapters
 behind `EventSinkBridge`.
 
 Current adapter surface contracts:
