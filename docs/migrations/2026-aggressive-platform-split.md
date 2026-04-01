@@ -6,15 +6,19 @@ Date: 2026-02-19
 
 Repository topology moved to layered public crates in `crates/libs/*`, app binaries in `crates/apps/*`, and legacy implementation crates in `crates/internal/*` during migration.
 
+Historical naming note: this migration record keeps the workspace directory
+names used during the split. The published crates.io names are `lxmf-wire`,
+`reticulum-rs-core`, `reticulum-rs-transport`, and `reticulum-rs-rpc`.
+
 ## Breaking Changes
 
 1. Old crate paths under `crates/lxmf`, `crates/reticulum`, and `crates/reticulum-daemon` were removed.
 2. Stable interfaces are now exposed through:
-   - `lxmf-core`
+   - `lxmf-core` (published as `lxmf-wire`)
    - `lxmf-sdk`
-   - `rns-core`
-   - `rns-transport`
-   - `rns-rpc`
+   - `rns-core` (published as `reticulum-rs-core`)
+   - `rns-transport` (published as `reticulum-rs-transport`)
+   - `rns-rpc` (published as `reticulum-rs-rpc`)
 3. `lxmf-router` and `lxmf-runtime` are retained as transitional stubs only and are excluded from
    the active workspace graph and stable public contract surface.
 4. Binary crates moved to:

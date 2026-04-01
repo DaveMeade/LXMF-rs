@@ -9,10 +9,15 @@ Accepted
 ## Context
 The previous monolithic crate boundaries made it difficult to enforce architecture rules across protocol logic, transport/runtime orchestration, and operator tooling.
 
+Historical naming note: this ADR describes the repository split using the
+workspace directory names that existed at the time. The current published
+crates.io names for those crates are `lxmf-wire`, `reticulum-rs-core`,
+`reticulum-rs-transport`, and `reticulum-rs-rpc`.
+
 ## Decision
 - Introduce layered public crates under `crates/libs/*`:
-  - `lxmf-core`, `lxmf-sdk`
-  - `rns-core`, `rns-transport`, `rns-rpc`
+  - `lxmf-core` (`lxmf-wire` on crates.io), `lxmf-sdk`
+  - `rns-core` (`reticulum-rs-core`), `rns-transport` (`reticulum-rs-transport`), `rns-rpc` (`reticulum-rs-rpc`)
 - Move binary entrypoints to `crates/apps/*`:
   - `lxmf-cli`, `reticulumd`, `rns-tools`
 - Add boundary checks and CI jobs that enforce layering and API drift control.

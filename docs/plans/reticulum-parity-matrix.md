@@ -1,10 +1,14 @@
 # Reticulum Parity Matrix
 
-Last reassessed: 2026-03-10 (`cargo test -p rns-rpc --lib`, `cargo test -p rns-transport --lib`, `cargo test -p lxmf-core --lib`)
+Last reassessed: 2026-03-10 (`cargo test -p reticulum-rs-rpc --lib`, `cargo test -p reticulum-rs-transport --lib`, `cargo test -p lxmf-wire --lib`)
 
 Status legend: `not-started` | `partial` | `done`
 
 `done` means behavior is present in the active workspace and backed by active code/tests, not only by planning docs or migration-only crates under `crates/internal/`.
+
+Naming note: this matrix keeps workspace paths in the table for code-navigation
+clarity. The corresponding published crate names are `reticulum-rs-core`,
+`reticulum-rs-transport`, and `reticulum-rs-rpc`.
 
 | Python Surface | Rust Surface | Status | Notes |
 | --- | --- | --- | --- |
@@ -35,5 +39,5 @@ Status legend: `not-started` | `partial` | `done`
 ## Reassessment Summary
 
 - Core protocol primitives are in substantially better shape than the surrounding runtime/tooling surface.
-- The active workspace is closest to parity in `rns-core` and the lower-level parts of `rns-transport`.
+- The active workspace is closest to parity in `reticulum-rs-core` and the lower-level parts of `reticulum-rs-transport`.
 - The largest Reticulum gaps are interface breadth, operational daemon behavior, and utility/CLI parity.

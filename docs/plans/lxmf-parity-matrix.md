@@ -1,10 +1,14 @@
 # LXMF Parity Matrix
 
-Last reassessed: 2026-03-10 (`cargo test -p rns-rpc --lib`, `cargo test -p rns-transport --lib`, `cargo test -p lxmf-core --lib`)
+Last reassessed: 2026-03-10 (`cargo test -p reticulum-rs-rpc --lib`, `cargo test -p reticulum-rs-transport --lib`, `cargo test -p lxmf-wire --lib`)
 
 Status legend: `not-started` | `partial` | `done`
 
 `done` means the active workspace implements the behavior directly. RPC-domain placeholders, SDK-only state machines, or migration-only crates under `crates/internal/` do not qualify as full parity.
+
+Naming note: this matrix keeps workspace paths such as `crates/libs/lxmf-core`
+and `crates/libs/rns-rpc` for code-navigation clarity. The published package
+names are `lxmf-wire` and `reticulum-rs-rpc`.
 
 ## Module Map
 
@@ -62,6 +66,6 @@ Status legend: `not-started` | `partial` | `done`
 
 ## Reassessment Summary
 
-- `lxmf-core` is the strongest parity area and should be treated as mostly complete for base message encoding/decoding.
-- `reticulumd` and `rns-rpc` expose a large SDK surface, but a meaningful share of that surface is currently local domain logic rather than Python LXMF parity.
+- `lxmf-wire` is the strongest parity area and should be treated as mostly complete for base message encoding/decoding.
+- `reticulumd` and `reticulum-rs-rpc` expose a large SDK surface, but a meaningful share of that surface is currently local domain logic rather than Python LXMF parity.
 - Full LXMF parity should not be claimed until delivery-mode handling, propagation-node behavior, paper ingest/encode semantics, and stamp/ticket behavior are brought into the active workspace.
