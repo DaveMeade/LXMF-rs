@@ -2,10 +2,10 @@
 
 #[cfg(feature = "core")]
 pub use rns_core as core;
-#[cfg(feature = "transport")]
-pub use rns_transport as transport;
 #[cfg(feature = "rpc")]
 pub use rns_rpc as rpc;
+#[cfg(feature = "transport")]
+pub use rns_transport as transport;
 
 #[cfg(feature = "core")]
 pub use rns_core::{destination, hash, identity, packet, ratchets};

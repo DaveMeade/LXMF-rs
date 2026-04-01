@@ -160,22 +160,13 @@ const WAVE1_PUBLIC_CRATES: &[PublishedCrate] = &[
         package: "reticulum-rs-core",
         manifest_path: "crates/libs/rns-core/Cargo.toml",
     },
-    PublishedCrate {
-        package: "lxmf-wire",
-        manifest_path: "crates/libs/lxmf-core/Cargo.toml",
-    },
+    PublishedCrate { package: "lxmf-wire", manifest_path: "crates/libs/lxmf-core/Cargo.toml" },
     PublishedCrate {
         package: "reticulum-rs-transport",
         manifest_path: "crates/libs/rns-transport/Cargo.toml",
     },
-    PublishedCrate {
-        package: "reticulum-rs-rpc",
-        manifest_path: "crates/libs/rns-rpc/Cargo.toml",
-    },
-    PublishedCrate {
-        package: "lxmf-sdk",
-        manifest_path: "crates/libs/lxmf-sdk/Cargo.toml",
-    },
+    PublishedCrate { package: "reticulum-rs-rpc", manifest_path: "crates/libs/rns-rpc/Cargo.toml" },
+    PublishedCrate { package: "lxmf-sdk", manifest_path: "crates/libs/lxmf-sdk/Cargo.toml" },
 ];
 
 const FACADE_PUBLIC_CRATES: &[PublishedCrate] = &[
@@ -869,7 +860,10 @@ fn run_interfaces_required() -> Result<()> {
         "cargo",
         &["test", "-p", "reticulum-rs-rpc", "set_interfaces_rejects_startup_only_interface_kinds"],
     )?;
-    run("cargo", &["test", "-p", "reticulum-rs-rpc", "reload_config_hot_applies_legacy_tcp_only_diff"])?;
+    run(
+        "cargo",
+        &["test", "-p", "reticulum-rs-rpc", "reload_config_hot_applies_legacy_tcp_only_diff"],
+    )?;
     run(
         "cargo",
         &[
@@ -4579,7 +4573,10 @@ fn run_embedded_native_lock_check() -> Result<()> {
 }
 
 fn run_embedded_link_check() -> Result<()> {
-    run("cargo", &["test", "-p", "reticulum-rs-transport", "--test", "embedded_link_contract", "--no-run"])?;
+    run(
+        "cargo",
+        &["test", "-p", "reticulum-rs-transport", "--test", "embedded_link_contract", "--no-run"],
+    )?;
 
     let backends = fs::read_to_string("docs/contracts/sdk-v2-backends.md")
         .context("missing docs/contracts/sdk-v2-backends.md")?;
@@ -4617,7 +4614,10 @@ fn run_embedded_core_check() -> Result<()> {
     )?;
     run("cargo", &["check", "-p", "rns-embedded-runtime", "--features", "std"])?;
     run("cargo", &["check", "-p", "lxmf-wire", "--no-default-features", "--features", "alloc"])?;
-    run("cargo", &["check", "-p", "reticulum-rs-core", "--no-default-features", "--features", "alloc"])?;
+    run(
+        "cargo",
+        &["check", "-p", "reticulum-rs-core", "--no-default-features", "--features", "alloc"],
+    )?;
     run("cargo", &["test", "-p", "rns-embedded-core"])?;
     run("cargo", &["test", "-p", "rns-embedded-ffi"])?;
     run("cargo", &["test", "-p", "rns-embedded-runtime"])?;
