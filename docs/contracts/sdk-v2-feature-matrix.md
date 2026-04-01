@@ -71,7 +71,7 @@ Legend:
 
 | Backend | Status | Notes |
 | --- | --- | --- |
-| RPC-backed adapter (`rns-rpc`) | required | first implementation target for v2.5 |
+| RPC-backed adapter (`reticulum-rs-rpc`) | required | first implementation target for v2.5 |
 | In-process runtime adapter | optional | deferred from foundation slice |
 | External custom backend | experimental | allowed via backend SPI, not release-blocking |
 
@@ -81,8 +81,8 @@ This table is the source of truth for constrained-device portability planning.
 
 | Crate | std_required | alloc_target | status | removal_plan |
 | --- | --- | --- | --- | --- |
-| `lxmf-core` | `wire_fields` JSON bridge only (`std`-gated module) | message encode/decode primitives and msgpack payload model | `alloc-ready` | keep JSON conversion in `std` module and preserve alloc-only protocol core |
-| `rns-core` | host entropy sources for random key generation (`rand_core/getrandom`) | packet/hash/destination/ratchet primitives | `alloc-ready` | follow-up hardening: injectable entropy adapter for `no_std` targets without OS RNG |
+| `lxmf-wire` | `wire_fields` JSON bridge only (`std`-gated module) | message encode/decode primitives and msgpack payload model | `alloc-ready` | keep JSON conversion in `std` module and preserve alloc-only protocol core |
+| `reticulum-rs-core` | host entropy sources for random key generation (`rand_core/getrandom`) | packet/hash/destination/ratchet primitives | `alloc-ready` | follow-up hardening: injectable entropy adapter for `no_std` targets without OS RNG |
 | `rns-embedded-ffi` | host-only C ABI boundary with documented unsafe sites | firmware-facing create/tick/ble-wire/message queue entrypoints | `std-first` | keep unsafe isolated to FFI crate and migrate ESP call sites onto native Rust when toolchain is ready |
 | `rns-embedded-runtime` | no host-only requirement in current scaffold | announce scheduler, outbound queueing, replay-aware inbound dispatch | `alloc-ready` | keep transport and store behind traits so ESP bindings stay out of the core runtime |
 

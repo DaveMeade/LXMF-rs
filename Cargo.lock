@@ -1584,25 +1584,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "lxmf-core"
-version = "0.1.0"
-dependencies = [
- "base64 0.22.1",
- "criterion",
- "ed25519-dalek",
- "hex",
- "rand_core",
- "rmp-serde",
- "rmpv",
- "rns-core",
- "serde",
- "serde_bytes",
- "serde_json",
- "sha2",
- "x25519-dalek",
-]
-
-[[package]]
 name = "lxmf-grpc-client"
 version = "0.1.0"
 dependencies = [
@@ -1618,13 +1599,13 @@ dependencies = [
 
 [[package]]
 name = "lxmf-sdk"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "criterion",
  "hex",
  "hmac",
  "loom",
- "rns-rpc",
+ "reticulum-rs-rpc",
  "rustls",
  "rustls-pemfile",
  "serde",
@@ -1632,6 +1613,25 @@ dependencies = [
  "sha2",
  "thiserror 1.0.69",
  "zeroize",
+]
+
+[[package]]
+name = "lxmf-wire"
+version = "0.2.0"
+dependencies = [
+ "base64 0.22.1",
+ "criterion",
+ "ed25519-dalek",
+ "hex",
+ "rand_core",
+ "reticulum-rs-core",
+ "rmp-serde",
+ "rmpv",
+ "serde",
+ "serde_bytes",
+ "serde_json",
+ "sha2",
+ "x25519-dalek",
 ]
 
 [[package]]
@@ -2288,6 +2288,88 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "a96887878f22d7bad8a3b6dc5b7440e0ada9a245242924394987b21cf2210a4c"
 
 [[package]]
+name = "reticulum-rs-core"
+version = "0.2.0"
+dependencies = [
+ "aes",
+ "cbc",
+ "criterion",
+ "crypto-common",
+ "ed25519-dalek",
+ "hex",
+ "hkdf",
+ "hmac",
+ "rand_core",
+ "rmp-serde",
+ "serde",
+ "serde_bytes",
+ "sha2",
+ "tempfile",
+ "x25519-dalek",
+]
+
+[[package]]
+name = "reticulum-rs-rpc"
+version = "0.2.0"
+dependencies = [
+ "base64 0.22.1",
+ "criterion",
+ "hex",
+ "hkdf",
+ "hmac",
+ "prost",
+ "prost-types",
+ "protoc-bin-vendored",
+ "rand_core",
+ "rmp-serde",
+ "rmpv",
+ "rusqlite",
+ "serde",
+ "serde_cbor",
+ "serde_json",
+ "sha2",
+ "tokio",
+ "tokio-stream",
+ "tonic",
+ "tonic-prost",
+ "tonic-prost-build",
+ "tonic-reflection",
+ "x509-parser",
+ "zeroize",
+]
+
+[[package]]
+name = "reticulum-rs-transport"
+version = "0.2.0"
+dependencies = [
+ "aes",
+ "bzip2",
+ "cbc",
+ "criterion",
+ "crypto-common",
+ "ed25519-dalek",
+ "hex",
+ "hkdf",
+ "hmac",
+ "log",
+ "rand_core",
+ "reticulum-rs-core",
+ "rmp",
+ "rmp-serde",
+ "rmpv",
+ "rusqlite",
+ "serde",
+ "serde_bytes",
+ "serde_json",
+ "sha2",
+ "tempfile",
+ "tokio",
+ "tokio-serial",
+ "tokio-util",
+ "x25519-dalek",
+]
+
+[[package]]
 name = "reticulumd"
 version = "0.1.0"
 dependencies = [
@@ -2298,13 +2380,13 @@ dependencies = [
  "futures",
  "hex",
  "hkdf",
- "lxmf-core",
+ "lxmf-wire",
  "rand_core",
+ "reticulum-rs-core",
+ "reticulum-rs-rpc",
+ "reticulum-rs-transport",
  "rmp-serde",
  "rmpv",
- "rns-core",
- "rns-rpc",
- "rns-transport",
  "rustls",
  "rustls-pemfile",
  "serde",
@@ -2368,27 +2450,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "rns-core"
-version = "0.1.0"
-dependencies = [
- "aes",
- "cbc",
- "criterion",
- "crypto-common",
- "ed25519-dalek",
- "hex",
- "hkdf",
- "hmac",
- "rand_core",
- "rmp-serde",
- "serde",
- "serde_bytes",
- "sha2",
- "tempfile",
- "x25519-dalek",
-]
-
-[[package]]
 name = "rns-embedded-core"
 version = "0.1.0"
 dependencies = [
@@ -2414,11 +2475,11 @@ name = "rns-embedded-mininode"
 version = "0.1.0"
 dependencies = [
  "hex",
- "lxmf-core",
+ "lxmf-wire",
  "rand_core",
+ "reticulum-rs-core",
  "rmp-serde",
  "rmpv",
- "rns-core",
 ]
 
 [[package]]
@@ -2426,36 +2487,6 @@ name = "rns-embedded-runtime"
 version = "0.1.0"
 dependencies = [
  "rns-embedded-core",
-]
-
-[[package]]
-name = "rns-rpc"
-version = "0.1.0"
-dependencies = [
- "base64 0.22.1",
- "criterion",
- "hex",
- "hkdf",
- "hmac",
- "prost",
- "prost-types",
- "protoc-bin-vendored",
- "rand_core",
- "rmp-serde",
- "rmpv",
- "rusqlite",
- "serde",
- "serde_cbor",
- "serde_json",
- "sha2",
- "tokio",
- "tokio-stream",
- "tonic",
- "tonic-prost",
- "tonic-prost-build",
- "tonic-reflection",
- "x509-parser",
- "zeroize",
 ]
 
 [[package]]
@@ -2468,45 +2499,14 @@ dependencies = [
  "futures",
  "hex",
  "lxmf-grpc-client",
+ "reticulum-rs-rpc",
  "rns-embedded-core",
  "rns-embedded-runtime",
- "rns-rpc",
  "serde_json",
  "sha2",
  "tempfile",
  "tokio",
  "uuid",
-]
-
-[[package]]
-name = "rns-transport"
-version = "0.1.0"
-dependencies = [
- "aes",
- "bzip2",
- "cbc",
- "criterion",
- "crypto-common",
- "ed25519-dalek",
- "hex",
- "hkdf",
- "hmac",
- "log",
- "rand_core",
- "rmp",
- "rmp-serde",
- "rmpv",
- "rns-core",
- "rusqlite",
- "serde",
- "serde_bytes",
- "serde_json",
- "sha2",
- "tempfile",
- "tokio",
- "tokio-serial",
- "tokio-util",
- "x25519-dalek",
 ]
 
 [[package]]
@@ -2879,8 +2879,8 @@ dependencies = [
  "base64 0.22.1",
  "jsonschema",
  "lxmf-sdk",
- "rns-core",
- "rns-rpc",
+ "reticulum-rs-core",
+ "reticulum-rs-rpc",
  "serde_json",
  "tempfile",
 ]
@@ -3853,11 +3853,11 @@ dependencies = [
  "globset",
  "hex",
  "jsonschema",
- "lxmf-core",
+ "lxmf-wire",
  "protoc-bin-vendored",
  "rand_core",
- "rns-core",
- "rns-transport",
+ "reticulum-rs-core",
+ "reticulum-rs-transport",
  "serde",
  "serde_json",
  "sha2",

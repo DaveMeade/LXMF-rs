@@ -56,15 +56,15 @@ directories are intentionally present on disk but excluded from the workspace.
 
 ## Active Libraries
 
-- `lxmf-core`: message/payload/identity primitives.
+- `lxmf-wire` (`crates/libs/lxmf-core`): message/payload/identity primitives.
 - `lxmf-sdk`: host-facing client API (`start/send/cancel/status/configure/poll/snapshot/shutdown`).
 - `lxmf-grpc-client`: generated Rust client for the gRPC surface.
 - `rns-embedded-runtime`: node-centric embedded runtime facade with lifecycle, event, and managed `std` driver support.
 - `rns-embedded-ffi`: C ABI for embedded/manual-tick compatibility and the v1 node-centric API.
 - `rns-embedded-core`: shared embedded/runtime types and fixtures.
-- `rns-core`: Reticulum cryptographic and packet primitives.
-- `rns-transport`: transport + iface + receipt/resource API.
-- `rns-rpc`: RPC request/response/event contracts and bridges.
+- `reticulum-rs-core` (`crates/libs/rns-core`): Reticulum cryptographic and packet primitives.
+- `reticulum-rs-transport` (`crates/libs/rns-transport`): transport + iface + receipt/resource API.
+- `reticulum-rs-rpc` (`crates/libs/rns-rpc`): RPC request/response/event contracts and bridges.
 - `test-support`: schema/fixture validation and integration-test helpers.
 
 ## Active Applications

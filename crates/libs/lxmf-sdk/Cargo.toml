@@ -1,10 +1,15 @@
 [package]
 name = "lxmf-sdk"
-version = "0.1.0"
+version = "0.2.0"
 edition.workspace = true
 rust-version.workspace = true
 license.workspace = true
 repository.workspace = true
+description = "High-level Rust SDK for LXMF clients and RPC-backed LXMF workflows."
+readme = "../../../README.md"
+documentation = "https://docs.rs/lxmf-sdk"
+keywords = ["lxmf", "sdk", "messaging", "reticulum"]
+categories = ["network-programming", "api-bindings"]
 
 [dependencies]
 rns-rpc = { workspace = true, optional = true }

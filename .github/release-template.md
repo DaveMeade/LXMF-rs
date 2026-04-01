@@ -46,3 +46,9 @@ chmod +x /path/to/lxmd-daemon-<version>-macos-arm64/reticulumd
 - Replace `<version>` with the tagged release version.
 - Keep this release page focused on the daemon bundle unless there is a
   user-facing reason to call out additional binaries.
+
+## crates.io
+
+- If this release train also ships library crates, list them here with exact versions.
+- GitHub release versions and crates.io package versions do not need to match 1:1.
+- When both ship together, they should point to the same release train and migration notes.

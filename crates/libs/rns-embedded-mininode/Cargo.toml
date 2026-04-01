@@ -8,11 +8,11 @@ repository.workspace = true
 
 [dependencies]
 hex.workspace = true
-lxmf-core = { path = "../lxmf-core", version = "0.1.0", default-features = false, features = ["alloc"] }
+lxmf-core = { package = "lxmf-wire", path = "../lxmf-core", version = "0.2.0", default-features = false, features = ["alloc"] }
 rand_core.workspace = true
 rmp-serde.workspace = true
 rmpv.workspace = true
-rns-core = { path = "../rns-core", version = "0.1.0", default-features = false, features = ["alloc"] }
+rns-core = { package = "reticulum-rs-core", path = "../rns-core", version = "0.2.0", default-features = false, features = ["alloc"] }
 
 [features]
 default = ["std"]

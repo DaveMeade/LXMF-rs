@@ -1,10 +1,18 @@
 [package]
-name = "rns-rpc"
-version = "0.1.0"
+name = "reticulum-rs-rpc"
+version = "0.2.0"
 edition.workspace = true
 rust-version.workspace = true
 license.workspace = true
 repository.workspace = true
+description = "RPC, HTTP, and gRPC contracts and bridges for LXMF-rs and the Reticulum stack."
+readme = "../../../README.md"
+documentation = "https://docs.rs/reticulum-rs-rpc"
+keywords = ["reticulum", "rpc", "grpc", "lxmf"]
+categories = ["network-programming", "api-bindings"]
+
+[lib]
+name = "rns_rpc"
 
 [dependencies]
 rand_core = { workspace = true, features = ["getrandom"] }

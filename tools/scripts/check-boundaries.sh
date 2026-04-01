@@ -169,15 +169,15 @@ if [ -d "lxmf.egg-info" ]; then
 fi
 
 # 1) Core dependency constraints (hard policy).
-check_forbidden_dependency "lxmf-core" "tokio" "clap" "ureq"
-check_forbidden_dependency "rns-core" "tokio" "clap"
-check_forbidden_dependency "rns-transport" "clap"
-check_forbidden_dependency "rns-rpc" "clap"
-check_no_app_dependencies "lxmf-core" "lxmf-cli" "rns-tools" "reticulumd"
+check_forbidden_dependency "lxmf-wire" "tokio" "clap" "ureq"
+check_forbidden_dependency "reticulum-rs-core" "tokio" "clap"
+check_forbidden_dependency "reticulum-rs-transport" "clap"
+check_forbidden_dependency "reticulum-rs-rpc" "clap"
+check_no_app_dependencies "lxmf-wire" "lxmf-cli" "rns-tools" "reticulumd"
 check_no_app_dependencies "lxmf-sdk" "lxmf-cli" "rns-tools" "reticulumd"
-check_no_app_dependencies "rns-core" "lxmf-cli" "rns-tools" "reticulumd"
-check_no_app_dependencies "rns-transport" "lxmf-cli" "rns-tools" "reticulumd"
-check_no_app_dependencies "rns-rpc" "lxmf-cli" "rns-tools" "reticulumd"
+check_no_app_dependencies "reticulum-rs-core" "lxmf-cli" "rns-tools" "reticulumd"
+check_no_app_dependencies "reticulum-rs-transport" "lxmf-cli" "rns-tools" "reticulumd"
+check_no_app_dependencies "reticulum-rs-rpc" "lxmf-cli" "rns-tools" "reticulumd"
 check_no_app_dependencies "test-support" "lxmf-cli" "rns-tools" "reticulumd"
 
 allowed_library_edges="$(load_allowlisted_edges "allowed_library_edges")"

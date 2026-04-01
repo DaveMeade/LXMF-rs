@@ -73,7 +73,7 @@ jobs:
       - name: SDK schema fixtures
         run: cargo xtask ci --stage sdk-schema-check
       - name: gRPC transport tests
-        run: cargo test -p rns-rpc grpc::tests
+        run: cargo test -p reticulum-rs-rpc grpc::tests
       - name: gRPC clients and operator tools
         run: cargo check -p reticulumd -p rns-tools -p lxmf-grpc-client
       - name: Boundary policy check

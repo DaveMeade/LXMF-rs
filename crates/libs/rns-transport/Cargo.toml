@@ -1,10 +1,18 @@
 [package]
-name = "rns-transport"
-version = "0.1.0"
+name = "reticulum-rs-transport"
+version = "0.2.0"
 edition.workspace = true
 rust-version.workspace = true
 license.workspace = true
 repository.workspace = true
+description = "Transport, link, interface, receipt, and resource layers for the Reticulum network stack."
+readme = "../../../README.md"
+documentation = "https://docs.rs/reticulum-rs-transport"
+keywords = ["reticulum", "transport", "network", "links"]
+categories = ["network-programming"]
+
+[lib]
+name = "rns_transport"
 
 [dependencies]
 aes.workspace = true

@@ -49,6 +49,7 @@ deleted or folded into a newer source-of-truth doc.
 - `docs/grpc-getting-started.md`: short path for gRPC users
 - `docs/runbooks/grpc.md`: fuller gRPC operator reference
 - `docs/runbooks/release-readiness.md`: release gate checklist
+- `docs/runbooks/crates-io-publish-plan.md`: crates.io naming, versioning, and publish order
 - `docs/contracts/support-policy.md`: support and lifecycle guarantees
 - `docs/architecture/overview.md`: architecture entry point
 - `docs/architecture/json-lxmf-fields.md`: JSON-to-MessagePack and field-id details

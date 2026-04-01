@@ -45,28 +45,28 @@ repository = "https://github.com/FreeTAKTeam/LXMF-rs"
 # Exact workspace-local dependency edges allowed between crates.
 # `tools/scripts/check-boundaries.sh` treats this as a strict allowlist.
 allowed_library_edges = [
-  "lxmf-core->rns-core",
-  "lxmf-sdk->rns-rpc",
+  "lxmf-sdk->reticulum-rs-rpc",
+  "lxmf-wire->reticulum-rs-core",
   "rns-embedded-ffi->rns-embedded-core",
   "rns-embedded-ffi->rns-embedded-runtime",
-  "rns-embedded-mininode->lxmf-core",
-  "rns-embedded-mininode->rns-core",
+  "rns-embedded-mininode->lxmf-wire",
+  "rns-embedded-mininode->reticulum-rs-core",
   "rns-embedded-runtime->rns-embedded-core",
-  "rns-transport->rns-core",
+  "reticulum-rs-transport->reticulum-rs-core",
   "test-support->lxmf-sdk",
-  "test-support->rns-core",
-  "test-support->rns-rpc",
+  "test-support->reticulum-rs-core",
+  "test-support->reticulum-rs-rpc",
 ]
 allowed_app_edges = [
   "lxmf-cli->lxmf-sdk",
-  "reticulumd->lxmf-core",
-  "reticulumd->rns-core",
-  "reticulumd->rns-rpc",
-  "reticulumd->rns-transport",
+  "reticulumd->lxmf-wire",
+  "reticulumd->reticulum-rs-core",
+  "reticulumd->reticulum-rs-rpc",
+  "reticulumd->reticulum-rs-transport",
   "rns-tools->lxmf-grpc-client",
   "rns-tools->rns-embedded-core",
   "rns-tools->rns-embedded-runtime",
-  "rns-tools->rns-rpc",
+  "rns-tools->reticulum-rs-rpc",
 ]
 
 [workspace.dependencies]
@@ -77,12 +77,12 @@ anyhow = "1"
 clap = { version = "4.5.29", features = ["derive"] }
 clap_complete = "4.5"
 criterion = "0.5"
-lxmf-core = { version = "0.1.0", path = "crates/libs/lxmf-core" }
+lxmf-core = { package = "lxmf-wire", version = "0.2.0", path = "crates/libs/lxmf-core" }
 lxmf-grpc-client = { version = "0.1.0", path = "crates/libs/lxmf-grpc-client" }
-lxmf-sdk = { version = "0.1.0", path = "crates/libs/lxmf-sdk" }
-rns-core = { version = "0.1.0", path = "crates/libs/rns-core" }
-rns-rpc = { version = "0.1.0", path = "crates/libs/rns-rpc" }
-rns-transport = { version = "0.1.0", path = "crates/libs/rns-transport" }
+lxmf-sdk = { version = "0.2.0", path = "crates/libs/lxmf-sdk" }
+rns-core = { package = "reticulum-rs-core", version = "0.2.0", path = "crates/libs/rns-core" }
+rns-rpc = { package = "reticulum-rs-rpc", version = "0.2.0", path = "crates/libs/rns-rpc" }
+rns-transport = { package = "reticulum-rs-transport", version = "0.2.0", path = "crates/libs/rns-transport" }
 aes = "0.8.4"
 base64 = "0.22"
 cbc = "0.1.2"
@@ -121,10 +121,10 @@ x25519-dalek = "2.0.1"
 thiserror = "1"
 zeroize = "1.8"
 
-[profile.dev.package.rns-core]
+[profile.dev.package.reticulum-rs-core]
 opt-level = 2
 
-[profile.test.package.rns-core]
+[profile.test.package.reticulum-rs-core]
 opt-level = 2
 
 [workspace.lints.rust]

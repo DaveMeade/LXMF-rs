@@ -632,7 +632,7 @@ fn run_pr_core_ci() -> Result<()> {
     run("cargo", &["test", "--workspace", "--tests"])?;
     run_proto_check()?;
     run_sdk_schema_check()?;
-    run("cargo", &["test", "-p", "rns-rpc", "grpc::tests"])?;
+    run("cargo", &["test", "-p", "reticulum-rs-rpc", "grpc::tests"])?;
     run("cargo", &["check", "-p", "reticulumd", "-p", "rns-tools", "-p", "lxmf-grpc-client"])?;
     run("bash", &["tools/scripts/check-boundaries.sh"])?;
     run_cargo_deny_policy_check()?;
@@ -803,25 +803,25 @@ fn run_release_check() -> Result<()> {
 
 fn run_interfaces_required() -> Result<()> {
     run("cargo", &["check", "-p", "reticulumd", "--all-targets"])?;
-    run("cargo", &["check", "-p", "rns-rpc", "--all-targets"])?;
+    run("cargo", &["check", "-p", "reticulum-rs-rpc", "--all-targets"])?;
     run("cargo", &["check", "-p", "lxmf-sdk", "--all-targets"])?;
-    run("cargo", &["check", "-p", "rns-transport", "--all-targets"])?;
+    run("cargo", &["check", "-p", "reticulum-rs-transport", "--all-targets"])?;
     run("cargo", &["test", "-p", "reticulumd", "--test", "config"])?;
     run("cargo", &["test", "-p", "reticulumd", "--bin", "reticulumd"])?;
-    run("cargo", &["test", "-p", "rns-transport", "serial::tests"])?;
+    run("cargo", &["test", "-p", "reticulum-rs-transport", "serial::tests"])?;
     run("cargo", &["test", "-p", "reticulumd", "--bin", "reticulumd", "interfaces::ble::"])?;
     run("cargo", &["test", "-p", "reticulumd", "--bin", "reticulumd", "lora_state::tests"])?;
     run(
         "cargo",
-        &["test", "-p", "rns-rpc", "set_interfaces_rejects_startup_only_interface_kinds"],
+        &["test", "-p", "reticulum-rs-rpc", "set_interfaces_rejects_startup_only_interface_kinds"],
     )?;
-    run("cargo", &["test", "-p", "rns-rpc", "reload_config_hot_applies_legacy_tcp_only_diff"])?;
+    run("cargo", &["test", "-p", "reticulum-rs-rpc", "reload_config_hot_applies_legacy_tcp_only_diff"])?;
     run(
         "cargo",
         &[
             "test",
             "-p",
-            "rns-rpc",
+            "reticulum-rs-rpc",
             "reload_config_rejects_mixed_startup_kind_diff_without_partial_apply",
         ],
     )?;
@@ -2219,7 +2219,7 @@ fn run_crypto_agility_check() -> Result<()> {
 }
 
 fn run_key_management_check() -> Result<()> {
-    run("cargo", &["test", "-p", "rns-core", "key_manager", "--", "--nocapture"])?;
+    run("cargo", &["test", "-p", "reticulum-rs-core", "key_manager", "--", "--nocapture"])?;
     run(
         "cargo",
         &["test", "-p", "test-support", "sdk_conformance_key_management", "--", "--nocapture"],
@@ -2252,7 +2252,7 @@ fn run_key_management_check() -> Result<()> {
 }
 
 fn run_sdk_security_check() -> Result<()> {
-    run("cargo", &["test", "-p", "rns-rpc", "sdk_security", "--", "--nocapture"])
+    run("cargo", &["test", "-p", "reticulum-rs-rpc", "sdk_security", "--", "--nocapture"])
 }
 
 fn run_sdk_fuzz_check() -> Result<()> {
@@ -2263,7 +2263,7 @@ fn run_sdk_fuzz_check() -> Result<()> {
         &[
             "test",
             "-p",
-            "rns-rpc",
+            "reticulum-rs-rpc",
             "fuzz_smoke_rpc_frame_and_http_parsers_do_not_panic",
             "--",
             "--nocapture",
@@ -2283,7 +2283,7 @@ fn run_sdk_fuzz_check() -> Result<()> {
 }
 
 fn run_sdk_property_check() -> Result<()> {
-    run("cargo", &["test", "-p", "rns-rpc", "sdk_property", "--", "--nocapture"])
+    run("cargo", &["test", "-p", "reticulum-rs-rpc", "sdk_property", "--", "--nocapture"])
 }
 
 fn run_sdk_model_check() -> Result<()> {
@@ -2309,7 +2309,7 @@ fn run_correctness_check() -> Result<()> {
             "-p",
             "lxmf-sdk",
             "-p",
-            "rns-rpc",
+            "reticulum-rs-rpc",
             "--lib",
             "--all-features",
             "--no-deps",
@@ -2326,7 +2326,7 @@ fn run_correctness_check() -> Result<()> {
     let miri_toolchain =
         std::env::var("SDK_CORRECTNESS_MIRI_TOOLCHAIN").unwrap_or_else(|_| "nightly".to_string());
     let miri_command =
-        toolchain_cargo_command(&miri_toolchain, "miri test -p lxmf-core --lib -- --nocapture");
+        toolchain_cargo_command(&miri_toolchain, "miri test -p lxmf-wire --lib -- --nocapture");
     run("bash", &["-lc", &miri_command])?;
 
     run(
@@ -2347,7 +2347,7 @@ fn run_correctness_check() -> Result<()> {
 
 fn run_sdk_race_check() -> Result<()> {
     run("cargo", &["test", "-p", "lxmf-sdk", "race_idempot", "--", "--nocapture"])?;
-    run("cargo", &["test", "-p", "rns-rpc", "sdk_race", "--", "--nocapture"])
+    run("cargo", &["test", "-p", "reticulum-rs-rpc", "sdk_race", "--", "--nocapture"])
 }
 
 fn run_sdk_replay_check() -> Result<()> {
@@ -2356,7 +2356,7 @@ fn run_sdk_replay_check() -> Result<()> {
         &[
             "test",
             "-p",
-            "rns-rpc",
+            "reticulum-rs-rpc",
             "replay_fixture_trace_executes_successfully",
             "--",
             "--nocapture",
@@ -2379,7 +2379,7 @@ fn run_sdk_replay_check() -> Result<()> {
 }
 
 fn run_sdk_metrics_check() -> Result<()> {
-    run("cargo", &["test", "-p", "rns-rpc", "rpc::http::tests", "--", "--nocapture"])
+    run("cargo", &["test", "-p", "reticulum-rs-rpc", "rpc::http::tests", "--", "--nocapture"])
 }
 
 fn run_sdk_bench_check() -> Result<()> {
@@ -2388,7 +2388,7 @@ fn run_sdk_bench_check() -> Result<()> {
         &[
             "bench",
             "-p",
-            "lxmf-core",
+            "lxmf-wire",
             "--bench",
             "core_message_paths",
             "--",
@@ -2422,7 +2422,7 @@ fn run_sdk_bench_check() -> Result<()> {
         &[
             "bench",
             "-p",
-            "rns-rpc",
+            "reticulum-rs-rpc",
             "--bench",
             "rpc_hotpaths",
             "--",
@@ -2779,7 +2779,7 @@ fn run_python_impl_bench_compare_with_paths(
         &[
             "bench",
             "-p",
-            "lxmf-core",
+            "lxmf-wire",
             "--bench",
             "core_message_paths",
             "--",
@@ -2796,7 +2796,7 @@ fn run_python_impl_bench_compare_with_paths(
         &[
             "bench",
             "-p",
-            "rns-core",
+            "reticulum-rs-core",
             "--bench",
             "parity_hotpaths",
             "--",
@@ -2813,7 +2813,7 @@ fn run_python_impl_bench_compare_with_paths(
         &[
             "bench",
             "-p",
-            "rns-transport",
+            "reticulum-rs-transport",
             "--bench",
             "link_hotpaths",
             "--",
@@ -4159,7 +4159,7 @@ fn run_sdk_queue_pressure_check() -> Result<()> {
         &[
             "test",
             "-p",
-            "rns-rpc",
+            "reticulum-rs-rpc",
             "sdk_event_queues_remain_bounded_under_sustained_load",
             "--",
             "--nocapture",
@@ -4525,7 +4525,7 @@ fn run_embedded_native_lock_check() -> Result<()> {
 }
 
 fn run_embedded_link_check() -> Result<()> {
-    run("cargo", &["test", "-p", "rns-transport", "--test", "embedded_link_contract", "--no-run"])?;
+    run("cargo", &["test", "-p", "reticulum-rs-transport", "--test", "embedded_link_contract", "--no-run"])?;
 
     let backends = fs::read_to_string("docs/contracts/sdk-v2-backends.md")
         .context("missing docs/contracts/sdk-v2-backends.md")?;
@@ -4562,8 +4562,8 @@ fn run_embedded_core_check() -> Result<()> {
         &["check", "-p", "rns-embedded-runtime", "--no-default-features", "--features", "alloc"],
     )?;
     run("cargo", &["check", "-p", "rns-embedded-runtime", "--features", "std"])?;
-    run("cargo", &["check", "-p", "lxmf-core", "--no-default-features", "--features", "alloc"])?;
-    run("cargo", &["check", "-p", "rns-core", "--no-default-features", "--features", "alloc"])?;
+    run("cargo", &["check", "-p", "lxmf-wire", "--no-default-features", "--features", "alloc"])?;
+    run("cargo", &["check", "-p", "reticulum-rs-core", "--no-default-features", "--features", "alloc"])?;
     run("cargo", &["test", "-p", "rns-embedded-core"])?;
     run("cargo", &["test", "-p", "rns-embedded-ffi"])?;
     run("cargo", &["test", "-p", "rns-embedded-runtime"])?;
@@ -4571,8 +4571,8 @@ fn run_embedded_core_check() -> Result<()> {
     let matrix = fs::read_to_string("docs/contracts/sdk-v2-feature-matrix.md")
         .context("missing docs/contracts/sdk-v2-feature-matrix.md")?;
     for marker in [
-        "| `lxmf-core` |",
-        "| `rns-core` |",
+        "| `lxmf-wire` |",
+        "| `reticulum-rs-core` |",
         "| `rns-embedded-ffi` |",
         "| `rns-embedded-runtime` |",
         "`alloc-ready`",

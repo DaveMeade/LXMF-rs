@@ -20,11 +20,11 @@ This checklist is the publication gate for the Rust workspace.
 ## 3. API stability gates
 
 - Public API surface checks pass for:
-  - `lxmf-core`
+  - `lxmf-wire`
   - `lxmf-sdk`
-  - `rns-core`
-  - `rns-transport`
-  - `rns-rpc`
+  - `reticulum-rs-core`
+  - `reticulum-rs-transport`
+  - `reticulum-rs-rpc`
 - Breaking changes are called out in migration docs under `docs/migrations/`.
 
 ## 4. CI quality gates
@@ -182,3 +182,4 @@ Report artifacts:
 - Changelog/release notes summarize API and migration impacts.
 - Relevant migration notes updated in `docs/migrations/`.
 - RC execution and tagging follow `docs/runbooks/release-candidate-runbook.md`.
+- crates.io packaging and rename policy follow `docs/runbooks/crates-io-publish-plan.md`.

@@ -88,7 +88,7 @@ Runtime status visibility:
 ## Verification Commands
 
 ```bash
-cargo test -p rns-transport serial::tests
+cargo test -p reticulum-rs-transport serial::tests
 cargo test -p reticulumd --test config
 cargo test -p reticulumd --bin reticulumd
 ```
