@@ -1,13 +1,23 @@
 mod capabilities;
 mod config;
+mod control;
 mod delivery;
+mod directory;
 mod discovery;
+mod dispatch;
+mod dispatch_attachment_topic;
+mod dispatch_content;
+mod dispatch_identity;
+mod dispatch_telemetry_marker_voice;
 mod envelope;
 mod errors;
 mod events;
 mod node;
 mod operations;
 mod profiles;
+mod runtime;
+mod session;
+mod workflows;
 
 pub use capabilities::CapabilitySummary;
 pub use delivery::{
@@ -24,13 +34,14 @@ pub use errors::{Error, ErrorCategory, ErrorCode};
 pub use events::{
     Event, EventBatch, EventKind, EventMetadata, Severity, StreamGapDetails, SubscriptionStart,
 };
-#[cfg(feature = "sdk-async")]
-pub use node::EventStream;
-pub use node::{
-    Client, Config, DeliveryState, DeliveryStatus, Handle, Profile, RunState, RuntimeStatus,
-    SendReceipt, SendRequest,
-};
+pub use node::Client;
 pub use operations::{
     OperationEntry, OperationId, OperationKind, OperationRegistry, RegistryError,
     ResolvedOperation, TransportFamily, TransportVariant,
 };
+pub use runtime::{
+    Config, DeliveryState, DeliveryStatus, Handle, Profile, RunState, RuntimeStatus, SendReceipt,
+    SendRequest,
+};
+#[cfg(feature = "sdk-async")]
+pub use session::EventStream;
