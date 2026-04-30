@@ -74,11 +74,41 @@ A passing run must retain:
 - external client delivery hash
 - exact message bodies used for both directions
 
+## Release Gate Command
+
+The release gate runs one concrete external-client proof through:
+
+```bash
+tools/scripts/external-client-interop-gate.sh <meshchatx|sideband|columba> [client-root]
+```
+
+The gate does not fetch external clients. The selected client must already be
+available as a local checkout, either through the optional `[client-root]`
+argument or the matching environment variable:
+
+- `MESHCHATX_ROOT`
+- `SIDEBAND_ROOT`
+- `COLUMBA_ROOT`
+
+The default local paths are `../MeshChatX`, `../Sideband`, and `../columba`.
+
+The command delegates to the matching client-specific smoke harness, validates
+that the machine-readable report contains the required proof fields and artifact
+paths, and writes:
+
+- `target/interop/external-client-gate/<client>/report.json`
+- `target/interop/external-client-gate/<client>/gate-summary.json`
+
+Release notes may only claim external-client interoperability for a client whose
+gate summary has `status: "pass"` for the release candidate.
+
 ## Non-Goals
 
 This contract does not yet require:
 
 - CI gating
 
-That belongs to the later release-gated interop track once the local harnesses
-are stable on repeated runs.
+The release gate is intentionally local/manual until external client checkouts
+and credentials are available in automation. A future CI version must provide
+those checkouts explicitly, for example through a pinned external interop
+workspace, private checkout token, or prebuilt client image.
