@@ -1,3 +1,4 @@
+use super::diag;
 use super::*;
 
 pub(super) async fn send_to_next_hop<'a>(
@@ -8,7 +9,24 @@ pub(super) async fn send_to_next_hop<'a>(
     let (packet, maybe_iface) = handler.path_table.handle_inbound_packet(packet, lookup);
 
     if let Some(iface) = maybe_iface {
+        if diag::enabled() {
+            log::info!(
+                "[tp-diag] forward_next_hop node={} dst={} lookup={} out={} iface={}",
+                handler.config.name,
+                packet.destination,
+                lookup.map(|value| value.to_string()).unwrap_or_else(|| "-".to_string()),
+                packet,
+                iface
+            );
+        }
         handler.send(TxMessage { tx_type: TxMessageType::Direct(iface), packet }).await;
+    } else if diag::enabled() {
+        log::info!(
+            "[tp-diag] forward_next_hop_miss node={} dst={} lookup={}",
+            handler.config.name,
+            packet.destination,
+            lookup.map(|value| value.to_string()).unwrap_or_else(|| "-".to_string())
+        );
     }
 
     maybe_iface.is_some()
@@ -108,6 +126,9 @@ pub(super) async fn handle_fixed_destinations<'a>(
     if packet.destination == handler.fixed_dest_path_requests {
         handle_path_request(packet, handler, iface).await;
         true
+    } else if packet.destination == handler.fixed_dest_tunnel_synthesize {
+        super::tunnels::handle_tunnel_synthesize_packet(packet, handler, iface).await;
+        true
     } else {
         false
     }
@@ -171,6 +192,17 @@ pub(super) async fn handle_link_request_as_intermediate<'a>(
     packet: &Packet,
     mut handler: MutexGuard<'a, TransportHandler>,
 ) {
+    if diag::enabled() {
+        log::info!(
+            "[tp-diag] link_request_intermediate node={} dst={} from_iface={} next_hop={} next_iface={} packet={}",
+            handler.config.name,
+            packet.destination,
+            received_from,
+            next_hop,
+            next_hop_iface,
+            packet
+        );
+    }
     handler.link_table.add(packet, packet.destination, received_from, next_hop, next_hop_iface);
 
     send_to_next_hop(packet, &handler, None).await;

@@ -1,3 +1,4 @@
+use super::diag;
 use super::path::send_to_next_hop;
 use super::*;
 use ed25519_dalek::{Signature, SIGNATURE_LENGTH};
@@ -86,24 +87,60 @@ async fn should_forward_link_request_proof(
     let Some((original_destination, expected_iface)) =
         handler.link_table.proof_validation_context(&packet.destination)
     else {
+        if diag::enabled() {
+            log::info!(
+                "[tp-diag] lrproof_forward_skip node={} reason=no_link_table_entry link={} iface={}",
+                handler.config.name,
+                packet.destination,
+                iface
+            );
+        }
         return false;
     };
     if expected_iface != iface {
+        if diag::enabled() {
+            log::info!(
+                "[tp-diag] lrproof_forward_skip node={} reason=wrong_iface link={} expected={} got={}",
+                handler.config.name,
+                packet.destination,
+                expected_iface,
+                iface
+            );
+        }
         return false;
     }
 
     let Some(destination) = handler.single_out_destinations.get(&original_destination).cloned()
     else {
+        if diag::enabled() {
+            log::info!(
+                "[tp-diag] lrproof_forward_skip node={} reason=missing_destination_identity link={} dst={}",
+                handler.config.name,
+                packet.destination,
+                original_destination
+            );
+        }
         return false;
     };
     let destination = destination.lock().await;
 
-    crate::destination::link::validate_link_request_proof_packet(
+    let valid = crate::destination::link::validate_link_request_proof_packet(
         &destination.desc,
         &packet.destination,
         packet,
     )
-    .is_ok()
+    .is_ok();
+    if diag::enabled() {
+        log::info!(
+            "[tp-diag] lrproof_forward_validate node={} link={} dst={} iface={} valid={}",
+            handler.config.name,
+            packet.destination,
+            original_destination,
+            iface,
+            valid
+        );
+    }
+    valid
 }
 
 pub(super) async fn handle_proof(
@@ -164,15 +201,26 @@ pub(super) async fn handle_proof(
 
     let mut handler = handler.lock().await;
 
-    let mut rtt_packets = Vec::new();
+    let mut rtt_messages = Vec::new();
     for link in handler.out_links.values() {
         let mut link = link.lock().await;
         if let LinkHandleResult::Activated = link.handle_packet(&packet, iface) {
-            rtt_packets.push(link.create_rtt());
+            rtt_messages.push(TxMessage {
+                tx_type: TxMessageType::Direct(iface),
+                packet: link.create_rtt(),
+            });
         }
     }
-    for packet in rtt_packets {
-        handler.send_packet(packet).await;
+    for message in rtt_messages {
+        let dispatch = handler.send(message).await;
+        if dispatch.sent_ifaces == 0 {
+            log::warn!(
+                "tp({}): failed to dispatch link RTT packet matched={} failed={}",
+                handler.config.name,
+                dispatch.matched_ifaces,
+                dispatch.failed_ifaces
+            );
+        }
     }
 
     let maybe_packet = if should_forward_link_request_proof(&packet, &handler, iface).await {
@@ -182,7 +230,22 @@ pub(super) async fn handle_proof(
     };
 
     if let Some((packet, iface)) = maybe_packet {
+        if diag::enabled() {
+            log::info!(
+                "[tp-diag] lrproof_forward node={} link={} iface={}",
+                handler.config.name,
+                packet.destination,
+                iface
+            );
+        }
         handler.send(TxMessage { tx_type: TxMessageType::Direct(iface), packet }).await;
+    } else if packet.context == PacketContext::LinkRequestProof && diag::enabled() {
+        log::info!(
+            "[tp-diag] lrproof_not_forwarded node={} link={} ingress_iface={}",
+            handler.config.name,
+            packet.destination,
+            iface
+        );
     }
 }
 

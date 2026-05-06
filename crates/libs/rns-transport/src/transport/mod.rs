@@ -14,6 +14,8 @@ use std::time::Duration;
 use tokio::time;
 use tokio::time::Instant;
 use tokio_util::sync::CancellationToken;
+use tunnels::create_tunnel_synthesize_destination;
+use tunnels::TunnelTable;
 
 use tokio::sync::broadcast;
 use tokio::sync::Mutex;
@@ -37,6 +39,7 @@ use crate::error::RnsError;
 use crate::hash::{AddressHash, Hash, HASH_SIZE};
 use crate::identity::{Identity, PrivateIdentity};
 
+use crate::iface::AnnounceBroadcastPolicy;
 use crate::iface::IfaceRole;
 use crate::iface::IfaceSource;
 use crate::iface::InterfaceManager;
@@ -56,11 +59,14 @@ use crate::resource::{build_resource_request_packet, ResourceEvent, ResourceMana
 
 mod announce_limits;
 pub mod announce_table;
+mod diag;
 pub mod discovery;
 mod link_table;
 mod packet_cache;
 mod path_requests;
 pub mod path_table;
+mod persistence;
+mod tunnels;
 
 pub mod test_bridge {
     use std::cell::RefCell;
@@ -221,6 +227,8 @@ pub(crate) struct TransportHandler {
     resource_events_tx: broadcast::Sender<ResourceEvent>,
 
     fixed_dest_path_requests: AddressHash,
+    fixed_dest_tunnel_synthesize: AddressHash,
+    tunnel_table: TunnelTable,
 
     /// Per-peer *virtual* unicast UDP ifaces pinned to a specific
     /// `SocketAddr` when an announce arrives over a multicast iface.

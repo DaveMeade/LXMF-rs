@@ -1,22 +1,6 @@
+use super::diag;
 use super::wire::should_encrypt_packet;
 use super::*;
-use std::sync::OnceLock;
-
-fn transport_diag_enabled() -> bool {
-    static ENABLED: OnceLock<bool> = OnceLock::new();
-    *ENABLED.get_or_init(|| {
-        std::env::var("RETICULUMD_DIAGNOSTICS")
-            .or_else(|_| std::env::var("RETICULUM_TRANSPORT_DIAGNOSTICS"))
-            .ok()
-            .map(|value| {
-                matches!(
-                    value.trim().to_ascii_lowercase().as_str(),
-                    "1" | "true" | "yes" | "on" | "debug"
-                )
-            })
-            .unwrap_or(false)
-    })
-}
 
 impl TransportHandler {
     async fn note_link_packet_sent(&self, packet: &Packet) {
@@ -128,7 +112,7 @@ impl TransportHandler {
             }
         }
 
-        if transport_diag_enabled() {
+        if diag::enabled() {
             if let Some(entry) = self.path_table.get(&packet.destination) {
                 log::trace!(
                     "[tp-diag] route_lookup dst={} hops={} via_next_hop={} via_iface={}",
@@ -159,7 +143,7 @@ impl TransportHandler {
             } else {
                 SendPacketOutcome::DroppedNoRoute
             };
-            if transport_diag_enabled() {
+            if diag::enabled() {
                 log::trace!(
                     "[tp-diag] direct_send iface={} outcome={:?} matched={} sent={} failed={}",
                     iface,
@@ -186,7 +170,7 @@ impl TransportHandler {
             } else {
                 SendPacketOutcome::DroppedNoRoute
             };
-            if transport_diag_enabled() {
+            if diag::enabled() {
                 log::trace!(
                     "[tp-diag] broadcast_send outcome={:?} matched={} sent={} failed={}",
                     outcome,
@@ -221,7 +205,29 @@ impl TransportHandler {
     pub(super) async fn send(&self, message: TxMessage) -> TxDispatchTrace {
         let packet = message.packet;
         self.packet_cache.lock().await.update(&packet);
-        let dispatch = self.iface_manager.lock().await.send(message).await;
+        let announce_policy = if packet.header.packet_type == PacketType::Announce
+            && matches!(message.tx_type, TxMessageType::Broadcast(_))
+        {
+            let next_hop_iface = self.path_table.next_hop_iface(&packet.destination);
+            let mgr = self.iface_manager.lock().await;
+            let policy = AnnounceBroadcastPolicy {
+                local_destination: self.single_in_destinations.contains_key(&packet.destination),
+                next_hop_iface_mode: next_hop_iface.and_then(|iface| mgr.mode(&iface)),
+            };
+            let dispatch = mgr.send_with_announce_policy(message, Some(policy)).await;
+            if dispatch.sent_ifaces > 0 {
+                self.note_link_packet_sent(&packet).await;
+            }
+            return dispatch;
+        } else {
+            None
+        };
+        let dispatch = self
+            .iface_manager
+            .lock()
+            .await
+            .send_with_announce_policy(message, announce_policy)
+            .await;
         if dispatch.sent_ifaces > 0 {
             self.note_link_packet_sent(&packet).await;
         }
@@ -247,7 +253,8 @@ impl TransportHandler {
                 allow_duplicate = true;
             }
             PacketType::Data => {
-                allow_duplicate = packet.context == PacketContext::KeepAlive;
+                allow_duplicate =
+                    matches!(packet.context, PacketContext::KeepAlive | PacketContext::LinkClose);
             }
             PacketType::Proof => {
                 if packet.context == PacketContext::LinkRequestProof {
