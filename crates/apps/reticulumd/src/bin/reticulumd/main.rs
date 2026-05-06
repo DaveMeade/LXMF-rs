@@ -1,5 +1,6 @@
 #![allow(clippy::items_after_test_module)]
 
+mod announce_persistence;
 mod announce_worker;
 mod bootstrap;
 mod bridge;
@@ -7,6 +8,7 @@ mod bridge_helpers;
 mod inbound_worker;
 mod interface_hot_apply;
 mod interfaces;
+mod receipt_events;
 mod receipt_worker;
 mod rpc_loop;
 #[cfg(test)]
