@@ -49,6 +49,7 @@ repository = "https://github.com/FreeTAKTeam/LXMF-rs"
 allowed_library_edges = [
   "lxmf->lxmf-sdk",
   "lxmf->lxmf-wire",
+  "lxmf-sdk->lxmf-wire",
   "lxmf-sdk->reticulum-rs-rpc",
   "reticulum-rs->reticulum-rs-core",
   "reticulum-rs->reticulum-rs-rpc",

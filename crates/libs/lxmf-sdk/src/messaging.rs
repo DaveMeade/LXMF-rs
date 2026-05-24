@@ -1,6 +1,12 @@
+use lxmf_core::announce::display_name_from_delivery_app_data;
 use serde::{Deserialize, Serialize};
 use std::cmp::Reverse;
 use std::collections::{HashMap, HashSet};
+
+pub const DESTINATION_KIND_APP: &str = "app";
+pub const DESTINATION_KIND_LXMF_DELIVERY: &str = "lxmf_delivery";
+pub const DESTINATION_KIND_LXMF_PROPAGATION: &str = "lxmf_propagation";
+pub const DESTINATION_KIND_OTHER: &str = "other";
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub enum PeerState {
@@ -59,6 +65,34 @@ pub struct AnnounceRecord {
     pub hops: u8,
     pub interface_hex: String,
     pub received_at_ms: u64,
+}
+
+impl AnnounceRecord {
+    pub fn from_raw(
+        destination_hex: impl Into<String>,
+        identity_hex: impl Into<String>,
+        destination_kind: impl Into<String>,
+        app_data: &[u8],
+        hops: u8,
+        interface_hex: impl Into<String>,
+        received_at_ms: u64,
+    ) -> Self {
+        let destination_kind = destination_kind.into();
+        let display_name =
+            announce_display_name_from_raw_app_data(destination_kind.as_str(), app_data);
+        let app_data = normalize_announce_app_data(app_data);
+
+        Self {
+            destination_hex: destination_hex.into(),
+            identity_hex: identity_hex.into(),
+            destination_kind,
+            app_data,
+            display_name,
+            hops,
+            interface_hex: interface_hex.into(),
+            received_at_ms,
+        }
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -177,11 +211,11 @@ impl MessagingStore {
         let mut lxmf_records = HashMap::<String, AnnounceRecord>::new();
 
         for record in self.announce_records.values() {
-            if record.destination_kind == "app" {
+            if record.destination_kind == DESTINATION_KIND_APP {
                 app_dest_by_identity
                     .insert(record.identity_hex.clone(), record.destination_hex.clone());
                 app_records.insert(record.destination_hex.clone(), record.clone());
-            } else if record.destination_kind == "lxmf_delivery" {
+            } else if record.destination_kind == DESTINATION_KIND_LXMF_DELIVERY {
                 lxmf_dest_by_identity
                     .insert(record.identity_hex.clone(), record.destination_hex.clone());
                 lxmf_records.insert(record.destination_hex.clone(), record.clone());
@@ -387,6 +421,21 @@ impl MessagingStore {
     }
 }
 
+fn normalize_announce_app_data(app_data: &[u8]) -> String {
+    String::from_utf8(app_data.to_vec()).unwrap_or_else(|_| hex::encode(app_data))
+}
+
+fn announce_display_name_from_raw_app_data(
+    destination_kind: &str,
+    app_data: &[u8],
+) -> Option<String> {
+    if destination_kind == DESTINATION_KIND_LXMF_DELIVERY {
+        display_name_from_delivery_app_data(app_data)
+    } else {
+        None
+    }
+}
+
 fn message_preview(body_utf8: &str) -> Option<String> {
     let trimmed = body_utf8.trim();
     if trimmed.is_empty() {
@@ -405,6 +454,84 @@ fn peer_display_name_for(peer: &PeerRecord) -> Option<String> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use lxmf_core::announce::encode_delivery_display_name_app_data;
+
+    #[test]
+    fn announce_record_from_raw_extracts_lxmf_delivery_display_name() {
+        let app_data =
+            encode_delivery_display_name_app_data("Alice Router").expect("encoded display name");
+
+        let record = AnnounceRecord::from_raw(
+            "dest",
+            "identity",
+            DESTINATION_KIND_LXMF_DELIVERY,
+            app_data.as_slice(),
+            2,
+            "iface",
+            42,
+        );
+
+        assert_eq!(record.destination_hex, "dest");
+        assert_eq!(record.identity_hex, "identity");
+        assert_eq!(record.destination_kind, DESTINATION_KIND_LXMF_DELIVERY);
+        assert_eq!(record.app_data, hex::encode(app_data));
+        assert_eq!(record.display_name.as_deref(), Some("Alice Router"));
+        assert_eq!(record.hops, 2);
+        assert_eq!(record.interface_hex, "iface");
+        assert_eq!(record.received_at_ms, 42);
+    }
+
+    #[test]
+    fn announce_record_from_raw_preserves_text_app_data() {
+        let record = AnnounceRecord::from_raw(
+            "appdest",
+            "identity",
+            DESTINATION_KIND_APP,
+            b"R3AKT;EMergencyMessages;name=Bravo",
+            1,
+            "iface",
+            100,
+        );
+
+        assert_eq!(record.app_data, "R3AKT;EMergencyMessages;name=Bravo");
+        assert!(record.display_name.is_none());
+    }
+
+    #[test]
+    fn announce_record_from_raw_hex_encodes_malformed_binary_app_data() {
+        let record = AnnounceRecord::from_raw(
+            "otherdest",
+            "identity",
+            DESTINATION_KIND_OTHER,
+            &[0xff, 0xfe, 0x00],
+            1,
+            "iface",
+            100,
+        );
+
+        assert_eq!(record.app_data, "fffe00");
+        assert!(record.display_name.is_none());
+    }
+
+    #[test]
+    fn non_delivery_announce_does_not_parse_lxmf_display_name() {
+        let app_data =
+            encode_delivery_display_name_app_data("Relay Name").expect("encoded display name");
+
+        let record = AnnounceRecord::from_raw(
+            "propdest",
+            "identity",
+            DESTINATION_KIND_LXMF_PROPAGATION,
+            app_data.as_slice(),
+            1,
+            "iface",
+            100,
+        );
+
+        assert_eq!(record.destination_kind, DESTINATION_KIND_LXMF_PROPAGATION);
+        assert_eq!(record.app_data, hex::encode(app_data));
+        assert!(record.display_name.is_none());
+    }
 
     #[test]
     fn peer_projection_merges_app_and_lxmf_announces() {

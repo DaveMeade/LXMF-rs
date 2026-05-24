@@ -1437,6 +1437,7 @@ dependencies = [
  "hex",
  "hmac",
  "loom",
+ "lxmf-wire",
  "reticulum-rs-rpc",
  "rustls",
  "rustls-pemfile",
