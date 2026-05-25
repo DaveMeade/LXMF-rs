@@ -1,5 +1,6 @@
 use crate::backend::SdkBackend;
 use crate::capability::{NegotiationRequest, NegotiationResponse};
+use crate::domain::{PresenceListRequest, PresenceListResult};
 use crate::error::{code, ErrorCategory, SdkError};
 use crate::event::{EventBatch, EventCursor, SdkEvent, Severity};
 use crate::types::{
@@ -387,6 +388,22 @@ impl SdkBackend for ZmqPipelineBackendClient {
                 .and_then(JsonValue::as_u64),
             extensions: BTreeMap::new(),
         })
+    }
+
+    fn identity_announce_now(&self) -> Result<Ack, SdkError> {
+        let result = self.call_rpc("sdk_identity_announce_now_v2", Some(json!({})))?;
+        Ok(Self::parse_ack(&result))
+    }
+
+    fn identity_presence_list(
+        &self,
+        req: PresenceListRequest,
+    ) -> Result<PresenceListResult, SdkError> {
+        let params = serde_json::to_value(req).map_err(|err| {
+            SdkError::new(code::INTERNAL, ErrorCategory::Internal, err.to_string())
+        })?;
+        let result = self.call_rpc("sdk_identity_presence_list_v2", Some(params))?;
+        Self::decode_field_or_root(&result, "presence_list", "identity_presence_list response")
     }
 
     fn snapshot(&self) -> Result<RuntimeSnapshot, SdkError> {

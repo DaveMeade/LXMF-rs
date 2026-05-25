@@ -2,7 +2,8 @@ use super::{sdk_error, ZmqPipelineBackendClient};
 use crate::capability::EffectiveLimits;
 use crate::error::{code, ErrorCategory, SdkError};
 use crate::event::Severity;
-use crate::types::{CancelResult, DeliveryState, RuntimeState};
+use crate::types::{Ack, CancelResult, DeliveryState, RuntimeState};
+use serde::de::DeserializeOwned;
 use serde_json::Value as JsonValue;
 
 impl ZmqPipelineBackendClient {
@@ -67,6 +68,41 @@ impl ZmqPipelineBackendClient {
             .map_err(|_| sdk_error(ErrorCategory::Internal, "max_extension_keys overflow"))?,
             idempotency_ttl_ms: Self::parse_required_u64(value, "idempotency_ttl_ms")?,
         })
+    }
+
+    pub(super) fn decode_value<T: DeserializeOwned>(
+        value: JsonValue,
+        context: &str,
+    ) -> Result<T, SdkError> {
+        serde_json::from_value(value).map_err(|err| {
+            SdkError::new(
+                code::INTERNAL,
+                ErrorCategory::Internal,
+                format!("failed to decode {context}: {err}"),
+            )
+        })
+    }
+
+    pub(super) fn decode_field_or_root<T: DeserializeOwned>(
+        result: &JsonValue,
+        field: &str,
+        context: &str,
+    ) -> Result<T, SdkError> {
+        let value = result.get(field).cloned().unwrap_or_else(|| result.clone());
+        Self::decode_value(value, context)
+    }
+
+    pub(super) fn parse_ack(result: &JsonValue) -> Ack {
+        let accepted = result
+            .get("accepted")
+            .and_then(JsonValue::as_bool)
+            .or_else(|| {
+                result.get("ack").and_then(JsonValue::as_str).map(|ack| {
+                    ack.eq_ignore_ascii_case("ok") || ack.eq_ignore_ascii_case("accepted")
+                })
+            })
+            .unwrap_or(true);
+        Ack { accepted, revision: result.get("revision").and_then(JsonValue::as_u64) }
     }
 
     pub(super) fn parse_cancel_result(value: &str) -> Result<CancelResult, SdkError> {

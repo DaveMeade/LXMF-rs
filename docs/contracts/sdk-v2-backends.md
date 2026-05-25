@@ -202,6 +202,9 @@ Required behavior:
 3. Resolve responses only when both session and request identifiers match.
 4. Reject remote endpoints without explicit auth.
 5. Keep `poll_events` cursor behavior authoritative; pushed events are not a replacement contract.
+6. Forward identity discovery calls, including `sdk_identity_announce_now_v2` and
+   `sdk_identity_presence_list_v2`, through the same framed request/response path as core
+   send/status/event operations.
 
 Feature gates:
 
