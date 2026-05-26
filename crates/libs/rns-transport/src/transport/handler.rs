@@ -242,6 +242,7 @@ impl TransportHandler {
         is_new || allow_duplicate
     }
 
+    #[allow(dead_code)]
     pub(super) async fn request_path(
         &mut self,
         address: &AddressHash,

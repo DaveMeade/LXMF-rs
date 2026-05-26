@@ -36,6 +36,7 @@ impl RpcDaemon {
             | "list_propagation_nodes"
             | "propagation_remote_status"
             | "propagation_remote_sync"
+            | "propagation_remote_fetch"
             | "propagation_remote_download"
             | "propagation_acknowledge_sync_completion"
             | "propagation_remote_unpeer" => self.handle_rpc_legacy_propagation(request),

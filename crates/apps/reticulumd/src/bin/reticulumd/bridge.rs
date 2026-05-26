@@ -35,6 +35,10 @@ mod remote_control;
 mod remote_control_download;
 #[path = "bridge_remote_control_link.rs"]
 mod remote_control_link;
+#[path = "bridge_remote_fetch.rs"]
+mod remote_fetch;
+#[path = "bridge_remote_request.rs"]
+mod remote_request;
 use super::outbound_resources::{
     track_outbound_resource, OutboundResourceMap, OutboundResourceTracking,
     OUTBOUND_RESOURCE_SENT_STATUS,
@@ -66,6 +70,8 @@ use std::time::{Duration, SystemTime, UNIX_EPOCH};
 pub(crate) use delivery_method::{validate_delivery_request, RequestedDeliveryMethod};
 use delivery_task::{DeliveryTask, LinkModeStatuses};
 use identity_resolver::resolve_destination_identity_blocking;
+#[cfg(test)]
+pub(crate) use propagation::wait_for_propagation_signal;
 use propagation::CachedPropagationLink;
 
 pub(super) struct TransportBridge {
@@ -75,6 +81,7 @@ pub(super) struct TransportBridge {
     delivery_source_hash: [u8; 16],
     announce_destination: Arc<tokio::sync::Mutex<SingleInputDestination>>,
     announce_app_data: Option<Vec<u8>>,
+    announce_capabilities: Vec<String>,
     propagation_announce_destination: Option<Arc<tokio::sync::Mutex<SingleInputDestination>>>,
     propagation_announce_app_data: Option<Vec<u8>>,
     control_announce_destination: Option<Arc<tokio::sync::Mutex<SingleInputDestination>>>,
@@ -99,6 +106,7 @@ impl TransportBridge {
         delivery_source_hash: [u8; 16],
         announce_destination: Arc<tokio::sync::Mutex<SingleInputDestination>>,
         announce_app_data: Option<Vec<u8>>,
+        announce_capabilities: Vec<String>,
         propagation_announce_destination: Option<Arc<tokio::sync::Mutex<SingleInputDestination>>>,
         propagation_announce_app_data: Option<Vec<u8>>,
         control_announce_destination: Option<Arc<tokio::sync::Mutex<SingleInputDestination>>>,
@@ -114,6 +122,7 @@ impl TransportBridge {
             delivery_source_hash,
             announce_destination,
             announce_app_data,
+            announce_capabilities,
             propagation_announce_destination,
             propagation_announce_app_data,
             control_announce_destination,

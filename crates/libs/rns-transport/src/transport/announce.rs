@@ -109,18 +109,16 @@ pub(super) async fn handle_announce<'a>(
 
     let destination_known = handler.has_destination(&packet.destination)
         || handler.knows_destination(&packet.destination);
-    match handler.announce_limits.check(iface, packet, destination_known) {
-        AnnounceLimitAction::Allow => {}
-        AnnounceLimitAction::Hold(release_after) => {
-            log::info!(
-                "tp({}): holding announce for {} on iface {} for at least {:?}",
-                handler.config.name,
-                packet.destination,
-                iface,
-                release_after,
-            );
-            return;
-        }
+    if let AnnounceLimitAction::Hold(delay) =
+        handler.announce_limits.check(iface, packet, destination_known)
+    {
+        log::debug!(
+            "tp({}): holding announce for {} for {:?}",
+            handler.config.name,
+            packet.destination,
+            delay
+        );
+        return;
     }
 
     let _ = process_announce(packet, handler, iface, source, announce).await;

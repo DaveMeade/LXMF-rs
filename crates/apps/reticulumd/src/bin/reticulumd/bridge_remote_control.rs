@@ -1,13 +1,74 @@
 use super::remote_control_download::propagation_download_request;
-use super::remote_control_link::{
-    build_link_identify_payload, build_link_request_payload, open_refreshed_remote_link,
-    resolve_remote_identity, send_link_context_packet, wait_for_link_request_response,
-};
 use super::*;
 use reticulum_daemon::lxmf_bridge::rmpv_to_json;
 use rns_rpc::RemoteControlBridge;
 
+use super::remote_fetch::{rmpv_binary_array, LocalPropagationImportOutcome};
+use super::remote_request::remote_control_request;
+
 impl TransportBridge {
+    pub(super) fn run_remote_control_raw(
+        &self,
+        remote: &str,
+        identity_private_key_hex: Option<&str>,
+        timeout_secs: f64,
+        path: &str,
+        data: rmpv::Value,
+    ) -> Result<rmpv::Value, std::io::Error> {
+        let remote = remote.trim().to_string();
+        let identity_override = identity_private_key_hex
+            .map(str::trim)
+            .filter(|value| !value.is_empty())
+            .map(|value| {
+                let bytes = hex::decode(value).map_err(|err| {
+                    std::io::Error::new(
+                        std::io::ErrorKind::InvalidInput,
+                        format!("identity_private_key_hex must be hex-encoded: {err}"),
+                    )
+                })?;
+                PrivateIdentity::from_private_key_bytes(&bytes).map_err(|err| {
+                    std::io::Error::new(
+                        std::io::ErrorKind::InvalidInput,
+                        format!("invalid identity private key: {err:?}"),
+                    )
+                })
+            })
+            .transpose()?;
+        let request_identity = identity_override.unwrap_or_else(|| self.signer.clone());
+        let timeout = Duration::from_secs_f64(timeout_secs.max(0.1));
+        let path = path.to_string();
+        let transport = self.transport.clone();
+        let identity_cache = self.outbound_propagation_identities.clone();
+
+        std::thread::spawn(move || {
+            let runtime = tokio::runtime::Builder::new_current_thread()
+                .enable_all()
+                .build()
+                .map_err(|err| {
+                    std::io::Error::other(format!("failed to build remote control runtime: {err}"))
+                })?;
+            runtime.block_on(async move {
+                let result = remote_control_request(
+                    transport.as_ref(),
+                    &request_identity,
+                    &remote,
+                    &path,
+                    data,
+                    timeout,
+                )
+                .await;
+                if let Ok((_, identity)) = &result {
+                    if let Ok(mut guard) = identity_cache.lock() {
+                        guard.insert(remote.clone(), *identity);
+                    }
+                }
+                result.and_then(|(value, _)| response_to_result(value))
+            })
+        })
+        .join()
+        .map_err(|_| std::io::Error::other("remote control helper thread panicked"))?
+    }
+
     pub(super) fn run_remote_control(
         &self,
         remote: &str,
@@ -63,7 +124,7 @@ impl TransportBridge {
                         guard.insert(remote.clone(), *identity);
                     }
                 }
-                result.map(|(json, _)| json)
+                result.and_then(|(value, _)| response_to_json(&value))
             })
         })
         .join()
@@ -106,6 +167,68 @@ impl RemoteControlBridge for TransportBridge {
             "/pn/peer/sync",
             remote_peer_value(peer)?,
         )
+    }
+
+    fn propagation_remote_fetch(
+        &self,
+        remote: &str,
+        identity_private_key_hex: Option<&str>,
+        timeout_secs: f64,
+        transfer_limit_kb: Option<f64>,
+    ) -> Result<JsonValue, std::io::Error> {
+        let available = self.run_remote_control_raw(
+            remote,
+            identity_private_key_hex,
+            timeout_secs,
+            "/get",
+            rmpv::Value::Array(vec![rmpv::Value::Nil, rmpv::Value::Nil]),
+        )?;
+        let transient_ids = rmpv_binary_array(&available)?;
+        if transient_ids.is_empty() {
+            return Ok(json!({
+                "available_count": 0,
+                "fetched_count": 0,
+                "imported_count": 0,
+            }));
+        }
+
+        let fetched = self.run_remote_control_raw(
+            remote,
+            identity_private_key_hex,
+            timeout_secs,
+            "/get",
+            rmpv::Value::Array(vec![
+                rmpv::Value::Array(
+                    transient_ids.iter().cloned().map(rmpv::Value::Binary).collect(),
+                ),
+                rmpv::Value::Nil,
+                transfer_limit_kb
+                    .map(rmpv::Value::F64)
+                    .unwrap_or_else(|| rmpv::Value::from(10_240u64)),
+            ]),
+        )?;
+        let payloads = rmpv_binary_array(&fetched)?;
+        let daemon = self
+            .daemon
+            .lock()
+            .ok()
+            .and_then(|guard| guard.clone())
+            .ok_or_else(|| std::io::Error::other("daemon unavailable"))?;
+
+        let mut imported_count = 0usize;
+        for payload in &payloads {
+            if self.accept_local_propagated_payload(daemon.clone(), payload.clone())?
+                == LocalPropagationImportOutcome::Imported
+            {
+                imported_count = imported_count.saturating_add(1);
+            }
+        }
+
+        Ok(json!({
+            "available_count": transient_ids.len(),
+            "fetched_count": payloads.len(),
+            "imported_count": imported_count,
+        }))
     }
 
     fn propagation_remote_download(
@@ -193,76 +316,9 @@ impl RemoteControlBridge for TransportBridge {
     }
 }
 
-async fn remote_control_request(
-    transport: &Transport,
-    request_identity: &PrivateIdentity,
-    remote: &str,
-    path: &str,
-    data: rmpv::Value,
-    timeout: Duration,
-) -> Result<(JsonValue, Identity), std::io::Error> {
-    let remote_hash = AddressHash::new(parse_destination_hash_required(remote)?);
-    let remote_identity = resolve_remote_identity(transport, &remote_hash, timeout).await?;
-    let remote_identity = remote_identity.ok_or_else(|| {
-        std::io::Error::new(
-            std::io::ErrorKind::NotFound,
-            "no path known for propagation control node",
-        )
-    })?;
-
-    let destination = SingleOutputDestination::new(
-        remote_identity,
-        DestinationName::new("lxmf", "propagation.control"),
-    );
-    let link =
-        open_refreshed_remote_link(transport, &remote_hash, destination.desc, timeout).await?;
-    let link_id = *link.lock().await.id();
-
-    let identify_payload = build_link_identify_payload(request_identity, &link_id);
-    send_link_context_packet(
-        transport,
-        &link,
-        PacketContext::LinkIdentify,
-        identify_payload.as_slice(),
-    )
-    .await?;
-
-    let mut data_rx = transport.received_data_events();
-    let mut resource_rx = transport.resource_events();
-    let request_payload = build_link_request_payload(path, data)?;
-    let request_id = send_link_context_packet(
-        transport,
-        &link,
-        PacketContext::Request,
-        request_payload.as_slice(),
-    )
-    .await?
-    .ok_or_else(|| std::io::Error::other("missing remote control request id"))?;
-
-    let response = wait_for_link_request_response(
-        &mut data_rx,
-        &mut resource_rx,
-        destination.desc.address_hash,
-        link_id,
-        request_id,
-        timeout,
-    )
-    .await
-    .map_err(|err| std::io::Error::new(std::io::ErrorKind::TimedOut, err))?;
-
-    response_to_json(&response).map(|json| (json, remote_identity))
-}
-
 fn response_to_json(response: &rmpv::Value) -> Result<JsonValue, std::io::Error> {
-    if let Some(code) = response.as_u64().or_else(|| response.as_i64().map(|value| value as u64)) {
-        let (kind, message) = match code as u8 {
-            0xF0 => (std::io::ErrorKind::PermissionDenied, "propagation node requires identity"),
-            0xF1 => (std::io::ErrorKind::PermissionDenied, "propagation node denied access"),
-            0xF4 => (std::io::ErrorKind::InvalidInput, "propagation node rejected the request"),
-            0xFD => (std::io::ErrorKind::NotFound, "propagation peer not found"),
-            _ => (std::io::ErrorKind::InvalidData, "unexpected propagation control response"),
-        };
-        return Err(std::io::Error::new(kind, message));
+    if let Some(error) = response_code_error(response) {
+        return Err(error);
     }
     if let Some(json) = rmpv_to_json(response) {
         return Ok(json);
@@ -275,4 +331,25 @@ fn response_to_json(response: &rmpv::Value) -> Result<JsonValue, std::io::Error>
             "unsupported propagation control response payload",
         )),
     }
+}
+
+fn response_to_result(response: rmpv::Value) -> Result<rmpv::Value, std::io::Error> {
+    if let Some(error) = response_code_error(&response) {
+        return Err(error);
+    }
+    Ok(response)
+}
+
+fn response_code_error(response: &rmpv::Value) -> Option<std::io::Error> {
+    if let Some(code) = response.as_u64().or_else(|| response.as_i64().map(|value| value as u64)) {
+        let (kind, message) = match code as u8 {
+            0xF0 => (std::io::ErrorKind::PermissionDenied, "propagation node requires identity"),
+            0xF1 => (std::io::ErrorKind::PermissionDenied, "propagation node denied access"),
+            0xF4 => (std::io::ErrorKind::InvalidInput, "propagation node rejected the request"),
+            0xFD => (std::io::ErrorKind::NotFound, "propagation peer not found"),
+            _ => (std::io::ErrorKind::InvalidData, "unexpected propagation control response"),
+        };
+        return Some(std::io::Error::new(kind, message));
+    }
+    None
 }
