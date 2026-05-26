@@ -474,10 +474,7 @@ pub trait OutboundBridge: Send + Sync {
         Ok(None)
     }
 
-    fn decode_paper_uri(
-        &self,
-        _uri: &str,
-    ) -> Result<Option<PaperDecodeOutcome>, std::io::Error> {
+    fn decode_paper_uri(&self, _uri: &str) -> Result<Option<PaperDecodeOutcome>, std::io::Error> {
         Ok(None)
     }
 }
