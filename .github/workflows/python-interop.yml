@@ -99,7 +99,7 @@ jobs:
 
       - name: Rust E2E compatibility gate
         working-directory: lxmf-rs
-        run: cargo xtask ci --stage e2e-compatibility
+        run: cargo xtask ci --stage e2e-compatibility -timeout-secs 60
 
       - name: Rust/Python Reticulum channel interop
         working-directory: lxmf-rs
