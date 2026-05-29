@@ -98,8 +98,8 @@ jobs:
         run: cargo xtask ci --stage sdk-conformance
 
       - name: Rust E2E compatibility gate
-       working-directory: lxmf-rs
-       run: cargo xtask ci --stage e2e-compatibility
+        working-directory: lxmf-rs
+        run: cargo xtask ci --stage e2e-compatibility
 
       - name: Rust/Python Reticulum channel interop
         working-directory: lxmf-rs
