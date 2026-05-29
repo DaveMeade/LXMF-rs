@@ -25,7 +25,7 @@ pub(super) async fn run_zmq_rpc_loop_until(
     let mut commands = PullSocket::new();
     commands.bind(config.command_endpoint.as_str()).await.map_err(zmq_io_error)?;
     let mut responses: HashMap<String, PushSocket> = HashMap::new();
-    println!("reticulumd listening on zmq {}", config.command_endpoint);
+    log::info!("reticulumd listening on zmq {}", config.command_endpoint);
 
     loop {
         tokio::select! {
@@ -38,7 +38,7 @@ pub(super) async fn run_zmq_rpc_loop_until(
                 let message = match message {
                     Ok(message) => message,
                     Err(err) if is_recoverable_zmq_transport_error(&err) => {
-                        eprintln!("[daemon] zmq rpc receive dropped client connection: {}", err);
+                        log::warn!("[daemon] zmq rpc receive dropped client connection: {}", err);
                         continue;
                     }
                     Err(err) => return Err(zmq_io_error(err)),
@@ -51,7 +51,7 @@ pub(super) async fn run_zmq_rpc_loop_until(
                     );
                 if let Some(response) = response {
                     if let Err(err) = send_zmq_response(&mut responses, response).await {
-                        eprintln!("[daemon] zmq rpc response dropped client connection: {}", err);
+                        log::warn!("[daemon] zmq rpc response dropped client connection: {}", err);
                     }
                 }
             }
