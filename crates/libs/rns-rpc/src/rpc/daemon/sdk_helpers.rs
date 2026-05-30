@@ -11,6 +11,20 @@ pub(super) struct SdkStoreForwardPolicy {
 
 use super::*;
 
+pub(super) const SDK_VERSION: &str = "0.2.1";
+pub(super) const RETICULUM_CONFORMANCE_REFERENCE_REF: &str =
+    "0319444b20e0815f26c6b9ceeba8fa44de037c9b";
+pub(super) const PYTHON_RETICULUM_REFERENCE_REF: &str = "15320e4d2cfabb143c1db20ca887e275fd521585";
+pub(super) const PYTHON_LXMF_REFERENCE_REF: &str = "727830cefda83d9c6e3982b48675425f3f988f9c";
+
+pub(super) fn python_reference_meta() -> JsonValue {
+    json!({
+        "reticulum_conformance_ref": RETICULUM_CONFORMANCE_REFERENCE_REF,
+        "python_reticulum_ref": PYTHON_RETICULUM_REFERENCE_REF,
+        "python_lxmf_ref": PYTHON_LXMF_REFERENCE_REF,
+    })
+}
+
 impl RpcDaemon {
     pub(super) fn sdk_config_error(code: &str, message: &str) -> RpcError {
         RpcError::new(code, message)
@@ -726,6 +740,7 @@ impl RpcDaemon {
         matches!(
             method,
             "sdk_send_v2"
+                | "sdk_send_batch_v2"
                 | "send_message"
                 | "send_message_v2"
                 | "sdk_cancel_message_v2"
@@ -767,6 +782,27 @@ impl RpcDaemon {
                     details.insert(
                         "message_id".to_string(),
                         JsonValue::String(message_id.to_string()),
+                    );
+                }
+            }
+            "sdk_send_batch_v2" => {
+                if let Some(batch_id) = result.get("batch_id").and_then(JsonValue::as_str) {
+                    details.insert("batch_id".to_string(), JsonValue::String(batch_id.to_string()));
+                }
+                if let Some(accepted_count) =
+                    result.get("accepted_count").and_then(JsonValue::as_u64)
+                {
+                    details.insert(
+                        "accepted_count".to_string(),
+                        JsonValue::Number(serde_json::Number::from(accepted_count)),
+                    );
+                }
+                if let Some(rejected_count) =
+                    result.get("rejected_count").and_then(JsonValue::as_u64)
+                {
+                    details.insert(
+                        "rejected_count".to_string(),
+                        JsonValue::Number(serde_json::Number::from(rejected_count)),
                     );
                 }
             }

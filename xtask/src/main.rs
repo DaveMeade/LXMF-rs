@@ -440,7 +440,10 @@ enum XtaskCommand {
         undo: bool,
     },
     CompatKitCheck,
-    E2eCompatibility,
+    E2eCompatibility {
+        #[arg(long)]
+        timeout_secs: Option<u64>,
+    },
     MeshSim,
     SdkProfileBuild,
     SdkExamplesCheck,
@@ -647,7 +650,7 @@ fn main() -> Result<()> {
             run_yank_crate(&package, &version, undo)
         }
         XtaskCommand::CompatKitCheck => run_compat_kit_check(),
-        XtaskCommand::E2eCompatibility => run_e2e_compatibility(None),
+        XtaskCommand::E2eCompatibility { timeout_secs } => run_e2e_compatibility(timeout_secs),
         XtaskCommand::MeshSim => run_mesh_sim(),
         XtaskCommand::SdkProfileBuild => run_sdk_profile_build(),
         XtaskCommand::SdkExamplesCheck => run_sdk_examples_check(),
@@ -1460,7 +1463,8 @@ fn build_interop_artifacts_manifest() -> Result<InteropArtifactsManifest> {
         if path == Path::new(INTEROP_BASELINE_PATH) {
             continue;
         }
-        let bytes = fs::read(&path).with_context(|| format!("read {}", path.display()))?;
+        let raw_bytes = fs::read(&path).with_context(|| format!("read {}", path.display()))?;
+        let bytes = normalize_interop_artifact_bytes(raw_bytes);
         let mut hasher = Sha256::new();
         hasher.update(&bytes);
         let sha256 = hex::encode(hasher.finalize());
@@ -1478,6 +1482,24 @@ fn build_interop_artifacts_manifest() -> Result<InteropArtifactsManifest> {
     entries.sort_by(|left, right| left.path.cmp(&right.path));
 
     Ok(InteropArtifactsManifest { version: 1, files: entries })
+}
+
+fn normalize_interop_artifact_bytes(bytes: Vec<u8>) -> Vec<u8> {
+    bytes
+        .split(|byte| *byte == b'\n')
+        .enumerate()
+        .flat_map(|(index, line)| {
+            let mut normalized = if line.last() == Some(&b'\r') {
+                line[..line.len() - 1].to_vec()
+            } else {
+                line.to_vec()
+            };
+            if index > 0 {
+                normalized.insert(0, b'\n');
+            }
+            normalized
+        })
+        .collect()
 }
 
 fn collect_files(root: &Path, files: &mut Vec<PathBuf>) -> Result<()> {
