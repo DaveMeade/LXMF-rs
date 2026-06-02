@@ -4336,6 +4336,31 @@ fn propagation_remote_sync_forwards_transfer_limit_to_bridge() {
 }
 
 #[test]
+fn propagation_remote_sync_uses_peer_transfer_limit_when_request_limit_absent() {
+    let daemon = RpcDaemon::test_instance();
+    daemon.set_remote_control_bridge(Arc::new(TransferLimitRemoteControlBridge));
+    daemon
+        .handle_rpc(rpc_request(78, "peer_sync", json!({ "peer": "peer-transfer-limit" })))
+        .expect("seed peer");
+    {
+        let mut peers = daemon.peers.lock().expect("peers mutex poisoned");
+        let peer = peers.get_mut("peer-transfer-limit").expect("peer record");
+        peer.propagation_transfer_limit = Some(42_500);
+    }
+
+    daemon
+        .handle_rpc(rpc_request(
+            79,
+            "propagation_remote_sync",
+            json!({
+                "remote": "remote-node",
+                "peer": "peer-transfer-limit",
+            }),
+        ))
+        .expect("remote sync with peer transfer limit");
+}
+
+#[test]
 fn failed_propagation_remote_download_import_updates_lifecycle_error() {
     let daemon = RpcDaemon::test_instance();
     daemon.set_remote_control_bridge(Arc::new(TestRemoteControlBridge {

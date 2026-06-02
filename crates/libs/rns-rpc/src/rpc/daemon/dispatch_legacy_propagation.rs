@@ -857,6 +857,22 @@ impl RpcDaemon {
                     .clone()
                     .ok_or_else(|| std::io::Error::other("remote control bridge unavailable"))?;
                 let timeout_secs = parsed.timeout_secs.unwrap_or(5.0).max(0.1);
+                let peer_transfer_limit_kb = self
+                    .peers
+                    .lock()
+                    .expect("peers mutex poisoned")
+                    .get(parsed.peer.as_str())
+                    .and_then(|peer| {
+                        peer.propagation_transfer_limit.map(|limit| f64::from(limit) / 1000.0)
+                    });
+                let request_transfer_limit_kb =
+                    parsed.transfer_limit_kb.map(|limit| limit.max(0.0));
+                let transfer_limit_kb = match (peer_transfer_limit_kb, request_transfer_limit_kb) {
+                    (Some(peer_limit), Some(request_limit)) => Some(peer_limit.min(request_limit)),
+                    (Some(peer_limit), None) => Some(peer_limit),
+                    (None, Some(request_limit)) => Some(request_limit),
+                    (None, None) => None,
+                };
                 self.update_propagation_sync_state(|state| {
                     state.sync_state = PR_REQUEST_SENT;
                     state.state_name = "syncing".to_string();
@@ -870,7 +886,7 @@ impl RpcDaemon {
                     parsed.peer.as_str(),
                     parsed.identity_private_key_hex.as_deref(),
                     timeout_secs,
-                    parsed.transfer_limit_kb,
+                    transfer_limit_kb,
                 ) {
                     Ok(mut result) => {
                         let imported = match self.import_remote_propagation_payloads(&result) {
