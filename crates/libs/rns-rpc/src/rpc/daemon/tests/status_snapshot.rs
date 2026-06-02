@@ -1608,6 +1608,60 @@ fn peer_sync_applies_per_peer_propagation_sync_limit() {
 }
 
 #[test]
+fn peer_sync_uses_transfer_limit_when_sync_limit_is_absent() {
+    let daemon = RpcDaemon::test_instance();
+    daemon
+        .handle_rpc(rpc_request(58, "peer_sync", json!({ "peer": "peer-transfer-budget" })))
+        .expect("initial peer sync");
+    {
+        let mut peers = daemon.peers.lock().expect("peers mutex poisoned");
+        let peer = peers.get_mut("peer-transfer-budget").expect("peer record");
+        peer.propagation_transfer_limit = Some((24 + 20 + 32 + 16) as u32);
+        peer.propagation_sync_limit = None;
+    }
+
+    let small = PropagationEntryRecord {
+        transient_id: "c1".repeat(32),
+        destination: "16".repeat(16),
+        payload_hex: "16".repeat(20),
+        received_at: 1_700_000_610,
+        size_bytes: 20,
+        stamp_value: None,
+    };
+    let large = PropagationEntryRecord {
+        transient_id: "c2".repeat(32),
+        destination: "16".repeat(16),
+        payload_hex: "16".repeat(100),
+        received_at: 1_700_000_611,
+        size_bytes: 100,
+        stamp_value: None,
+    };
+    daemon.store.upsert_propagation_entry(&small).expect("store small entry");
+    daemon.store.upsert_propagation_entry(&large).expect("store large entry");
+    for entry in [&small, &large] {
+        daemon
+            .store
+            .mark_peer_unhandled_propagation("peer-transfer-budget", entry.transient_id.as_str())
+            .expect("mark unhandled");
+    }
+
+    daemon
+        .handle_rpc(rpc_request(59, "peer_sync", json!({ "peer": "peer-transfer-budget" })))
+        .expect("budgeted peer sync");
+
+    let handled = daemon
+        .store
+        .list_peer_handled_propagation_ids("peer-transfer-budget")
+        .expect("handled ids");
+    assert_eq!(handled, vec![small.transient_id]);
+    let pending = daemon
+        .store
+        .list_peer_unhandled_propagation("peer-transfer-budget")
+        .expect("pending propagation");
+    assert_eq!(pending, vec![large]);
+}
+
+#[test]
 fn list_peers_includes_propagation_marks_in_message_counters() {
     let daemon = RpcDaemon::test_instance();
     daemon

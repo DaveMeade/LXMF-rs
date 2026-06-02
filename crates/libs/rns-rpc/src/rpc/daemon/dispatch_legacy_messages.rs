@@ -387,7 +387,10 @@ impl RpcDaemon {
                     None,
                     peer_type,
                 )?;
-                let sync_limit_bytes = record.propagation_sync_limit.map(|limit| limit as usize);
+                let sync_limit_bytes = record
+                    .propagation_sync_limit
+                    .or(record.propagation_transfer_limit)
+                    .map(|limit| limit as usize);
                 let pending_propagation = self
                     .store
                     .list_peer_unhandled_propagation(peer_id)
