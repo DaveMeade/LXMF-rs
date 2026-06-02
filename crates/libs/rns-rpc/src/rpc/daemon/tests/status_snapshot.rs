@@ -1569,6 +1569,14 @@ fn peer_sync_during_backoff_postpones_skipped_offers() {
     assert_eq!(result["propagation"]["offered"].as_u64(), Some(0));
     assert_eq!(result["propagation"]["handled"].as_u64(), Some(0));
     assert_eq!(result["propagation"]["skipped"].as_u64(), Some(0));
+    assert_eq!(result["propagation"]["transfer_limited"].as_u64(), Some(0));
+    assert_eq!(result["propagation"]["transfer_limited_bytes"].as_u64(), Some(0));
+    assert_eq!(
+        result["propagation"]["transfer_limited_ids"]
+            .as_array()
+            .expect("transfer limited ids"),
+        &[] as &[JsonValue]
+    );
 
     let after = daemon
         .handle_rpc(RpcRequest { id: 55, method: "list_peers".to_string(), params: None })

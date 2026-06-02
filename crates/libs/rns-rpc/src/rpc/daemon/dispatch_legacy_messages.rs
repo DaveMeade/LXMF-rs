@@ -66,6 +66,9 @@ impl RpcDaemon {
             "remaining_bytes": 0,
             "handled_ids": [],
             "skipped_ids": [],
+            "transfer_limited": 0,
+            "transfer_limited_bytes": 0,
+            "transfer_limited_ids": [],
             "messages": [],
             "sync_limit": sync_limit_bytes,
         });
