@@ -8,6 +8,7 @@ impl RpcDaemon {
         record: &PeerRecord,
         timestamp: i64,
         postpone_reason: &str,
+        transfer_limit_bytes: Option<usize>,
         sync_limit_bytes: Option<usize>,
     ) -> RpcResponse {
         let (
@@ -74,7 +75,7 @@ impl RpcDaemon {
             "transfer_limited_bytes": 0,
             "transfer_limited_ids": [],
             "messages": [],
-            "transfer_limit": record.propagation_transfer_limit.map(|limit| limit as usize),
+            "transfer_limit": transfer_limit_bytes,
             "sync_limit": sync_limit_bytes,
             "target_stamp_cost": record.propagation_stamp_cost,
             "stamp_cost_flexibility": record.propagation_stamp_cost_flexibility,
@@ -601,6 +602,7 @@ impl RpcDaemon {
                         &record,
                         timestamp,
                         "backoff",
+                        transfer_limit_bytes,
                         sync_limit_bytes,
                     ));
                 }
@@ -618,6 +620,7 @@ impl RpcDaemon {
                             &record,
                             timestamp,
                             "stamp_policy",
+                            transfer_limit_bytes,
                             sync_limit_bytes,
                         ));
                     }
@@ -627,6 +630,7 @@ impl RpcDaemon {
                             &record,
                             timestamp,
                             "peering_key",
+                            transfer_limit_bytes,
                             sync_limit_bytes,
                         ));
                     }

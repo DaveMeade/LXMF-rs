@@ -2489,6 +2489,38 @@ fn peer_sync_request_transfer_limit_does_not_loosen_peer_limit() {
 }
 
 #[test]
+fn postponed_peer_sync_reports_request_transfer_limit() {
+    let daemon = RpcDaemon::test_instance();
+    daemon
+        .handle_rpc(rpc_request(60, "peer_sync", json!({ "peer": "peer-postponed-limit" })))
+        .expect("initial peer sync");
+    {
+        let mut peers = daemon.peers.lock().expect("peers mutex poisoned");
+        let peer = peers.get_mut("peer-postponed-limit").expect("peer record");
+        peer.next_sync_attempt = i64::MAX;
+    }
+
+    let result = daemon
+        .handle_rpc(rpc_request(
+            61,
+            "peer_sync",
+            json!({
+                "peer": "peer-postponed-limit",
+                "transfer_limit_kb": 0.08,
+            }),
+        ))
+        .expect("postponed peer sync")
+        .result
+        .expect("peer sync result");
+    assert_eq!(result["synced"].as_bool(), Some(false));
+    assert_eq!(result["postponed"].as_bool(), Some(true));
+    assert_eq!(result["postpone_reason"].as_str(), Some("backoff"));
+    assert_eq!(result["propagation"]["transfer_limit"].as_u64(), Some(80));
+    assert_eq!(result["propagation"]["sync_limit"].as_u64(), Some(80));
+    assert_eq!(result["transfer_limit"], JsonValue::Null);
+}
+
+#[test]
 fn peer_sync_orders_offers_by_python_weight_before_sync_limit() {
     let daemon = RpcDaemon::test_instance();
     daemon
