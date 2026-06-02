@@ -1898,7 +1898,7 @@ fn peer_sync_skips_entry_at_exact_sync_limit_like_python() {
     {
         let mut peers = daemon.peers.lock().expect("peers mutex poisoned");
         let peer = peers.get_mut("peer-sync-equal-budget").expect("peer record");
-        peer.propagation_sync_limit = Some((24 + 20 + 32 + 16) as u32);
+        peer.propagation_sync_limit = Some((24 + 20 + 16) as u32);
     }
 
     let entry = PropagationEntryRecord {
@@ -1940,6 +1940,51 @@ fn peer_sync_skips_entry_at_exact_sync_limit_like_python() {
         .list_peer_unhandled_propagation("peer-sync-equal-budget")
         .expect("pending propagation");
     assert_eq!(pending, vec![entry]);
+}
+
+#[test]
+fn peer_sync_applies_python_per_message_overhead_for_sync_limit() {
+    let daemon = RpcDaemon::test_instance();
+    daemon
+        .handle_rpc(rpc_request(56, "peer_sync", json!({ "peer": "peer-sync-overhead" })))
+        .expect("initial peer sync");
+    {
+        let mut peers = daemon.peers.lock().expect("peers mutex poisoned");
+        let peer = peers.get_mut("peer-sync-overhead").expect("peer record");
+        peer.propagation_sync_limit = Some((24 + 40 + 16 + 1) as u32);
+    }
+
+    let entry = PropagationEntryRecord {
+        transient_id: "b4".repeat(32),
+        destination: "15".repeat(16),
+        payload_hex: "15".repeat(40),
+        received_at: 1_700_000_610,
+        size_bytes: 40,
+        stamp_value: None,
+    };
+    daemon.store.upsert_propagation_entry(&entry).expect("store propagation entry");
+    daemon
+        .store
+        .mark_peer_unhandled_propagation("peer-sync-overhead", entry.transient_id.as_str())
+        .expect("mark unhandled");
+
+    let result = daemon
+        .handle_rpc(rpc_request(57, "peer_sync", json!({ "peer": "peer-sync-overhead" })))
+        .expect("budgeted peer sync")
+        .result
+        .expect("peer sync result");
+    assert_eq!(result["propagation"]["handled"].as_u64(), Some(1));
+    assert_eq!(result["propagation"]["skipped"].as_u64(), Some(0));
+    assert_eq!(
+        result["propagation"]["handled_ids"].as_array().expect("handled ids"),
+        &[json!(entry.transient_id.as_str())]
+    );
+
+    let handled = daemon
+        .store
+        .list_peer_handled_propagation_ids("peer-sync-overhead")
+        .expect("handled ids");
+    assert_eq!(handled, vec![entry.transient_id]);
 }
 
 #[test]
