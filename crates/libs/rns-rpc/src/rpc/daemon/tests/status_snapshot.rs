@@ -2129,6 +2129,65 @@ fn peer_sync_result_and_event_report_message_accounting() {
 }
 
 #[test]
+fn peer_sync_result_and_event_report_transfer_and_stamp_policy() {
+    let daemon = RpcDaemon::test_instance();
+    daemon
+        .handle_rpc(rpc_request(65, "peer_sync", json!({ "peer": "peer-sync-policy" })))
+        .expect("initial peer sync");
+    daemon.event_queue.lock().expect("event_queue mutex poisoned").clear();
+
+    {
+        let mut peers = daemon.peers.lock().expect("peers mutex poisoned");
+        let peer = peers.get_mut("peer-sync-policy").expect("peer record");
+        peer.peer_type = Some("static".to_string());
+        peer.propagation_transfer_limit = Some(333);
+        peer.propagation_sync_limit = Some(999);
+        peer.propagation_stamp_cost = Some(8);
+        peer.propagation_stamp_cost_flexibility = Some(2);
+    }
+
+    let result = daemon
+        .handle_rpc(rpc_request(66, "peer_sync", json!({ "peer": "peer-sync-policy" })))
+        .expect("peer sync")
+        .result
+        .expect("peer sync result");
+    assert_eq!(result["peer_type"].as_str(), Some("static"));
+    assert_eq!(result["propagation_transfer_limit"].as_u64(), Some(333));
+    assert_eq!(result["propagation_sync_limit"].as_u64(), Some(999));
+    assert_eq!(result["propagation_stamp_cost"].as_u64(), Some(8));
+    assert_eq!(result["propagation_stamp_cost_flexibility"].as_u64(), Some(2));
+    assert_eq!(result["transfer_limit"].as_u64(), Some(333));
+    assert_eq!(result["sync_limit"].as_u64(), Some(999));
+    assert_eq!(result["target_stamp_cost"].as_u64(), Some(8));
+    assert_eq!(result["stamp_cost_flexibility"].as_u64(), Some(2));
+
+    let event = daemon
+        .event_queue
+        .lock()
+        .expect("event_queue mutex poisoned")
+        .iter()
+        .rev()
+        .find(|event| event.event_type == "peer_sync")
+        .cloned()
+        .expect("peer sync event");
+    assert_eq!(event.payload["peer_type"].as_str(), Some("static"));
+    assert_eq!(
+        event.payload["propagation_transfer_limit"].as_u64(),
+        Some(333)
+    );
+    assert_eq!(event.payload["propagation_sync_limit"].as_u64(), Some(999));
+    assert_eq!(event.payload["propagation_stamp_cost"].as_u64(), Some(8));
+    assert_eq!(
+        event.payload["propagation_stamp_cost_flexibility"].as_u64(),
+        Some(2)
+    );
+    assert_eq!(event.payload["transfer_limit"].as_u64(), Some(333));
+    assert_eq!(event.payload["sync_limit"].as_u64(), Some(999));
+    assert_eq!(event.payload["target_stamp_cost"].as_u64(), Some(8));
+    assert_eq!(event.payload["stamp_cost_flexibility"].as_u64(), Some(2));
+}
+
+#[test]
 fn list_peers_includes_propagation_marks_in_message_counters() {
     let daemon = RpcDaemon::test_instance();
     daemon
