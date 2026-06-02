@@ -1913,9 +1913,9 @@ fn peer_sync_uses_transfer_limit_when_sync_limit_is_absent() {
     let large = PropagationEntryRecord {
         transient_id: "c2".repeat(32),
         destination: "16".repeat(16),
-        payload_hex: "16".repeat(100),
+        payload_hex: "16".repeat(40),
         received_at: 1_700_000_611,
-        size_bytes: 100,
+        size_bytes: 40,
         stamp_value: None,
     };
     daemon.store.upsert_propagation_entry(&small).expect("store small entry");
@@ -1941,6 +1941,73 @@ fn peer_sync_uses_transfer_limit_when_sync_limit_is_absent() {
         .list_peer_unhandled_propagation("peer-transfer-budget")
         .expect("pending propagation");
     assert_eq!(pending, vec![large]);
+}
+
+#[test]
+fn peer_sync_marks_entries_above_transfer_limit_handled_without_offering() {
+    let daemon = RpcDaemon::test_instance();
+    daemon
+        .handle_rpc(rpc_request(60, "peer_sync", json!({ "peer": "peer-transfer-oversize" })))
+        .expect("initial peer sync");
+    daemon.event_queue.lock().expect("event_queue mutex poisoned").clear();
+    {
+        let mut peers = daemon.peers.lock().expect("peers mutex poisoned");
+        let peer = peers.get_mut("peer-transfer-oversize").expect("peer record");
+        peer.propagation_transfer_limit = Some(80);
+        peer.propagation_sync_limit = Some(1_000);
+    }
+
+    let oversized = PropagationEntryRecord {
+        transient_id: "c3".repeat(32),
+        destination: "16".repeat(16),
+        payload_hex: "16".repeat(100),
+        received_at: 1_700_000_612,
+        size_bytes: 100,
+        stamp_value: None,
+    };
+    daemon.store.upsert_propagation_entry(&oversized).expect("store oversized entry");
+    daemon
+        .store
+        .mark_peer_unhandled_propagation("peer-transfer-oversize", oversized.transient_id.as_str())
+        .expect("mark unhandled");
+
+    let result = daemon
+        .handle_rpc(rpc_request(61, "peer_sync", json!({ "peer": "peer-transfer-oversize" })))
+        .expect("peer sync")
+        .result
+        .expect("peer sync result");
+    assert_eq!(result["propagation"]["handled"].as_u64(), Some(0));
+    assert_eq!(result["propagation"]["offered"].as_u64(), Some(0));
+    assert_eq!(result["propagation"]["bytes"].as_u64(), Some(0));
+    assert_eq!(result["messages"]["offered"].as_u64(), Some(1));
+    assert_eq!(result["messages"]["unhandled"].as_u64(), Some(0));
+
+    let handled = daemon
+        .store
+        .list_peer_handled_propagation_ids("peer-transfer-oversize")
+        .expect("handled ids");
+    assert_eq!(handled, vec![oversized.transient_id]);
+    assert!(
+        daemon
+            .store
+            .list_peer_unhandled_propagation("peer-transfer-oversize")
+            .expect("pending propagation")
+            .is_empty()
+    );
+
+    let event = daemon
+        .event_queue
+        .lock()
+        .expect("event_queue mutex poisoned")
+        .iter()
+        .rev()
+        .find(|event| event.event_type == "peer_sync")
+        .cloned()
+        .expect("peer sync event");
+    assert_eq!(event.payload["propagation"]["handled"].as_u64(), Some(0));
+    assert_eq!(event.payload["propagation"]["offered"].as_u64(), Some(0));
+    assert_eq!(event.payload["messages"]["offered"].as_u64(), Some(1));
+    assert_eq!(event.payload["messages"]["unhandled"].as_u64(), Some(0));
 }
 
 #[test]
