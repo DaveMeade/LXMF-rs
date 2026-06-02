@@ -70,6 +70,7 @@ impl RpcDaemon {
             "transfer_limited_bytes": 0,
             "transfer_limited_ids": [],
             "messages": [],
+            "transfer_limit": record.propagation_transfer_limit.map(|limit| limit as usize),
             "sync_limit": sync_limit_bytes,
         });
         let peer_type_value = record.peer_type.clone();
@@ -682,6 +683,7 @@ impl RpcDaemon {
                     "transfer_limited_bytes": propagation_transfer_limited_bytes,
                     "transfer_limited_ids": propagation_transfer_limited_ids,
                     "messages": propagation_messages,
+                    "transfer_limit": transfer_limit_bytes,
                     "sync_limit": sync_limit_bytes,
                 });
                 let (
