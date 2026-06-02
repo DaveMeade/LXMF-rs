@@ -3867,7 +3867,9 @@ fn propagation_remote_sync_updates_peer_runtime_state() {
     let payload = b"remote-sync-peer-accounting";
     let payload_hex = hex::encode(payload);
     let transient_id = hex::encode(Sha256::digest(payload));
-    let daemon = RpcDaemon::test_instance();
+    let peer_id = hex::encode([3u8; 16]);
+    let daemon =
+        RpcDaemon::with_store(MessagesStore::in_memory().expect("store"), hex::encode([2u8; 16]));
     daemon.set_remote_control_bridge(Arc::new(TestRemoteControlBridge {
         result: Ok(json!({
             "synced": true,
@@ -3878,12 +3880,12 @@ fn propagation_remote_sync_updates_peer_runtime_state() {
         })),
     }));
     daemon
-        .handle_rpc(rpc_request(73, "peer_sync", json!({ "peer": "peer-remote-sync-state" })))
+        .handle_rpc(rpc_request(73, "peer_sync", json!({ "peer": peer_id })))
         .expect("initial peer sync");
     daemon.event_queue.lock().expect("event_queue mutex poisoned").clear();
     {
         let mut peers = daemon.peers.lock().expect("peers mutex poisoned");
-        let peer = peers.get_mut("peer-remote-sync-state").expect("peer record");
+        let peer = peers.get_mut(peer_id.as_str()).expect("peer record");
         peer.name = Some("Remote Sync State".to_string());
         peer.name_source = Some("test".to_string());
         peer.alive = false;
@@ -3893,6 +3895,7 @@ fn propagation_remote_sync_updates_peer_runtime_state() {
         peer.propagation_sync_limit = Some(84_000);
         peer.propagation_stamp_cost = Some(8);
         peer.propagation_stamp_cost_flexibility = Some(2);
+        peer.peering_cost = Some(1);
     }
 
     daemon
@@ -3901,7 +3904,7 @@ fn propagation_remote_sync_updates_peer_runtime_state() {
             "propagation_remote_sync",
             json!({
                 "remote": "remote-node",
-                "peer": "peer-remote-sync-state",
+                "peer": peer_id,
             }),
         ))
         .expect("remote sync");
@@ -3915,7 +3918,7 @@ fn propagation_remote_sync_updates_peer_runtime_state() {
         .as_array()
         .expect("peer rows")
         .iter()
-        .find(|row| row["peer"].as_str() == Some("peer-remote-sync-state"))
+        .find(|row| row["peer"].as_str() == Some(peer_id.as_str()))
         .expect("peer row");
     assert_eq!(row["alive"].as_bool(), Some(true));
     assert!(row["last_sync_attempt"].as_i64().is_some_and(|value| value > 0));
@@ -3934,7 +3937,7 @@ fn propagation_remote_sync_updates_peer_runtime_state() {
         .find(|event| event.event_type == "peer_sync")
         .cloned()
         .expect("peer sync event");
-    assert_eq!(event.payload["peer"].as_str(), Some("peer-remote-sync-state"));
+    assert_eq!(event.payload["peer"].as_str(), Some(peer_id.as_str()));
     assert_eq!(event.payload["name"].as_str(), Some("Remote Sync State"));
     assert_eq!(event.payload["name_source"].as_str(), Some("test"));
     assert_eq!(event.payload["remote"].as_str(), Some("remote-node"));
@@ -3958,6 +3961,9 @@ fn propagation_remote_sync_updates_peer_runtime_state() {
     assert_eq!(event.payload["sync_limit"].as_u64(), Some(84_000));
     assert_eq!(event.payload["target_stamp_cost"].as_u64(), Some(8));
     assert_eq!(event.payload["stamp_cost_flexibility"].as_u64(), Some(2));
+    let peering_key = event.payload["peering_key"].as_u64().expect("peering key");
+    assert!(peering_key >= 1);
+    assert_eq!(event.payload["propagation"]["peering_key"].as_u64(), Some(peering_key));
     assert_eq!(event.payload["sync_backoff"].as_u64(), Some(0));
     assert_eq!(event.payload["next_sync_attempt"].as_i64(), Some(0));
     assert_eq!(event.payload["tx_bytes"].as_u64(), Some(payload.len() as u64));

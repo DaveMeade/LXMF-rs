@@ -960,6 +960,11 @@ impl RpcDaemon {
                                 .store
                                 .list_peer_unhandled_propagation_ids(peer.peer.as_str())
                                 .unwrap_or_default();
+                            let peering_key =
+                                super::dispatch_legacy_messages::peer_peering_key_value(
+                                    &peer,
+                                    self.identity_hash.as_str(),
+                                );
                             let messages = json!({
                                 "offered": offered,
                                 "outgoing": outgoing,
@@ -976,6 +981,7 @@ impl RpcDaemon {
                                 "imported_count": imported.imported_count,
                                 "imported_ids": imported.imported_ids,
                                 "transferred_bytes": imported.transferred_bytes,
+                                "peering_key": peering_key,
                             });
                             let peer_status_type = if self.is_static_peer(peer.peer.as_str()) {
                                 "static"
@@ -1015,6 +1021,7 @@ impl RpcDaemon {
                                     "propagation_sync_limit": peer.propagation_sync_limit,
                                     "propagation_stamp_cost": peer.propagation_stamp_cost,
                                     "propagation_stamp_cost_flexibility": peer.propagation_stamp_cost_flexibility,
+                                    "peering_key": peering_key,
                                     "transfer_limit": peer.propagation_transfer_limit,
                                     "sync_limit": peer.propagation_sync_limit,
                                     "target_stamp_cost": peer.propagation_stamp_cost,

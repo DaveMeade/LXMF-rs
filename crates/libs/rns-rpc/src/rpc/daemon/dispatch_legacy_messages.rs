@@ -1463,7 +1463,7 @@ impl RpcDaemon {
     }
 }
 
-fn peer_peering_key_value(peer: &PeerRecord, local_identity_hash: &str) -> Option<u32> {
+pub(super) fn peer_peering_key_value(peer: &PeerRecord, local_identity_hash: &str) -> Option<u32> {
     let peering_cost = peer.peering_cost?;
     let remote_hash = decode_truncated_hash(peer.peer.as_str())?;
     let local_hash = decode_truncated_hash(local_identity_hash)?;
