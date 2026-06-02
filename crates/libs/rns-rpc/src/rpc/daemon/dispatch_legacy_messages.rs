@@ -2,6 +2,113 @@ use super::init::LXMF_PEER_SYNC_BACKOFF_STEP_SECS;
 use super::*;
 
 impl RpcDaemon {
+    fn postponed_peer_sync_response(
+        &self,
+        request_id: u64,
+        record: &PeerRecord,
+        timestamp: i64,
+        postpone_reason: &str,
+        sync_limit_bytes: Option<usize>,
+    ) -> RpcResponse {
+        let (acceptance_rate, last_sync_attempt, next_sync_attempt, sync_backoff) = {
+            let mut guard = self.peers.lock().expect("peers mutex poisoned");
+            if let Some(existing) = guard.get_mut(&record.peer) {
+                existing.last_sync_attempt = timestamp;
+                existing.alive = true;
+                (
+                    existing.acceptance_rate,
+                    existing.last_sync_attempt,
+                    existing.next_sync_attempt,
+                    existing.sync_backoff,
+                )
+            } else {
+                (record.acceptance_rate, timestamp, record.next_sync_attempt, record.sync_backoff)
+            }
+        };
+        let (outgoing, incoming, offered, unhandled, offered_bytes, unhandled_bytes) =
+            self.peer_message_stats(record.peer.as_str()).unwrap_or((0, 0, 0, 0, 0, 0));
+        let messages = json!({
+            "offered": offered,
+            "outgoing": outgoing,
+            "incoming": incoming,
+            "unhandled": unhandled,
+            "offered_bytes": offered_bytes,
+            "unhandled_bytes": unhandled_bytes,
+        });
+        let propagation_sync = json!({
+            "handled": 0,
+            "skipped": 0,
+            "offered": 0,
+            "bytes": 0,
+            "offered_bytes": 0,
+            "remaining": 0,
+            "remaining_bytes": 0,
+            "handled_ids": [],
+            "skipped_ids": [],
+            "messages": [],
+            "sync_limit": sync_limit_bytes,
+        });
+        let peer_type_value = record.peer_type.clone();
+        let peering_key = peer_peering_key_value(record, self.identity_hash.as_str());
+        let event = RpcEvent {
+            event_type: "peer_sync".into(),
+            payload: json!({
+                "peer": &record.peer,
+                "peer_type": peer_type_value.clone(),
+                "timestamp": timestamp,
+                "name": &record.name,
+                "name_source": &record.name_source,
+                "first_seen": record.first_seen,
+                "seen_count": record.seen_count,
+                "acceptance_rate": acceptance_rate,
+                "last_sync_attempt": last_sync_attempt,
+                "next_sync_attempt": next_sync_attempt,
+                "sync_backoff": sync_backoff,
+                "postponed": true,
+                "postpone_reason": postpone_reason,
+                "propagation_transfer_limit": record.propagation_transfer_limit,
+                "propagation_sync_limit": record.propagation_sync_limit,
+                "propagation_stamp_cost": record.propagation_stamp_cost,
+                "propagation_stamp_cost_flexibility": record.propagation_stamp_cost_flexibility,
+                "peering_key": peering_key,
+                "transfer_limit": record.propagation_transfer_limit,
+                "sync_limit": record.propagation_sync_limit,
+                "target_stamp_cost": record.propagation_stamp_cost,
+                "stamp_cost_flexibility": record.propagation_stamp_cost_flexibility,
+                "messages": messages.clone(),
+                "propagation": propagation_sync.clone(),
+            }),
+        };
+        self.publish_event(event);
+
+        RpcResponse {
+            id: request_id,
+            result: Some(json!({
+                "peer": &record.peer,
+                "peer_type": peer_type_value,
+                "synced": false,
+                "postponed": true,
+                "postpone_reason": postpone_reason,
+                "acceptance_rate": acceptance_rate,
+                "last_sync_attempt": last_sync_attempt,
+                "next_sync_attempt": next_sync_attempt,
+                "sync_backoff": sync_backoff,
+                "propagation_transfer_limit": record.propagation_transfer_limit,
+                "propagation_sync_limit": record.propagation_sync_limit,
+                "propagation_stamp_cost": record.propagation_stamp_cost,
+                "propagation_stamp_cost_flexibility": record.propagation_stamp_cost_flexibility,
+                "peering_key": peering_key,
+                "transfer_limit": record.propagation_transfer_limit,
+                "sync_limit": record.propagation_sync_limit,
+                "target_stamp_cost": record.propagation_stamp_cost,
+                "stamp_cost_flexibility": record.propagation_stamp_cost_flexibility,
+                "messages": messages,
+                "propagation": propagation_sync,
+            })),
+            error: None,
+        }
+    }
+
     pub(super) fn handle_rpc_legacy_messages(
         &self,
         request: RpcRequest,
@@ -397,124 +504,36 @@ impl RpcDaemon {
                     None,
                     peer_type,
                 )?;
-                if record.next_sync_attempt > 0 && timestamp < record.next_sync_attempt {
-                    let (acceptance_rate, last_sync_attempt, next_sync_attempt, sync_backoff) = {
-                        let mut guard = self.peers.lock().expect("peers mutex poisoned");
-                        if let Some(existing) = guard.get_mut(&record.peer) {
-                            existing.last_sync_attempt = timestamp;
-                            existing.alive = true;
-                            (
-                                existing.acceptance_rate,
-                                existing.last_sync_attempt,
-                                existing.next_sync_attempt,
-                                existing.sync_backoff,
-                            )
-                        } else {
-                            (
-                                record.acceptance_rate,
-                                timestamp,
-                                record.next_sync_attempt,
-                                record.sync_backoff,
-                            )
-                        }
-                    };
-                    let (outgoing, incoming, offered, unhandled, offered_bytes, unhandled_bytes) =
-                        self.peer_message_stats(record.peer.as_str()).unwrap_or((0, 0, 0, 0, 0, 0));
-                    let messages = json!({
-                        "offered": offered,
-                        "outgoing": outgoing,
-                        "incoming": incoming,
-                        "unhandled": unhandled,
-                        "offered_bytes": offered_bytes,
-                        "unhandled_bytes": unhandled_bytes,
-                    });
-                    let sync_limit_bytes = record
-                        .propagation_sync_limit
-                        .or(record.propagation_transfer_limit)
-                        .map(|limit| limit as usize);
-                    let propagation_sync = json!({
-                        "handled": 0,
-                        "skipped": 0,
-                        "offered": 0,
-                        "bytes": 0,
-                        "offered_bytes": 0,
-                        "remaining": 0,
-                        "remaining_bytes": 0,
-                        "handled_ids": [],
-                        "skipped_ids": [],
-                        "messages": [],
-                        "sync_limit": sync_limit_bytes,
-                    });
-                    let peer_type_value = record.peer_type.clone();
-                    let peering_key = peer_peering_key_value(&record, self.identity_hash.as_str());
-                    let event = RpcEvent {
-                        event_type: "peer_sync".into(),
-                        payload: json!({
-                            "peer": &record.peer,
-                            "peer_type": peer_type_value.clone(),
-                            "timestamp": timestamp,
-                            "name": &record.name,
-                            "name_source": &record.name_source,
-                            "first_seen": record.first_seen,
-                            "seen_count": record.seen_count,
-                            "acceptance_rate": acceptance_rate,
-                            "last_sync_attempt": last_sync_attempt,
-                            "next_sync_attempt": next_sync_attempt,
-                            "sync_backoff": sync_backoff,
-                            "postponed": true,
-                            "postpone_reason": "backoff",
-                            "propagation_transfer_limit": record.propagation_transfer_limit,
-                            "propagation_sync_limit": record.propagation_sync_limit,
-                            "propagation_stamp_cost": record.propagation_stamp_cost,
-                            "propagation_stamp_cost_flexibility": record.propagation_stamp_cost_flexibility,
-                            "peering_key": peering_key,
-                            "transfer_limit": record.propagation_transfer_limit,
-                            "sync_limit": record.propagation_sync_limit,
-                            "target_stamp_cost": record.propagation_stamp_cost,
-                            "stamp_cost_flexibility": record.propagation_stamp_cost_flexibility,
-                            "messages": messages.clone(),
-                            "propagation": propagation_sync.clone(),
-                        }),
-                    };
-                    self.publish_event(event);
-
-                    return Ok(RpcResponse {
-                        id: request.id,
-                        result: Some(json!({
-                            "peer": record.peer,
-                            "peer_type": peer_type_value,
-                            "synced": false,
-                            "postponed": true,
-                            "postpone_reason": "backoff",
-                            "acceptance_rate": acceptance_rate,
-                            "last_sync_attempt": last_sync_attempt,
-                            "next_sync_attempt": next_sync_attempt,
-                            "sync_backoff": sync_backoff,
-                            "propagation_transfer_limit": record.propagation_transfer_limit,
-                            "propagation_sync_limit": record.propagation_sync_limit,
-                            "propagation_stamp_cost": record.propagation_stamp_cost,
-                            "propagation_stamp_cost_flexibility": record.propagation_stamp_cost_flexibility,
-                            "peering_key": peering_key,
-                            "transfer_limit": record.propagation_transfer_limit,
-                            "sync_limit": record.propagation_sync_limit,
-                            "target_stamp_cost": record.propagation_stamp_cost,
-                            "stamp_cost_flexibility": record.propagation_stamp_cost_flexibility,
-                            "messages": messages,
-                            "propagation": propagation_sync,
-                        })),
-                        error: None,
-                    });
-                }
                 let sync_limit_bytes = record
                     .propagation_sync_limit
                     .or(record.propagation_transfer_limit)
                     .map(|limit| limit as usize);
+                if record.next_sync_attempt > 0 && timestamp < record.next_sync_attempt {
+                    return Ok(self.postponed_peer_sync_response(
+                        request.id,
+                        &record,
+                        timestamp,
+                        "backoff",
+                        sync_limit_bytes,
+                    ));
+                }
                 let transfer_limit_bytes =
                     record.propagation_transfer_limit.map(|limit| limit as usize);
                 let mut pending_propagation = self
                     .store
                     .list_peer_unhandled_propagation(peer_id)
                     .map_err(std::io::Error::other)?;
+                if pending_propagation.iter().any(|entry| entry.stamp_value.is_some())
+                    && !peer_stamp_policy_known(&record)
+                {
+                    return Ok(self.postponed_peer_sync_response(
+                        request.id,
+                        &record,
+                        timestamp,
+                        "stamp_policy",
+                        sync_limit_bytes,
+                    ));
+                }
                 pending_propagation.sort_by(|left, right| {
                     let left_weight = propagation_peer_sync_weight(left, timestamp);
                     let right_weight = propagation_peer_sync_weight(right, timestamp);
@@ -1234,6 +1253,12 @@ fn peer_peering_key_value(peer: &PeerRecord, local_identity_hash: &str) -> Optio
     material.extend_from_slice(remote_hash.as_slice());
     material.extend_from_slice(local_hash.as_slice());
     generate_peering_key_value(material.as_slice(), peering_cost)
+}
+
+fn peer_stamp_policy_known(peer: &PeerRecord) -> bool {
+    peer.propagation_stamp_cost.is_some()
+        && peer.propagation_stamp_cost_flexibility.is_some()
+        && peer.peering_cost.is_some()
 }
 
 fn propagation_peer_sync_weight(entry: &PropagationEntryRecord, now: i64) -> f64 {
