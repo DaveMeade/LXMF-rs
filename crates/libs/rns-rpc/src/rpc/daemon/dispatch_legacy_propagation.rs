@@ -794,6 +794,15 @@ impl RpcDaemon {
                         entry.selected = true;
                     }
                 }
+                if let Some(selected) = selected.as_ref() {
+                    by_peer.entry(selected.clone()).or_insert_with(|| PropagationNodeRecord {
+                        peer: selected.clone(),
+                        name: None,
+                        last_seen: 0,
+                        capabilities: vec!["propagation".to_string()],
+                        selected: true,
+                    });
+                }
 
                 let mut nodes = by_peer.into_values().collect::<Vec<_>>();
                 nodes.sort_by(|a, b| {

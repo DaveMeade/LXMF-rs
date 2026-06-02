@@ -3635,6 +3635,20 @@ fn selected_propagation_node_updates_status_snapshot() {
         Some("peer-propagation-node")
     );
 
+    let nodes = daemon
+        .handle_rpc(RpcRequest {
+            id: 72,
+            method: "list_propagation_nodes".to_string(),
+            params: None,
+        })
+        .expect("list propagation nodes")
+        .result
+        .expect("list propagation nodes result");
+    let node = nodes["nodes"].as_array().and_then(|rows| rows.first()).expect("node row");
+    assert_eq!(node["peer"].as_str(), Some("peer-propagation-node"));
+    assert_eq!(node["selected"].as_bool(), Some(true));
+    assert_eq!(node["capabilities"], json!(["propagation"]));
+
     daemon
         .handle_rpc(rpc_request(70, "set_outbound_propagation_node", json!({ "peer": " " })))
         .expect("clear propagation node");
