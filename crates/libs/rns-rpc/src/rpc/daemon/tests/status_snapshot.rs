@@ -1468,6 +1468,53 @@ fn new_peer_acceptance_rate_matches_python_zero_offer_default() {
 }
 
 #[test]
+fn peer_sync_without_offers_preserves_failure_backoff() {
+    let daemon = RpcDaemon::test_instance();
+    daemon
+        .handle_rpc(rpc_request(52, "peer_sync", json!({ "peer": "peer-backoff-no-offers" })))
+        .expect("initial peer sync");
+    daemon.record_outbound_peer_activity("peer-backoff-no-offers", 64, false);
+
+    let before = daemon
+        .handle_rpc(RpcRequest { id: 53, method: "list_peers".to_string(), params: None })
+        .expect("list peers")
+        .result
+        .expect("list peers result");
+    let before_row = before["peers"]
+        .as_array()
+        .expect("peer rows")
+        .iter()
+        .find(|row| row["peer"].as_str() == Some("peer-backoff-no-offers"))
+        .expect("peer row");
+    let sync_backoff = before_row["sync_backoff"].as_u64().expect("sync backoff");
+    let next_sync_attempt =
+        before_row["next_sync_attempt"].as_i64().expect("next sync attempt");
+    assert!(sync_backoff > 0);
+    assert!(next_sync_attempt > 0);
+
+    let result = daemon
+        .handle_rpc(rpc_request(54, "peer_sync", json!({ "peer": "peer-backoff-no-offers" })))
+        .expect("no-offer peer sync")
+        .result
+        .expect("peer sync result");
+    assert_eq!(result["propagation"]["offered"].as_u64(), Some(0));
+
+    let after = daemon
+        .handle_rpc(RpcRequest { id: 55, method: "list_peers".to_string(), params: None })
+        .expect("list peers")
+        .result
+        .expect("list peers result");
+    let after_row = after["peers"]
+        .as_array()
+        .expect("peer rows")
+        .iter()
+        .find(|row| row["peer"].as_str() == Some("peer-backoff-no-offers"))
+        .expect("peer row");
+    assert_eq!(after_row["sync_backoff"].as_u64(), Some(sync_backoff));
+    assert_eq!(after_row["next_sync_attempt"].as_i64(), Some(next_sync_attempt));
+}
+
+#[test]
 fn list_peers_exposes_python_style_message_counters() {
     let daemon = RpcDaemon::test_instance();
     daemon
