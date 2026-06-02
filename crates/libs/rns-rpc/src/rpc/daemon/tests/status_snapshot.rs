@@ -1945,6 +1945,52 @@ fn peer_sync_marks_unhandled_propagation_entries_handled() {
 }
 
 #[test]
+fn peer_sync_drops_stale_unhandled_propagation_marks() {
+    let daemon = RpcDaemon::test_instance();
+    daemon
+        .handle_rpc(rpc_request(55, "peer_sync", json!({ "peer": "peer-stale-propagation" })))
+        .expect("initial peer sync");
+    daemon
+        .store
+        .mark_peer_unhandled_propagation("peer-stale-propagation", "fa".repeat(32).as_str())
+        .expect("mark stale unhandled");
+
+    let before = daemon
+        .handle_rpc(RpcRequest { id: 56, method: "list_peers".to_string(), params: None })
+        .expect("list peers")
+        .result
+        .expect("list peers result");
+    let before_row = before["peers"]
+        .as_array()
+        .expect("peer rows")
+        .iter()
+        .find(|row| row["peer"].as_str() == Some("peer-stale-propagation"))
+        .expect("peer row");
+    assert_eq!(before_row["messages"]["unhandled"].as_u64(), Some(1));
+
+    let result = daemon
+        .handle_rpc(rpc_request(57, "peer_sync", json!({ "peer": "peer-stale-propagation" })))
+        .expect("peer sync")
+        .result
+        .expect("peer sync result");
+    assert_eq!(result["propagation"]["offered"].as_u64(), Some(0));
+
+    let after = daemon
+        .handle_rpc(RpcRequest { id: 58, method: "list_peers".to_string(), params: None })
+        .expect("list peers")
+        .result
+        .expect("list peers result");
+    let after_row = after["peers"]
+        .as_array()
+        .expect("peer rows")
+        .iter()
+        .find(|row| row["peer"].as_str() == Some("peer-stale-propagation"))
+        .expect("peer row");
+    assert_eq!(after_row["messages"]["unhandled"].as_u64(), Some(0));
+    assert_eq!(after_row["messages"]["offered"].as_u64(), Some(0));
+}
+
+#[test]
 fn peer_sync_applies_per_peer_propagation_sync_limit() {
     let daemon = RpcDaemon::test_instance();
     daemon

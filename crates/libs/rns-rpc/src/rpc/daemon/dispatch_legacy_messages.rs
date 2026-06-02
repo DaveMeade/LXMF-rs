@@ -519,6 +519,9 @@ impl RpcDaemon {
                 }
                 let transfer_limit_bytes =
                     record.propagation_transfer_limit.map(|limit| limit as usize);
+                self.store
+                    .remove_stale_peer_unhandled_propagation(peer_id)
+                    .map_err(std::io::Error::other)?;
                 let mut pending_propagation = self
                     .store
                     .list_peer_unhandled_propagation(peer_id)
