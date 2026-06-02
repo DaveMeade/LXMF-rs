@@ -963,10 +963,10 @@ impl MessagesStore {
                 Option<i64>,
             ) = conn.query_row(
                 "SELECT
-                    COALESCE(SUM(CASE WHEN state IN ('handled', 'unhandled') THEN 1 ELSE 0 END), 0),
-                    COALESCE(SUM(CASE WHEN state = 'unhandled' THEN 1 ELSE 0 END), 0),
-                    COALESCE(SUM(CASE WHEN state IN ('handled', 'unhandled') THEN e.size_bytes ELSE 0 END), 0),
-                    COALESCE(SUM(CASE WHEN state = 'unhandled' THEN e.size_bytes ELSE 0 END), 0)
+                    COALESCE(SUM(CASE WHEN e.transient_id IS NOT NULL AND state IN ('handled', 'unhandled') THEN 1 ELSE 0 END), 0),
+                    COALESCE(SUM(CASE WHEN e.transient_id IS NOT NULL AND state = 'unhandled' THEN 1 ELSE 0 END), 0),
+                    COALESCE(SUM(CASE WHEN e.transient_id IS NOT NULL AND state IN ('handled', 'unhandled') THEN e.size_bytes ELSE 0 END), 0),
+                    COALESCE(SUM(CASE WHEN e.transient_id IS NOT NULL AND state = 'unhandled' THEN e.size_bytes ELSE 0 END), 0)
                  FROM propagation_peer_entries p
                  LEFT JOIN propagation_entries e
                     ON e.transient_id = p.transient_id
@@ -2189,17 +2189,53 @@ mod tests {
     #[test]
     fn peer_propagation_message_stats_counts_offered_and_unhandled_marks() {
         let store = MessagesStore::in_memory().expect("in-memory store");
-        store.mark_peer_handled_propagation("peer-a", "aa").expect("mark handled");
-        store.mark_peer_unhandled_propagation("peer-a", "bb").expect("mark unhandled");
-        store.mark_peer_unhandled_propagation("peer-b", "cc").expect("mark other peer unhandled");
+        let handled = PropagationEntryRecord {
+            transient_id: "aa".repeat(32),
+            destination: "11".repeat(16),
+            payload_hex: "aa".repeat(12),
+            received_at: 1_700_000_001,
+            size_bytes: 12,
+            stamp_value: None,
+        };
+        let unhandled = PropagationEntryRecord {
+            transient_id: "bb".repeat(32),
+            destination: "11".repeat(16),
+            payload_hex: "bb".repeat(24),
+            received_at: 1_700_000_002,
+            size_bytes: 24,
+            stamp_value: None,
+        };
+        let other = PropagationEntryRecord {
+            transient_id: "cc".repeat(32),
+            destination: "11".repeat(16),
+            payload_hex: "cc".repeat(36),
+            received_at: 1_700_000_003,
+            size_bytes: 36,
+            stamp_value: None,
+        };
+        for entry in [&handled, &unhandled, &other] {
+            store.upsert_propagation_entry(entry).expect("upsert entry");
+        }
+        store
+            .mark_peer_handled_propagation("peer-a", handled.transient_id.as_str())
+            .expect("mark handled");
+        store
+            .mark_peer_unhandled_propagation("peer-a", unhandled.transient_id.as_str())
+            .expect("mark unhandled");
+        store
+            .mark_peer_handled_propagation("peer-a", "dd".repeat(32).as_str())
+            .expect("mark stale handled");
+        store
+            .mark_peer_unhandled_propagation("peer-b", other.transient_id.as_str())
+            .expect("mark other peer unhandled");
 
         assert_eq!(
             store.peer_propagation_message_stats("peer-a").expect("peer-a stats"),
             PeerPropagationMessageStats {
                 offered: 2,
                 unhandled: 1,
-                offered_bytes: 0,
-                unhandled_bytes: 0,
+                offered_bytes: 36,
+                unhandled_bytes: 24,
             }
         );
         assert_eq!(
@@ -2207,8 +2243,8 @@ mod tests {
             PeerPropagationMessageStats {
                 offered: 1,
                 unhandled: 1,
-                offered_bytes: 0,
-                unhandled_bytes: 0,
+                offered_bytes: 36,
+                unhandled_bytes: 36,
             }
         );
     }
