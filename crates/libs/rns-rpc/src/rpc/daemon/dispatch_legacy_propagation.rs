@@ -1010,16 +1010,53 @@ impl RpcDaemon {
                     .clone()
                     .ok_or_else(|| std::io::Error::other("remote control bridge unavailable"))?;
                 let timeout_secs = parsed.timeout_secs.unwrap_or(8.0).max(0.1);
-                let mut result = bridge.propagation_remote_fetch(
+                self.update_propagation_sync_state(|state| {
+                    state.sync_state = PR_REQUEST_SENT;
+                    state.state_name = "fetching".to_string();
+                    state.sync_progress = 0.0;
+                    state.last_sync_started = Some(now_i64());
+                    state.last_sync_completed = None;
+                    state.last_sync_error = None;
+                });
+                let mut result = match bridge.propagation_remote_fetch(
                     parsed.remote.as_str(),
                     parsed.identity_private_key_hex.as_deref(),
                     timeout_secs,
                     parsed.transfer_limit_kb,
-                )?;
-                let imported = self.import_remote_propagation_payloads(&result)?;
+                ) {
+                    Ok(result) => result,
+                    Err(err) => {
+                        self.update_propagation_sync_state(|state| {
+                            state.sync_state = PR_FAILED;
+                            state.state_name = "failed".to_string();
+                            state.sync_progress = 0.0;
+                            state.last_sync_error = Some(err.to_string());
+                        });
+                        return Err(err);
+                    }
+                };
+                let imported = match self.import_remote_propagation_payloads(&result) {
+                    Ok(imported) => imported,
+                    Err(err) => {
+                        self.update_propagation_sync_state(|state| {
+                            state.sync_state = PR_FAILED;
+                            state.state_name = "failed".to_string();
+                            state.sync_progress = 0.0;
+                            state.last_sync_error = Some(err.to_string());
+                        });
+                        return Err(err);
+                    }
+                };
                 if let Some(result) = result.as_object_mut() {
                     result.insert("imported_count".to_string(), json!(imported));
                 }
+                self.update_propagation_sync_state(|state| {
+                    state.sync_state = PR_COMPLETE;
+                    state.state_name = "completed".to_string();
+                    state.sync_progress = 1.0;
+                    state.last_sync_completed = Some(now_i64());
+                    state.last_sync_error = None;
+                });
                 Ok(RpcResponse {
                     id: request.id,
                     result: Some(json!({

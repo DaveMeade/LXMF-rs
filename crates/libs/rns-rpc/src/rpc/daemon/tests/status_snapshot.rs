@@ -2738,6 +2738,48 @@ fn propagation_remote_fetch_imports_payloads_into_local_store() {
 }
 
 #[test]
+fn propagation_remote_fetch_updates_lifecycle_status() {
+    let payload = b"remote-fetch-lifecycle-payload";
+    let payload_hex = hex::encode(payload);
+    let transient_id = hex::encode(Sha256::digest(payload));
+    let daemon = RpcDaemon::test_instance();
+    daemon.set_remote_control_bridge(Arc::new(TestRemoteControlBridge {
+        result: Ok(json!({
+            "available_count": 1,
+            "fetched_count": 1,
+            "imported_count": 1,
+            "messages": [{
+                "transient_id": transient_id,
+                "payload_hex": payload_hex,
+            }],
+        })),
+    }));
+
+    daemon
+        .handle_rpc(rpc_request(
+            75,
+            "propagation_remote_fetch",
+            json!({
+                "remote": "remote-node",
+            }),
+        ))
+        .expect("remote fetch");
+
+    let status = daemon
+        .handle_rpc(RpcRequest { id: 76, method: "propagation_status".to_string(), params: None })
+        .expect("propagation status")
+        .result
+        .expect("propagation status result");
+    let propagation = &status["propagation"];
+    assert_eq!(propagation["sync_state"].as_u64(), Some(0x07));
+    assert_eq!(propagation["state_name"].as_str(), Some("completed"));
+    assert_eq!(propagation["sync_progress"].as_f64(), Some(1.0));
+    assert!(propagation["last_sync_started"].as_i64().is_some());
+    assert!(propagation["last_sync_completed"].as_i64().is_some());
+    assert_eq!(propagation["last_sync_error"], JsonValue::Null);
+}
+
+#[test]
 fn propagation_remote_fetch_derives_missing_transient_id_from_payload_bytes() {
     let payload = b"remote-payload-without-id";
     let payload_hex = hex::encode(payload);
@@ -2813,6 +2855,48 @@ fn propagation_remote_fetch_rejects_mismatched_transient_id() {
             .expect("load bogus transient id")
             .is_none()
     );
+}
+
+#[test]
+fn failed_propagation_remote_fetch_import_updates_lifecycle_error() {
+    let daemon = RpcDaemon::test_instance();
+    daemon.set_remote_control_bridge(Arc::new(TestRemoteControlBridge {
+        result: Ok(json!({
+            "available_count": 1,
+            "fetched_count": 1,
+            "imported_count": 1,
+            "messages": [{
+                "payload_hex": "not-hex",
+            }],
+        })),
+    }));
+
+    let err = daemon
+        .handle_rpc(rpc_request(
+            77,
+            "propagation_remote_fetch",
+            json!({
+                "remote": "remote-node",
+            }),
+        ))
+        .expect_err("remote fetch import failure should be returned");
+    assert_eq!(err.kind(), std::io::ErrorKind::InvalidInput);
+    assert!(err.to_string().contains("invalid remote propagation payload hex"));
+
+    let status = daemon
+        .handle_rpc(RpcRequest { id: 78, method: "propagation_status".to_string(), params: None })
+        .expect("propagation status")
+        .result
+        .expect("propagation status result");
+    let propagation = &status["propagation"];
+    assert_eq!(propagation["sync_state"].as_u64(), Some(0xfe));
+    assert_eq!(propagation["state_name"].as_str(), Some("failed"));
+    assert_eq!(propagation["sync_progress"].as_f64(), Some(0.0));
+    assert!(propagation["last_sync_started"].as_i64().is_some());
+    assert!(propagation["last_sync_completed"].is_null());
+    assert!(propagation["last_sync_error"]
+        .as_str()
+        .is_some_and(|value| value.contains("invalid remote propagation payload hex")));
 }
 
 #[test]
