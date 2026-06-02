@@ -1845,7 +1845,7 @@ fn peer_sync_applies_per_peer_propagation_sync_limit() {
     {
         let mut peers = daemon.peers.lock().expect("peers mutex poisoned");
         let peer = peers.get_mut("peer-sync-budget").expect("peer record");
-        peer.propagation_sync_limit = Some((24 + 20 + 32 + 16) as u32);
+        peer.propagation_sync_limit = Some((24 + 20 + 32 + 16 + 1) as u32);
     }
 
     let small = PropagationEntryRecord {
@@ -1890,6 +1890,59 @@ fn peer_sync_applies_per_peer_propagation_sync_limit() {
 }
 
 #[test]
+fn peer_sync_skips_entry_at_exact_sync_limit_like_python() {
+    let daemon = RpcDaemon::test_instance();
+    daemon
+        .handle_rpc(rpc_request(56, "peer_sync", json!({ "peer": "peer-sync-equal-budget" })))
+        .expect("initial peer sync");
+    {
+        let mut peers = daemon.peers.lock().expect("peers mutex poisoned");
+        let peer = peers.get_mut("peer-sync-equal-budget").expect("peer record");
+        peer.propagation_sync_limit = Some((24 + 20 + 32 + 16) as u32);
+    }
+
+    let entry = PropagationEntryRecord {
+        transient_id: "b3".repeat(32),
+        destination: "15".repeat(16),
+        payload_hex: "15".repeat(20),
+        received_at: 1_700_000_609,
+        size_bytes: 20,
+        stamp_value: None,
+    };
+    daemon.store.upsert_propagation_entry(&entry).expect("store propagation entry");
+    daemon
+        .store
+        .mark_peer_unhandled_propagation("peer-sync-equal-budget", entry.transient_id.as_str())
+        .expect("mark unhandled");
+
+    let result = daemon
+        .handle_rpc(rpc_request(57, "peer_sync", json!({ "peer": "peer-sync-equal-budget" })))
+        .expect("budgeted peer sync")
+        .result
+        .expect("peer sync result");
+    assert_eq!(result["propagation"]["handled"].as_u64(), Some(0));
+    assert_eq!(result["propagation"]["skipped"].as_u64(), Some(1));
+    assert_eq!(result["propagation"]["offered"].as_u64(), Some(1));
+    assert_eq!(
+        result["propagation"]["skipped_ids"].as_array().expect("skipped ids"),
+        &[json!(entry.transient_id.as_str())]
+    );
+
+    assert!(
+        daemon
+            .store
+            .list_peer_handled_propagation_ids("peer-sync-equal-budget")
+            .expect("handled ids")
+            .is_empty()
+    );
+    let pending = daemon
+        .store
+        .list_peer_unhandled_propagation("peer-sync-equal-budget")
+        .expect("pending propagation");
+    assert_eq!(pending, vec![entry]);
+}
+
+#[test]
 fn peer_sync_uses_transfer_limit_when_sync_limit_is_absent() {
     let daemon = RpcDaemon::test_instance();
     daemon
@@ -1898,7 +1951,7 @@ fn peer_sync_uses_transfer_limit_when_sync_limit_is_absent() {
     {
         let mut peers = daemon.peers.lock().expect("peers mutex poisoned");
         let peer = peers.get_mut("peer-transfer-budget").expect("peer record");
-        peer.propagation_transfer_limit = Some((24 + 20 + 32 + 16) as u32);
+        peer.propagation_transfer_limit = Some((24 + 20 + 32 + 16 + 1) as u32);
         peer.propagation_sync_limit = None;
     }
 
@@ -2082,7 +2135,7 @@ fn peer_sync_reports_propagation_transfer_accounting() {
     {
         let mut peers = daemon.peers.lock().expect("peers mutex poisoned");
         let peer = peers.get_mut("peer-sync-report").expect("peer record");
-        peer.propagation_sync_limit = Some((24 + 20 + 32 + 16) as u32);
+        peer.propagation_sync_limit = Some((24 + 20 + 32 + 16 + 1) as u32);
     }
 
     let small = PropagationEntryRecord {
@@ -2122,7 +2175,10 @@ fn peer_sync_reports_propagation_transfer_accounting() {
     assert_eq!(result["propagation"]["offered_bytes"].as_u64(), Some(120));
     assert_eq!(result["propagation"]["remaining"].as_u64(), Some(1));
     assert_eq!(result["propagation"]["remaining_bytes"].as_u64(), Some(100));
-    assert_eq!(result["propagation"]["sync_limit"].as_u64(), Some((24 + 20 + 32 + 16) as u64));
+    assert_eq!(
+        result["propagation"]["sync_limit"].as_u64(),
+        Some((24 + 20 + 32 + 16 + 1) as u64)
+    );
     assert_eq!(result["acceptance_rate"].as_f64(), Some(0.5));
     assert_eq!(
         result["propagation"]["handled_ids"].as_array().expect("handled ids"),

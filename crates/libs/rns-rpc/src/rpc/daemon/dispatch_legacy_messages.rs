@@ -434,7 +434,7 @@ impl RpcDaemon {
                     }
                     let next_size = cumulative_size
                         .saturating_add(entry_size.saturating_add(32).saturating_add(16));
-                    if sync_limit_bytes.is_some_and(|limit| next_size > limit) {
+                    if sync_limit_bytes.is_some_and(|limit| next_size >= limit) {
                         propagation_skipped = propagation_skipped.saturating_add(1);
                         propagation_remaining_bytes =
                             propagation_remaining_bytes.saturating_add(entry.size_bytes);
