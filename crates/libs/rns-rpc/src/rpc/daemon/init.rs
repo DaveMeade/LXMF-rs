@@ -515,15 +515,20 @@ impl RpcDaemon {
         Ok(self.store.get_message(message_id).map_err(std::io::Error::other)?.is_some())
     }
 
-    pub fn peer_message_stats(&self, peer: &str) -> Result<(u64, u64, u64, u64), std::io::Error> {
+    pub fn peer_message_stats(
+        &self,
+        peer: &str,
+    ) -> Result<(u64, u64, u64, u64, u64, u64), std::io::Error> {
         let stats = self.store.peer_message_stats(peer).map_err(std::io::Error::other)?;
-        let (propagation_offered, propagation_unhandled) =
+        let propagation =
             self.store.peer_propagation_message_stats(peer).map_err(std::io::Error::other)?;
         Ok((
             stats.outgoing,
             stats.incoming,
-            stats.offered.saturating_add(propagation_offered),
-            stats.unhandled.saturating_add(propagation_unhandled),
+            stats.offered.saturating_add(propagation.offered),
+            stats.unhandled.saturating_add(propagation.unhandled),
+            propagation.offered_bytes,
+            propagation.unhandled_bytes,
         ))
     }
 

@@ -125,6 +125,14 @@ pub struct PeerMessageStats {
     pub unhandled: u64,
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct PeerPropagationMessageStats {
+    pub offered: u64,
+    pub unhandled: u64,
+    pub offered_bytes: u64,
+    pub unhandled_bytes: u64,
+}
+
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct PropagationEntryRecord {
     pub transient_id: String,
@@ -903,18 +911,35 @@ impl MessagesStore {
         })
     }
 
-    pub fn peer_propagation_message_stats(&self, peer: &str) -> rusqlite::Result<(u64, u64)> {
+    pub fn peer_propagation_message_stats(
+        &self,
+        peer: &str,
+    ) -> rusqlite::Result<PeerPropagationMessageStats> {
         self.with_read_conn(|conn| {
-            let (offered, unhandled): (i64, i64) = conn.query_row(
+            let (offered, unhandled, offered_bytes, unhandled_bytes): (
+                i64,
+                i64,
+                Option<i64>,
+                Option<i64>,
+            ) = conn.query_row(
                 "SELECT
                     COALESCE(SUM(CASE WHEN state IN ('handled', 'unhandled') THEN 1 ELSE 0 END), 0),
-                    COALESCE(SUM(CASE WHEN state = 'unhandled' THEN 1 ELSE 0 END), 0)
-                 FROM propagation_peer_entries
-                 WHERE peer = ?1",
+                    COALESCE(SUM(CASE WHEN state = 'unhandled' THEN 1 ELSE 0 END), 0),
+                    COALESCE(SUM(CASE WHEN state IN ('handled', 'unhandled') THEN e.size_bytes ELSE 0 END), 0),
+                    COALESCE(SUM(CASE WHEN state = 'unhandled' THEN e.size_bytes ELSE 0 END), 0)
+                 FROM propagation_peer_entries p
+                 LEFT JOIN propagation_entries e
+                    ON e.transient_id = p.transient_id
+                 WHERE p.peer = ?1",
                 params![peer],
-                |row| Ok((row.get(0)?, row.get(1)?)),
+                |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?, row.get(3)?)),
             )?;
-            Ok((offered.max(0) as u64, unhandled.max(0) as u64))
+            Ok(PeerPropagationMessageStats {
+                offered: offered.max(0) as u64,
+                unhandled: unhandled.max(0) as u64,
+                offered_bytes: offered_bytes.unwrap_or(0).max(0) as u64,
+                unhandled_bytes: unhandled_bytes.unwrap_or(0).max(0) as u64,
+            })
         })
     }
 
@@ -2128,8 +2153,24 @@ mod tests {
         store.mark_peer_unhandled_propagation("peer-a", "bb").expect("mark unhandled");
         store.mark_peer_unhandled_propagation("peer-b", "cc").expect("mark other peer unhandled");
 
-        assert_eq!(store.peer_propagation_message_stats("peer-a").expect("peer-a stats"), (2, 1));
-        assert_eq!(store.peer_propagation_message_stats("peer-b").expect("peer-b stats"), (1, 1));
+        assert_eq!(
+            store.peer_propagation_message_stats("peer-a").expect("peer-a stats"),
+            PeerPropagationMessageStats {
+                offered: 2,
+                unhandled: 1,
+                offered_bytes: 0,
+                unhandled_bytes: 0,
+            }
+        );
+        assert_eq!(
+            store.peer_propagation_message_stats("peer-b").expect("peer-b stats"),
+            PeerPropagationMessageStats {
+                offered: 1,
+                unhandled: 1,
+                offered_bytes: 0,
+                unhandled_bytes: 0,
+            }
+        );
     }
 
     #[test]

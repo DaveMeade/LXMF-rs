@@ -102,8 +102,16 @@ impl RpcDaemon {
                 let peers = peers
                     .into_iter()
                     .map(|peer| {
-                        let (outgoing, incoming, offered, unhandled) =
-                            self.peer_message_stats(peer.peer.as_str()).unwrap_or((0, 0, 0, 0));
+                        let (
+                            outgoing,
+                            incoming,
+                            offered,
+                            unhandled,
+                            offered_bytes,
+                            unhandled_bytes,
+                        ) = self
+                            .peer_message_stats(peer.peer.as_str())
+                            .unwrap_or((0, 0, 0, 0, 0, 0));
                         let peering_key =
                             peer_peering_key_value(&peer, self.identity_hash.as_str());
                         let is_static_peer = peer.peer_type.as_deref() == Some("static")
@@ -123,6 +131,8 @@ impl RpcDaemon {
                             "outgoing": outgoing,
                             "incoming": incoming,
                             "unhandled": unhandled,
+                            "offered_bytes": offered_bytes,
+                            "unhandled_bytes": unhandled_bytes,
                         });
                         row["peering_key"] = peering_key.map_or(JsonValue::Null, JsonValue::from);
                         row["last_heard"] =

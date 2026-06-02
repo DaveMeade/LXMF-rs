@@ -1777,9 +1777,9 @@ fn list_peers_includes_propagation_marks_in_message_counters() {
     let unhandled = PropagationEntryRecord {
         transient_id: "ad".repeat(32),
         destination: "14".repeat(16),
-        payload_hex: "14".repeat(16),
+        payload_hex: "14".repeat(24),
         received_at: 1_700_000_607,
-        size_bytes: 16,
+        size_bytes: 24,
         stamp_value: None,
     };
     daemon.store.upsert_propagation_entry(&handled).expect("store handled entry");
@@ -1806,6 +1806,8 @@ fn list_peers_includes_propagation_marks_in_message_counters() {
         .expect("peer row");
     assert_eq!(row["messages"]["offered"].as_u64(), Some(2));
     assert_eq!(row["messages"]["unhandled"].as_u64(), Some(1));
+    assert_eq!(row["messages"]["offered_bytes"].as_u64(), Some(40));
+    assert_eq!(row["messages"]["unhandled_bytes"].as_u64(), Some(24));
 }
 
 #[test]

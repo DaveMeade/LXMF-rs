@@ -44,8 +44,14 @@ pub(super) fn compose_python_status(
                     } else {
                         "discovered"
                     };
-                    let (outgoing, incoming, offered, unhandled) =
-                        daemon.peer_message_stats(peer.as_str()).unwrap_or((0, 0, 0, 0));
+                    let (
+                        outgoing,
+                        incoming,
+                        offered,
+                        unhandled,
+                        offered_bytes,
+                        unhandled_bytes,
+                    ) = daemon.peer_message_stats(peer.as_str()).unwrap_or((0, 0, 0, 0, 0, 0));
                     total_peer_count = total_peer_count.saturating_add(1);
                     if peer_type == "discovered" {
                         discovered_peer_count = discovered_peer_count.saturating_add(1);
@@ -84,7 +90,9 @@ pub(super) fn compose_python_status(
                                 "offered": offered,
                                 "outgoing": outgoing,
                                 "incoming": incoming,
-                                "unhandled": unhandled
+                                "unhandled": unhandled,
+                                "offered_bytes": offered_bytes,
+                                "unhandled_bytes": unhandled_bytes
                             }
                         }),
                     ))
