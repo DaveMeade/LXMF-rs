@@ -1085,11 +1085,16 @@ impl RpcDaemon {
                     parsed.identity_private_key_hex.as_deref(),
                     timeout_secs,
                 )?;
+                let cleanup = self.unpeer_local_state(parsed.peer.as_str())?;
                 Ok(RpcResponse {
                     id: request.id,
                     result: Some(json!({
                         "remote": parsed.remote,
                         "peer": parsed.peer,
+                        "removed": cleanup.removed,
+                        "propagation_cleared": cleanup.propagation_cleared,
+                        "propagation_cleared_bytes": cleanup.propagation_cleared_bytes,
+                        "messages": cleanup.messages,
                         "result": result,
                     })),
                     error: None,

@@ -3069,6 +3069,63 @@ fn failed_propagation_remote_sync_updates_lifecycle_error() {
 }
 
 #[test]
+fn propagation_remote_unpeer_clears_local_peer_and_queue_state() {
+    let daemon = RpcDaemon::test_instance();
+    daemon.set_remote_control_bridge(Arc::new(TestRemoteControlBridge {
+        result: Ok(json!({})),
+    }));
+    daemon
+        .handle_rpc(rpc_request(76, "peer_sync", json!({ "peer": "peer-remote-unpeer" })))
+        .expect("peer sync");
+
+    let entry = PropagationEntryRecord {
+        transient_id: "e1".repeat(32),
+        destination: "19".repeat(16),
+        payload_hex: "19".repeat(24),
+        received_at: 1_700_000_801,
+        size_bytes: 24,
+        stamp_value: None,
+    };
+    daemon.store.upsert_propagation_entry(&entry).expect("store propagation entry");
+    daemon
+        .store
+        .mark_peer_unhandled_propagation("peer-remote-unpeer", entry.transient_id.as_str())
+        .expect("mark unhandled");
+
+    let result = daemon
+        .handle_rpc(rpc_request(
+            77,
+            "propagation_remote_unpeer",
+            json!({
+                "remote": "remote-node",
+                "peer": "peer-remote-unpeer",
+            }),
+        ))
+        .expect("remote unpeer")
+        .result
+        .expect("remote unpeer result");
+    assert_eq!(result["removed"].as_bool(), Some(true));
+    assert_eq!(result["propagation_cleared"].as_u64(), Some(1));
+    assert_eq!(result["propagation_cleared_bytes"].as_u64(), Some(24));
+    assert_eq!(result["messages"]["unhandled"].as_u64(), Some(1));
+    assert_eq!(result["messages"]["unhandled_bytes"].as_u64(), Some(24));
+
+    let peers = daemon
+        .handle_rpc(RpcRequest { id: 78, method: "list_peers".to_string(), params: None })
+        .expect("list peers")
+        .result
+        .expect("list peers result");
+    assert_eq!(peers["peers"].as_array().map(Vec::len), Some(0));
+    assert!(
+        daemon
+            .store
+            .list_peer_unhandled_propagation("peer-remote-unpeer")
+            .expect("list unhandled")
+            .is_empty()
+    );
+}
+
+#[test]
 fn failed_propagation_remote_sync_clears_previous_completion() {
     let daemon = RpcDaemon::test_instance();
     daemon.set_remote_control_bridge(Arc::new(TestRemoteControlBridge {

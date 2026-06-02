@@ -576,48 +576,25 @@ impl RpcDaemon {
                     ));
                 }
 
-                let propagation_stats = self
-                    .store
-                    .peer_propagation_message_stats(peer_id)
-                    .map_err(std::io::Error::other)?;
-                let propagation_cleared = self
-                    .store
-                    .clear_peer_propagation_marks(peer_id)
-                    .map_err(std::io::Error::other)?;
-                let messages = json!({
-                    "offered": propagation_stats.offered,
-                    "unhandled": propagation_stats.unhandled,
-                    "offered_bytes": propagation_stats.offered_bytes,
-                    "unhandled_bytes": propagation_stats.unhandled_bytes,
-                });
-                let removed = {
-                    let mut guard = self.peers.lock().expect("peers mutex poisoned");
-                    let removed = guard.remove(peer_id).is_some();
-                    let peer_count = Self::active_peer_count_from_guard(&guard);
-                    drop(guard);
-                    self.update_daemon_status_snapshot(|snapshot| {
-                        snapshot.peer_count = peer_count;
-                    });
-                    removed
-                };
+                let cleanup = self.unpeer_local_state(peer_id)?;
                 let event = RpcEvent {
                     event_type: "peer_unpeer".into(),
                     payload: json!({
                         "peer": peer_id,
-                        "removed": removed,
-                        "propagation_cleared": propagation_cleared,
-                        "propagation_cleared_bytes": propagation_stats.offered_bytes,
-                        "messages": messages.clone(),
+                        "removed": cleanup.removed,
+                        "propagation_cleared": cleanup.propagation_cleared,
+                        "propagation_cleared_bytes": cleanup.propagation_cleared_bytes,
+                        "messages": cleanup.messages.clone(),
                     }),
                 };
                 self.publish_event(event);
                 Ok(RpcResponse {
                     id: request.id,
                     result: Some(json!({
-                        "removed": removed,
-                        "propagation_cleared": propagation_cleared,
-                        "propagation_cleared_bytes": propagation_stats.offered_bytes,
-                        "messages": messages,
+                        "removed": cleanup.removed,
+                        "propagation_cleared": cleanup.propagation_cleared,
+                        "propagation_cleared_bytes": cleanup.propagation_cleared_bytes,
+                        "messages": cleanup.messages,
                     })),
                     error: None,
                 })
@@ -1084,6 +1061,47 @@ impl RpcDaemon {
         let host = iface.host.as_deref()?.trim();
         let port = iface.port?;
         Some(format!("{host}:{port}"))
+    }
+}
+
+pub(super) struct LocalUnpeerCleanup {
+    pub(super) removed: bool,
+    pub(super) propagation_cleared: usize,
+    pub(super) propagation_cleared_bytes: u64,
+    pub(super) messages: JsonValue,
+}
+
+impl RpcDaemon {
+    pub(super) fn unpeer_local_state(
+        &self,
+        peer_id: &str,
+    ) -> Result<LocalUnpeerCleanup, std::io::Error> {
+        let propagation_stats =
+            self.store.peer_propagation_message_stats(peer_id).map_err(std::io::Error::other)?;
+        let propagation_cleared =
+            self.store.clear_peer_propagation_marks(peer_id).map_err(std::io::Error::other)?;
+        let messages = json!({
+            "offered": propagation_stats.offered,
+            "unhandled": propagation_stats.unhandled,
+            "offered_bytes": propagation_stats.offered_bytes,
+            "unhandled_bytes": propagation_stats.unhandled_bytes,
+        });
+        let removed = {
+            let mut guard = self.peers.lock().expect("peers mutex poisoned");
+            let removed = guard.remove(peer_id).is_some();
+            let peer_count = Self::active_peer_count_from_guard(&guard);
+            drop(guard);
+            self.update_daemon_status_snapshot(|snapshot| {
+                snapshot.peer_count = peer_count;
+            });
+            removed
+        };
+        Ok(LocalUnpeerCleanup {
+            removed,
+            propagation_cleared,
+            propagation_cleared_bytes: propagation_stats.offered_bytes,
+            messages,
+        })
     }
 }
 
