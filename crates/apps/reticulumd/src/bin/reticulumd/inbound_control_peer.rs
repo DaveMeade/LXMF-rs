@@ -37,7 +37,10 @@ fn peer_request_from_data(data: Option<rmpv::Value>) -> Option<(String, Option<f
                 rmpv::Value::Binary(bytes) if bytes.len() == 16 => hex::encode(bytes),
                 _ => return None,
             };
-            let transfer_limit_kb = entries.get(1).and_then(transfer_limit_kb_from_value);
+            let transfer_limit_kb = match entries.get(1) {
+                Some(value) => Some(transfer_limit_kb_from_value(value)?),
+                None => None,
+            };
             Some((peer, transfer_limit_kb))
         }
         _ => None,
@@ -119,6 +122,18 @@ mod tests {
 
         assert_eq!(peer_hex, hex::encode(peer_bytes));
         assert_eq!(transfer_limit_kb, Some(42.5));
+    }
+
+    #[test]
+    fn peer_request_rejects_invalid_transfer_limit_array_payload() {
+        let peer_bytes = [0xA5; 16];
+
+        let request = peer_request_from_data(Some(rmpv::Value::Array(vec![
+            rmpv::Value::Binary(peer_bytes.to_vec()),
+            rmpv::Value::Nil,
+        ])));
+
+        assert!(request.is_none());
     }
 
     #[test]
