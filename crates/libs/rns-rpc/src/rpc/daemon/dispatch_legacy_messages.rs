@@ -496,6 +496,16 @@ impl RpcDaemon {
                         )
                     }
                 };
+                let (outgoing, incoming, offered, unhandled, offered_bytes, unhandled_bytes) =
+                    self.peer_message_stats(record.peer.as_str()).unwrap_or((0, 0, 0, 0, 0, 0));
+                let messages = json!({
+                    "offered": offered,
+                    "outgoing": outgoing,
+                    "incoming": incoming,
+                    "unhandled": unhandled,
+                    "offered_bytes": offered_bytes,
+                    "unhandled_bytes": unhandled_bytes,
+                });
                 let event = RpcEvent {
                     event_type: "peer_sync".into(),
                     payload: json!({
@@ -509,6 +519,7 @@ impl RpcDaemon {
                         "last_sync_attempt": last_sync_attempt,
                         "next_sync_attempt": next_sync_attempt,
                         "sync_backoff": sync_backoff,
+                        "messages": messages.clone(),
                         "propagation": propagation_sync.clone(),
                     }),
                 };
@@ -523,6 +534,7 @@ impl RpcDaemon {
                         "last_sync_attempt": last_sync_attempt,
                         "next_sync_attempt": next_sync_attempt,
                         "sync_backoff": sync_backoff,
+                        "messages": messages,
                         "propagation": propagation_sync,
                     })),
                     error: None,

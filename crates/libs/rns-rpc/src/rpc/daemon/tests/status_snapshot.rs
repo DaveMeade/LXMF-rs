@@ -2082,6 +2082,53 @@ fn peer_sync_reports_transferred_propagation_messages() {
 }
 
 #[test]
+fn peer_sync_result_and_event_report_message_accounting() {
+    let daemon = RpcDaemon::test_instance();
+    daemon
+        .handle_rpc(rpc_request(63, "peer_sync", json!({ "peer": "peer-sync-accounting" })))
+        .expect("initial peer sync");
+    daemon.event_queue.lock().expect("event_queue mutex poisoned").clear();
+
+    let entry = PropagationEntryRecord {
+        transient_id: "d4".repeat(32),
+        destination: "18".repeat(16),
+        payload_hex: "22".repeat(24),
+        received_at: 1_700_000_616,
+        size_bytes: 24,
+        stamp_value: Some(12),
+    };
+    daemon.store.upsert_propagation_entry(&entry).expect("store propagation entry");
+    daemon
+        .store
+        .mark_peer_unhandled_propagation("peer-sync-accounting", entry.transient_id.as_str())
+        .expect("mark unhandled");
+
+    let result = daemon
+        .handle_rpc(rpc_request(64, "peer_sync", json!({ "peer": "peer-sync-accounting" })))
+        .expect("peer sync")
+        .result
+        .expect("peer sync result");
+    assert_eq!(result["messages"]["offered"].as_u64(), Some(1));
+    assert_eq!(result["messages"]["unhandled"].as_u64(), Some(0));
+    assert_eq!(result["messages"]["offered_bytes"].as_u64(), Some(24));
+    assert_eq!(result["messages"]["unhandled_bytes"].as_u64(), Some(0));
+
+    let event = daemon
+        .event_queue
+        .lock()
+        .expect("event_queue mutex poisoned")
+        .iter()
+        .rev()
+        .find(|event| event.event_type == "peer_sync")
+        .cloned()
+        .expect("peer sync event");
+    assert_eq!(event.payload["messages"]["offered"].as_u64(), Some(1));
+    assert_eq!(event.payload["messages"]["unhandled"].as_u64(), Some(0));
+    assert_eq!(event.payload["messages"]["offered_bytes"].as_u64(), Some(24));
+    assert_eq!(event.payload["messages"]["unhandled_bytes"].as_u64(), Some(0));
+}
+
+#[test]
 fn list_peers_includes_propagation_marks_in_message_counters() {
     let daemon = RpcDaemon::test_instance();
     daemon
