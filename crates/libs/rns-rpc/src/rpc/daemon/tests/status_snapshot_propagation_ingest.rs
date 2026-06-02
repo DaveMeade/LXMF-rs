@@ -188,6 +188,47 @@ fn propagation_ingest_derives_transient_id_from_payload_bytes() {
 }
 
 #[test]
+fn propagation_rpc_ingest_persists_payloads_to_store_for_fetch_after_cache_clear() {
+    use sha2::{Digest, Sha256};
+
+    let daemon = RpcDaemon::test_instance();
+    let payload = b"stored-rpc-propagation-wire-payload";
+    let payload_hex = hex::encode(payload);
+    let transient_id = hex::encode(Sha256::digest(payload));
+
+    daemon
+        .handle_rpc(rpc_request(
+            72,
+            "propagation_ingest",
+            json!({
+                "payload_hex": payload_hex,
+            }),
+        ))
+        .expect("propagation ingest");
+
+    let stored = daemon
+        .store
+        .get_propagation_entry(transient_id.as_str())
+        .expect("load propagation entry")
+        .expect("propagation entry persisted");
+    assert_eq!(stored.payload_hex, payload_hex);
+
+    daemon.propagation_payloads.lock().expect("propagation payload mutex poisoned").clear();
+    let fetched = daemon
+        .handle_rpc(rpc_request(
+            73,
+            "propagation_fetch",
+            json!({
+                "transient_id": transient_id,
+            }),
+        ))
+        .expect("fetch stored propagation payload")
+        .result
+        .expect("fetch result");
+    assert_eq!(fetched["payload_hex"].as_str(), Some(payload_hex.as_str()));
+}
+
+#[test]
 fn propagation_ingest_accepts_stamped_payload_with_canonical_transient_id_when_cost_is_zero() {
     use sha2::{Digest, Sha256};
 

@@ -536,6 +536,10 @@ impl RpcDaemon {
                 if let Some(payload_hex) =
                     normalized_payload.map(|(_transient_id, payload_hex)| payload_hex)
                 {
+                    self.store_propagation_payload_hex(
+                        transient_id.as_str(),
+                        payload_hex.as_str(),
+                    )?;
                     self.propagation_payloads
                         .lock()
                         .expect("propagation payload mutex poisoned")
@@ -571,12 +575,21 @@ impl RpcDaemon {
                 let parsed: PropagationFetchParams = serde_json::from_value(params)
                     .map_err(|err| std::io::Error::new(std::io::ErrorKind::InvalidInput, err))?;
 
+                let normalized_transient_id =
+                    normalize_propagation_transient_key(parsed.transient_id.as_str());
                 let payload = self
                     .propagation_payloads
                     .lock()
                     .expect("propagation payload mutex poisoned")
-                    .get(normalize_propagation_transient_key(parsed.transient_id.as_str()).as_str())
+                    .get(normalized_transient_id.as_str())
                     .cloned()
+                    .or_else(|| {
+                        self.store
+                            .get_propagation_entry(normalized_transient_id.as_str())
+                            .ok()
+                            .flatten()
+                            .map(|entry| entry.payload_hex)
+                    })
                     .ok_or_else(|| {
                         std::io::Error::new(std::io::ErrorKind::NotFound, "transient_id not found")
                     })?;
@@ -595,7 +608,7 @@ impl RpcDaemon {
                 Ok(RpcResponse {
                     id: request.id,
                     result: Some(json!({
-                        "transient_id": normalize_propagation_transient_key(parsed.transient_id.as_str()),
+                        "transient_id": normalized_transient_id,
                         "payload_hex": payload,
                     })),
                     error: None,
