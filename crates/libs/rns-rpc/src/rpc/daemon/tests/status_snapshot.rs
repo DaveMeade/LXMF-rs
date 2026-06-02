@@ -3735,6 +3735,43 @@ fn propagation_remote_sync_updates_peer_runtime_state() {
 }
 
 #[test]
+fn propagation_remote_sync_creates_missing_peer_record() {
+    let daemon = RpcDaemon::test_instance();
+    daemon.set_remote_control_bridge(Arc::new(TestRemoteControlBridge {
+        result: Ok(json!({"synced": true})),
+    }));
+
+    daemon
+        .handle_rpc(rpc_request(
+            76,
+            "propagation_remote_sync",
+            json!({
+                "remote": "remote-node",
+                "peer": "peer-remote-sync-created",
+            }),
+        ))
+        .expect("remote sync");
+
+    let peers = daemon
+        .handle_rpc(RpcRequest { id: 77, method: "list_peers".to_string(), params: None })
+        .expect("list peers")
+        .result
+        .expect("list peers result");
+    let row = peers["peers"]
+        .as_array()
+        .expect("peer rows")
+        .iter()
+        .find(|row| row["peer"].as_str() == Some("peer-remote-sync-created"))
+        .expect("peer row");
+    assert_eq!(row["peer_type"].as_str(), Some("manual"));
+    assert_eq!(row["alive"].as_bool(), Some(true));
+    assert!(row["last_sync_attempt"].as_i64().is_some_and(|value| value > 0));
+    assert_eq!(row["sync_backoff"].as_u64(), Some(0));
+    assert_eq!(row["next_sync_attempt"].as_i64(), Some(0));
+    assert!(row["acceptance_rate"].as_f64().is_some_and(|value| value > 0.0));
+}
+
+#[test]
 fn propagation_remote_sync_imports_payloads_into_local_store() {
     let payload = b"remote-sync-propagation-payload";
     let payload_hex = hex::encode(payload);

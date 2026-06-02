@@ -889,6 +889,7 @@ impl RpcDaemon {
                             state.last_sync_completed = Some(now_i64());
                             state.last_sync_error = None;
                         });
+                        self.ensure_peer_for_sync(parsed.peer.as_str(), now_i64())?;
                         self.record_outbound_peer_activity(parsed.peer.as_str(), 0, true);
                         result
                     }

@@ -925,6 +925,25 @@ impl RpcDaemon {
         Ok(record)
     }
 
+    pub(super) fn ensure_peer_for_sync(
+        &self,
+        peer: &str,
+        timestamp: i64,
+    ) -> Result<PeerRecord, std::io::Error> {
+        let existing_peer_type = self
+            .peers
+            .lock()
+            .expect("peers mutex poisoned")
+            .get(peer)
+            .and_then(|record| record.peer_type.clone());
+        let peer_type = if self.is_static_peer(peer) {
+            Some("static".to_string())
+        } else {
+            existing_peer_type.or(Some("manual".to_string()))
+        };
+        self.upsert_peer(peer.to_string(), timestamp, Vec::new(), None, None, peer_type)
+    }
+
     pub(super) fn activate_static_peers(&self, static_peers: &[String]) {
         if static_peers.is_empty() {
             return;
