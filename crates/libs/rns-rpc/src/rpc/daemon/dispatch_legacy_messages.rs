@@ -458,7 +458,7 @@ impl RpcDaemon {
                     "messages": propagation_messages,
                     "sync_limit": sync_limit_bytes,
                 });
-                let acceptance_rate = {
+                let (acceptance_rate, last_sync_attempt, next_sync_attempt, sync_backoff) = {
                     let mut guard = self.peers.lock().expect("peers mutex poisoned");
                     if let Some(existing) = guard.get_mut(&record.peer) {
                         let propagation_offered =
@@ -481,9 +481,19 @@ impl RpcDaemon {
                             existing.next_sync_attempt =
                                 timestamp.saturating_add(i64::from(existing.sync_backoff));
                         }
-                        existing.acceptance_rate
+                        (
+                            existing.acceptance_rate,
+                            existing.last_sync_attempt,
+                            existing.next_sync_attempt,
+                            existing.sync_backoff,
+                        )
                     } else {
-                        record.acceptance_rate
+                        (
+                            record.acceptance_rate,
+                            record.last_sync_attempt,
+                            record.next_sync_attempt,
+                            record.sync_backoff,
+                        )
                     }
                 };
                 let event = RpcEvent {
@@ -496,6 +506,9 @@ impl RpcDaemon {
                         "first_seen": record.first_seen,
                         "seen_count": record.seen_count,
                         "acceptance_rate": acceptance_rate,
+                        "last_sync_attempt": last_sync_attempt,
+                        "next_sync_attempt": next_sync_attempt,
+                        "sync_backoff": sync_backoff,
                         "propagation": propagation_sync.clone(),
                     }),
                 };
@@ -507,6 +520,9 @@ impl RpcDaemon {
                         "peer": record.peer,
                         "synced": true,
                         "acceptance_rate": acceptance_rate,
+                        "last_sync_attempt": last_sync_attempt,
+                        "next_sync_attempt": next_sync_attempt,
+                        "sync_backoff": sync_backoff,
                         "propagation": propagation_sync,
                     })),
                     error: None,

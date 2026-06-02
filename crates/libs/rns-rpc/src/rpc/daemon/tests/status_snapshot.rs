@@ -1700,6 +1700,56 @@ fn peer_sync_with_only_skipped_offers_schedules_initial_backoff() {
 }
 
 #[test]
+fn peer_sync_result_and_event_report_backoff_schedule() {
+    let daemon = RpcDaemon::test_instance();
+    daemon
+        .handle_rpc(rpc_request(55, "peer_sync", json!({ "peer": "peer-backoff-report" })))
+        .expect("initial peer sync");
+    daemon.event_queue.lock().expect("event_queue mutex poisoned").clear();
+    {
+        let mut peers = daemon.peers.lock().expect("peers mutex poisoned");
+        let peer = peers.get_mut("peer-backoff-report").expect("peer record");
+        peer.propagation_sync_limit = Some(24);
+    }
+    let entry = PropagationEntryRecord {
+        transient_id: "ba".repeat(32),
+        destination: "19".repeat(16),
+        payload_hex: "19".repeat(20),
+        received_at: 1_700_000_618,
+        size_bytes: 20,
+        stamp_value: None,
+    };
+    daemon.store.upsert_propagation_entry(&entry).expect("store entry");
+    daemon
+        .store
+        .mark_peer_unhandled_propagation("peer-backoff-report", entry.transient_id.as_str())
+        .expect("mark unhandled");
+
+    let result = daemon
+        .handle_rpc(rpc_request(56, "peer_sync", json!({ "peer": "peer-backoff-report" })))
+        .expect("skipped peer sync")
+        .result
+        .expect("peer sync result");
+    assert_eq!(result["sync_backoff"].as_u64(), Some(12 * 60));
+    let last_sync_attempt = result["last_sync_attempt"].as_i64().expect("last sync attempt");
+    assert!(last_sync_attempt > 0);
+    assert_eq!(result["next_sync_attempt"].as_i64(), Some(last_sync_attempt + 12 * 60));
+
+    let event = daemon
+        .event_queue
+        .lock()
+        .expect("event_queue mutex poisoned")
+        .iter()
+        .rev()
+        .find(|event| event.event_type == "peer_sync")
+        .cloned()
+        .expect("peer sync event");
+    assert_eq!(event.payload["sync_backoff"].as_u64(), Some(12 * 60));
+    assert_eq!(event.payload["last_sync_attempt"].as_i64(), Some(last_sync_attempt));
+    assert_eq!(event.payload["next_sync_attempt"].as_i64(), Some(last_sync_attempt + 12 * 60));
+}
+
+#[test]
 fn list_peers_exposes_python_style_message_counters() {
     let daemon = RpcDaemon::test_instance();
     daemon
