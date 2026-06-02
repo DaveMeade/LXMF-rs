@@ -4229,6 +4229,55 @@ fn failed_propagation_remote_sync_updates_lifecycle_error() {
 }
 
 #[test]
+fn failed_propagation_remote_sync_updates_peer_backoff() {
+    let daemon = RpcDaemon::test_instance();
+    daemon.set_remote_control_bridge(Arc::new(TestRemoteControlBridge {
+        result: Err(std::io::ErrorKind::TimedOut),
+    }));
+    daemon
+        .handle_rpc(rpc_request(75, "peer_sync", json!({ "peer": "peer-remote-sync-fail" })))
+        .expect("initial peer sync");
+    {
+        let mut peers = daemon.peers.lock().expect("peers mutex poisoned");
+        let peer = peers.get_mut("peer-remote-sync-fail").expect("peer record");
+        peer.alive = true;
+        peer.sync_backoff = 0;
+        peer.next_sync_attempt = 0;
+        peer.acceptance_rate = 0.5;
+    }
+
+    let err = daemon
+        .handle_rpc(rpc_request(
+            76,
+            "propagation_remote_sync",
+            json!({
+                "remote": "remote-node",
+                "peer": "peer-remote-sync-fail",
+            }),
+        ))
+        .expect_err("remote sync failure should be returned");
+    assert_eq!(err.kind(), std::io::ErrorKind::TimedOut);
+
+    let peers = daemon
+        .handle_rpc(RpcRequest { id: 77, method: "list_peers".to_string(), params: None })
+        .expect("list peers")
+        .result
+        .expect("list peers result");
+    let row = peers["peers"]
+        .as_array()
+        .expect("peer rows")
+        .iter()
+        .find(|row| row["peer"].as_str() == Some("peer-remote-sync-fail"))
+        .expect("peer row");
+    assert_eq!(row["alive"].as_bool(), Some(false));
+    assert_eq!(row["sync_backoff"].as_u64(), Some(12 * 60));
+    let last_sync_attempt = row["last_sync_attempt"].as_i64().expect("last sync attempt");
+    assert!(last_sync_attempt > 0);
+    assert_eq!(row["next_sync_attempt"].as_i64(), Some(last_sync_attempt + 12 * 60));
+    assert!(row["acceptance_rate"].as_f64().is_some_and(|value| value < 0.5));
+}
+
+#[test]
 fn propagation_remote_unpeer_clears_local_peer_and_queue_state() {
     let daemon = RpcDaemon::test_instance();
     daemon.set_remote_control_bridge(Arc::new(TestRemoteControlBridge {
