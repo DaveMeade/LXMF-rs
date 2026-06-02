@@ -507,6 +507,7 @@ impl RpcDaemon {
                     "unhandled_bytes": unhandled_bytes,
                 });
                 let peer_type_value = record.peer_type.clone();
+                let peering_key = peer_peering_key_value(&record, self.identity_hash.as_str());
                 let event = RpcEvent {
                     event_type: "peer_sync".into(),
                     payload: json!({
@@ -525,6 +526,7 @@ impl RpcDaemon {
                         "propagation_sync_limit": record.propagation_sync_limit,
                         "propagation_stamp_cost": record.propagation_stamp_cost,
                         "propagation_stamp_cost_flexibility": record.propagation_stamp_cost_flexibility,
+                        "peering_key": peering_key,
                         "transfer_limit": record.propagation_transfer_limit,
                         "sync_limit": record.propagation_sync_limit,
                         "target_stamp_cost": record.propagation_stamp_cost,
@@ -549,6 +551,7 @@ impl RpcDaemon {
                         "propagation_sync_limit": record.propagation_sync_limit,
                         "propagation_stamp_cost": record.propagation_stamp_cost,
                         "propagation_stamp_cost_flexibility": record.propagation_stamp_cost_flexibility,
+                        "peering_key": peering_key,
                         "transfer_limit": record.propagation_transfer_limit,
                         "sync_limit": record.propagation_sync_limit,
                         "target_stamp_cost": record.propagation_stamp_cost,

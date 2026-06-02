@@ -2282,6 +2282,56 @@ fn list_peers_exposes_peering_key_value_when_cost_is_known() {
 }
 
 #[test]
+fn peer_sync_result_and_event_expose_peering_key_value_when_cost_is_known() {
+    let store = MessagesStore::in_memory().expect("store");
+    let daemon = RpcDaemon::with_store(store, hex::encode([2u8; 16]));
+    let peer = hex::encode([3u8; 16]);
+
+    daemon
+        .accept_announce_with_metadata(
+            peer.clone(),
+            1_700_000_611,
+            None,
+            None,
+            None,
+            Some(vec!["propagation".to_string()]),
+            None,
+            None,
+            None,
+            Some(1),
+            Some(Some(1)),
+            Some(Some(1)),
+            None,
+            Some(1),
+            None,
+            None,
+            None,
+            None,
+        )
+        .expect("accept propagation peer announce");
+    daemon.event_queue.lock().expect("event_queue mutex poisoned").clear();
+
+    let result = daemon
+        .handle_rpc(rpc_request(56, "peer_sync", json!({ "peer": peer })))
+        .expect("peer sync")
+        .result
+        .expect("peer sync result");
+    let peering_key = result["peering_key"].as_u64().expect("peering key");
+    assert!(peering_key >= 1);
+
+    let event = daemon
+        .event_queue
+        .lock()
+        .expect("event_queue mutex poisoned")
+        .iter()
+        .rev()
+        .find(|event| event.event_type == "peer_sync")
+        .cloned()
+        .expect("peer sync event");
+    assert_eq!(event.payload["peering_key"].as_u64(), Some(peering_key));
+}
+
+#[test]
 fn peer_sync_preserves_existing_auto_peer_type() {
     let daemon = RpcDaemon::test_instance();
     daemon
