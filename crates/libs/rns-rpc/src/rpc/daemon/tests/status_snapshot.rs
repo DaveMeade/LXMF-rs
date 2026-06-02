@@ -2224,7 +2224,7 @@ fn peer_sync_uses_transfer_limit_when_sync_limit_is_absent() {
 }
 
 #[test]
-fn peer_sync_marks_entries_above_transfer_limit_handled_without_offering() {
+fn peer_sync_leaves_entries_above_transfer_limit_unhandled_like_python() {
     let daemon = RpcDaemon::test_instance();
     daemon
         .handle_rpc(rpc_request(60, "peer_sync", json!({ "peer": "peer-transfer-oversize" })))
@@ -2260,20 +2260,18 @@ fn peer_sync_marks_entries_above_transfer_limit_handled_without_offering() {
     assert_eq!(result["propagation"]["offered"].as_u64(), Some(0));
     assert_eq!(result["propagation"]["bytes"].as_u64(), Some(0));
     assert_eq!(result["messages"]["offered"].as_u64(), Some(1));
-    assert_eq!(result["messages"]["unhandled"].as_u64(), Some(0));
+    assert_eq!(result["messages"]["unhandled"].as_u64(), Some(1));
 
     let handled = daemon
         .store
         .list_peer_handled_propagation_ids("peer-transfer-oversize")
         .expect("handled ids");
-    assert_eq!(handled, vec![oversized.transient_id]);
-    assert!(
-        daemon
-            .store
-            .list_peer_unhandled_propagation("peer-transfer-oversize")
-            .expect("pending propagation")
-            .is_empty()
-    );
+    assert!(handled.is_empty());
+    let pending = daemon
+        .store
+        .list_peer_unhandled_propagation("peer-transfer-oversize")
+        .expect("pending propagation");
+    assert_eq!(pending, vec![oversized]);
 
     let event = daemon
         .event_queue
@@ -2287,7 +2285,7 @@ fn peer_sync_marks_entries_above_transfer_limit_handled_without_offering() {
     assert_eq!(event.payload["propagation"]["handled"].as_u64(), Some(0));
     assert_eq!(event.payload["propagation"]["offered"].as_u64(), Some(0));
     assert_eq!(event.payload["messages"]["offered"].as_u64(), Some(1));
-    assert_eq!(event.payload["messages"]["unhandled"].as_u64(), Some(0));
+    assert_eq!(event.payload["messages"]["unhandled"].as_u64(), Some(1));
 }
 
 #[test]

@@ -588,9 +588,6 @@ impl RpcDaemon {
                     let entry_size = usize::try_from(entry.size_bytes).unwrap_or(usize::MAX);
                     let transfer_size = entry_size.saturating_add(16);
                     if transfer_limit_bytes.is_some_and(|limit| transfer_size > limit) {
-                        self.store
-                            .mark_peer_handled_propagation(peer_id, entry.transient_id.as_str())
-                            .map_err(std::io::Error::other)?;
                         continue;
                     }
                     let next_size = cumulative_size.saturating_add(transfer_size);
