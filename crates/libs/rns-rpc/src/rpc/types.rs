@@ -650,7 +650,7 @@ pub struct SequencedRpcEvent {
     pub event: RpcEvent,
 }
 
-#[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
+#[derive(Debug, Serialize, Clone, PartialEq)]
 pub struct PeerRecord {
     pub peer: String,
     pub last_seen: i64,
@@ -696,6 +696,85 @@ pub struct PeerRecord {
     pub peering_cost: Option<u32>,
 }
 
+#[derive(Deserialize)]
+struct PeerRecordWire {
+    peer: String,
+    last_seen: i64,
+    #[serde(default)]
+    capabilities: Vec<String>,
+    #[serde(default)]
+    name: Option<String>,
+    #[serde(default)]
+    name_source: Option<String>,
+    #[serde(default)]
+    peer_type: Option<String>,
+    #[serde(default)]
+    alive: bool,
+    #[serde(default)]
+    last_sync_attempt: i64,
+    #[serde(default)]
+    next_sync_attempt: i64,
+    #[serde(default)]
+    sync_backoff: u32,
+    #[serde(default = "default_network_distance")]
+    network_distance: u32,
+    #[serde(default)]
+    rx_bytes: u64,
+    #[serde(default)]
+    tx_bytes: u64,
+    #[serde(default = "default_acceptance_rate")]
+    acceptance_rate: f64,
+    #[serde(default)]
+    first_seen: Option<i64>,
+    #[serde(default)]
+    seen_count: Option<u64>,
+    #[serde(default)]
+    peering_timebase: i64,
+    #[serde(default)]
+    propagation_transfer_limit: Option<u32>,
+    #[serde(default)]
+    propagation_sync_limit: Option<u32>,
+    #[serde(default)]
+    propagation_stamp_cost: Option<u32>,
+    #[serde(default)]
+    propagation_stamp_cost_flexibility: Option<u32>,
+    #[serde(default)]
+    peering_cost: Option<u32>,
+}
+
+impl<'de> Deserialize<'de> for PeerRecord {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        let wire = PeerRecordWire::deserialize(deserializer)?;
+        Ok(Self {
+            peer: wire.peer,
+            last_seen: wire.last_seen,
+            capabilities: wire.capabilities,
+            name: wire.name,
+            name_source: wire.name_source,
+            peer_type: wire.peer_type,
+            alive: wire.alive,
+            last_sync_attempt: wire.last_sync_attempt,
+            next_sync_attempt: wire.next_sync_attempt,
+            sync_backoff: wire.sync_backoff,
+            network_distance: wire.network_distance,
+            rx_bytes: wire.rx_bytes,
+            tx_bytes: wire.tx_bytes,
+            acceptance_rate: wire.acceptance_rate,
+            first_seen: wire.first_seen.unwrap_or(wire.last_seen),
+            seen_count: wire.seen_count.unwrap_or_else(|| u64::from(wire.last_seen > 0)),
+            peering_timebase: wire.peering_timebase,
+            propagation_transfer_limit: wire.propagation_transfer_limit,
+            propagation_sync_limit: wire.propagation_sync_limit,
+            propagation_stamp_cost: wire.propagation_stamp_cost,
+            propagation_stamp_cost_flexibility: wire.propagation_stamp_cost_flexibility,
+            peering_cost: wire.peering_cost,
+        })
+    }
+}
+
 fn default_true() -> bool {
     true
 }
@@ -726,4 +805,48 @@ fn default_network_distance() -> u32 {
 
 fn default_acceptance_rate() -> f64 {
     0.0
+}
+
+#[cfg(test)]
+mod peer_record_serde_tests {
+    use super::*;
+    use serde_json::json;
+
+    #[test]
+    fn peer_record_deserializes_legacy_seen_fields_from_last_seen() {
+        let record: PeerRecord = serde_json::from_value(json!({
+            "peer": "peer-legacy",
+            "last_seen": 1_700_001_001,
+        }))
+        .expect("deserialize legacy peer");
+
+        assert_eq!(record.first_seen, 1_700_001_001);
+        assert_eq!(record.seen_count, 1);
+    }
+
+    #[test]
+    fn peer_record_deserializes_explicit_seen_fields_without_rewriting_them() {
+        let record: PeerRecord = serde_json::from_value(json!({
+            "peer": "peer-current",
+            "last_seen": 1_700_001_020,
+            "first_seen": 1_700_001_000,
+            "seen_count": 4,
+        }))
+        .expect("deserialize current peer");
+
+        assert_eq!(record.first_seen, 1_700_001_000);
+        assert_eq!(record.seen_count, 4);
+    }
+
+    #[test]
+    fn peer_record_deserializes_unseen_legacy_peer_without_synthetic_seen_count() {
+        let record: PeerRecord = serde_json::from_value(json!({
+            "peer": "peer-static",
+            "last_seen": 0,
+        }))
+        .expect("deserialize unseen peer");
+
+        assert_eq!(record.first_seen, 0);
+        assert_eq!(record.seen_count, 0);
+    }
 }
