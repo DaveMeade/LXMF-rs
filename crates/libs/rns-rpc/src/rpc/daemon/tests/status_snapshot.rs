@@ -2717,6 +2717,8 @@ fn peer_sync_result_and_event_report_transfer_and_stamp_policy() {
     assert_eq!(result["sync_limit"].as_u64(), Some(999));
     assert_eq!(result["propagation"]["transfer_limit"].as_u64(), Some(333));
     assert_eq!(result["propagation"]["sync_limit"].as_u64(), Some(999));
+    assert_eq!(result["propagation"]["target_stamp_cost"].as_u64(), Some(8));
+    assert_eq!(result["propagation"]["stamp_cost_flexibility"].as_u64(), Some(2));
     assert_eq!(result["target_stamp_cost"].as_u64(), Some(8));
     assert_eq!(result["stamp_cost_flexibility"].as_u64(), Some(2));
     assert_eq!(result["sync_transfer_rate"].as_f64(), Some(12_345.0));
@@ -2746,6 +2748,11 @@ fn peer_sync_result_and_event_report_transfer_and_stamp_policy() {
     assert_eq!(event.payload["sync_limit"].as_u64(), Some(999));
     assert_eq!(event.payload["propagation"]["transfer_limit"].as_u64(), Some(333));
     assert_eq!(event.payload["propagation"]["sync_limit"].as_u64(), Some(999));
+    assert_eq!(event.payload["propagation"]["target_stamp_cost"].as_u64(), Some(8));
+    assert_eq!(
+        event.payload["propagation"]["stamp_cost_flexibility"].as_u64(),
+        Some(2)
+    );
     assert_eq!(event.payload["target_stamp_cost"].as_u64(), Some(8));
     assert_eq!(event.payload["stamp_cost_flexibility"].as_u64(), Some(2));
     assert_eq!(event.payload["sync_transfer_rate"].as_f64(), Some(12_345.0));

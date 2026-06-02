@@ -72,6 +72,8 @@ impl RpcDaemon {
             "messages": [],
             "transfer_limit": record.propagation_transfer_limit.map(|limit| limit as usize),
             "sync_limit": sync_limit_bytes,
+            "target_stamp_cost": record.propagation_stamp_cost,
+            "stamp_cost_flexibility": record.propagation_stamp_cost_flexibility,
         });
         let peer_type_value = record.peer_type.clone();
         let peering_key = peer_peering_key_value(record, self.identity_hash.as_str());
@@ -685,6 +687,8 @@ impl RpcDaemon {
                     "messages": propagation_messages,
                     "transfer_limit": transfer_limit_bytes,
                     "sync_limit": sync_limit_bytes,
+                    "target_stamp_cost": record.propagation_stamp_cost,
+                    "stamp_cost_flexibility": record.propagation_stamp_cost_flexibility,
                 });
                 let (
                     acceptance_rate,
