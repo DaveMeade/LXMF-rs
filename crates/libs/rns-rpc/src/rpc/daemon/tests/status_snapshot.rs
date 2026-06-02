@@ -2734,6 +2734,22 @@ fn list_peers_includes_propagation_marks_in_message_counters() {
     assert_eq!(row["messages"]["unhandled"].as_u64(), Some(1));
     assert_eq!(row["messages"]["offered_bytes"].as_u64(), Some(40));
     assert_eq!(row["messages"]["unhandled_bytes"].as_u64(), Some(24));
+    assert_eq!(
+        row["handled_ids"].as_array().expect("handled ids"),
+        &[json!(handled.transient_id.as_str())]
+    );
+    assert_eq!(
+        row["unhandled_ids"].as_array().expect("unhandled ids"),
+        &[json!(unhandled.transient_id.as_str())]
+    );
+    assert_eq!(
+        row["messages"]["handled_ids"].as_array().expect("message handled ids"),
+        &[json!(handled.transient_id.as_str())]
+    );
+    assert_eq!(
+        row["messages"]["unhandled_ids"].as_array().expect("message unhandled ids"),
+        &[json!(unhandled.transient_id.as_str())]
+    );
 }
 
 #[test]

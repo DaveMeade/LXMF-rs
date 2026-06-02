@@ -239,6 +239,14 @@ impl RpcDaemon {
                             .unwrap_or((0, 0, 0, 0, 0, 0));
                         let peering_key =
                             peer_peering_key_value(&peer, self.identity_hash.as_str());
+                        let handled_ids = self
+                            .store
+                            .list_peer_handled_propagation_ids(peer.peer.as_str())
+                            .unwrap_or_default();
+                        let unhandled_ids = self
+                            .store
+                            .list_peer_unhandled_propagation_ids(peer.peer.as_str())
+                            .unwrap_or_default();
                         let is_static_peer = static_peers.iter().any(|static_peer| {
                             static_peer.eq_ignore_ascii_case(peer.peer.as_str())
                         });
@@ -261,7 +269,11 @@ impl RpcDaemon {
                             "unhandled": unhandled,
                             "offered_bytes": offered_bytes,
                             "unhandled_bytes": unhandled_bytes,
+                            "handled_ids": handled_ids.clone(),
+                            "unhandled_ids": unhandled_ids.clone(),
                         });
+                        row["handled_ids"] = json!(handled_ids);
+                        row["unhandled_ids"] = json!(unhandled_ids);
                         row["peering_key"] = peering_key.map_or(JsonValue::Null, JsonValue::from);
                         row["last_heard"] =
                             row.get("last_seen").cloned().unwrap_or(JsonValue::Null);

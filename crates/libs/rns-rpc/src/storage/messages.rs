@@ -943,6 +943,19 @@ impl MessagesStore {
         })
     }
 
+    pub fn list_peer_unhandled_propagation_ids(&self, peer: &str) -> rusqlite::Result<Vec<String>> {
+        self.with_read_conn(|conn| {
+            let mut stmt = conn.prepare(
+                "SELECT transient_id
+                 FROM propagation_peer_entries
+                 WHERE peer = ?1 AND state = 'unhandled'
+                 ORDER BY transient_id ASC",
+            )?;
+            let rows = stmt.query_map(params![peer], |row| row.get(0))?;
+            rows.collect()
+        })
+    }
+
     pub fn clear_peer_propagation_marks(&self, peer: &str) -> rusqlite::Result<usize> {
         self.with_write_conn(|conn| {
             let affected = conn
