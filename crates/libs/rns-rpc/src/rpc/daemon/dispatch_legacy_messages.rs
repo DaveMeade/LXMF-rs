@@ -403,10 +403,18 @@ impl RpcDaemon {
                     .map(|limit| limit as usize);
                 let transfer_limit_bytes =
                     record.propagation_transfer_limit.map(|limit| limit as usize);
-                let pending_propagation = self
+                let mut pending_propagation = self
                     .store
                     .list_peer_unhandled_propagation(peer_id)
                     .map_err(std::io::Error::other)?;
+                pending_propagation.sort_by(|left, right| {
+                    let left_weight = propagation_peer_sync_weight(left, timestamp);
+                    let right_weight = propagation_peer_sync_weight(right, timestamp);
+                    left_weight
+                        .partial_cmp(&right_weight)
+                        .unwrap_or(std::cmp::Ordering::Equal)
+                        .then_with(|| left.transient_id.cmp(&right.transient_id))
+                });
                 let mut cumulative_size = 24usize;
                 let mut propagation_handled = 0usize;
                 let mut propagation_skipped = 0usize;
@@ -1119,6 +1127,14 @@ fn peer_peering_key_value(peer: &PeerRecord, local_identity_hash: &str) -> Optio
     material.extend_from_slice(remote_hash.as_slice());
     material.extend_from_slice(local_hash.as_slice());
     generate_peering_key_value(material.as_slice(), peering_cost)
+}
+
+fn propagation_peer_sync_weight(entry: &PropagationEntryRecord, now: i64) -> f64 {
+    const FOUR_DAYS_SECS: f64 = 4.0 * 24.0 * 60.0 * 60.0;
+
+    let age_secs = now.saturating_sub(entry.received_at) as f64;
+    let age_weight = (age_secs / FOUR_DAYS_SECS).max(1.0);
+    age_weight * entry.size_bytes as f64
 }
 
 fn decode_truncated_hash(value: &str) -> Option<Vec<u8>> {

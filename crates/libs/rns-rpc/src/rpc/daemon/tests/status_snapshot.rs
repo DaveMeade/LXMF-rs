@@ -2011,6 +2011,68 @@ fn peer_sync_marks_entries_above_transfer_limit_handled_without_offering() {
 }
 
 #[test]
+fn peer_sync_orders_offers_by_python_weight_before_sync_limit() {
+    let daemon = RpcDaemon::test_instance();
+    daemon
+        .handle_rpc(rpc_request(62, "peer_sync", json!({ "peer": "peer-weight-order" })))
+        .expect("initial peer sync");
+    {
+        let mut peers = daemon.peers.lock().expect("peers mutex poisoned");
+        let peer = peers.get_mut("peer-weight-order").expect("peer record");
+        peer.propagation_sync_limit = Some(152);
+    }
+
+    let older_large = PropagationEntryRecord {
+        transient_id: "c4".repeat(32),
+        destination: "16".repeat(16),
+        payload_hex: "16".repeat(80),
+        received_at: 1_700_000_612,
+        size_bytes: 80,
+        stamp_value: None,
+    };
+    let newer_small = PropagationEntryRecord {
+        transient_id: "c5".repeat(32),
+        destination: "16".repeat(16),
+        payload_hex: "16".repeat(20),
+        received_at: 1_700_000_613,
+        size_bytes: 20,
+        stamp_value: None,
+    };
+    for entry in [&older_large, &newer_small] {
+        daemon.store.upsert_propagation_entry(entry).expect("store propagation entry");
+        daemon
+            .store
+            .mark_peer_unhandled_propagation("peer-weight-order", entry.transient_id.as_str())
+            .expect("mark unhandled");
+    }
+
+    let result = daemon
+        .handle_rpc(rpc_request(63, "peer_sync", json!({ "peer": "peer-weight-order" })))
+        .expect("peer sync")
+        .result
+        .expect("peer sync result");
+    assert_eq!(
+        result["propagation"]["handled_ids"].as_array().expect("handled ids"),
+        &[json!(newer_small.transient_id.as_str())]
+    );
+    assert_eq!(
+        result["propagation"]["skipped_ids"].as_array().expect("skipped ids"),
+        &[json!(older_large.transient_id.as_str())]
+    );
+
+    let handled = daemon
+        .store
+        .list_peer_handled_propagation_ids("peer-weight-order")
+        .expect("handled ids");
+    assert_eq!(handled, vec![newer_small.transient_id]);
+    let pending = daemon
+        .store
+        .list_peer_unhandled_propagation("peer-weight-order")
+        .expect("pending propagation");
+    assert_eq!(pending, vec![older_large]);
+}
+
+#[test]
 fn peer_sync_reports_propagation_transfer_accounting() {
     let daemon = RpcDaemon::test_instance();
     daemon
