@@ -553,6 +553,7 @@ impl RpcDaemon {
                         existing.sync_backoff.saturating_add(LXMF_PEER_SYNC_BACKOFF_STEP_SECS);
                     existing.next_sync_attempt =
                         now.saturating_add(i64::from(existing.sync_backoff));
+                    existing.alive = false;
                     existing.acceptance_rate = (existing.acceptance_rate * 0.9).max(0.0);
                 } else {
                     existing.alive = true;
@@ -904,6 +905,7 @@ impl RpcDaemon {
             network_distance: 1,
             rx_bytes: 0,
             tx_bytes: 0,
+            sync_transfer_rate: 0.0,
             acceptance_rate: 0.0,
             first_seen: timestamp,
             seen_count: 1,
@@ -956,6 +958,7 @@ impl RpcDaemon {
                     network_distance: 1,
                     rx_bytes: 0,
                     tx_bytes: 0,
+                    sync_transfer_rate: 0.0,
                     acceptance_rate: 0.0,
                     first_seen: 0,
                     seen_count: 0,
@@ -1089,6 +1092,7 @@ impl RpcDaemon {
             network_distance: 1,
             rx_bytes: 0,
             tx_bytes: 0,
+            sync_transfer_rate: 0.0,
             acceptance_rate: 0.0,
             first_seen: timestamp,
             seen_count: 1,

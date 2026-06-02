@@ -1512,6 +1512,7 @@ fn peer_sync_without_offers_preserves_failure_backoff() {
         .expect("peer row");
     assert_eq!(after_row["sync_backoff"].as_u64(), Some(sync_backoff));
     assert_eq!(after_row["next_sync_attempt"].as_i64(), Some(next_sync_attempt));
+    assert_eq!(after_row["alive"].as_bool(), Some(false));
 }
 
 #[test]
@@ -2637,6 +2638,7 @@ fn peer_sync_result_and_event_report_transfer_and_stamp_policy() {
         peer.propagation_sync_limit = Some(999);
         peer.propagation_stamp_cost = Some(8);
         peer.propagation_stamp_cost_flexibility = Some(2);
+        peer.sync_transfer_rate = 12_345.0;
     }
 
     let result = daemon
@@ -2653,6 +2655,8 @@ fn peer_sync_result_and_event_report_transfer_and_stamp_policy() {
     assert_eq!(result["sync_limit"].as_u64(), Some(999));
     assert_eq!(result["target_stamp_cost"].as_u64(), Some(8));
     assert_eq!(result["stamp_cost_flexibility"].as_u64(), Some(2));
+    assert_eq!(result["sync_transfer_rate"].as_f64(), Some(12_345.0));
+    assert_eq!(result["str"].as_u64(), Some(12_345));
 
     let event = daemon
         .event_queue
@@ -2678,6 +2682,8 @@ fn peer_sync_result_and_event_report_transfer_and_stamp_policy() {
     assert_eq!(event.payload["sync_limit"].as_u64(), Some(999));
     assert_eq!(event.payload["target_stamp_cost"].as_u64(), Some(8));
     assert_eq!(event.payload["stamp_cost_flexibility"].as_u64(), Some(2));
+    assert_eq!(event.payload["sync_transfer_rate"].as_f64(), Some(12_345.0));
+    assert_eq!(event.payload["str"].as_u64(), Some(12_345));
 }
 
 #[test]

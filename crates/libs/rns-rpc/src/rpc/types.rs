@@ -677,6 +677,8 @@ pub struct PeerRecord {
     pub rx_bytes: u64,
     #[serde(default)]
     pub tx_bytes: u64,
+    #[serde(default)]
+    pub sync_transfer_rate: f64,
     #[serde(default = "default_acceptance_rate")]
     pub acceptance_rate: f64,
     #[serde(default)]
@@ -723,6 +725,8 @@ struct PeerRecordWire {
     rx_bytes: u64,
     #[serde(default)]
     tx_bytes: u64,
+    #[serde(default)]
+    sync_transfer_rate: f64,
     #[serde(default = "default_acceptance_rate")]
     acceptance_rate: f64,
     #[serde(default)]
@@ -763,6 +767,7 @@ impl<'de> Deserialize<'de> for PeerRecord {
             network_distance: wire.network_distance,
             rx_bytes: wire.rx_bytes,
             tx_bytes: wire.tx_bytes,
+            sync_transfer_rate: wire.sync_transfer_rate,
             acceptance_rate: wire.acceptance_rate,
             first_seen: wire.first_seen.unwrap_or(wire.last_seen),
             seen_count: wire.seen_count.unwrap_or_else(|| u64::from(wire.last_seen > 0)),

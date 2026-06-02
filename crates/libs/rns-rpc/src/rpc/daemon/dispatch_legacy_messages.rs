@@ -10,19 +10,32 @@ impl RpcDaemon {
         postpone_reason: &str,
         sync_limit_bytes: Option<usize>,
     ) -> RpcResponse {
-        let (acceptance_rate, last_sync_attempt, next_sync_attempt, sync_backoff) = {
+        let (
+            acceptance_rate,
+            last_sync_attempt,
+            next_sync_attempt,
+            sync_backoff,
+            sync_transfer_rate,
+        ) = {
             let mut guard = self.peers.lock().expect("peers mutex poisoned");
             if let Some(existing) = guard.get_mut(&record.peer) {
                 existing.last_sync_attempt = timestamp;
-                existing.alive = true;
+                existing.alive = existing.last_sync_attempt < existing.last_seen;
                 (
                     existing.acceptance_rate,
                     existing.last_sync_attempt,
                     existing.next_sync_attempt,
                     existing.sync_backoff,
+                    existing.sync_transfer_rate,
                 )
             } else {
-                (record.acceptance_rate, timestamp, record.next_sync_attempt, record.sync_backoff)
+                (
+                    record.acceptance_rate,
+                    timestamp,
+                    record.next_sync_attempt,
+                    record.sync_backoff,
+                    record.sync_transfer_rate,
+                )
             }
         };
         let (outgoing, incoming, offered, unhandled, offered_bytes, unhandled_bytes) =
@@ -64,6 +77,8 @@ impl RpcDaemon {
                 "last_sync_attempt": last_sync_attempt,
                 "next_sync_attempt": next_sync_attempt,
                 "sync_backoff": sync_backoff,
+                "sync_transfer_rate": sync_transfer_rate,
+                "str": sync_transfer_rate as u64,
                 "postponed": true,
                 "postpone_reason": postpone_reason,
                 "propagation_transfer_limit": record.propagation_transfer_limit,
@@ -93,6 +108,8 @@ impl RpcDaemon {
                 "last_sync_attempt": last_sync_attempt,
                 "next_sync_attempt": next_sync_attempt,
                 "sync_backoff": sync_backoff,
+                "sync_transfer_rate": sync_transfer_rate,
+                "str": sync_transfer_rate as u64,
                 "propagation_transfer_limit": record.propagation_transfer_limit,
                 "propagation_sync_limit": record.propagation_sync_limit,
                 "propagation_stamp_cost": record.propagation_stamp_cost,
@@ -232,7 +249,11 @@ impl RpcDaemon {
                         row["state"] = JsonValue::from(0);
                         row["sync_strategy"] = JsonValue::from(2);
                         row["ler"] = JsonValue::from(0);
-                        row["str"] = JsonValue::from(0);
+                        row["str"] = row
+                            .get("sync_transfer_rate")
+                            .and_then(JsonValue::as_f64)
+                            .map(|value| JsonValue::from(value as u64))
+                            .unwrap_or_else(|| JsonValue::from(0));
                         row["messages"] = json!({
                             "offered": offered,
                             "outgoing": outgoing,
@@ -629,13 +650,20 @@ impl RpcDaemon {
                     "messages": propagation_messages,
                     "sync_limit": sync_limit_bytes,
                 });
-                let (acceptance_rate, last_sync_attempt, next_sync_attempt, sync_backoff) = {
+                let (
+                    acceptance_rate,
+                    last_sync_attempt,
+                    next_sync_attempt,
+                    sync_backoff,
+                    sync_transfer_rate,
+                ) = {
                     let mut guard = self.peers.lock().expect("peers mutex poisoned");
                     if let Some(existing) = guard.get_mut(&record.peer) {
                         let propagation_offered =
                             propagation_handled.saturating_add(propagation_skipped);
                         existing.last_sync_attempt = timestamp;
-                        existing.alive = true;
+                        existing.alive = propagation_handled > 0
+                            || existing.last_sync_attempt < existing.last_seen;
                         existing.tx_bytes = existing.tx_bytes.saturating_add(propagation_bytes);
                         if propagation_offered > 0 {
                             existing.acceptance_rate = (propagation_handled as f64
@@ -657,6 +685,7 @@ impl RpcDaemon {
                             existing.last_sync_attempt,
                             existing.next_sync_attempt,
                             existing.sync_backoff,
+                            existing.sync_transfer_rate,
                         )
                     } else {
                         (
@@ -664,6 +693,7 @@ impl RpcDaemon {
                             record.last_sync_attempt,
                             record.next_sync_attempt,
                             record.sync_backoff,
+                            record.sync_transfer_rate,
                         )
                     }
                 };
@@ -693,6 +723,8 @@ impl RpcDaemon {
                         "last_sync_attempt": last_sync_attempt,
                         "next_sync_attempt": next_sync_attempt,
                         "sync_backoff": sync_backoff,
+                        "sync_transfer_rate": sync_transfer_rate,
+                        "str": sync_transfer_rate as u64,
                         "propagation_transfer_limit": record.propagation_transfer_limit,
                         "propagation_sync_limit": record.propagation_sync_limit,
                         "propagation_stamp_cost": record.propagation_stamp_cost,
@@ -718,6 +750,8 @@ impl RpcDaemon {
                         "last_sync_attempt": last_sync_attempt,
                         "next_sync_attempt": next_sync_attempt,
                         "sync_backoff": sync_backoff,
+                        "sync_transfer_rate": sync_transfer_rate,
+                        "str": sync_transfer_rate as u64,
                         "propagation_transfer_limit": record.propagation_transfer_limit,
                         "propagation_sync_limit": record.propagation_sync_limit,
                         "propagation_stamp_cost": record.propagation_stamp_cost,
