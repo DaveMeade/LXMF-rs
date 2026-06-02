@@ -901,11 +901,14 @@ impl RpcDaemon {
                         return Err(err);
                     }
                 };
+                let propagation =
+                    self.propagation_state.lock().expect("propagation mutex poisoned").clone();
                 Ok(RpcResponse {
                     id: request.id,
                     result: Some(json!({
                         "remote": parsed.remote,
                         "peer": parsed.peer,
+                        "propagation": propagation,
                         "result": result,
                     })),
                     error: None,
@@ -977,10 +980,13 @@ impl RpcDaemon {
                         return Err(err);
                     }
                 };
+                let propagation =
+                    self.propagation_state.lock().expect("propagation mutex poisoned").clone();
                 Ok(RpcResponse {
                     id: request.id,
                     result: Some(json!({
                         "remote": parsed.remote,
+                        "propagation": propagation,
                         "result": result,
                     })),
                     error: None,
@@ -1077,10 +1083,13 @@ impl RpcDaemon {
                     state.last_sync_completed = Some(now_i64());
                     state.last_sync_error = None;
                 });
+                let propagation =
+                    self.propagation_state.lock().expect("propagation mutex poisoned").clone();
                 Ok(RpcResponse {
                     id: request.id,
                     result: Some(json!({
                         "remote": parsed.remote,
+                        "propagation": propagation,
                         "result": result,
                     })),
                     error: None,

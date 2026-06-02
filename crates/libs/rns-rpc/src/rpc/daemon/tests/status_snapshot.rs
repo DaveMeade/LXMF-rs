@@ -3376,7 +3376,7 @@ fn propagation_remote_sync_updates_lifecycle_status() {
         result: Ok(json!({"synced": true})),
     }));
 
-    daemon
+    let result = daemon
         .handle_rpc(rpc_request(
             72,
             "propagation_remote_sync",
@@ -3385,7 +3385,16 @@ fn propagation_remote_sync_updates_lifecycle_status() {
                 "peer": "peer-a",
             }),
         ))
-        .expect("remote sync");
+        .expect("remote sync")
+        .result
+        .expect("remote sync result");
+    let result_propagation = &result["propagation"];
+    assert_eq!(result_propagation["sync_state"].as_u64(), Some(0x07));
+    assert_eq!(result_propagation["state_name"].as_str(), Some("completed"));
+    assert_eq!(result_propagation["sync_progress"].as_f64(), Some(1.0));
+    assert!(result_propagation["last_sync_started"].as_i64().is_some());
+    assert!(result_propagation["last_sync_completed"].as_i64().is_some());
+    assert_eq!(result_propagation["last_sync_error"], JsonValue::Null);
 
     let status = daemon
         .handle_rpc(RpcRequest { id: 73, method: "propagation_status".to_string(), params: None })
@@ -3529,6 +3538,12 @@ fn propagation_remote_fetch_imports_payloads_into_local_store() {
         .expect("remote fetch")
         .result
         .expect("remote fetch result");
+    assert_eq!(result["propagation"]["sync_state"].as_u64(), Some(0x07));
+    assert_eq!(result["propagation"]["state_name"].as_str(), Some("completed"));
+    assert_eq!(result["propagation"]["sync_progress"].as_f64(), Some(1.0));
+    assert!(result["propagation"]["last_sync_started"].as_i64().is_some());
+    assert!(result["propagation"]["last_sync_completed"].as_i64().is_some());
+    assert_eq!(result["propagation"]["last_sync_error"], JsonValue::Null);
     assert_eq!(result["result"]["imported_count"].as_u64(), Some(1));
     assert_eq!(result["result"]["imported_ids"], json!([transient_id]));
 
@@ -3737,6 +3752,12 @@ fn propagation_remote_download_imports_payloads_into_local_store() {
         .expect("remote download")
         .result
         .expect("remote download result");
+    assert_eq!(result["propagation"]["sync_state"].as_u64(), Some(0x07));
+    assert_eq!(result["propagation"]["state_name"].as_str(), Some("completed"));
+    assert_eq!(result["propagation"]["sync_progress"].as_f64(), Some(1.0));
+    assert!(result["propagation"]["last_sync_started"].as_i64().is_some());
+    assert!(result["propagation"]["last_sync_completed"].as_i64().is_some());
+    assert_eq!(result["propagation"]["last_sync_error"], JsonValue::Null);
     assert_eq!(result["result"]["imported_count"].as_u64(), Some(1));
     assert_eq!(result["result"]["imported_ids"], json!([transient_id]));
 
