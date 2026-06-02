@@ -2351,6 +2351,9 @@ fn peer_sync_leaves_entries_above_transfer_limit_unhandled_like_python() {
     );
     assert_eq!(result["messages"]["offered"].as_u64(), Some(1));
     assert_eq!(result["messages"]["unhandled"].as_u64(), Some(1));
+    assert_eq!(result["sync_backoff"].as_u64(), Some(12 * 60));
+    let last_sync_attempt = result["last_sync_attempt"].as_i64().expect("last sync attempt");
+    assert_eq!(result["next_sync_attempt"].as_i64(), Some(last_sync_attempt + 12 * 60));
 
     let handled = daemon
         .store
@@ -2383,6 +2386,11 @@ fn peer_sync_leaves_entries_above_transfer_limit_unhandled_like_python() {
     );
     assert_eq!(event.payload["messages"]["offered"].as_u64(), Some(1));
     assert_eq!(event.payload["messages"]["unhandled"].as_u64(), Some(1));
+    assert_eq!(event.payload["sync_backoff"].as_u64(), Some(12 * 60));
+    assert_eq!(
+        event.payload["next_sync_attempt"].as_i64(),
+        Some(last_sync_attempt + 12 * 60)
+    );
 }
 
 #[test]
