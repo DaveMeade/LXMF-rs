@@ -702,6 +702,7 @@ pub struct PeerRecord {
 #[derive(Deserialize)]
 struct PeerRecordWire {
     peer: String,
+    #[serde(alias = "last_heard")]
     last_seen: i64,
     #[serde(default)]
     capabilities: Vec<String>,
@@ -726,6 +727,7 @@ struct PeerRecordWire {
     #[serde(default)]
     tx_bytes: u64,
     #[serde(default)]
+    #[serde(alias = "str")]
     sync_transfer_rate: f64,
     #[serde(default = "default_acceptance_rate")]
     acceptance_rate: f64,
@@ -736,12 +738,16 @@ struct PeerRecordWire {
     #[serde(default)]
     peering_timebase: i64,
     #[serde(default)]
+    #[serde(alias = "transfer_limit")]
     propagation_transfer_limit: Option<u32>,
     #[serde(default)]
+    #[serde(alias = "sync_limit")]
     propagation_sync_limit: Option<u32>,
     #[serde(default)]
+    #[serde(alias = "target_stamp_cost")]
     propagation_stamp_cost: Option<u32>,
     #[serde(default)]
+    #[serde(alias = "stamp_cost_flexibility")]
     propagation_stamp_cost_flexibility: Option<u32>,
     #[serde(default)]
     peering_cost: Option<u32>,
@@ -854,5 +860,28 @@ mod peer_record_serde_tests {
 
         assert_eq!(record.first_seen, 0);
         assert_eq!(record.seen_count, 0);
+    }
+
+    #[test]
+    fn peer_record_deserializes_python_status_aliases() {
+        let record: PeerRecord = serde_json::from_value(json!({
+            "peer": "peer-python-status",
+            "last_heard": 1_700_001_004,
+            "str": 4096.0,
+            "transfer_limit": 333,
+            "sync_limit": 444,
+            "target_stamp_cost": 7,
+            "stamp_cost_flexibility": 2,
+        }))
+        .expect("deserialize python status peer");
+
+        assert_eq!(record.last_seen, 1_700_001_004);
+        assert_eq!(record.first_seen, 1_700_001_004);
+        assert_eq!(record.seen_count, 1);
+        assert_eq!(record.sync_transfer_rate, 4096.0);
+        assert_eq!(record.propagation_transfer_limit, Some(333));
+        assert_eq!(record.propagation_sync_limit, Some(444));
+        assert_eq!(record.propagation_stamp_cost, Some(7));
+        assert_eq!(record.propagation_stamp_cost_flexibility, Some(2));
     }
 }
