@@ -1737,6 +1737,19 @@ fn peer_sync_reports_propagation_transfer_accounting() {
         event.payload["propagation"]["skipped_ids"].as_array().expect("event skipped ids"),
         &[json!(large.transient_id.as_str())]
     );
+
+    let peers = daemon
+        .handle_rpc(RpcRequest { id: 62, method: "list_peers".to_string(), params: None })
+        .expect("list peers")
+        .result
+        .expect("list peers result");
+    let row = peers["peers"]
+        .as_array()
+        .expect("peer rows")
+        .iter()
+        .find(|row| row["peer"].as_str() == Some("peer-sync-report"))
+        .expect("peer row");
+    assert_eq!(row["tx_bytes"].as_u64(), Some(20));
 }
 
 #[test]

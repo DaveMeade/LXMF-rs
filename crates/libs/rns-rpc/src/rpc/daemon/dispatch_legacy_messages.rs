@@ -435,6 +435,7 @@ impl RpcDaemon {
                     if let Some(existing) = guard.get_mut(&record.peer) {
                         existing.last_sync_attempt = timestamp;
                         existing.alive = true;
+                        existing.tx_bytes = existing.tx_bytes.saturating_add(propagation_bytes);
                         existing.sync_backoff = 0;
                         existing.next_sync_attempt = 0;
                     }
