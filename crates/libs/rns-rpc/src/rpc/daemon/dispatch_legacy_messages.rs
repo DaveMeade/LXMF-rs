@@ -523,16 +523,25 @@ impl RpcDaemon {
                     .store
                     .list_peer_unhandled_propagation(peer_id)
                     .map_err(std::io::Error::other)?;
-                if pending_propagation.iter().any(|entry| entry.stamp_value.is_some())
-                    && !peer_stamp_policy_known(&record)
-                {
-                    return Ok(self.postponed_peer_sync_response(
-                        request.id,
-                        &record,
-                        timestamp,
-                        "stamp_policy",
-                        sync_limit_bytes,
-                    ));
+                if pending_propagation.iter().any(|entry| entry.stamp_value.is_some()) {
+                    if !peer_stamp_policy_known(&record) {
+                        return Ok(self.postponed_peer_sync_response(
+                            request.id,
+                            &record,
+                            timestamp,
+                            "stamp_policy",
+                            sync_limit_bytes,
+                        ));
+                    }
+                    if peer_peering_key_value(&record, self.identity_hash.as_str()).is_none() {
+                        return Ok(self.postponed_peer_sync_response(
+                            request.id,
+                            &record,
+                            timestamp,
+                            "peering_key",
+                            sync_limit_bytes,
+                        ));
+                    }
                 }
                 pending_propagation.sort_by(|left, right| {
                     let left_weight = propagation_peer_sync_weight(left, timestamp);
