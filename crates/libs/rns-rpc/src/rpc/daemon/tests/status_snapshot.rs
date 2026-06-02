@@ -4242,6 +4242,14 @@ fn peer_unpeer_reports_cleared_propagation_queue_accounting() {
     assert_eq!(result["messages"]["unhandled"].as_u64(), Some(1));
     assert_eq!(result["messages"]["offered_bytes"].as_u64(), Some(36));
     assert_eq!(result["messages"]["unhandled_bytes"].as_u64(), Some(24));
+    assert_eq!(
+        result["messages"]["handled_ids"].as_array().expect("result handled ids"),
+        &[json!(handled.transient_id.as_str())]
+    );
+    assert_eq!(
+        result["messages"]["unhandled_ids"].as_array().expect("result unhandled ids"),
+        &[json!(unhandled.transient_id.as_str())]
+    );
 
     let event = daemon
         .event_queue
@@ -4258,6 +4266,14 @@ fn peer_unpeer_reports_cleared_propagation_queue_accounting() {
     assert_eq!(event.payload["messages"]["unhandled"].as_u64(), Some(1));
     assert_eq!(event.payload["messages"]["offered_bytes"].as_u64(), Some(36));
     assert_eq!(event.payload["messages"]["unhandled_bytes"].as_u64(), Some(24));
+    assert_eq!(
+        event.payload["messages"]["handled_ids"].as_array().expect("event handled ids"),
+        &[json!(handled.transient_id.as_str())]
+    );
+    assert_eq!(
+        event.payload["messages"]["unhandled_ids"].as_array().expect("event unhandled ids"),
+        &[json!(unhandled.transient_id.as_str())]
+    );
 }
 
 #[test]

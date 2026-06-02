@@ -1313,6 +1313,12 @@ impl RpcDaemon {
     ) -> Result<LocalUnpeerCleanup, std::io::Error> {
         let propagation_stats =
             self.store.peer_propagation_message_stats(peer_id).map_err(std::io::Error::other)?;
+        let handled_ids =
+            self.store.list_peer_handled_propagation_ids(peer_id).map_err(std::io::Error::other)?;
+        let unhandled_ids = self
+            .store
+            .list_peer_unhandled_propagation_ids(peer_id)
+            .map_err(std::io::Error::other)?;
         let propagation_cleared =
             self.store.clear_peer_propagation_marks(peer_id).map_err(std::io::Error::other)?;
         let messages = json!({
@@ -1320,6 +1326,8 @@ impl RpcDaemon {
             "unhandled": propagation_stats.unhandled,
             "offered_bytes": propagation_stats.offered_bytes,
             "unhandled_bytes": propagation_stats.unhandled_bytes,
+            "handled_ids": handled_ids,
+            "unhandled_ids": unhandled_ids,
         });
         let removed = {
             let mut guard = self.peers.lock().expect("peers mutex poisoned");
