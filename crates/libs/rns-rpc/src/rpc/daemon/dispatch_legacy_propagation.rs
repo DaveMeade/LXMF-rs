@@ -902,7 +902,15 @@ impl RpcDaemon {
                     timeout_secs,
                 ) {
                     Ok(result) => {
-                        self.import_remote_propagation_payloads(&result)?;
+                        if let Err(err) = self.import_remote_propagation_payloads(&result) {
+                            self.update_propagation_sync_state(|state| {
+                                state.sync_state = PR_FAILED;
+                                state.state_name = "failed".to_string();
+                                state.sync_progress = 0.0;
+                                state.last_sync_error = Some(err.to_string());
+                            });
+                            return Err(err);
+                        }
                         self.update_propagation_sync_state(|state| {
                             state.sync_state = PR_COMPLETE;
                             state.state_name = "completed".to_string();

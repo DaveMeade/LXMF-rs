@@ -2611,6 +2611,47 @@ fn propagation_remote_download_imports_payloads_into_local_store() {
 }
 
 #[test]
+fn failed_propagation_remote_download_import_updates_lifecycle_error() {
+    let daemon = RpcDaemon::test_instance();
+    daemon.set_remote_control_bridge(Arc::new(TestRemoteControlBridge {
+        result: Ok(json!({
+            "downloaded_count": 1,
+            "imported_count": 1,
+            "messages": [{
+                "payload_hex": "not-hex",
+            }],
+        })),
+    }));
+
+    let err = daemon
+        .handle_rpc(rpc_request(
+            78,
+            "propagation_remote_download",
+            json!({
+                "remote": "remote-node",
+            }),
+        ))
+        .expect_err("remote download import failure should be returned");
+    assert_eq!(err.kind(), std::io::ErrorKind::InvalidInput);
+    assert!(err.to_string().contains("invalid remote propagation payload hex"));
+
+    let status = daemon
+        .handle_rpc(RpcRequest { id: 79, method: "propagation_status".to_string(), params: None })
+        .expect("propagation status")
+        .result
+        .expect("propagation status result");
+    let propagation = &status["propagation"];
+    assert_eq!(propagation["sync_state"].as_u64(), Some(0xfe));
+    assert_eq!(propagation["state_name"].as_str(), Some("failed"));
+    assert_eq!(propagation["sync_progress"].as_f64(), Some(0.0));
+    assert!(propagation["last_sync_started"].as_i64().is_some());
+    assert!(propagation["last_sync_completed"].is_null());
+    assert!(propagation["last_sync_error"]
+        .as_str()
+        .is_some_and(|value| value.contains("invalid remote propagation payload hex")));
+}
+
+#[test]
 fn failed_propagation_remote_sync_updates_lifecycle_error() {
     let daemon = RpcDaemon::test_instance();
     daemon.set_remote_control_bridge(Arc::new(TestRemoteControlBridge {
