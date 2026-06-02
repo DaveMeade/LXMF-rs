@@ -463,8 +463,10 @@ impl RpcDaemon {
                         if propagation_handled > 0 {
                             existing.sync_backoff = 0;
                             existing.next_sync_attempt = 0;
-                        } else if propagation_offered > 0 && existing.sync_backoff == 0 {
-                            existing.sync_backoff = LXMF_PEER_SYNC_BACKOFF_STEP_SECS;
+                        } else if propagation_offered > 0 {
+                            existing.sync_backoff = existing
+                                .sync_backoff
+                                .saturating_add(LXMF_PEER_SYNC_BACKOFF_STEP_SECS);
                             existing.next_sync_attempt =
                                 timestamp.saturating_add(i64::from(existing.sync_backoff));
                         }

@@ -1515,7 +1515,7 @@ fn peer_sync_without_offers_preserves_failure_backoff() {
 }
 
 #[test]
-fn peer_sync_with_only_skipped_offers_preserves_failure_backoff() {
+fn peer_sync_with_only_skipped_offers_advances_failure_backoff() {
     let daemon = RpcDaemon::test_instance();
     daemon
         .handle_rpc(rpc_request(52, "peer_sync", json!({ "peer": "peer-backoff-skipped" })))
@@ -1578,8 +1578,72 @@ fn peer_sync_with_only_skipped_offers_preserves_failure_backoff() {
         .iter()
         .find(|row| row["peer"].as_str() == Some("peer-backoff-skipped"))
         .expect("peer row");
-    assert_eq!(after_row["sync_backoff"].as_u64(), Some(sync_backoff));
-    assert_eq!(after_row["next_sync_attempt"].as_i64(), Some(next_sync_attempt));
+    assert_eq!(after_row["sync_backoff"].as_u64(), Some(sync_backoff + 12 * 60));
+    assert!(after_row["next_sync_attempt"].as_i64().is_some_and(|value| value > next_sync_attempt));
+}
+
+#[test]
+fn repeated_skipped_peer_sync_increases_failure_backoff() {
+    let daemon = RpcDaemon::test_instance();
+    daemon
+        .handle_rpc(rpc_request(52, "peer_sync", json!({ "peer": "peer-skipped-repeat" })))
+        .expect("initial peer sync");
+    {
+        let mut peers = daemon.peers.lock().expect("peers mutex poisoned");
+        let peer = peers.get_mut("peer-skipped-repeat").expect("peer record");
+        peer.propagation_sync_limit = Some(24);
+    }
+    let entry = PropagationEntryRecord {
+        transient_id: "ea".repeat(32),
+        destination: "1a".repeat(16),
+        payload_hex: "1a".repeat(20),
+        received_at: 1_700_000_616,
+        size_bytes: 20,
+        stamp_value: None,
+    };
+    daemon.store.upsert_propagation_entry(&entry).expect("store entry");
+    daemon
+        .store
+        .mark_peer_unhandled_propagation("peer-skipped-repeat", entry.transient_id.as_str())
+        .expect("mark unhandled");
+
+    daemon
+        .handle_rpc(rpc_request(53, "peer_sync", json!({ "peer": "peer-skipped-repeat" })))
+        .expect("first skipped peer sync");
+    let first = daemon
+        .handle_rpc(RpcRequest { id: 54, method: "list_peers".to_string(), params: None })
+        .expect("list peers")
+        .result
+        .expect("list peers result");
+    let first_row = first["peers"]
+        .as_array()
+        .expect("peer rows")
+        .iter()
+        .find(|row| row["peer"].as_str() == Some("peer-skipped-repeat"))
+        .expect("peer row");
+    let first_attempt = first_row["last_sync_attempt"].as_i64().expect("first attempt");
+    assert_eq!(first_row["sync_backoff"].as_u64(), Some(12 * 60));
+
+    daemon
+        .handle_rpc(rpc_request(55, "peer_sync", json!({ "peer": "peer-skipped-repeat" })))
+        .expect("second skipped peer sync");
+    let second = daemon
+        .handle_rpc(RpcRequest { id: 56, method: "list_peers".to_string(), params: None })
+        .expect("list peers")
+        .result
+        .expect("list peers result");
+    let second_row = second["peers"]
+        .as_array()
+        .expect("peer rows")
+        .iter()
+        .find(|row| row["peer"].as_str() == Some("peer-skipped-repeat"))
+        .expect("peer row");
+    assert_eq!(second_row["sync_backoff"].as_u64(), Some(24 * 60));
+    assert!(second_row["last_sync_attempt"].as_i64().is_some_and(|value| value >= first_attempt));
+    assert_eq!(
+        second_row["next_sync_attempt"].as_i64(),
+        Some(second_row["last_sync_attempt"].as_i64().expect("second attempt") + 24 * 60)
+    );
 }
 
 #[test]
