@@ -2453,11 +2453,59 @@ fn peer_unpeer_snapshot_count_ignores_unpeered_records() {
 }
 
 #[test]
+fn peer_unpeer_clears_persisted_propagation_queue_marks() {
+    let daemon = RpcDaemon::test_instance();
+    daemon
+        .handle_rpc(rpc_request(90, "peer_sync", json!({ "peer": "peer-unpeer-queue" })))
+        .expect("sync peer");
+    let entry = PropagationEntryRecord {
+        transient_id: "ee".repeat(32),
+        destination: "19".repeat(16),
+        payload_hex: "19".repeat(24),
+        received_at: 1_700_000_920,
+        size_bytes: 24,
+        stamp_value: None,
+    };
+    daemon.store.upsert_propagation_entry(&entry).expect("store propagation entry");
+    daemon
+        .store
+        .mark_peer_unhandled_propagation("peer-unpeer-queue", entry.transient_id.as_str())
+        .expect("mark unhandled");
+
+    let unpeer = daemon
+        .handle_rpc(rpc_request(91, "peer_unpeer", json!({ "peer": "peer-unpeer-queue" })))
+        .expect("unpeer peer")
+        .result
+        .expect("unpeer result");
+    assert_eq!(unpeer["removed"].as_bool(), Some(true));
+    assert_eq!(unpeer["propagation_cleared"].as_u64(), Some(1));
+    assert!(
+        daemon
+            .store
+            .list_peer_unhandled_propagation("peer-unpeer-queue")
+            .expect("list unhandled")
+            .is_empty()
+    );
+
+    daemon
+        .handle_rpc(rpc_request(92, "peer_sync", json!({ "peer": "peer-unpeer-queue" })))
+        .expect("resync peer");
+    let peers = daemon
+        .handle_rpc(RpcRequest { id: 93, method: "list_peers".to_string(), params: None })
+        .expect("list peers")
+        .result
+        .expect("list peers result");
+    let row = peers["peers"].as_array().and_then(|rows| rows.first()).expect("peer row");
+    assert_eq!(row["messages"]["offered"].as_u64(), Some(0));
+    assert_eq!(row["messages"]["unhandled"].as_u64(), Some(0));
+}
+
+#[test]
 fn peer_sync_rejects_blank_peer_identifier() {
     let daemon = RpcDaemon::test_instance();
 
     let err = daemon
-        .handle_rpc(rpc_request(90, "peer_sync", json!({ "peer": "   " })))
+        .handle_rpc(rpc_request(94, "peer_sync", json!({ "peer": "   " })))
         .expect_err("blank peer id should be rejected");
     assert_eq!(err.kind(), std::io::ErrorKind::InvalidInput);
     assert!(err.to_string().contains("peer is required"));
