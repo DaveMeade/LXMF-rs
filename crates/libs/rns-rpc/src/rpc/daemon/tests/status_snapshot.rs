@@ -1662,6 +1662,68 @@ fn peer_sync_uses_transfer_limit_when_sync_limit_is_absent() {
 }
 
 #[test]
+fn peer_sync_reports_propagation_transfer_accounting() {
+    let daemon = RpcDaemon::test_instance();
+    daemon
+        .handle_rpc(rpc_request(60, "peer_sync", json!({ "peer": "peer-sync-report" })))
+        .expect("initial peer sync");
+    daemon.event_queue.lock().expect("event_queue mutex poisoned").clear();
+    {
+        let mut peers = daemon.peers.lock().expect("peers mutex poisoned");
+        let peer = peers.get_mut("peer-sync-report").expect("peer record");
+        peer.propagation_sync_limit = Some((24 + 20 + 32 + 16) as u32);
+    }
+
+    let small = PropagationEntryRecord {
+        transient_id: "d1".repeat(32),
+        destination: "17".repeat(16),
+        payload_hex: "17".repeat(20),
+        received_at: 1_700_000_612,
+        size_bytes: 20,
+        stamp_value: None,
+    };
+    let large = PropagationEntryRecord {
+        transient_id: "d2".repeat(32),
+        destination: "17".repeat(16),
+        payload_hex: "17".repeat(100),
+        received_at: 1_700_000_613,
+        size_bytes: 100,
+        stamp_value: None,
+    };
+    daemon.store.upsert_propagation_entry(&small).expect("store small entry");
+    daemon.store.upsert_propagation_entry(&large).expect("store large entry");
+    for entry in [&small, &large] {
+        daemon
+            .store
+            .mark_peer_unhandled_propagation("peer-sync-report", entry.transient_id.as_str())
+            .expect("mark unhandled");
+    }
+
+    let result = daemon
+        .handle_rpc(rpc_request(61, "peer_sync", json!({ "peer": "peer-sync-report" })))
+        .expect("peer sync")
+        .result
+        .expect("peer sync result");
+    assert_eq!(result["propagation"]["handled"].as_u64(), Some(1));
+    assert_eq!(result["propagation"]["skipped"].as_u64(), Some(1));
+    assert_eq!(result["propagation"]["bytes"].as_u64(), Some(20));
+    assert_eq!(result["propagation"]["sync_limit"].as_u64(), Some((24 + 20 + 32 + 16) as u64));
+
+    let event = daemon
+        .event_queue
+        .lock()
+        .expect("event_queue mutex poisoned")
+        .iter()
+        .rev()
+        .find(|event| event.event_type == "peer_sync")
+        .cloned()
+        .expect("peer sync event");
+    assert_eq!(event.payload["propagation"]["handled"].as_u64(), Some(1));
+    assert_eq!(event.payload["propagation"]["skipped"].as_u64(), Some(1));
+    assert_eq!(event.payload["propagation"]["bytes"].as_u64(), Some(20));
+}
+
+#[test]
 fn list_peers_includes_propagation_marks_in_message_counters() {
     let daemon = RpcDaemon::test_instance();
     daemon

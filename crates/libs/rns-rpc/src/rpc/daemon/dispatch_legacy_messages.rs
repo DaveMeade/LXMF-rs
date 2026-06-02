@@ -396,6 +396,9 @@ impl RpcDaemon {
                     .list_peer_unhandled_propagation(peer_id)
                     .map_err(std::io::Error::other)?;
                 let mut cumulative_size = 24usize;
+                let mut propagation_handled = 0usize;
+                let mut propagation_skipped = 0usize;
+                let mut propagation_bytes = 0u64;
                 for entry in pending_propagation {
                     let next_size = cumulative_size.saturating_add(
                         usize::try_from(entry.size_bytes)
@@ -404,13 +407,22 @@ impl RpcDaemon {
                             .saturating_add(16),
                     );
                     if sync_limit_bytes.is_some_and(|limit| next_size > limit) {
+                        propagation_skipped = propagation_skipped.saturating_add(1);
                         continue;
                     }
                     self.store
                         .mark_peer_handled_propagation(peer_id, entry.transient_id.as_str())
                         .map_err(std::io::Error::other)?;
                     cumulative_size = next_size;
+                    propagation_handled = propagation_handled.saturating_add(1);
+                    propagation_bytes = propagation_bytes.saturating_add(entry.size_bytes);
                 }
+                let propagation_sync = json!({
+                    "handled": propagation_handled,
+                    "skipped": propagation_skipped,
+                    "bytes": propagation_bytes,
+                    "sync_limit": sync_limit_bytes,
+                });
                 {
                     let mut guard = self.peers.lock().expect("peers mutex poisoned");
                     if let Some(existing) = guard.get_mut(&record.peer) {
@@ -429,13 +441,18 @@ impl RpcDaemon {
                         "name_source": &record.name_source,
                         "first_seen": record.first_seen,
                         "seen_count": record.seen_count,
+                        "propagation": propagation_sync.clone(),
                     }),
                 };
                 self.publish_event(event);
 
                 Ok(RpcResponse {
                     id: request.id,
-                    result: Some(json!({ "peer": record.peer, "synced": true })),
+                    result: Some(json!({
+                        "peer": record.peer,
+                        "synced": true,
+                        "propagation": propagation_sync,
+                    })),
                     error: None,
                 })
             }
