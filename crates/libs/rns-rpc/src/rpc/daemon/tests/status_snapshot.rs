@@ -2636,6 +2636,7 @@ fn peer_sync_reports_propagation_transfer_accounting() {
         result["propagation"]["sync_limit"].as_u64(),
         Some((24 + 20 + 32 + 16 + 1) as u64)
     );
+    assert_eq!(result["tx_bytes"].as_u64(), Some(20));
     assert_eq!(result["acceptance_rate"].as_f64(), Some(0.5));
     assert_eq!(
         result["propagation"]["handled_ids"].as_array().expect("handled ids"),
@@ -2665,6 +2666,7 @@ fn peer_sync_reports_propagation_transfer_accounting() {
     assert_eq!(event.payload["synced"].as_bool(), Some(true));
     assert_eq!(event.payload["propagation"]["synced"].as_bool(), Some(true));
     assert_eq!(event.payload["propagation"]["postponed"].as_bool(), Some(false));
+    assert_eq!(event.payload["tx_bytes"].as_u64(), Some(20));
     assert_eq!(event.payload["acceptance_rate"].as_f64(), Some(0.5));
     assert_eq!(
         event.payload["propagation"]["handled_ids"].as_array().expect("event handled ids"),
