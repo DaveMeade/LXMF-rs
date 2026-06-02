@@ -933,10 +933,12 @@ impl MessagesStore {
     pub fn list_peer_handled_propagation_ids(&self, peer: &str) -> rusqlite::Result<Vec<String>> {
         self.with_read_conn(|conn| {
             let mut stmt = conn.prepare(
-                "SELECT transient_id
-                 FROM propagation_peer_entries
-                 WHERE peer = ?1 AND state = 'handled'
-                 ORDER BY transient_id ASC",
+                "SELECT p.transient_id
+                 FROM propagation_peer_entries p
+                 INNER JOIN propagation_entries e
+                    ON e.transient_id = p.transient_id
+                 WHERE p.peer = ?1 AND p.state = 'handled'
+                 ORDER BY p.transient_id ASC",
             )?;
             let rows = stmt.query_map(params![peer], |row| row.get(0))?;
             rows.collect()
@@ -946,10 +948,12 @@ impl MessagesStore {
     pub fn list_peer_unhandled_propagation_ids(&self, peer: &str) -> rusqlite::Result<Vec<String>> {
         self.with_read_conn(|conn| {
             let mut stmt = conn.prepare(
-                "SELECT transient_id
-                 FROM propagation_peer_entries
-                 WHERE peer = ?1 AND state = 'unhandled'
-                 ORDER BY transient_id ASC",
+                "SELECT p.transient_id
+                 FROM propagation_peer_entries p
+                 INNER JOIN propagation_entries e
+                    ON e.transient_id = p.transient_id
+                 WHERE p.peer = ?1 AND p.state = 'unhandled'
+                 ORDER BY p.transient_id ASC",
             )?;
             let rows = stmt.query_map(params![peer], |row| row.get(0))?;
             rows.collect()

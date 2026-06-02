@@ -1968,6 +1968,14 @@ fn peer_sync_drops_stale_unhandled_propagation_marks() {
         .find(|row| row["peer"].as_str() == Some("peer-stale-propagation"))
         .expect("peer row");
     assert_eq!(before_row["messages"]["unhandled"].as_u64(), Some(0));
+    assert_eq!(
+        before_row["messages"]["unhandled_ids"].as_array().expect("message unhandled ids"),
+        &[] as &[JsonValue]
+    );
+    assert_eq!(
+        before_row["unhandled_ids"].as_array().expect("top-level unhandled ids"),
+        &[] as &[JsonValue]
+    );
 
     let result = daemon
         .handle_rpc(rpc_request(57, "peer_sync", json!({ "peer": "peer-stale-propagation" })))
@@ -1989,6 +1997,14 @@ fn peer_sync_drops_stale_unhandled_propagation_marks() {
         .expect("peer row");
     assert_eq!(after_row["messages"]["unhandled"].as_u64(), Some(0));
     assert_eq!(after_row["messages"]["offered"].as_u64(), Some(0));
+    assert_eq!(
+        after_row["messages"]["unhandled_ids"].as_array().expect("message unhandled ids"),
+        &[] as &[JsonValue]
+    );
+    assert_eq!(
+        after_row["unhandled_ids"].as_array().expect("top-level unhandled ids"),
+        &[] as &[JsonValue]
+    );
 }
 
 #[test]
@@ -2017,6 +2033,14 @@ fn list_peers_ignores_stale_handled_propagation_marks() {
     assert_eq!(row["messages"]["unhandled"].as_u64(), Some(0));
     assert_eq!(row["messages"]["offered_bytes"].as_u64(), Some(0));
     assert_eq!(row["messages"]["unhandled_bytes"].as_u64(), Some(0));
+    assert_eq!(
+        row["messages"]["handled_ids"].as_array().expect("message handled ids"),
+        &[] as &[JsonValue]
+    );
+    assert_eq!(
+        row["handled_ids"].as_array().expect("top-level handled ids"),
+        &[] as &[JsonValue]
+    );
 }
 
 #[test]
