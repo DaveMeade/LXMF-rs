@@ -14,25 +14,47 @@ pub(super) fn handle_peer_command(
     } else {
         return None;
     };
-    let Some(peer_hex) = peer_hex_from_data(data) else {
+    let Some((peer_hex, transfer_limit_kb)) = peer_request_from_data(data) else {
         return Some(ControlResponse::Code(error_invalid_data));
     };
     if !peer_exists(daemon, peer_hex.as_str()) {
         return Some(ControlResponse::Code(error_not_found));
     }
-    let _ = daemon.handle_rpc(RpcRequest {
-        id: 0,
-        method: method.to_string(),
-        params: Some(json!({ "peer": peer_hex })),
-    });
+    let mut params = json!({ "peer": peer_hex });
+    if let Some(transfer_limit_kb) = transfer_limit_kb {
+        params["transfer_limit_kb"] = json!(transfer_limit_kb);
+    }
+    let _ =
+        daemon.handle_rpc(RpcRequest { id: 0, method: method.to_string(), params: Some(params) });
     Some(ControlResponse::Bool(true))
 }
 
-fn peer_hex_from_data(data: Option<rmpv::Value>) -> Option<String> {
+fn peer_request_from_data(data: Option<rmpv::Value>) -> Option<(String, Option<f64>)> {
     match data {
-        Some(rmpv::Value::Binary(bytes)) if bytes.len() == 16 => Some(hex::encode(bytes)),
+        Some(rmpv::Value::Binary(bytes)) if bytes.len() == 16 => Some((hex::encode(bytes), None)),
+        Some(rmpv::Value::Array(entries)) => {
+            let peer = match entries.first()? {
+                rmpv::Value::Binary(bytes) if bytes.len() == 16 => hex::encode(bytes),
+                _ => return None,
+            };
+            let transfer_limit_kb = entries.get(1).and_then(transfer_limit_kb_from_value);
+            Some((peer, transfer_limit_kb))
+        }
         _ => None,
     }
+}
+
+fn transfer_limit_kb_from_value(value: &rmpv::Value) -> Option<f64> {
+    let limit = match value {
+        rmpv::Value::F64(value) => Some(*value),
+        rmpv::Value::F32(value) => Some((*value).into()),
+        rmpv::Value::Integer(value) => value.as_f64(),
+        rmpv::Value::String(value) => value.as_str()?.trim().parse::<f64>().ok(),
+        rmpv::Value::Binary(value) => std::str::from_utf8(value).ok()?.trim().parse::<f64>().ok(),
+        rmpv::Value::Boolean(value) => Some(f64::from(*value as u8)),
+        _ => None,
+    }?;
+    limit.is_finite().then_some(limit.max(0.0))
 }
 
 fn peer_exists(daemon: &RpcDaemon, peer_hex: &str) -> bool {
@@ -83,6 +105,20 @@ mod tests {
         );
 
         assert!(matches!(response, Some(ControlResponse::Code(ERROR_NOT_FOUND))));
+    }
+
+    #[test]
+    fn peer_request_accepts_transfer_limit_array_payload() {
+        let peer_bytes = [0xA5; 16];
+
+        let (peer_hex, transfer_limit_kb) = peer_request_from_data(Some(rmpv::Value::Array(vec![
+            rmpv::Value::Binary(peer_bytes.to_vec()),
+            rmpv::Value::F64(42.5),
+        ])))
+        .expect("peer request");
+
+        assert_eq!(peer_hex, hex::encode(peer_bytes));
+        assert_eq!(transfer_limit_kb, Some(42.5));
     }
 
     #[test]

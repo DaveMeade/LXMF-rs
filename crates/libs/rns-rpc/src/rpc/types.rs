@@ -566,6 +566,7 @@ pub trait RemoteControlBridge: Send + Sync {
         peer: &str,
         identity_private_key_hex: Option<&str>,
         timeout_secs: f64,
+        transfer_limit_kb: Option<f64>,
     ) -> Result<JsonValue, std::io::Error>;
 
     fn propagation_remote_fetch(

@@ -2394,6 +2394,101 @@ fn peer_sync_leaves_entries_above_transfer_limit_unhandled_like_python() {
 }
 
 #[test]
+fn peer_sync_applies_request_transfer_limit_without_persisting_it() {
+    let daemon = RpcDaemon::test_instance();
+    daemon
+        .handle_rpc(rpc_request(60, "peer_sync", json!({ "peer": "peer-request-limit" })))
+        .expect("initial peer sync");
+
+    let oversized = PropagationEntryRecord {
+        transient_id: "d4".repeat(32),
+        destination: "16".repeat(16),
+        payload_hex: "16".repeat(100),
+        received_at: 1_700_000_613,
+        size_bytes: 100,
+        stamp_value: None,
+    };
+    daemon.store.upsert_propagation_entry(&oversized).expect("store oversized entry");
+    daemon
+        .store
+        .mark_peer_unhandled_propagation("peer-request-limit", oversized.transient_id.as_str())
+        .expect("mark unhandled");
+
+    let result = daemon
+        .handle_rpc(rpc_request(
+            61,
+            "peer_sync",
+            json!({
+                "peer": "peer-request-limit",
+                "transfer_limit_kb": 0.08,
+            }),
+        ))
+        .expect("peer sync")
+        .result
+        .expect("peer sync result");
+    assert_eq!(result["propagation"]["handled"].as_u64(), Some(0));
+    assert_eq!(result["propagation"]["transfer_limited"].as_u64(), Some(1));
+    assert_eq!(result["propagation"]["transfer_limit"].as_u64(), Some(80));
+
+    let peers = daemon
+        .handle_rpc(RpcRequest { id: 62, method: "list_peers".to_string(), params: None })
+        .expect("list peers")
+        .result
+        .expect("list peers result");
+    let row = peers["peers"]
+        .as_array()
+        .expect("peer rows")
+        .iter()
+        .find(|row| row["peer"].as_str() == Some("peer-request-limit"))
+        .expect("peer row");
+    assert_eq!(row["propagation_transfer_limit"], JsonValue::Null);
+}
+
+#[test]
+fn peer_sync_request_transfer_limit_does_not_loosen_peer_limit() {
+    let daemon = RpcDaemon::test_instance();
+    daemon
+        .handle_rpc(rpc_request(60, "peer_sync", json!({ "peer": "peer-strict-limit" })))
+        .expect("initial peer sync");
+    {
+        let mut peers = daemon.peers.lock().expect("peers mutex poisoned");
+        let peer = peers.get_mut("peer-strict-limit").expect("peer record");
+        peer.propagation_transfer_limit = Some(80);
+        peer.propagation_sync_limit = Some(1_000);
+    }
+
+    let oversized = PropagationEntryRecord {
+        transient_id: "d5".repeat(32),
+        destination: "16".repeat(16),
+        payload_hex: "16".repeat(100),
+        received_at: 1_700_000_614,
+        size_bytes: 100,
+        stamp_value: None,
+    };
+    daemon.store.upsert_propagation_entry(&oversized).expect("store oversized entry");
+    daemon
+        .store
+        .mark_peer_unhandled_propagation("peer-strict-limit", oversized.transient_id.as_str())
+        .expect("mark unhandled");
+
+    let result = daemon
+        .handle_rpc(rpc_request(
+            61,
+            "peer_sync",
+            json!({
+                "peer": "peer-strict-limit",
+                "transfer_limit_kb": 1.0,
+            }),
+        ))
+        .expect("peer sync")
+        .result
+        .expect("peer sync result");
+    assert_eq!(result["propagation"]["handled"].as_u64(), Some(0));
+    assert_eq!(result["propagation"]["transfer_limited"].as_u64(), Some(1));
+    assert_eq!(result["propagation"]["transfer_limit"].as_u64(), Some(80));
+}
+
+#[test]
 fn peer_sync_orders_offers_by_python_weight_before_sync_limit() {
     let daemon = RpcDaemon::test_instance();
     daemon
@@ -3493,7 +3588,9 @@ impl RemoteControlBridge for TestRemoteControlBridge {
         peer: &str,
         _identity_private_key_hex: Option<&str>,
         _timeout_secs: f64,
+        transfer_limit_kb: Option<f64>,
     ) -> Result<JsonValue, std::io::Error> {
+        assert_eq!(transfer_limit_kb, None);
         self.result.clone().map(|mut result| {
             result["remote"] = json!(remote);
             result["peer"] = json!(peer);
@@ -3562,7 +3659,9 @@ impl RemoteControlBridge for TransferLimitRemoteControlBridge {
         _peer: &str,
         _identity_private_key_hex: Option<&str>,
         _timeout_secs: f64,
+        transfer_limit_kb: Option<f64>,
     ) -> Result<JsonValue, std::io::Error> {
+        assert_eq!(transfer_limit_kb, Some(42.5));
         Ok(json!({"synced": true}))
     }
 
@@ -4184,6 +4283,24 @@ fn propagation_remote_download_forwards_transfer_limit_to_bridge() {
             }),
         ))
         .expect("remote download with transfer limit");
+}
+
+#[test]
+fn propagation_remote_sync_forwards_transfer_limit_to_bridge() {
+    let daemon = RpcDaemon::test_instance();
+    daemon.set_remote_control_bridge(Arc::new(TransferLimitRemoteControlBridge));
+
+    daemon
+        .handle_rpc(rpc_request(
+            78,
+            "propagation_remote_sync",
+            json!({
+                "remote": "remote-node",
+                "peer": "peer-transfer-limit",
+                "transfer_limit_kb": 42.5,
+            }),
+        ))
+        .expect("remote sync with transfer limit");
 }
 
 #[test]

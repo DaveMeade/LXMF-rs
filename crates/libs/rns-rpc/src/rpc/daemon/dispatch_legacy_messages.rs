@@ -578,10 +578,23 @@ impl RpcDaemon {
                     None,
                     peer_type,
                 )?;
+                let record_transfer_limit_bytes =
+                    record.propagation_transfer_limit.map(|limit| limit as usize);
+                let requested_transfer_limit_bytes =
+                    parsed.transfer_limit_kb.map(|limit| (limit.max(0.0) * 1000.0) as usize);
+                let transfer_limit_bytes =
+                    match (record_transfer_limit_bytes, requested_transfer_limit_bytes) {
+                        (Some(record_limit), Some(requested_limit)) => {
+                            Some(record_limit.min(requested_limit))
+                        }
+                        (Some(record_limit), None) => Some(record_limit),
+                        (None, Some(requested_limit)) => Some(requested_limit),
+                        (None, None) => None,
+                    };
                 let sync_limit_bytes = record
                     .propagation_sync_limit
-                    .or(record.propagation_transfer_limit)
-                    .map(|limit| limit as usize);
+                    .map(|limit| limit as usize)
+                    .or(transfer_limit_bytes);
                 if record.next_sync_attempt > 0 && timestamp < record.next_sync_attempt {
                     return Ok(self.postponed_peer_sync_response(
                         request.id,
@@ -591,8 +604,6 @@ impl RpcDaemon {
                         sync_limit_bytes,
                     ));
                 }
-                let transfer_limit_bytes =
-                    record.propagation_transfer_limit.map(|limit| limit as usize);
                 self.store
                     .remove_stale_peer_unhandled_propagation(peer_id)
                     .map_err(std::io::Error::other)?;

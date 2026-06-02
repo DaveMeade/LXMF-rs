@@ -159,13 +159,18 @@ impl RemoteControlBridge for TransportBridge {
         peer: &str,
         identity_private_key_hex: Option<&str>,
         timeout_secs: f64,
+        transfer_limit_kb: Option<f64>,
     ) -> Result<JsonValue, std::io::Error> {
+        let peer_value = remote_peer_value(peer)?;
+        let request = transfer_limit_kb
+            .map(|limit| rmpv::Value::Array(vec![peer_value.clone(), rmpv::Value::F64(limit)]))
+            .unwrap_or(peer_value);
         self.run_remote_control(
             remote,
             identity_private_key_hex,
             timeout_secs,
             "/pn/peer/sync",
-            remote_peer_value(peer)?,
+            request,
         )
     }
 
