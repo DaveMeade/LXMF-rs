@@ -5,6 +5,11 @@ const PR_COMPLETE: u32 = 0x07;
 const PR_IDLE: u32 = 0x00;
 const PR_FAILED: u32 = 0xfe;
 
+struct RemotePropagationImportSummary {
+    imported_count: usize,
+    imported_ids: Vec<String>,
+}
+
 impl RpcDaemon {
     fn store_propagation_payload_hex(
         &self,
@@ -34,14 +39,18 @@ impl RpcDaemon {
     fn import_remote_propagation_payloads(
         &self,
         result: &JsonValue,
-    ) -> Result<usize, std::io::Error> {
+    ) -> Result<RemotePropagationImportSummary, std::io::Error> {
         let Some(messages) =
             result.get("messages").or_else(|| result.get("payloads")).and_then(JsonValue::as_array)
         else {
-            return Ok(0);
+            return Ok(RemotePropagationImportSummary {
+                imported_count: 0,
+                imported_ids: Vec::new(),
+            });
         };
 
-        let mut imported = 0usize;
+        let mut imported_count = 0usize;
+        let mut imported_ids = Vec::new();
         for message in messages {
             let Some(payload_hex) = message.get("payload_hex").and_then(JsonValue::as_str) else {
                 continue;
@@ -103,15 +112,16 @@ impl RpcDaemon {
             self.propagation_payloads
                 .lock()
                 .expect("propagation payload mutex poisoned")
-                .insert(transient_id, record.payload_hex);
+                .insert(transient_id.clone(), record.payload_hex);
             if !already_known {
-                imported = imported.saturating_add(1);
+                imported_count = imported_count.saturating_add(1);
+                imported_ids.push(transient_id);
             }
         }
         if !messages.is_empty() {
-            self.note_client_propagation_messages_received(imported);
+            self.note_client_propagation_messages_received(imported_count);
         }
-        Ok(imported)
+        Ok(RemotePropagationImportSummary { imported_count, imported_ids })
     }
 
     pub fn note_client_propagation_messages_received(&self, ingested_count: usize) {
@@ -866,7 +876,11 @@ impl RpcDaemon {
                             }
                         };
                         if let Some(result) = result.as_object_mut() {
-                            result.insert("imported_count".to_string(), json!(imported));
+                            result.insert(
+                                "imported_count".to_string(),
+                                json!(imported.imported_count),
+                            );
+                            result.insert("imported_ids".to_string(), json!(imported.imported_ids));
                         }
                         self.update_propagation_sync_state(|state| {
                             state.sync_state = PR_COMPLETE;
@@ -938,7 +952,11 @@ impl RpcDaemon {
                             }
                         };
                         if let Some(result) = result.as_object_mut() {
-                            result.insert("imported_count".to_string(), json!(imported));
+                            result.insert(
+                                "imported_count".to_string(),
+                                json!(imported.imported_count),
+                            );
+                            result.insert("imported_ids".to_string(), json!(imported.imported_ids));
                         }
                         self.update_propagation_sync_state(|state| {
                             state.sync_state = PR_COMPLETE;
@@ -1049,7 +1067,8 @@ impl RpcDaemon {
                     }
                 };
                 if let Some(result) = result.as_object_mut() {
-                    result.insert("imported_count".to_string(), json!(imported));
+                    result.insert("imported_count".to_string(), json!(imported.imported_count));
+                    result.insert("imported_ids".to_string(), json!(imported.imported_ids));
                 }
                 self.update_propagation_sync_state(|state| {
                     state.sync_state = PR_COMPLETE;

@@ -3296,6 +3296,7 @@ fn propagation_remote_sync_imports_payloads_into_local_store() {
         .result
         .expect("remote sync result");
     assert_eq!(result["result"]["imported_count"].as_u64(), Some(1));
+    assert_eq!(result["result"]["imported_ids"], json!([transient_id]));
 
     daemon.propagation_payloads.lock().expect("propagation payload mutex poisoned").clear();
     let fetched = daemon
@@ -3346,6 +3347,7 @@ fn duplicate_propagation_remote_sync_import_does_not_double_count_received() {
         second = result;
     }
     assert_eq!(second["result"]["imported_count"].as_u64(), Some(0));
+    assert_eq!(second["result"]["imported_ids"], json!([]));
 
     let status = daemon
         .handle_rpc(RpcRequest { id: 75, method: "propagation_status".to_string(), params: None })
@@ -3393,6 +3395,7 @@ fn propagation_remote_fetch_imports_payloads_into_local_store() {
         .result
         .expect("remote fetch result");
     assert_eq!(result["result"]["imported_count"].as_u64(), Some(1));
+    assert_eq!(result["result"]["imported_ids"], json!([transient_id]));
 
     daemon.propagation_payloads.lock().expect("propagation payload mutex poisoned").clear();
     let fetched = daemon
@@ -3600,6 +3603,7 @@ fn propagation_remote_download_imports_payloads_into_local_store() {
         .result
         .expect("remote download result");
     assert_eq!(result["result"]["imported_count"].as_u64(), Some(1));
+    assert_eq!(result["result"]["imported_ids"], json!([transient_id]));
 
     daemon.propagation_payloads.lock().expect("propagation payload mutex poisoned").clear();
     let fetched = daemon
