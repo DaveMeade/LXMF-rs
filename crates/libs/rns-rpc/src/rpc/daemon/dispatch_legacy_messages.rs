@@ -387,14 +387,26 @@ impl RpcDaemon {
                     None,
                     peer_type,
                 )?;
+                let sync_limit_bytes = record.propagation_sync_limit.map(|limit| limit as usize);
                 let pending_propagation = self
                     .store
                     .list_peer_unhandled_propagation(peer_id)
                     .map_err(std::io::Error::other)?;
+                let mut cumulative_size = 24usize;
                 for entry in pending_propagation {
+                    let next_size = cumulative_size.saturating_add(
+                        usize::try_from(entry.size_bytes)
+                            .unwrap_or(usize::MAX)
+                            .saturating_add(32)
+                            .saturating_add(16),
+                    );
+                    if sync_limit_bytes.is_some_and(|limit| next_size > limit) {
+                        continue;
+                    }
                     self.store
                         .mark_peer_handled_propagation(peer_id, entry.transient_id.as_str())
                         .map_err(std::io::Error::other)?;
+                    cumulative_size = next_size;
                 }
                 {
                     let mut guard = self.peers.lock().expect("peers mutex poisoned");

@@ -1555,6 +1555,59 @@ fn peer_sync_marks_unhandled_propagation_entries_handled() {
 }
 
 #[test]
+fn peer_sync_applies_per_peer_propagation_sync_limit() {
+    let daemon = RpcDaemon::test_instance();
+    daemon
+        .handle_rpc(rpc_request(56, "peer_sync", json!({ "peer": "peer-sync-budget" })))
+        .expect("initial peer sync");
+    {
+        let mut peers = daemon.peers.lock().expect("peers mutex poisoned");
+        let peer = peers.get_mut("peer-sync-budget").expect("peer record");
+        peer.propagation_sync_limit = Some((24 + 20 + 32 + 16) as u32);
+    }
+
+    let small = PropagationEntryRecord {
+        transient_id: "b1".repeat(32),
+        destination: "15".repeat(16),
+        payload_hex: "15".repeat(20),
+        received_at: 1_700_000_608,
+        size_bytes: 20,
+        stamp_value: None,
+    };
+    let large = PropagationEntryRecord {
+        transient_id: "b2".repeat(32),
+        destination: "15".repeat(16),
+        payload_hex: "15".repeat(100),
+        received_at: 1_700_000_609,
+        size_bytes: 100,
+        stamp_value: None,
+    };
+    daemon.store.upsert_propagation_entry(&small).expect("store small entry");
+    daemon.store.upsert_propagation_entry(&large).expect("store large entry");
+    for entry in [&small, &large] {
+        daemon
+            .store
+            .mark_peer_unhandled_propagation("peer-sync-budget", entry.transient_id.as_str())
+            .expect("mark unhandled");
+    }
+
+    daemon
+        .handle_rpc(rpc_request(57, "peer_sync", json!({ "peer": "peer-sync-budget" })))
+        .expect("budgeted peer sync");
+
+    let handled = daemon
+        .store
+        .list_peer_handled_propagation_ids("peer-sync-budget")
+        .expect("handled ids");
+    assert_eq!(handled, vec![small.transient_id]);
+    let pending = daemon
+        .store
+        .list_peer_unhandled_propagation("peer-sync-budget")
+        .expect("pending propagation");
+    assert_eq!(pending, vec![large]);
+}
+
+#[test]
 fn list_peers_includes_propagation_marks_in_message_counters() {
     let daemon = RpcDaemon::test_instance();
     daemon
