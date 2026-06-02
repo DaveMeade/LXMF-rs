@@ -3834,9 +3834,18 @@ fn propagation_remote_sync_updates_lifecycle_status() {
 
 #[test]
 fn propagation_remote_sync_updates_peer_runtime_state() {
+    let payload = b"remote-sync-peer-accounting";
+    let payload_hex = hex::encode(payload);
+    let transient_id = hex::encode(Sha256::digest(payload));
     let daemon = RpcDaemon::test_instance();
     daemon.set_remote_control_bridge(Arc::new(TestRemoteControlBridge {
-        result: Ok(json!({"synced": true})),
+        result: Ok(json!({
+            "synced": true,
+            "messages": [{
+                "transient_id": transient_id,
+                "payload_hex": payload_hex,
+            }],
+        })),
     }));
     daemon
         .handle_rpc(rpc_request(73, "peer_sync", json!({ "peer": "peer-remote-sync-state" })))
@@ -3877,6 +3886,8 @@ fn propagation_remote_sync_updates_peer_runtime_state() {
     assert!(row["last_sync_attempt"].as_i64().is_some_and(|value| value > 0));
     assert_eq!(row["sync_backoff"].as_u64(), Some(0));
     assert_eq!(row["next_sync_attempt"].as_i64(), Some(0));
+    assert_eq!(row["tx_bytes"].as_u64(), Some(payload.len() as u64));
+    assert_eq!(row["sync_transfer_rate"].as_f64(), Some(payload.len() as f64));
     assert!(row["acceptance_rate"].as_f64().is_some_and(|value| value > 0.25));
 
     let event = daemon
@@ -3895,6 +3906,8 @@ fn propagation_remote_sync_updates_peer_runtime_state() {
     assert_eq!(event.payload["alive"].as_bool(), Some(true));
     assert_eq!(event.payload["sync_backoff"].as_u64(), Some(0));
     assert_eq!(event.payload["next_sync_attempt"].as_i64(), Some(0));
+    assert_eq!(event.payload["tx_bytes"].as_u64(), Some(payload.len() as u64));
+    assert_eq!(event.payload["sync_transfer_rate"].as_f64(), Some(payload.len() as f64));
 }
 
 #[test]

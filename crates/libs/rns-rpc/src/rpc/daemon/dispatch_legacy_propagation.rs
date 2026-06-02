@@ -8,6 +8,7 @@ const PR_FAILED: u32 = 0xfe;
 struct RemotePropagationImportSummary {
     imported_count: usize,
     imported_ids: Vec<String>,
+    transferred_bytes: usize,
 }
 
 impl RpcDaemon {
@@ -46,11 +47,13 @@ impl RpcDaemon {
             return Ok(RemotePropagationImportSummary {
                 imported_count: 0,
                 imported_ids: Vec::new(),
+                transferred_bytes: 0,
             });
         };
 
         let mut imported_count = 0usize;
         let mut imported_ids = Vec::new();
+        let mut transferred_bytes = 0usize;
         for message in messages {
             let Some(payload_hex) = message.get("payload_hex").and_then(JsonValue::as_str) else {
                 continue;
@@ -61,6 +64,7 @@ impl RpcDaemon {
                     format!("invalid remote propagation payload hex: {err}"),
                 )
             })?;
+            transferred_bytes = transferred_bytes.saturating_add(payload.len());
             let canonical_transient_id = {
                 let mut hasher = Sha256::new();
                 hasher.update(payload.as_slice());
@@ -121,7 +125,7 @@ impl RpcDaemon {
         if !messages.is_empty() {
             self.note_client_propagation_messages_received(imported_count);
         }
-        Ok(RemotePropagationImportSummary { imported_count, imported_ids })
+        Ok(RemotePropagationImportSummary { imported_count, imported_ids, transferred_bytes })
     }
 
     pub fn note_client_propagation_messages_received(&self, ingested_count: usize) {
@@ -917,7 +921,16 @@ impl RpcDaemon {
                             state.last_sync_error = None;
                         });
                         self.ensure_peer_for_sync(parsed.peer.as_str(), now_i64())?;
-                        self.record_outbound_peer_activity(parsed.peer.as_str(), 0, true);
+                        self.record_outbound_peer_activity(
+                            parsed.peer.as_str(),
+                            imported.transferred_bytes,
+                            true,
+                        );
+                        if let Ok(mut peers) = self.peers.lock() {
+                            if let Some(peer) = peers.get_mut(parsed.peer.as_str()) {
+                                peer.sync_transfer_rate = imported.transferred_bytes as f64;
+                            }
+                        }
                         if let Some(peer) = self
                             .peers
                             .lock()
