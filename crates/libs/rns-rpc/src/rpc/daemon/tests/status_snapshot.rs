@@ -2270,6 +2270,7 @@ fn peer_sync_leaves_entries_above_transfer_limit_unhandled_like_python() {
         size_bytes: 100,
         stamp_value: None,
     };
+    let oversized_id = oversized.transient_id.clone();
     daemon.store.upsert_propagation_entry(&oversized).expect("store oversized entry");
     daemon
         .store
@@ -2284,6 +2285,12 @@ fn peer_sync_leaves_entries_above_transfer_limit_unhandled_like_python() {
     assert_eq!(result["propagation"]["handled"].as_u64(), Some(0));
     assert_eq!(result["propagation"]["offered"].as_u64(), Some(0));
     assert_eq!(result["propagation"]["bytes"].as_u64(), Some(0));
+    assert_eq!(result["propagation"]["transfer_limited"].as_u64(), Some(1));
+    assert_eq!(result["propagation"]["transfer_limited_bytes"].as_u64(), Some(100));
+    assert_eq!(
+        result["propagation"]["transfer_limited_ids"].as_array().expect("transfer limited ids"),
+        &[json!(oversized_id.as_str())]
+    );
     assert_eq!(result["messages"]["offered"].as_u64(), Some(1));
     assert_eq!(result["messages"]["unhandled"].as_u64(), Some(1));
 
@@ -2309,6 +2316,13 @@ fn peer_sync_leaves_entries_above_transfer_limit_unhandled_like_python() {
         .expect("peer sync event");
     assert_eq!(event.payload["propagation"]["handled"].as_u64(), Some(0));
     assert_eq!(event.payload["propagation"]["offered"].as_u64(), Some(0));
+    assert_eq!(event.payload["propagation"]["transfer_limited"].as_u64(), Some(1));
+    assert_eq!(
+        event.payload["propagation"]["transfer_limited_ids"]
+            .as_array()
+            .expect("event transfer limited ids"),
+        &[json!(oversized_id.as_str())]
+    );
     assert_eq!(event.payload["messages"]["offered"].as_u64(), Some(1));
     assert_eq!(event.payload["messages"]["unhandled"].as_u64(), Some(1));
 }

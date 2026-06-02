@@ -624,11 +624,19 @@ impl RpcDaemon {
                 let mut propagation_remaining_bytes = 0u64;
                 let mut propagation_handled_ids = Vec::new();
                 let mut propagation_skipped_ids = Vec::new();
+                let mut propagation_transfer_limited = 0usize;
+                let mut propagation_transfer_limited_bytes = 0u64;
+                let mut propagation_transfer_limited_ids = Vec::new();
                 let mut propagation_messages = Vec::new();
                 for entry in pending_propagation {
                     let entry_size = usize::try_from(entry.size_bytes).unwrap_or(usize::MAX);
                     let transfer_size = entry_size.saturating_add(16);
                     if transfer_limit_bytes.is_some_and(|limit| transfer_size > limit) {
+                        propagation_transfer_limited =
+                            propagation_transfer_limited.saturating_add(1);
+                        propagation_transfer_limited_bytes =
+                            propagation_transfer_limited_bytes.saturating_add(entry.size_bytes);
+                        propagation_transfer_limited_ids.push(entry.transient_id);
                         continue;
                     }
                     let next_size = cumulative_size.saturating_add(transfer_size);
@@ -667,6 +675,9 @@ impl RpcDaemon {
                     "remaining_bytes": propagation_remaining_bytes,
                     "handled_ids": propagation_handled_ids,
                     "skipped_ids": propagation_skipped_ids,
+                    "transfer_limited": propagation_transfer_limited,
+                    "transfer_limited_bytes": propagation_transfer_limited_bytes,
+                    "transfer_limited_ids": propagation_transfer_limited_ids,
                     "messages": propagation_messages,
                     "sync_limit": sync_limit_bytes,
                 });
