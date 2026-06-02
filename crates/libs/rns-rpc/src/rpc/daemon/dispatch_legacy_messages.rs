@@ -412,6 +412,7 @@ impl RpcDaemon {
                 let mut propagation_remaining_bytes = 0u64;
                 let mut propagation_handled_ids = Vec::new();
                 let mut propagation_skipped_ids = Vec::new();
+                let mut propagation_messages = Vec::new();
                 for entry in pending_propagation {
                     let next_size = cumulative_size.saturating_add(
                         usize::try_from(entry.size_bytes)
@@ -426,6 +427,14 @@ impl RpcDaemon {
                         propagation_skipped_ids.push(entry.transient_id);
                         continue;
                     }
+                    let propagation_message = json!({
+                        "transient_id": entry.transient_id,
+                        "destination": entry.destination,
+                        "payload_hex": entry.payload_hex,
+                        "received_at": entry.received_at,
+                        "size_bytes": entry.size_bytes,
+                        "stamp_value": entry.stamp_value,
+                    });
                     let transient_id = entry.transient_id;
                     self.store
                         .mark_peer_handled_propagation(peer_id, transient_id.as_str())
@@ -434,6 +443,7 @@ impl RpcDaemon {
                     propagation_handled = propagation_handled.saturating_add(1);
                     propagation_bytes = propagation_bytes.saturating_add(entry.size_bytes);
                     propagation_handled_ids.push(transient_id);
+                    propagation_messages.push(propagation_message);
                 }
                 let propagation_sync = json!({
                     "handled": propagation_handled,
@@ -445,6 +455,7 @@ impl RpcDaemon {
                     "remaining_bytes": propagation_remaining_bytes,
                     "handled_ids": propagation_handled_ids,
                     "skipped_ids": propagation_skipped_ids,
+                    "messages": propagation_messages,
                     "sync_limit": sync_limit_bytes,
                 });
                 let acceptance_rate = {

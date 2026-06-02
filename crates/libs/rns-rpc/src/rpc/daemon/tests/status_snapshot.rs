@@ -1996,6 +1996,42 @@ fn peer_sync_reports_propagation_transfer_accounting() {
 }
 
 #[test]
+fn peer_sync_reports_transferred_propagation_messages() {
+    let daemon = RpcDaemon::test_instance();
+    daemon
+        .handle_rpc(rpc_request(63, "peer_sync", json!({ "peer": "peer-sync-payloads" })))
+        .expect("initial peer sync");
+
+    let entry = PropagationEntryRecord {
+        transient_id: "d3".repeat(32),
+        destination: "18".repeat(16),
+        payload_hex: "21".repeat(24),
+        received_at: 1_700_000_614,
+        size_bytes: 24,
+        stamp_value: Some(11),
+    };
+    daemon.store.upsert_propagation_entry(&entry).expect("store propagation entry");
+    daemon
+        .store
+        .mark_peer_unhandled_propagation("peer-sync-payloads", entry.transient_id.as_str())
+        .expect("mark unhandled");
+
+    let result = daemon
+        .handle_rpc(rpc_request(64, "peer_sync", json!({ "peer": "peer-sync-payloads" })))
+        .expect("peer sync")
+        .result
+        .expect("peer sync result");
+    let messages = result["propagation"]["messages"].as_array().expect("propagation messages");
+    assert_eq!(messages.len(), 1);
+    assert_eq!(messages[0]["transient_id"].as_str(), Some(entry.transient_id.as_str()));
+    assert_eq!(messages[0]["destination"].as_str(), Some(entry.destination.as_str()));
+    assert_eq!(messages[0]["payload_hex"].as_str(), Some(entry.payload_hex.as_str()));
+    assert_eq!(messages[0]["received_at"].as_i64(), Some(entry.received_at));
+    assert_eq!(messages[0]["size_bytes"].as_u64(), Some(entry.size_bytes));
+    assert_eq!(messages[0]["stamp_value"].as_u64(), Some(11));
+}
+
+#[test]
 fn list_peers_includes_propagation_marks_in_message_counters() {
     let daemon = RpcDaemon::test_instance();
     daemon
