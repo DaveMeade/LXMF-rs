@@ -1,6 +1,6 @@
 use super::*;
 
-const LXMF_PEER_SYNC_BACKOFF_STEP_SECS: u32 = 12 * 60;
+pub(super) const LXMF_PEER_SYNC_BACKOFF_STEP_SECS: u32 = 12 * 60;
 
 #[derive(Debug, Clone, Copy)]
 pub(super) struct PeerPropagationState {
