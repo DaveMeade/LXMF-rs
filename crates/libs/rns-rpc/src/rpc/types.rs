@@ -1,3 +1,5 @@
+use serde::ser::SerializeMap;
+
 #[derive(Debug, Serialize, Deserialize, PartialEq, Clone)]
 pub struct RpcRequest {
     pub id: u64,
@@ -651,52 +653,80 @@ pub struct SequencedRpcEvent {
     pub event: RpcEvent,
 }
 
-#[derive(Debug, Serialize, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct PeerRecord {
     pub peer: String,
     pub last_seen: i64,
-    #[serde(default)]
     pub capabilities: Vec<String>,
-    #[serde(default)]
     pub name: Option<String>,
-    #[serde(default)]
     pub name_source: Option<String>,
-    #[serde(default)]
     pub peer_type: Option<String>,
-    #[serde(default)]
     pub alive: bool,
-    #[serde(default)]
     pub last_sync_attempt: i64,
-    #[serde(default)]
     pub next_sync_attempt: i64,
-    #[serde(default)]
     pub sync_backoff: u32,
-    #[serde(default = "default_network_distance")]
     pub network_distance: u32,
-    #[serde(default)]
     pub rx_bytes: u64,
-    #[serde(default)]
     pub tx_bytes: u64,
-    #[serde(default)]
     pub sync_transfer_rate: f64,
-    #[serde(default = "default_acceptance_rate")]
     pub acceptance_rate: f64,
-    #[serde(default)]
     pub first_seen: i64,
-    #[serde(default)]
     pub seen_count: u64,
-    #[serde(default)]
     pub peering_timebase: i64,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub propagation_transfer_limit: Option<u32>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub propagation_sync_limit: Option<u32>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub propagation_stamp_cost: Option<u32>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub propagation_stamp_cost_flexibility: Option<u32>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub peering_cost: Option<u32>,
+}
+
+impl serde::Serialize for PeerRecord {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        let mut map = serializer.serialize_map(None)?;
+        map.serialize_entry("peer", &self.peer)?;
+        map.serialize_entry("last_seen", &self.last_seen)?;
+        map.serialize_entry("last_heard", &self.last_seen)?;
+        map.serialize_entry("capabilities", &self.capabilities)?;
+        map.serialize_entry("name", &self.name)?;
+        map.serialize_entry("name_source", &self.name_source)?;
+        map.serialize_entry("peer_type", &self.peer_type)?;
+        map.serialize_entry("alive", &self.alive)?;
+        map.serialize_entry("last_sync_attempt", &self.last_sync_attempt)?;
+        map.serialize_entry("next_sync_attempt", &self.next_sync_attempt)?;
+        map.serialize_entry("sync_backoff", &self.sync_backoff)?;
+        map.serialize_entry("network_distance", &self.network_distance)?;
+        map.serialize_entry("rx_bytes", &self.rx_bytes)?;
+        map.serialize_entry("tx_bytes", &self.tx_bytes)?;
+        map.serialize_entry("sync_transfer_rate", &self.sync_transfer_rate)?;
+        map.serialize_entry("str", &self.sync_transfer_rate)?;
+        map.serialize_entry("acceptance_rate", &self.acceptance_rate)?;
+        map.serialize_entry("first_seen", &self.first_seen)?;
+        map.serialize_entry("seen_count", &self.seen_count)?;
+        map.serialize_entry("peering_timebase", &self.peering_timebase)?;
+        if let Some(value) = self.propagation_transfer_limit {
+            map.serialize_entry("propagation_transfer_limit", &value)?;
+            map.serialize_entry("transfer_limit", &value)?;
+        }
+        if let Some(value) = self.propagation_sync_limit {
+            map.serialize_entry("propagation_sync_limit", &value)?;
+            map.serialize_entry("sync_limit", &value)?;
+        }
+        if let Some(value) = self.propagation_stamp_cost {
+            map.serialize_entry("propagation_stamp_cost", &value)?;
+            map.serialize_entry("target_stamp_cost", &value)?;
+        }
+        if let Some(value) = self.propagation_stamp_cost_flexibility {
+            map.serialize_entry("propagation_stamp_cost_flexibility", &value)?;
+            map.serialize_entry("stamp_cost_flexibility", &value)?;
+        }
+        if let Some(value) = self.peering_cost {
+            map.serialize_entry("peering_cost", &value)?;
+        }
+        map.end()
+    }
 }
 
 #[derive(Deserialize)]
@@ -883,5 +913,48 @@ mod peer_record_serde_tests {
         assert_eq!(record.propagation_sync_limit, Some(444));
         assert_eq!(record.propagation_stamp_cost, Some(7));
         assert_eq!(record.propagation_stamp_cost_flexibility, Some(2));
+    }
+
+    #[test]
+    fn peer_record_serializes_python_status_aliases() {
+        let record = PeerRecord {
+            peer: "peer-python-status".to_string(),
+            last_seen: 1_700_001_005,
+            capabilities: vec!["propagation".to_string()],
+            name: Some("Peer Python Status".to_string()),
+            name_source: Some("announce".to_string()),
+            peer_type: Some("auto".to_string()),
+            alive: true,
+            last_sync_attempt: 1_700_001_000,
+            next_sync_attempt: 1_700_001_720,
+            sync_backoff: 720,
+            network_distance: 3,
+            rx_bytes: 123,
+            tx_bytes: 456,
+            sync_transfer_rate: 2048.0,
+            acceptance_rate: 0.5,
+            first_seen: 1_700_000_900,
+            seen_count: 4,
+            peering_timebase: 1_700_000_950,
+            propagation_transfer_limit: Some(333),
+            propagation_sync_limit: Some(444),
+            propagation_stamp_cost: Some(7),
+            propagation_stamp_cost_flexibility: Some(2),
+            peering_cost: Some(9),
+        };
+
+        let value = serde_json::to_value(record).expect("serialize peer record");
+        assert_eq!(value["last_seen"].as_i64(), Some(1_700_001_005));
+        assert_eq!(value["last_heard"].as_i64(), Some(1_700_001_005));
+        assert_eq!(value["sync_transfer_rate"].as_f64(), Some(2048.0));
+        assert_eq!(value["str"].as_f64(), Some(2048.0));
+        assert_eq!(value["propagation_transfer_limit"].as_u64(), Some(333));
+        assert_eq!(value["transfer_limit"].as_u64(), Some(333));
+        assert_eq!(value["propagation_sync_limit"].as_u64(), Some(444));
+        assert_eq!(value["sync_limit"].as_u64(), Some(444));
+        assert_eq!(value["propagation_stamp_cost"].as_u64(), Some(7));
+        assert_eq!(value["target_stamp_cost"].as_u64(), Some(7));
+        assert_eq!(value["propagation_stamp_cost_flexibility"].as_u64(), Some(2));
+        assert_eq!(value["stamp_cost_flexibility"].as_u64(), Some(2));
     }
 }
