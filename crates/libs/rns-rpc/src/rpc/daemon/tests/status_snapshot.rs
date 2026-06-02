@@ -2530,6 +2530,51 @@ fn propagation_remote_fetch_derives_missing_transient_id_from_payload_bytes() {
 }
 
 #[test]
+fn propagation_remote_download_imports_payloads_into_local_store() {
+    let payload = b"remote-download-propagation-payload";
+    let payload_hex = hex::encode(payload);
+    let transient_id = hex::encode(Sha256::digest(payload));
+    let daemon = RpcDaemon::test_instance();
+    daemon.set_remote_control_bridge(Arc::new(TestRemoteControlBridge {
+        result: Ok(json!({
+            "downloaded_count": 1,
+            "imported_count": 1,
+            "messages": [{
+                "transient_id": transient_id,
+                "payload_hex": payload_hex,
+            }],
+        })),
+    }));
+
+    let result = daemon
+        .handle_rpc(rpc_request(
+            76,
+            "propagation_remote_download",
+            json!({
+                "remote": "remote-node",
+            }),
+        ))
+        .expect("remote download")
+        .result
+        .expect("remote download result");
+    assert_eq!(result["result"]["imported_count"].as_u64(), Some(1));
+
+    daemon.propagation_payloads.lock().expect("propagation payload mutex poisoned").clear();
+    let fetched = daemon
+        .handle_rpc(rpc_request(
+            77,
+            "propagation_fetch",
+            json!({
+                "transient_id": transient_id,
+            }),
+        ))
+        .expect("local fetch after remote download")
+        .result
+        .expect("local fetch result");
+    assert_eq!(fetched["payload_hex"].as_str(), Some(payload_hex.as_str()));
+}
+
+#[test]
 fn failed_propagation_remote_sync_updates_lifecycle_error() {
     let daemon = RpcDaemon::test_instance();
     daemon.set_remote_control_bridge(Arc::new(TestRemoteControlBridge {
