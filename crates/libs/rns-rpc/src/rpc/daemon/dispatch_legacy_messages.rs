@@ -741,6 +741,7 @@ impl RpcDaemon {
                     sync_backoff,
                     sync_transfer_rate,
                     tx_bytes,
+                    alive,
                 ) = {
                     let mut guard = self.peers.lock().expect("peers mutex poisoned");
                     if let Some(existing) = guard.get_mut(&record.peer) {
@@ -775,6 +776,7 @@ impl RpcDaemon {
                             existing.sync_backoff,
                             existing.sync_transfer_rate,
                             existing.tx_bytes,
+                            existing.alive,
                         )
                     } else {
                         (
@@ -784,6 +786,7 @@ impl RpcDaemon {
                             record.sync_backoff,
                             record.sync_transfer_rate,
                             record.tx_bytes,
+                            record.alive,
                         )
                     }
                 };
@@ -836,6 +839,7 @@ impl RpcDaemon {
                         "network_distance": record.network_distance,
                         "rx_bytes": record.rx_bytes,
                         "tx_bytes": tx_bytes,
+                        "alive": alive,
                         "acceptance_rate": acceptance_rate,
                         "last_sync_attempt": last_sync_attempt,
                         "next_sync_attempt": next_sync_attempt,
@@ -872,6 +876,7 @@ impl RpcDaemon {
                         "network_distance": record.network_distance,
                         "rx_bytes": record.rx_bytes,
                         "tx_bytes": tx_bytes,
+                        "alive": alive,
                         "acceptance_rate": acceptance_rate,
                         "last_heard": record.last_seen,
                         "last_sync_attempt": last_sync_attempt,
