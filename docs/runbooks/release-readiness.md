@@ -7,7 +7,7 @@ active branch.
 ## 1. Parity truth
 
 - Repository-wide status is tracked first in `docs/status/current-roadmap.md`.
-- `docs/plans/lxmf-parity-matrix.md` and `docs/plans/reticulum-parity-matrix.md`
+- `docs/status/lxmf-parity-matrix.md` and `docs/status/reticulum-parity-matrix.md`
   are historical parity snapshots, not the primary release gate.
 - If a parity matrix disagrees with `docs/status/current-roadmap.md`, treat the
   matrix as stale until it is refreshed in the same change.

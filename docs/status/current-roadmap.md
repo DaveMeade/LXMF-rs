@@ -10,8 +10,8 @@ Related documents:
 
 - Execution board: `docs/plans/2026-03-19-python-compatibility-execution-board.md`
 - Numbered compatibility backlog: `docs/plans/2026-03-18-rust-python-compat-issue-list.md`
-- LXMF parity snapshot: `docs/plans/lxmf-parity-matrix.md`
-- Reticulum parity snapshot: `docs/plans/reticulum-parity-matrix.md`
+- LXMF parity snapshot: `docs/status/lxmf-parity-matrix.md`
+- Reticulum parity snapshot: `docs/status/reticulum-parity-matrix.md`
 
 ## Current Summary
 
