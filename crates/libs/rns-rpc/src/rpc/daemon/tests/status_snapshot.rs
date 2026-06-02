@@ -2528,6 +2528,56 @@ fn peer_sync_reports_propagation_transfer_accounting() {
 }
 
 #[test]
+fn peer_sync_updates_transfer_rate_from_transferred_bytes() {
+    let daemon = RpcDaemon::test_instance();
+    daemon
+        .handle_rpc(rpc_request(63, "peer_sync", json!({ "peer": "peer-sync-rate" })))
+        .expect("initial peer sync");
+    {
+        let mut peers = daemon.peers.lock().expect("peers mutex poisoned");
+        let peer = peers.get_mut("peer-sync-rate").expect("peer record");
+        peer.propagation_sync_limit = Some(1_000);
+    }
+
+    let entry = PropagationEntryRecord {
+        transient_id: "d7".repeat(32),
+        destination: "18".repeat(16),
+        payload_hex: "25".repeat(40),
+        received_at: 1_700_000_619,
+        size_bytes: 40,
+        stamp_value: None,
+    };
+    daemon.store.upsert_propagation_entry(&entry).expect("store propagation entry");
+    daemon
+        .store
+        .mark_peer_unhandled_propagation("peer-sync-rate", entry.transient_id.as_str())
+        .expect("mark unhandled");
+
+    let result = daemon
+        .handle_rpc(rpc_request(64, "peer_sync", json!({ "peer": "peer-sync-rate" })))
+        .expect("peer sync")
+        .result
+        .expect("peer sync result");
+    assert_eq!(result["propagation"]["bytes"].as_u64(), Some(40));
+    assert_eq!(result["sync_transfer_rate"].as_f64(), Some(40.0));
+    assert_eq!(result["str"].as_u64(), Some(40));
+
+    let peers = daemon
+        .handle_rpc(RpcRequest { id: 65, method: "list_peers".to_string(), params: None })
+        .expect("list peers")
+        .result
+        .expect("list peers result");
+    let row = peers["peers"]
+        .as_array()
+        .expect("peer rows")
+        .iter()
+        .find(|row| row["peer"].as_str() == Some("peer-sync-rate"))
+        .expect("peer row");
+    assert_eq!(row["sync_transfer_rate"].as_f64(), Some(40.0));
+    assert_eq!(row["str"].as_u64(), Some(40));
+}
+
+#[test]
 fn peer_sync_reports_transferred_propagation_messages() {
     let store = MessagesStore::in_memory().expect("store");
     let daemon = RpcDaemon::with_store(store, hex::encode([2u8; 16]));
