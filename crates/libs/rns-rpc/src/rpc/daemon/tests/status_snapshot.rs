@@ -1599,6 +1599,7 @@ fn peer_sync_during_backoff_postpones_skipped_offers() {
     assert_eq!(result["peering_timebase"].as_i64(), Some(1_700_000_000));
     assert_eq!(result["rx_bytes"].as_u64(), Some(0));
     assert_eq!(result["tx_bytes"].as_u64(), Some(104));
+    assert_eq!(result["alive"].as_bool(), Some(false));
     assert_eq!(result["sync_transfer_rate"].as_f64(), Some(0.0));
     assert_eq!(result["str"].as_u64(), Some(0));
     assert!(result["last_heard"].as_i64().is_some_and(|value| value > 0));
@@ -1616,6 +1617,18 @@ fn peer_sync_during_backoff_postpones_skipped_offers() {
             .expect("transfer limited ids"),
         &[] as &[JsonValue]
     );
+    let event = daemon
+        .event_queue
+        .lock()
+        .expect("event_queue mutex poisoned")
+        .iter()
+        .rev()
+        .find(|event| event.event_type == "peer_sync")
+        .cloned()
+        .expect("peer sync event");
+    assert_eq!(event.payload["postponed"].as_bool(), Some(true));
+    assert_eq!(event.payload["postpone_reason"].as_str(), Some("backoff"));
+    assert_eq!(event.payload["alive"].as_bool(), Some(false));
 
     let after = daemon
         .handle_rpc(RpcRequest { id: 55, method: "list_peers".to_string(), params: None })
