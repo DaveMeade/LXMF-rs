@@ -2598,8 +2598,9 @@ fn duplicate_propagation_remote_sync_import_does_not_double_count_received() {
         })),
     }));
 
+    let mut second = JsonValue::Null;
     for request_id in [73, 74] {
-        daemon
+        let result = daemon
             .handle_rpc(rpc_request(
                 request_id,
                 "propagation_remote_sync",
@@ -2608,8 +2609,12 @@ fn duplicate_propagation_remote_sync_import_does_not_double_count_received() {
                     "peer": "peer-a",
                 }),
             ))
-            .expect("remote sync");
+            .expect("remote sync")
+            .result
+            .expect("remote sync result");
+        second = result;
     }
+    assert_eq!(second["result"]["imported_count"].as_u64(), Some(0));
 
     let status = daemon
         .handle_rpc(RpcRequest { id: 75, method: "propagation_status".to_string(), params: None })

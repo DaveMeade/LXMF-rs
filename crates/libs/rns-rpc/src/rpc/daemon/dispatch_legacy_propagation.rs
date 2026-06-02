@@ -852,15 +852,21 @@ impl RpcDaemon {
                     parsed.identity_private_key_hex.as_deref(),
                     timeout_secs,
                 ) {
-                    Ok(result) => {
-                        if let Err(err) = self.import_remote_propagation_payloads(&result) {
-                            self.update_propagation_sync_state(|state| {
-                                state.sync_state = PR_FAILED;
-                                state.state_name = "failed".to_string();
-                                state.sync_progress = 0.0;
-                                state.last_sync_error = Some(err.to_string());
-                            });
-                            return Err(err);
+                    Ok(mut result) => {
+                        let imported = match self.import_remote_propagation_payloads(&result) {
+                            Ok(imported) => imported,
+                            Err(err) => {
+                                self.update_propagation_sync_state(|state| {
+                                    state.sync_state = PR_FAILED;
+                                    state.state_name = "failed".to_string();
+                                    state.sync_progress = 0.0;
+                                    state.last_sync_error = Some(err.to_string());
+                                });
+                                return Err(err);
+                            }
+                        };
+                        if let Some(result) = result.as_object_mut() {
+                            result.insert("imported_count".to_string(), json!(imported));
                         }
                         self.update_propagation_sync_state(|state| {
                             state.sync_state = PR_COMPLETE;
@@ -917,15 +923,21 @@ impl RpcDaemon {
                     parsed.identity_private_key_hex.as_deref(),
                     timeout_secs,
                 ) {
-                    Ok(result) => {
-                        if let Err(err) = self.import_remote_propagation_payloads(&result) {
-                            self.update_propagation_sync_state(|state| {
-                                state.sync_state = PR_FAILED;
-                                state.state_name = "failed".to_string();
-                                state.sync_progress = 0.0;
-                                state.last_sync_error = Some(err.to_string());
-                            });
-                            return Err(err);
+                    Ok(mut result) => {
+                        let imported = match self.import_remote_propagation_payloads(&result) {
+                            Ok(imported) => imported,
+                            Err(err) => {
+                                self.update_propagation_sync_state(|state| {
+                                    state.sync_state = PR_FAILED;
+                                    state.state_name = "failed".to_string();
+                                    state.sync_progress = 0.0;
+                                    state.last_sync_error = Some(err.to_string());
+                                });
+                                return Err(err);
+                            }
+                        };
+                        if let Some(result) = result.as_object_mut() {
+                            result.insert("imported_count".to_string(), json!(imported));
                         }
                         self.update_propagation_sync_state(|state| {
                             state.sync_state = PR_COMPLETE;
@@ -998,13 +1010,16 @@ impl RpcDaemon {
                     .clone()
                     .ok_or_else(|| std::io::Error::other("remote control bridge unavailable"))?;
                 let timeout_secs = parsed.timeout_secs.unwrap_or(8.0).max(0.1);
-                let result = bridge.propagation_remote_fetch(
+                let mut result = bridge.propagation_remote_fetch(
                     parsed.remote.as_str(),
                     parsed.identity_private_key_hex.as_deref(),
                     timeout_secs,
                     parsed.transfer_limit_kb,
                 )?;
-                self.import_remote_propagation_payloads(&result)?;
+                let imported = self.import_remote_propagation_payloads(&result)?;
+                if let Some(result) = result.as_object_mut() {
+                    result.insert("imported_count".to_string(), json!(imported));
+                }
                 Ok(RpcResponse {
                     id: request.id,
                     result: Some(json!({
