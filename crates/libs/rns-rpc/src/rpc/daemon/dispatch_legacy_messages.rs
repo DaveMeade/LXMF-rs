@@ -573,10 +573,20 @@ impl RpcDaemon {
                     ));
                 }
 
+                let propagation_stats = self
+                    .store
+                    .peer_propagation_message_stats(peer_id)
+                    .map_err(std::io::Error::other)?;
                 let propagation_cleared = self
                     .store
                     .clear_peer_propagation_marks(peer_id)
                     .map_err(std::io::Error::other)?;
+                let messages = json!({
+                    "offered": propagation_stats.offered,
+                    "unhandled": propagation_stats.unhandled,
+                    "offered_bytes": propagation_stats.offered_bytes,
+                    "unhandled_bytes": propagation_stats.unhandled_bytes,
+                });
                 let removed = {
                     let mut guard = self.peers.lock().expect("peers mutex poisoned");
                     let removed = guard.remove(peer_id).is_some();
@@ -593,6 +603,8 @@ impl RpcDaemon {
                         "peer": peer_id,
                         "removed": removed,
                         "propagation_cleared": propagation_cleared,
+                        "propagation_cleared_bytes": propagation_stats.offered_bytes,
+                        "messages": messages.clone(),
                     }),
                 };
                 self.publish_event(event);
@@ -601,6 +613,8 @@ impl RpcDaemon {
                     result: Some(json!({
                         "removed": removed,
                         "propagation_cleared": propagation_cleared,
+                        "propagation_cleared_bytes": propagation_stats.offered_bytes,
+                        "messages": messages,
                     })),
                     error: None,
                 })
