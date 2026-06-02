@@ -1566,6 +1566,7 @@ fn peer_sync_during_backoff_postpones_skipped_offers() {
     assert_eq!(result["synced"].as_bool(), Some(false));
     assert_eq!(result["postponed"].as_bool(), Some(true));
     assert_eq!(result["postpone_reason"].as_str(), Some("backoff"));
+    assert!(result["last_heard"].as_i64().is_some_and(|value| value > 0));
     assert_eq!(result["propagation"]["synced"].as_bool(), Some(false));
     assert_eq!(result["propagation"]["postponed"].as_bool(), Some(true));
     assert_eq!(result["propagation"]["postpone_reason"].as_str(), Some("backoff"));
@@ -1858,7 +1859,9 @@ fn peer_sync_result_and_event_report_backoff_schedule() {
         .expect("peer sync result");
     assert_eq!(result["sync_backoff"].as_u64(), Some(12 * 60));
     let last_sync_attempt = result["last_sync_attempt"].as_i64().expect("last sync attempt");
+    let last_heard = result["last_heard"].as_i64().expect("last heard");
     assert!(last_sync_attempt > 0);
+    assert!(last_heard > 0);
     assert_eq!(result["next_sync_attempt"].as_i64(), Some(last_sync_attempt + 12 * 60));
 
     let event = daemon
@@ -1872,6 +1875,7 @@ fn peer_sync_result_and_event_report_backoff_schedule() {
         .expect("peer sync event");
     assert_eq!(event.payload["sync_backoff"].as_u64(), Some(12 * 60));
     assert_eq!(event.payload["last_sync_attempt"].as_i64(), Some(last_sync_attempt));
+    assert_eq!(event.payload["last_heard"].as_i64(), Some(last_heard));
     assert_eq!(event.payload["next_sync_attempt"].as_i64(), Some(last_sync_attempt + 12 * 60));
 }
 
