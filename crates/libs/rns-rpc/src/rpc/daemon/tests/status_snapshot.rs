@@ -1521,13 +1521,37 @@ fn peer_sync_during_backoff_postpones_skipped_offers() {
     daemon
         .handle_rpc(rpc_request(52, "peer_sync", json!({ "peer": "peer-backoff-skipped" })))
         .expect("initial peer sync");
+    {
+        let mut peers = daemon.peers.lock().expect("peers mutex poisoned");
+        let peer = peers.get_mut("peer-backoff-skipped").expect("peer record");
+        peer.propagation_sync_limit = Some(1_000);
+        peer.peering_timebase = 1_700_000_000;
+        peer.network_distance = 3;
+    }
+    let previous_transfer = PropagationEntryRecord {
+        transient_id: "ed".repeat(32),
+        destination: "18".repeat(16),
+        payload_hex: "19".repeat(40),
+        received_at: 1_700_000_613,
+        size_bytes: 40,
+        stamp_value: None,
+    };
+    daemon.store.upsert_propagation_entry(&previous_transfer).expect("store previous transfer");
+    daemon
+        .store
+        .mark_peer_unhandled_propagation(
+            "peer-backoff-skipped",
+            previous_transfer.transient_id.as_str(),
+        )
+        .expect("mark previous transfer unhandled");
+    daemon
+        .handle_rpc(rpc_request(53, "peer_sync", json!({ "peer": "peer-backoff-skipped" })))
+        .expect("peer sync with previous transfer");
     daemon.record_outbound_peer_activity("peer-backoff-skipped", 64, false);
     {
         let mut peers = daemon.peers.lock().expect("peers mutex poisoned");
         let peer = peers.get_mut("peer-backoff-skipped").expect("peer record");
         peer.propagation_sync_limit = Some(24);
-        peer.peering_timebase = 1_700_000_000;
-        peer.network_distance = 3;
     }
     let entry = PropagationEntryRecord {
         transient_id: "ee".repeat(32),
@@ -1574,7 +1598,9 @@ fn peer_sync_during_backoff_postpones_skipped_offers() {
     assert_eq!(result["network_distance"].as_u64(), Some(3));
     assert_eq!(result["peering_timebase"].as_i64(), Some(1_700_000_000));
     assert_eq!(result["rx_bytes"].as_u64(), Some(0));
-    assert_eq!(result["tx_bytes"].as_u64(), Some(64));
+    assert_eq!(result["tx_bytes"].as_u64(), Some(104));
+    assert_eq!(result["sync_transfer_rate"].as_f64(), Some(0.0));
+    assert_eq!(result["str"].as_u64(), Some(0));
     assert!(result["last_heard"].as_i64().is_some_and(|value| value > 0));
     assert_eq!(result["propagation"]["synced"].as_bool(), Some(false));
     assert_eq!(result["propagation"]["postponed"].as_bool(), Some(true));
@@ -1604,6 +1630,8 @@ fn peer_sync_during_backoff_postpones_skipped_offers() {
         .expect("peer row");
     assert_eq!(after_row["sync_backoff"].as_u64(), Some(sync_backoff));
     assert_eq!(after_row["next_sync_attempt"].as_i64(), Some(next_sync_attempt));
+    assert_eq!(after_row["sync_transfer_rate"].as_f64(), Some(0.0));
+    assert_eq!(after_row["str"].as_u64(), Some(0));
 }
 
 #[test]
