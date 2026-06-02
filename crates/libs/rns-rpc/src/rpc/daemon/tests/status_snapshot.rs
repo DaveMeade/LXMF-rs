@@ -2582,6 +2582,49 @@ fn propagation_remote_sync_imports_payloads_into_local_store() {
 }
 
 #[test]
+fn duplicate_propagation_remote_sync_import_does_not_double_count_received() {
+    let payload = b"duplicate-remote-sync-propagation-payload";
+    let payload_hex = hex::encode(payload);
+    let transient_id = hex::encode(Sha256::digest(payload));
+    let daemon = RpcDaemon::test_instance();
+    daemon.set_remote_control_bridge(Arc::new(TestRemoteControlBridge {
+        result: Ok(json!({
+            "synced": true,
+            "imported_count": 1,
+            "messages": [{
+                "transient_id": transient_id,
+                "payload_hex": payload_hex,
+            }],
+        })),
+    }));
+
+    for request_id in [73, 74] {
+        daemon
+            .handle_rpc(rpc_request(
+                request_id,
+                "propagation_remote_sync",
+                json!({
+                    "remote": "remote-node",
+                    "peer": "peer-a",
+                }),
+            ))
+            .expect("remote sync");
+    }
+
+    let status = daemon
+        .handle_rpc(RpcRequest { id: 75, method: "propagation_status".to_string(), params: None })
+        .expect("propagation status")
+        .result
+        .expect("propagation status result");
+    assert_eq!(
+        status["propagation"]["client_propagation_messages_received"].as_u64(),
+        Some(1)
+    );
+    assert_eq!(status["propagation"]["total_ingested"].as_u64(), Some(1));
+    assert_eq!(status["propagation"]["last_ingest_count"].as_u64(), Some(0));
+}
+
+#[test]
 fn propagation_remote_fetch_imports_payloads_into_local_store() {
     let payload = b"remote-propagation-payload";
     let payload_hex = hex::encode(payload);

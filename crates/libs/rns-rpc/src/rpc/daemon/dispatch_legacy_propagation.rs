@@ -94,14 +94,21 @@ impl RpcDaemon {
                 size_bytes: payload.len() as u64,
                 stamp_value,
             };
+            let already_known = self
+                .store
+                .get_propagation_entry(transient_id.as_str())
+                .map_err(std::io::Error::other)?
+                .is_some();
             self.store.upsert_propagation_entry(&record).map_err(std::io::Error::other)?;
             self.propagation_payloads
                 .lock()
                 .expect("propagation payload mutex poisoned")
                 .insert(transient_id, record.payload_hex);
-            imported = imported.saturating_add(1);
+            if !already_known {
+                imported = imported.saturating_add(1);
+            }
         }
-        if imported > 0 {
+        if !messages.is_empty() {
             self.note_client_propagation_messages_received(imported);
         }
         Ok(imported)
