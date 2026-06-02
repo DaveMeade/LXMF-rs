@@ -4403,6 +4403,7 @@ fn peer_unpeer_reports_cleared_propagation_queue_accounting() {
         .expect("unpeer")
         .result
         .expect("unpeer result");
+    assert_eq!(result["peer"].as_str(), Some("peer-unpeer-accounting"));
     assert_eq!(result["propagation_cleared"].as_u64(), Some(2));
     assert_eq!(result["propagation_cleared_bytes"].as_u64(), Some(36));
     assert_eq!(result["messages"]["offered"].as_u64(), Some(2));

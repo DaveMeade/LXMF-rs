@@ -901,6 +901,7 @@ impl RpcDaemon {
                 Ok(RpcResponse {
                     id: request.id,
                     result: Some(json!({
+                        "peer": peer_id,
                         "removed": cleanup.removed,
                         "propagation_cleared": cleanup.propagation_cleared,
                         "propagation_cleared_bytes": cleanup.propagation_cleared_bytes,
