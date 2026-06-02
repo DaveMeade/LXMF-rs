@@ -737,9 +737,9 @@ impl RpcDaemon {
                             existing.acceptance_rate = (propagation_handled as f64
                                 / propagation_offered as f64)
                                 .clamp(0.0, 1.0);
+                            existing.sync_transfer_rate = propagation_bytes as f64;
                         }
                         if propagation_handled > 0 {
-                            existing.sync_transfer_rate = propagation_bytes as f64;
                             existing.sync_backoff = 0;
                             existing.next_sync_attempt = 0;
                         } else if propagation_offered > 0 {
