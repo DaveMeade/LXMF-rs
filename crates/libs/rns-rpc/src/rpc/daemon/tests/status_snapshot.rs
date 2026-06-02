@@ -2357,11 +2357,7 @@ impl RemoteControlBridge for TestRemoteControlBridge {
         _timeout_secs: f64,
         _transfer_limit_kb: Option<f64>,
     ) -> Result<JsonValue, std::io::Error> {
-        Ok(json!({
-            "available_count": 0,
-            "fetched_count": 0,
-            "imported_count": 0,
-        }))
+        self.result.clone().map_err(|kind| std::io::Error::new(kind, "remote fetch failed"))
     }
 }
 
@@ -2440,6 +2436,97 @@ fn propagation_remote_sync_updates_lifecycle_status() {
     assert!(propagation["last_sync_started"].as_i64().is_some());
     assert!(propagation["last_sync_completed"].as_i64().is_some());
     assert_eq!(propagation["last_sync_error"], JsonValue::Null);
+}
+
+#[test]
+fn propagation_remote_fetch_imports_payloads_into_local_store() {
+    let payload = b"remote-propagation-payload";
+    let payload_hex = hex::encode(payload);
+    let transient_id = hex::encode(Sha256::digest(payload));
+    let daemon = RpcDaemon::test_instance();
+    daemon.set_remote_control_bridge(Arc::new(TestRemoteControlBridge {
+        result: Ok(json!({
+            "available_count": 1,
+            "fetched_count": 1,
+            "imported_count": 1,
+            "messages": [{
+                "transient_id": transient_id,
+                "destination": "23".repeat(16),
+                "payload_hex": payload_hex,
+                "received_at": 1_700_000_700i64,
+                "stamp_value": 6,
+            }],
+        })),
+    }));
+
+    let result = daemon
+        .handle_rpc(rpc_request(
+            73,
+            "propagation_remote_fetch",
+            json!({
+                "remote": "remote-node",
+            }),
+        ))
+        .expect("remote fetch")
+        .result
+        .expect("remote fetch result");
+    assert_eq!(result["result"]["imported_count"].as_u64(), Some(1));
+
+    daemon.propagation_payloads.lock().expect("propagation payload mutex poisoned").clear();
+    let fetched = daemon
+        .handle_rpc(rpc_request(
+            74,
+            "propagation_fetch",
+            json!({
+                "transient_id": transient_id,
+            }),
+        ))
+        .expect("local fetch after remote import")
+        .result
+        .expect("local fetch result");
+    assert_eq!(fetched["payload_hex"].as_str(), Some(payload_hex.as_str()));
+}
+
+#[test]
+fn propagation_remote_fetch_derives_missing_transient_id_from_payload_bytes() {
+    let payload = b"remote-payload-without-id";
+    let payload_hex = hex::encode(payload);
+    let transient_id = hex::encode(Sha256::digest(payload));
+    let daemon = RpcDaemon::test_instance();
+    daemon.set_remote_control_bridge(Arc::new(TestRemoteControlBridge {
+        result: Ok(json!({
+            "available_count": 1,
+            "fetched_count": 1,
+            "imported_count": 1,
+            "payloads": [{
+                "payload_hex": payload_hex,
+            }],
+        })),
+    }));
+
+    daemon
+        .handle_rpc(rpc_request(
+            74,
+            "propagation_remote_fetch",
+            json!({
+                "remote": "remote-node",
+            }),
+        ))
+        .expect("remote fetch");
+
+    daemon.propagation_payloads.lock().expect("propagation payload mutex poisoned").clear();
+    let fetched = daemon
+        .handle_rpc(rpc_request(
+            75,
+            "propagation_fetch",
+            json!({
+                "transient_id": transient_id,
+            }),
+        ))
+        .expect("local fetch after remote import")
+        .result
+        .expect("local fetch result");
+    assert_eq!(fetched["payload_hex"].as_str(), Some(payload_hex.as_str()));
 }
 
 #[test]

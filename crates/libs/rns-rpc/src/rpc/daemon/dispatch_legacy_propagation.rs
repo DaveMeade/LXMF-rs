@@ -31,6 +31,75 @@ impl RpcDaemon {
             .map_err(std::io::Error::other)
     }
 
+    fn import_remote_propagation_payloads(
+        &self,
+        result: &JsonValue,
+    ) -> Result<usize, std::io::Error> {
+        let Some(messages) =
+            result.get("messages").or_else(|| result.get("payloads")).and_then(JsonValue::as_array)
+        else {
+            return Ok(0);
+        };
+
+        let mut imported = 0usize;
+        for message in messages {
+            let Some(payload_hex) = message.get("payload_hex").and_then(JsonValue::as_str) else {
+                continue;
+            };
+            let payload = hex::decode(payload_hex.trim()).map_err(|err| {
+                std::io::Error::new(
+                    std::io::ErrorKind::InvalidInput,
+                    format!("invalid remote propagation payload hex: {err}"),
+                )
+            })?;
+            let transient_id = message
+                .get("transient_id")
+                .and_then(JsonValue::as_str)
+                .map(normalize_propagation_transient_key)
+                .unwrap_or_else(|| {
+                    let mut hasher = Sha256::new();
+                    hasher.update(payload.as_slice());
+                    encode_hex(hasher.finalize())
+                });
+            let destination = message
+                .get("destination")
+                .and_then(JsonValue::as_str)
+                .map(|value| value.trim().to_ascii_lowercase())
+                .filter(|value| !value.is_empty())
+                .unwrap_or_else(|| {
+                    if payload.len() >= 16 {
+                        hex::encode(&payload[..16])
+                    } else {
+                        String::new()
+                    }
+                });
+            let received_at =
+                message.get("received_at").and_then(JsonValue::as_i64).unwrap_or_else(now_i64);
+            let stamp_value = message
+                .get("stamp_value")
+                .and_then(JsonValue::as_u64)
+                .and_then(|value| u32::try_from(value).ok());
+            let record = PropagationEntryRecord {
+                transient_id: transient_id.clone(),
+                destination,
+                payload_hex: payload_hex.trim().to_ascii_lowercase(),
+                received_at,
+                size_bytes: payload.len() as u64,
+                stamp_value,
+            };
+            self.store.upsert_propagation_entry(&record).map_err(std::io::Error::other)?;
+            self.propagation_payloads
+                .lock()
+                .expect("propagation payload mutex poisoned")
+                .insert(transient_id, record.payload_hex);
+            imported = imported.saturating_add(1);
+        }
+        if imported > 0 {
+            self.note_client_propagation_messages_received(imported);
+        }
+        Ok(imported)
+    }
+
     pub fn note_client_propagation_messages_received(&self, ingested_count: usize) {
         let state = {
             let mut guard = self.propagation_state.lock().expect("propagation mutex poisoned");
@@ -903,6 +972,7 @@ impl RpcDaemon {
                     timeout_secs,
                     parsed.transfer_limit_kb,
                 )?;
+                self.import_remote_propagation_payloads(&result)?;
                 Ok(RpcResponse {
                     id: request.id,
                     result: Some(json!({
