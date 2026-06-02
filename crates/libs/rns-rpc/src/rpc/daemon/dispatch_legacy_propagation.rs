@@ -922,6 +922,7 @@ impl RpcDaemon {
                     parsed.remote.as_str(),
                     parsed.identity_private_key_hex.as_deref(),
                     timeout_secs,
+                    parsed.transfer_limit_kb,
                 ) {
                     Ok(mut result) => {
                         let imported = match self.import_remote_propagation_payloads(&result) {

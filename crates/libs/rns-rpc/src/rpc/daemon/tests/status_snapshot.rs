@@ -3034,7 +3034,9 @@ impl RemoteControlBridge for TestRemoteControlBridge {
         remote: &str,
         _identity_private_key_hex: Option<&str>,
         _timeout_secs: f64,
+        transfer_limit_kb: Option<f64>,
     ) -> Result<JsonValue, std::io::Error> {
+        assert_eq!(transfer_limit_kb, None);
         self.result.clone().map(|mut result| {
             result["remote"] = json!(remote);
             result
@@ -3067,6 +3069,63 @@ impl RemoteControlBridge for TestRemoteControlBridge {
         _transfer_limit_kb: Option<f64>,
     ) -> Result<JsonValue, std::io::Error> {
         self.result.clone().map_err(|kind| std::io::Error::new(kind, "remote fetch failed"))
+    }
+}
+
+struct TransferLimitRemoteControlBridge;
+
+impl RemoteControlBridge for TransferLimitRemoteControlBridge {
+    fn propagation_remote_status(
+        &self,
+        _remote: &str,
+        _identity_private_key_hex: Option<&str>,
+        _timeout_secs: f64,
+    ) -> Result<JsonValue, std::io::Error> {
+        Ok(json!({"status": "ok"}))
+    }
+
+    fn propagation_remote_sync(
+        &self,
+        _remote: &str,
+        _peer: &str,
+        _identity_private_key_hex: Option<&str>,
+        _timeout_secs: f64,
+    ) -> Result<JsonValue, std::io::Error> {
+        Ok(json!({"synced": true}))
+    }
+
+    fn propagation_remote_download(
+        &self,
+        _remote: &str,
+        _identity_private_key_hex: Option<&str>,
+        _timeout_secs: f64,
+        transfer_limit_kb: Option<f64>,
+    ) -> Result<JsonValue, std::io::Error> {
+        assert_eq!(transfer_limit_kb, Some(42.5));
+        Ok(json!({
+            "downloaded_count": 0,
+            "messages": [],
+        }))
+    }
+
+    fn propagation_remote_unpeer(
+        &self,
+        _remote: &str,
+        _peer: &str,
+        _identity_private_key_hex: Option<&str>,
+        _timeout_secs: f64,
+    ) -> Result<JsonValue, std::io::Error> {
+        Ok(json!({"unpeered": true}))
+    }
+
+    fn propagation_remote_fetch(
+        &self,
+        _remote: &str,
+        _identity_private_key_hex: Option<&str>,
+        _timeout_secs: f64,
+        _transfer_limit_kb: Option<f64>,
+    ) -> Result<JsonValue, std::io::Error> {
+        Ok(json!({"messages": []}))
     }
 }
 
@@ -3495,6 +3554,23 @@ fn propagation_remote_download_imports_payloads_into_local_store() {
         .result
         .expect("local fetch result");
     assert_eq!(fetched["payload_hex"].as_str(), Some(payload_hex.as_str()));
+}
+
+#[test]
+fn propagation_remote_download_forwards_transfer_limit_to_bridge() {
+    let daemon = RpcDaemon::test_instance();
+    daemon.set_remote_control_bridge(Arc::new(TransferLimitRemoteControlBridge));
+
+    daemon
+        .handle_rpc(rpc_request(
+            77,
+            "propagation_remote_download",
+            json!({
+                "remote": "remote-node",
+                "transfer_limit_kb": 42.5,
+            }),
+        ))
+        .expect("remote download with transfer limit");
 }
 
 #[test]

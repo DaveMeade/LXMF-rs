@@ -19,6 +19,7 @@ pub(super) async fn propagation_download_request(
     request_identity: &PrivateIdentity,
     remote: &str,
     timeout: Duration,
+    transfer_limit_kb: Option<f64>,
 ) -> Result<(JsonValue, Identity), std::io::Error> {
     let remote_hash = AddressHash::new(parse_destination_hash_required(remote)?);
     let remote_identity = resolve_remote_identity(transport, &remote_hash, timeout).await?;
@@ -72,7 +73,7 @@ pub(super) async fn propagation_download_request(
         rmpv::Value::Array(vec![
             rmpv::Value::Array(wanted.iter().cloned().map(rmpv::Value::Binary).collect()),
             rmpv::Value::Array(Vec::new()),
-            rmpv::Value::F64(1000.0),
+            transfer_limit_kb.map(rmpv::Value::F64).unwrap_or_else(|| rmpv::Value::F64(1000.0)),
         ]),
     )?;
     let get_request_id =

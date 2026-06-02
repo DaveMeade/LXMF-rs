@@ -173,6 +173,8 @@ struct PropagationRemoteStatusParams {
     identity_private_key_hex: Option<String>,
     #[serde(default)]
     timeout_secs: Option<f64>,
+    #[serde(default)]
+    transfer_limit_kb: Option<f64>,
 }
 
 #[derive(Debug, Deserialize)]

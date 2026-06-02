@@ -236,6 +236,7 @@ impl RemoteControlBridge for TransportBridge {
         remote: &str,
         identity_private_key_hex: Option<&str>,
         timeout_secs: f64,
+        transfer_limit_kb: Option<f64>,
     ) -> Result<JsonValue, std::io::Error> {
         let remote = remote.trim().to_string();
         let identity_override = identity_private_key_hex
@@ -285,6 +286,7 @@ impl RemoteControlBridge for TransportBridge {
                     &request_identity,
                     &remote,
                     timeout,
+                    transfer_limit_kb,
                 )
                 .await;
                 if let Ok((_, identity)) = &result {
