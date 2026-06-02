@@ -1319,8 +1319,7 @@ impl RpcDaemon {
             .store
             .list_peer_unhandled_propagation_ids(peer_id)
             .map_err(std::io::Error::other)?;
-        let propagation_cleared =
-            self.store.clear_peer_propagation_marks(peer_id).map_err(std::io::Error::other)?;
+        self.store.clear_peer_propagation_marks(peer_id).map_err(std::io::Error::other)?;
         let messages = json!({
             "offered": propagation_stats.offered,
             "unhandled": propagation_stats.unhandled,
@@ -1341,7 +1340,7 @@ impl RpcDaemon {
         };
         Ok(LocalUnpeerCleanup {
             removed,
-            propagation_cleared,
+            propagation_cleared: propagation_stats.offered as usize,
             propagation_cleared_bytes: propagation_stats.offered_bytes,
             messages,
         })

@@ -4163,6 +4163,10 @@ fn peer_unpeer_clears_persisted_propagation_queue_marks() {
         .store
         .mark_peer_unhandled_propagation("peer-unpeer-queue", entry.transient_id.as_str())
         .expect("mark unhandled");
+    daemon
+        .store
+        .mark_peer_unhandled_propagation("peer-unpeer-queue", "fa".repeat(32).as_str())
+        .expect("mark stale unhandled");
 
     let unpeer = daemon
         .handle_rpc(rpc_request(91, "peer_unpeer", json!({ "peer": "peer-unpeer-queue" })))
@@ -4171,6 +4175,9 @@ fn peer_unpeer_clears_persisted_propagation_queue_marks() {
         .expect("unpeer result");
     assert_eq!(unpeer["removed"].as_bool(), Some(true));
     assert_eq!(unpeer["propagation_cleared"].as_u64(), Some(1));
+    assert_eq!(unpeer["propagation_cleared_bytes"].as_u64(), Some(24));
+    assert_eq!(unpeer["messages"]["offered"].as_u64(), Some(1));
+    assert_eq!(unpeer["messages"]["unhandled"].as_u64(), Some(1));
     assert!(
         daemon
             .store
