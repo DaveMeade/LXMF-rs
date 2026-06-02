@@ -447,7 +447,7 @@ impl RpcDaemon {
                     "skipped_ids": propagation_skipped_ids,
                     "sync_limit": sync_limit_bytes,
                 });
-                {
+                let acceptance_rate = {
                     let mut guard = self.peers.lock().expect("peers mutex poisoned");
                     if let Some(existing) = guard.get_mut(&record.peer) {
                         let propagation_offered =
@@ -462,8 +462,11 @@ impl RpcDaemon {
                         }
                         existing.sync_backoff = 0;
                         existing.next_sync_attempt = 0;
+                        existing.acceptance_rate
+                    } else {
+                        record.acceptance_rate
                     }
-                }
+                };
                 let event = RpcEvent {
                     event_type: "peer_sync".into(),
                     payload: json!({
@@ -473,6 +476,7 @@ impl RpcDaemon {
                         "name_source": &record.name_source,
                         "first_seen": record.first_seen,
                         "seen_count": record.seen_count,
+                        "acceptance_rate": acceptance_rate,
                         "propagation": propagation_sync.clone(),
                     }),
                 };
@@ -483,6 +487,7 @@ impl RpcDaemon {
                     result: Some(json!({
                         "peer": record.peer,
                         "synced": true,
+                        "acceptance_rate": acceptance_rate,
                         "propagation": propagation_sync,
                     })),
                     error: None,
