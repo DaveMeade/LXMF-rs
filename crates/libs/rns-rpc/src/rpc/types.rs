@@ -732,8 +732,10 @@ impl serde::Serialize for PeerRecord {
 #[derive(Deserialize)]
 struct PeerRecordWire {
     peer: String,
-    #[serde(alias = "last_heard")]
-    last_seen: i64,
+    #[serde(default)]
+    last_seen: Option<i64>,
+    #[serde(default)]
+    last_heard: Option<i64>,
     #[serde(default)]
     capabilities: Vec<String>,
     #[serde(default)]
@@ -757,8 +759,9 @@ struct PeerRecordWire {
     #[serde(default)]
     tx_bytes: u64,
     #[serde(default)]
-    #[serde(alias = "str")]
-    sync_transfer_rate: f64,
+    sync_transfer_rate: Option<f64>,
+    #[serde(default)]
+    str: Option<f64>,
     #[serde(default = "default_acceptance_rate")]
     acceptance_rate: f64,
     #[serde(default)]
@@ -768,17 +771,21 @@ struct PeerRecordWire {
     #[serde(default)]
     peering_timebase: i64,
     #[serde(default)]
-    #[serde(alias = "transfer_limit")]
     propagation_transfer_limit: Option<u32>,
     #[serde(default)]
-    #[serde(alias = "sync_limit")]
+    transfer_limit: Option<u32>,
+    #[serde(default)]
     propagation_sync_limit: Option<u32>,
     #[serde(default)]
-    #[serde(alias = "target_stamp_cost")]
+    sync_limit: Option<u32>,
+    #[serde(default)]
     propagation_stamp_cost: Option<u32>,
     #[serde(default)]
-    #[serde(alias = "stamp_cost_flexibility")]
+    target_stamp_cost: Option<u32>,
+    #[serde(default)]
     propagation_stamp_cost_flexibility: Option<u32>,
+    #[serde(default)]
+    stamp_cost_flexibility: Option<u32>,
     #[serde(default)]
     peering_cost: Option<u32>,
 }
@@ -789,9 +796,14 @@ impl<'de> Deserialize<'de> for PeerRecord {
         D: serde::Deserializer<'de>,
     {
         let wire = PeerRecordWire::deserialize(deserializer)?;
+        let last_seen = wire
+            .last_seen
+            .or(wire.last_heard)
+            .ok_or_else(|| serde::de::Error::missing_field("last_seen"))?;
+        let sync_transfer_rate = wire.sync_transfer_rate.or(wire.str).unwrap_or_default();
         Ok(Self {
             peer: wire.peer,
-            last_seen: wire.last_seen,
+            last_seen,
             capabilities: wire.capabilities,
             name: wire.name,
             name_source: wire.name_source,
@@ -803,15 +815,17 @@ impl<'de> Deserialize<'de> for PeerRecord {
             network_distance: wire.network_distance,
             rx_bytes: wire.rx_bytes,
             tx_bytes: wire.tx_bytes,
-            sync_transfer_rate: wire.sync_transfer_rate,
+            sync_transfer_rate,
             acceptance_rate: wire.acceptance_rate,
-            first_seen: wire.first_seen.unwrap_or(wire.last_seen),
-            seen_count: wire.seen_count.unwrap_or_else(|| u64::from(wire.last_seen > 0)),
+            first_seen: wire.first_seen.unwrap_or(last_seen),
+            seen_count: wire.seen_count.unwrap_or_else(|| u64::from(last_seen > 0)),
             peering_timebase: wire.peering_timebase,
-            propagation_transfer_limit: wire.propagation_transfer_limit,
-            propagation_sync_limit: wire.propagation_sync_limit,
-            propagation_stamp_cost: wire.propagation_stamp_cost,
-            propagation_stamp_cost_flexibility: wire.propagation_stamp_cost_flexibility,
+            propagation_transfer_limit: wire.propagation_transfer_limit.or(wire.transfer_limit),
+            propagation_sync_limit: wire.propagation_sync_limit.or(wire.sync_limit),
+            propagation_stamp_cost: wire.propagation_stamp_cost.or(wire.target_stamp_cost),
+            propagation_stamp_cost_flexibility: wire
+                .propagation_stamp_cost_flexibility
+                .or(wire.stamp_cost_flexibility),
             peering_cost: wire.peering_cost,
         })
     }
@@ -916,6 +930,26 @@ mod peer_record_serde_tests {
     }
 
     #[test]
+    fn peer_record_prefers_internal_status_fields_over_aliases() {
+        let record: PeerRecord = serde_json::from_value(json!({
+            "peer": "peer-internal-status",
+            "last_seen": 0,
+            "last_heard": 1_700_001_004,
+            "sync_transfer_rate": 0.0,
+            "str": 4096.0,
+            "propagation_transfer_limit": 0,
+            "transfer_limit": 333,
+        }))
+        .expect("deserialize internal and alias status peer");
+
+        assert_eq!(record.last_seen, 0);
+        assert_eq!(record.first_seen, 0);
+        assert_eq!(record.seen_count, 0);
+        assert_eq!(record.sync_transfer_rate, 0.0);
+        assert_eq!(record.propagation_transfer_limit, Some(0));
+    }
+
+    #[test]
     fn peer_record_serializes_python_status_aliases() {
         let record = PeerRecord {
             peer: "peer-python-status".to_string(),
@@ -956,5 +990,40 @@ mod peer_record_serde_tests {
         assert_eq!(value["target_stamp_cost"].as_u64(), Some(7));
         assert_eq!(value["propagation_stamp_cost_flexibility"].as_u64(), Some(2));
         assert_eq!(value["stamp_cost_flexibility"].as_u64(), Some(2));
+    }
+
+    #[test]
+    fn peer_record_serialized_status_aliases_roundtrip() {
+        let record = PeerRecord {
+            peer: "peer-roundtrip-status".to_string(),
+            last_seen: 1_700_001_006,
+            capabilities: vec!["propagation".to_string(), "delivery".to_string()],
+            name: Some("Peer Roundtrip Status".to_string()),
+            name_source: Some("announce".to_string()),
+            peer_type: Some("static".to_string()),
+            alive: true,
+            last_sync_attempt: 1_700_001_001,
+            next_sync_attempt: 1_700_001_721,
+            sync_backoff: 720,
+            network_distance: 2,
+            rx_bytes: 12,
+            tx_bytes: 34,
+            sync_transfer_rate: 1024.0,
+            acceptance_rate: 0.75,
+            first_seen: 1_700_000_901,
+            seen_count: 5,
+            peering_timebase: 1_700_000_951,
+            propagation_transfer_limit: Some(555),
+            propagation_sync_limit: Some(666),
+            propagation_stamp_cost: Some(8),
+            propagation_stamp_cost_flexibility: Some(3),
+            peering_cost: Some(10),
+        };
+
+        let value = serde_json::to_value(&record).expect("serialize peer record");
+        let roundtrip: PeerRecord =
+            serde_json::from_value(value).expect("deserialize serialized peer record");
+
+        assert_eq!(roundtrip, record);
     }
 }
