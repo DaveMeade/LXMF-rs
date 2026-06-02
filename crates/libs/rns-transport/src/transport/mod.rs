@@ -247,10 +247,8 @@ pub(crate) struct TransportHandler {
     /// `PeerRouting` map (see `multicast_peer_routings`).
     unicast_udp_ifaces: HashMap<std::net::SocketAddr, (AddressHash, Instant)>,
 
-    /// One per registered multicast `UdpInterface`: the shared
-    /// `PeerRouting` that iface's tx/rx tasks consult. Populated by
-    /// `Transport::add_multicast_udp_interface`; consulted by
-    /// `unicast_iface_for_source` to register discovered peers.
+    /// Host multicast iface hash to the routing table used to map
+    /// virtual per-peer iface hashes back to concrete UDP peer sockets.
     multicast_peer_routings: HashMap<AddressHash, Arc<Mutex<crate::iface::udp::PeerRouting>>>,
 
     cancel: CancellationToken,
