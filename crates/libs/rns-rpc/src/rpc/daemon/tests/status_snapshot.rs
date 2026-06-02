@@ -2548,12 +2548,20 @@ impl RemoteControlBridge for TestRemoteControlBridge {
 
     fn propagation_remote_unpeer(
         &self,
-        _remote: &str,
-        _peer: &str,
+        remote: &str,
+        peer: &str,
         _identity_private_key_hex: Option<&str>,
         _timeout_secs: f64,
     ) -> Result<JsonValue, std::io::Error> {
-        Ok(json!({"unpeered": true}))
+        self.result
+            .clone()
+            .map(|mut result| {
+                result["remote"] = json!(remote);
+                result["peer"] = json!(peer);
+                result["unpeered"] = json!(true);
+                result
+            })
+            .map_err(|kind| std::io::Error::new(kind, "remote unpeer failed"))
     }
 
     fn propagation_remote_fetch(
@@ -3122,6 +3130,61 @@ fn propagation_remote_unpeer_clears_local_peer_and_queue_state() {
             .list_peer_unhandled_propagation("peer-remote-unpeer")
             .expect("list unhandled")
             .is_empty()
+    );
+}
+
+#[test]
+fn failed_propagation_remote_unpeer_preserves_local_peer_and_queue_state() {
+    let daemon = RpcDaemon::test_instance();
+    daemon.set_remote_control_bridge(Arc::new(TestRemoteControlBridge {
+        result: Err(std::io::ErrorKind::TimedOut),
+    }));
+    daemon
+        .handle_rpc(rpc_request(79, "peer_sync", json!({ "peer": "peer-remote-unpeer-fail" })))
+        .expect("peer sync");
+
+    let entry = PropagationEntryRecord {
+        transient_id: "e2".repeat(32),
+        destination: "1a".repeat(16),
+        payload_hex: "1a".repeat(20),
+        received_at: 1_700_000_802,
+        size_bytes: 20,
+        stamp_value: None,
+    };
+    daemon.store.upsert_propagation_entry(&entry).expect("store propagation entry");
+    daemon
+        .store
+        .mark_peer_unhandled_propagation("peer-remote-unpeer-fail", entry.transient_id.as_str())
+        .expect("mark unhandled");
+
+    let err = daemon
+        .handle_rpc(rpc_request(
+            80,
+            "propagation_remote_unpeer",
+            json!({
+                "remote": "remote-node",
+                "peer": "peer-remote-unpeer-fail",
+            }),
+        ))
+        .expect_err("remote unpeer failure should be returned");
+    assert_eq!(err.kind(), std::io::ErrorKind::TimedOut);
+    assert_eq!(err.to_string(), "remote unpeer failed");
+
+    let peers = daemon
+        .handle_rpc(RpcRequest { id: 81, method: "list_peers".to_string(), params: None })
+        .expect("list peers")
+        .result
+        .expect("list peers result");
+    let row = peers["peers"].as_array().and_then(|rows| rows.first()).expect("peer row");
+    assert_eq!(row["peer"].as_str(), Some("peer-remote-unpeer-fail"));
+    assert_eq!(row["messages"]["unhandled"].as_u64(), Some(1));
+    assert_eq!(row["messages"]["unhandled_bytes"].as_u64(), Some(20));
+    assert_eq!(
+        daemon
+            .store
+            .list_peer_unhandled_propagation("peer-remote-unpeer-fail")
+            .expect("list unhandled"),
+        vec![entry]
     );
 }
 
