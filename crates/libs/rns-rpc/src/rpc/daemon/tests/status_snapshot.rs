@@ -3978,6 +3978,7 @@ fn propagation_remote_sync_imports_payloads_into_local_store() {
         .expect("remote sync result");
     assert_eq!(result["result"]["imported_count"].as_u64(), Some(1));
     assert_eq!(result["result"]["imported_ids"], json!([transient_id]));
+    assert_eq!(result["result"]["transferred_bytes"].as_u64(), Some(payload.len() as u64));
 
     daemon.propagation_payloads.lock().expect("propagation payload mutex poisoned").clear();
     let fetched = daemon
@@ -4083,6 +4084,7 @@ fn propagation_remote_fetch_imports_payloads_into_local_store() {
     assert_eq!(result["propagation"]["last_sync_error"], JsonValue::Null);
     assert_eq!(result["result"]["imported_count"].as_u64(), Some(1));
     assert_eq!(result["result"]["imported_ids"], json!([transient_id]));
+    assert_eq!(result["result"]["transferred_bytes"].as_u64(), Some(payload.len() as u64));
 
     daemon.propagation_payloads.lock().expect("propagation payload mutex poisoned").clear();
     let fetched = daemon
@@ -4297,6 +4299,7 @@ fn propagation_remote_download_imports_payloads_into_local_store() {
     assert_eq!(result["propagation"]["last_sync_error"], JsonValue::Null);
     assert_eq!(result["result"]["imported_count"].as_u64(), Some(1));
     assert_eq!(result["result"]["imported_ids"], json!([transient_id]));
+    assert_eq!(result["result"]["transferred_bytes"].as_u64(), Some(payload.len() as u64));
 
     daemon.propagation_payloads.lock().expect("propagation payload mutex poisoned").clear();
     let fetched = daemon

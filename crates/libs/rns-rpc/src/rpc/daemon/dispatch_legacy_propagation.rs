@@ -912,6 +912,10 @@ impl RpcDaemon {
                                 json!(imported.imported_count),
                             );
                             result.insert("imported_ids".to_string(), json!(imported.imported_ids));
+                            result.insert(
+                                "transferred_bytes".to_string(),
+                                json!(imported.transferred_bytes),
+                            );
                         }
                         self.update_propagation_sync_state(|state| {
                             state.sync_state = PR_COMPLETE;
@@ -1033,6 +1037,10 @@ impl RpcDaemon {
                                 json!(imported.imported_count),
                             );
                             result.insert("imported_ids".to_string(), json!(imported.imported_ids));
+                            result.insert(
+                                "transferred_bytes".to_string(),
+                                json!(imported.transferred_bytes),
+                            );
                         }
                         self.update_propagation_sync_state(|state| {
                             state.sync_state = PR_COMPLETE;
@@ -1148,6 +1156,8 @@ impl RpcDaemon {
                 if let Some(result) = result.as_object_mut() {
                     result.insert("imported_count".to_string(), json!(imported.imported_count));
                     result.insert("imported_ids".to_string(), json!(imported.imported_ids));
+                    result
+                        .insert("transferred_bytes".to_string(), json!(imported.transferred_bytes));
                 }
                 self.update_propagation_sync_state(|state| {
                     state.sync_state = PR_COMPLETE;
