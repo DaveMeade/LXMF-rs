@@ -2371,6 +2371,48 @@ fn peer_types_drive_python_style_peer_counts() {
 }
 
 #[test]
+fn list_peers_static_type_tracks_current_static_peer_config() {
+    let daemon = RpcDaemon::test_instance();
+    daemon
+        .handle_rpc(rpc_request(
+            74,
+            "propagation_enable",
+            json!({
+                "enabled": true,
+                "static_peers": ["peer-old"],
+            }),
+        ))
+        .expect("enable old static peer");
+    daemon
+        .handle_rpc(rpc_request(75, "peer_sync", json!({ "peer": "peer-old" })))
+        .expect("sync old static peer");
+    daemon
+        .handle_rpc(rpc_request(
+            76,
+            "propagation_enable",
+            json!({
+                "enabled": true,
+                "static_peers": ["peer-new"],
+            }),
+        ))
+        .expect("replace static peers");
+
+    let peers = daemon
+        .handle_rpc(RpcRequest { id: 77, method: "list_peers".to_string(), params: None })
+        .expect("list peers")
+        .result
+        .expect("list peers result");
+    let old = peers["peers"]
+        .as_array()
+        .expect("peer rows")
+        .iter()
+        .find(|row| row["peer"].as_str() == Some("peer-old"))
+        .expect("old peer row");
+    assert_eq!(old["peer_type"].as_str(), Some("static"));
+    assert_eq!(old["type"].as_str(), Some("discovered"));
+}
+
+#[test]
 fn unpeered_peers_do_not_consume_max_peer_capacity() {
     let daemon = RpcDaemon::test_instance();
     daemon

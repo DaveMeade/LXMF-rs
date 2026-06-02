@@ -114,10 +114,9 @@ impl RpcDaemon {
                             .unwrap_or((0, 0, 0, 0, 0, 0));
                         let peering_key =
                             peer_peering_key_value(&peer, self.identity_hash.as_str());
-                        let is_static_peer = peer.peer_type.as_deref() == Some("static")
-                            || static_peers.iter().any(|static_peer| {
-                                static_peer.eq_ignore_ascii_case(peer.peer.as_str())
-                            });
+                        let is_static_peer = static_peers.iter().any(|static_peer| {
+                            static_peer.eq_ignore_ascii_case(peer.peer.as_str())
+                        });
                         let mut row = serde_json::to_value(peer).unwrap_or_else(|_| json!({}));
                         row["type"] = JsonValue::String(
                             if is_static_peer { "static" } else { "discovered" }.to_string(),
