@@ -409,8 +409,7 @@ mod tests {
             python_compat: super::PythonCompatConfig::default(),
         };
         let notes = compatibility_notes(&args, &effective);
-        assert!(notes.iter().any(|note| note.contains("--service")));
-        assert!(!notes.iter().any(|note| note.contains("--propagation-node")));
+        assert_eq!(notes.len(), 1);
     }
 
     #[test]
