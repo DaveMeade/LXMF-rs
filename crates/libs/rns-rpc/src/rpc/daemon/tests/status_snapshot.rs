@@ -1515,6 +1515,74 @@ fn peer_sync_without_offers_preserves_failure_backoff() {
 }
 
 #[test]
+fn peer_sync_with_only_skipped_offers_preserves_failure_backoff() {
+    let daemon = RpcDaemon::test_instance();
+    daemon
+        .handle_rpc(rpc_request(52, "peer_sync", json!({ "peer": "peer-backoff-skipped" })))
+        .expect("initial peer sync");
+    daemon.record_outbound_peer_activity("peer-backoff-skipped", 64, false);
+    {
+        let mut peers = daemon.peers.lock().expect("peers mutex poisoned");
+        let peer = peers.get_mut("peer-backoff-skipped").expect("peer record");
+        peer.propagation_sync_limit = Some(24);
+    }
+    let entry = PropagationEntryRecord {
+        transient_id: "ee".repeat(32),
+        destination: "18".repeat(16),
+        payload_hex: "18".repeat(20),
+        received_at: 1_700_000_614,
+        size_bytes: 20,
+        stamp_value: None,
+    };
+    daemon.store.upsert_propagation_entry(&entry).expect("store entry");
+    daemon
+        .store
+        .mark_peer_unhandled_propagation("peer-backoff-skipped", entry.transient_id.as_str())
+        .expect("mark unhandled");
+
+    let before = daemon
+        .handle_rpc(RpcRequest { id: 53, method: "list_peers".to_string(), params: None })
+        .expect("list peers")
+        .result
+        .expect("list peers result");
+    let before_row = before["peers"]
+        .as_array()
+        .expect("peer rows")
+        .iter()
+        .find(|row| row["peer"].as_str() == Some("peer-backoff-skipped"))
+        .expect("peer row");
+    let sync_backoff = before_row["sync_backoff"].as_u64().expect("sync backoff");
+    let next_sync_attempt =
+        before_row["next_sync_attempt"].as_i64().expect("next sync attempt");
+    assert!(sync_backoff > 0);
+    assert!(next_sync_attempt > 0);
+
+    let result = daemon
+        .handle_rpc(rpc_request(54, "peer_sync", json!({ "peer": "peer-backoff-skipped" })))
+        .expect("skipped peer sync")
+        .result
+        .expect("peer sync result");
+    assert_eq!(result["propagation"]["offered"].as_u64(), Some(1));
+    assert_eq!(result["propagation"]["handled"].as_u64(), Some(0));
+    assert_eq!(result["propagation"]["skipped"].as_u64(), Some(1));
+    assert_eq!(result["acceptance_rate"].as_f64(), Some(0.0));
+
+    let after = daemon
+        .handle_rpc(RpcRequest { id: 55, method: "list_peers".to_string(), params: None })
+        .expect("list peers")
+        .result
+        .expect("list peers result");
+    let after_row = after["peers"]
+        .as_array()
+        .expect("peer rows")
+        .iter()
+        .find(|row| row["peer"].as_str() == Some("peer-backoff-skipped"))
+        .expect("peer row");
+    assert_eq!(after_row["sync_backoff"].as_u64(), Some(sync_backoff));
+    assert_eq!(after_row["next_sync_attempt"].as_i64(), Some(next_sync_attempt));
+}
+
+#[test]
 fn list_peers_exposes_python_style_message_counters() {
     let daemon = RpcDaemon::test_instance();
     daemon
