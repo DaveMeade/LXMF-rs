@@ -1708,6 +1708,14 @@ fn peer_sync_reports_propagation_transfer_accounting() {
     assert_eq!(result["propagation"]["skipped"].as_u64(), Some(1));
     assert_eq!(result["propagation"]["bytes"].as_u64(), Some(20));
     assert_eq!(result["propagation"]["sync_limit"].as_u64(), Some((24 + 20 + 32 + 16) as u64));
+    assert_eq!(
+        result["propagation"]["handled_ids"].as_array().expect("handled ids"),
+        &[json!(small.transient_id.as_str())]
+    );
+    assert_eq!(
+        result["propagation"]["skipped_ids"].as_array().expect("skipped ids"),
+        &[json!(large.transient_id.as_str())]
+    );
 
     let event = daemon
         .event_queue
@@ -1721,6 +1729,14 @@ fn peer_sync_reports_propagation_transfer_accounting() {
     assert_eq!(event.payload["propagation"]["handled"].as_u64(), Some(1));
     assert_eq!(event.payload["propagation"]["skipped"].as_u64(), Some(1));
     assert_eq!(event.payload["propagation"]["bytes"].as_u64(), Some(20));
+    assert_eq!(
+        event.payload["propagation"]["handled_ids"].as_array().expect("event handled ids"),
+        &[json!(small.transient_id.as_str())]
+    );
+    assert_eq!(
+        event.payload["propagation"]["skipped_ids"].as_array().expect("event skipped ids"),
+        &[json!(large.transient_id.as_str())]
+    );
 }
 
 #[test]

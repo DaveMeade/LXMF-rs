@@ -399,6 +399,8 @@ impl RpcDaemon {
                 let mut propagation_handled = 0usize;
                 let mut propagation_skipped = 0usize;
                 let mut propagation_bytes = 0u64;
+                let mut propagation_handled_ids = Vec::new();
+                let mut propagation_skipped_ids = Vec::new();
                 for entry in pending_propagation {
                     let next_size = cumulative_size.saturating_add(
                         usize::try_from(entry.size_bytes)
@@ -408,19 +410,24 @@ impl RpcDaemon {
                     );
                     if sync_limit_bytes.is_some_and(|limit| next_size > limit) {
                         propagation_skipped = propagation_skipped.saturating_add(1);
+                        propagation_skipped_ids.push(entry.transient_id);
                         continue;
                     }
+                    let transient_id = entry.transient_id;
                     self.store
-                        .mark_peer_handled_propagation(peer_id, entry.transient_id.as_str())
+                        .mark_peer_handled_propagation(peer_id, transient_id.as_str())
                         .map_err(std::io::Error::other)?;
                     cumulative_size = next_size;
                     propagation_handled = propagation_handled.saturating_add(1);
                     propagation_bytes = propagation_bytes.saturating_add(entry.size_bytes);
+                    propagation_handled_ids.push(transient_id);
                 }
                 let propagation_sync = json!({
                     "handled": propagation_handled,
                     "skipped": propagation_skipped,
                     "bytes": propagation_bytes,
+                    "handled_ids": propagation_handled_ids,
+                    "skipped_ids": propagation_skipped_ids,
                     "sync_limit": sync_limit_bytes,
                 });
                 {
