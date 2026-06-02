@@ -79,6 +79,8 @@ impl RpcDaemon {
             "stamp_cost_flexibility": record.propagation_stamp_cost_flexibility,
         });
         let peer_type_value = record.peer_type.clone();
+        let peer_status_type =
+            if self.is_static_peer(record.peer.as_str()) { "static" } else { "discovered" };
         let peering_key = peer_peering_key_value(record, self.identity_hash.as_str());
         let mut propagation_sync = propagation_sync;
         propagation_sync["peering_key"] = peering_key.map_or(JsonValue::Null, JsonValue::from);
@@ -87,6 +89,7 @@ impl RpcDaemon {
             payload: json!({
                 "peer": &record.peer,
                 "peer_type": peer_type_value.clone(),
+                "type": peer_status_type,
                 "timestamp": timestamp,
                 "name": &record.name,
                 "name_source": &record.name_source,
@@ -129,6 +132,7 @@ impl RpcDaemon {
             result: Some(json!({
                 "peer": &record.peer,
                 "peer_type": peer_type_value,
+                "type": peer_status_type,
                 "synced": false,
                 "postponed": true,
                 "postpone_reason": postpone_reason,
@@ -782,6 +786,8 @@ impl RpcDaemon {
                     "unhandled_ids": unhandled_ids,
                 });
                 let peer_type_value = record.peer_type.clone();
+                let peer_status_type =
+                    if self.is_static_peer(record.peer.as_str()) { "static" } else { "discovered" };
                 let peering_key = peer_peering_key_value(&record, self.identity_hash.as_str());
                 if let Some(propagation) = propagation_sync.as_object_mut() {
                     propagation.insert(
@@ -794,6 +800,7 @@ impl RpcDaemon {
                     payload: json!({
                         "peer": &record.peer,
                         "peer_type": peer_type_value.clone(),
+                        "type": peer_status_type,
                         "timestamp": timestamp,
                         "name": &record.name,
                         "name_source": &record.name_source,
@@ -834,6 +841,7 @@ impl RpcDaemon {
                     result: Some(json!({
                         "peer": record.peer,
                         "peer_type": peer_type_value,
+                        "type": peer_status_type,
                         "synced": true,
                         "state": 0,
                         "sync_strategy": 2,

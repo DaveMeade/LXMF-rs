@@ -3015,6 +3015,63 @@ fn peer_sync_preserves_existing_auto_peer_type() {
 }
 
 #[test]
+fn peer_sync_reports_python_status_type_alias() {
+    let daemon = RpcDaemon::test_instance();
+    daemon
+        .handle_rpc(rpc_request(
+            55,
+            "propagation_enable",
+            json!({
+                "enabled": true,
+                "static_peers": ["peer-static-alias"],
+            }),
+        ))
+        .expect("enable propagation");
+    daemon.event_queue.lock().expect("event_queue mutex poisoned").clear();
+
+    let static_result = daemon
+        .handle_rpc(rpc_request(56, "peer_sync", json!({ "peer": "peer-static-alias" })))
+        .expect("static peer sync")
+        .result
+        .expect("static peer sync result");
+    assert_eq!(static_result["peer_type"].as_str(), Some("static"));
+    assert_eq!(static_result["type"].as_str(), Some("static"));
+
+    let static_event = daemon
+        .event_queue
+        .lock()
+        .expect("event_queue mutex poisoned")
+        .iter()
+        .rev()
+        .find(|event| event.event_type == "peer_sync")
+        .cloned()
+        .expect("static peer sync event");
+    assert_eq!(static_event.payload["peer_type"].as_str(), Some("static"));
+    assert_eq!(static_event.payload["type"].as_str(), Some("static"));
+    daemon.event_queue.lock().expect("event_queue mutex poisoned").clear();
+
+    let manual_result = daemon
+        .handle_rpc(rpc_request(57, "peer_sync", json!({ "peer": "peer-manual-alias" })))
+        .expect("manual peer sync")
+        .result
+        .expect("manual peer sync result");
+    assert_eq!(manual_result["peer_type"].as_str(), Some("manual"));
+    assert_eq!(manual_result["type"].as_str(), Some("discovered"));
+
+    let manual_event = daemon
+        .event_queue
+        .lock()
+        .expect("event_queue mutex poisoned")
+        .iter()
+        .rev()
+        .find(|event| event.event_type == "peer_sync")
+        .cloned()
+        .expect("manual peer sync event");
+    assert_eq!(manual_event.payload["peer_type"].as_str(), Some("manual"));
+    assert_eq!(manual_event.payload["type"].as_str(), Some("discovered"));
+}
+
+#[test]
 fn stale_high_cost_announce_does_not_remove_newer_autopeer() {
     let daemon = RpcDaemon::test_instance();
     daemon
