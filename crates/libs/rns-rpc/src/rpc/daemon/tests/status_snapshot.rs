@@ -2648,6 +2648,70 @@ fn peer_sync_clears_transfer_rate_when_offers_are_skipped() {
         .expect("peer row");
     assert_eq!(row["sync_transfer_rate"].as_f64(), Some(0.0));
     assert_eq!(row["str"].as_u64(), Some(0));
+
+    {
+        let mut peers = daemon.peers.lock().expect("peers mutex poisoned");
+        let peer = peers.get_mut("peer-sync-rate-skipped").expect("peer record");
+        peer.propagation_transfer_limit = None;
+        peer.propagation_sync_limit = Some(1_000);
+        peer.next_sync_attempt = 0;
+        peer.sync_backoff = 0;
+    }
+    let second_handled = PropagationEntryRecord {
+        transient_id: "da".repeat(32),
+        destination: "18".repeat(16),
+        payload_hex: "28".repeat(32),
+        received_at: 1_700_000_622,
+        size_bytes: 32,
+        stamp_value: None,
+    };
+    daemon.store.upsert_propagation_entry(&second_handled).expect("store second handled entry");
+    daemon
+        .store
+        .mark_peer_unhandled_propagation(
+            "peer-sync-rate-skipped",
+            second_handled.transient_id.as_str(),
+        )
+        .expect("mark second handled unhandled");
+    daemon
+        .handle_rpc(rpc_request(67, "peer_sync", json!({ "peer": "peer-sync-rate-skipped" })))
+        .expect("peer sync with second transfer");
+
+    {
+        let mut peers = daemon.peers.lock().expect("peers mutex poisoned");
+        let peer = peers.get_mut("peer-sync-rate-skipped").expect("peer record");
+        peer.propagation_transfer_limit = Some(80);
+        peer.propagation_sync_limit = Some(1_000);
+    }
+    let transfer_limited = PropagationEntryRecord {
+        transient_id: "db".repeat(32),
+        destination: "18".repeat(16),
+        payload_hex: "29".repeat(100),
+        received_at: 1_700_000_623,
+        size_bytes: 100,
+        stamp_value: None,
+    };
+    daemon
+        .store
+        .upsert_propagation_entry(&transfer_limited)
+        .expect("store transfer limited entry");
+    daemon
+        .store
+        .mark_peer_unhandled_propagation(
+            "peer-sync-rate-skipped",
+            transfer_limited.transient_id.as_str(),
+        )
+        .expect("mark transfer limited unhandled");
+
+    let result = daemon
+        .handle_rpc(rpc_request(68, "peer_sync", json!({ "peer": "peer-sync-rate-skipped" })))
+        .expect("peer sync with transfer-limited offer")
+        .result
+        .expect("peer sync result");
+    assert_eq!(result["propagation"]["handled"].as_u64(), Some(0));
+    assert_eq!(result["propagation"]["transfer_limited"].as_u64(), Some(1));
+    assert_eq!(result["sync_transfer_rate"].as_f64(), Some(0.0));
+    assert_eq!(result["str"].as_u64(), Some(0));
 }
 
 #[test]
