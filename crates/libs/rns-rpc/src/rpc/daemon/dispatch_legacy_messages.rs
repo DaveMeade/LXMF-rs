@@ -450,9 +450,16 @@ impl RpcDaemon {
                 {
                     let mut guard = self.peers.lock().expect("peers mutex poisoned");
                     if let Some(existing) = guard.get_mut(&record.peer) {
+                        let propagation_offered =
+                            propagation_handled.saturating_add(propagation_skipped);
                         existing.last_sync_attempt = timestamp;
                         existing.alive = true;
                         existing.tx_bytes = existing.tx_bytes.saturating_add(propagation_bytes);
+                        if propagation_offered > 0 {
+                            existing.acceptance_rate = (propagation_handled as f64
+                                / propagation_offered as f64)
+                                .clamp(0.0, 1.0);
+                        }
                         existing.sync_backoff = 0;
                         existing.next_sync_attempt = 0;
                     }

@@ -1758,6 +1758,7 @@ fn peer_sync_reports_propagation_transfer_accounting() {
         .find(|row| row["peer"].as_str() == Some("peer-sync-report"))
         .expect("peer row");
     assert_eq!(row["tx_bytes"].as_u64(), Some(20));
+    assert_eq!(row["acceptance_rate"].as_f64(), Some(0.5));
 }
 
 #[test]
