@@ -1566,6 +1566,9 @@ fn peer_sync_during_backoff_postpones_skipped_offers() {
     assert_eq!(result["synced"].as_bool(), Some(false));
     assert_eq!(result["postponed"].as_bool(), Some(true));
     assert_eq!(result["postpone_reason"].as_str(), Some("backoff"));
+    assert_eq!(result["state"].as_u64(), Some(0));
+    assert_eq!(result["sync_strategy"].as_u64(), Some(2));
+    assert_eq!(result["ler"].as_u64(), Some(0));
     assert!(result["last_heard"].as_i64().is_some_and(|value| value > 0));
     assert_eq!(result["propagation"]["synced"].as_bool(), Some(false));
     assert_eq!(result["propagation"]["postponed"].as_bool(), Some(true));
@@ -2725,6 +2728,9 @@ fn peer_sync_result_and_event_report_transfer_and_stamp_policy() {
         .result
         .expect("peer sync result");
     assert_eq!(result["peer_type"].as_str(), Some("static"));
+    assert_eq!(result["state"].as_u64(), Some(0));
+    assert_eq!(result["sync_strategy"].as_u64(), Some(2));
+    assert_eq!(result["ler"].as_u64(), Some(0));
     assert_eq!(result["propagation_transfer_limit"].as_u64(), Some(333));
     assert_eq!(result["propagation_sync_limit"].as_u64(), Some(999));
     assert_eq!(result["propagation_stamp_cost"].as_u64(), Some(8));
@@ -2750,6 +2756,9 @@ fn peer_sync_result_and_event_report_transfer_and_stamp_policy() {
         .cloned()
         .expect("peer sync event");
     assert_eq!(event.payload["peer_type"].as_str(), Some("static"));
+    assert_eq!(event.payload["state"].as_u64(), Some(0));
+    assert_eq!(event.payload["sync_strategy"].as_u64(), Some(2));
+    assert_eq!(event.payload["ler"].as_u64(), Some(0));
     assert_eq!(
         event.payload["propagation_transfer_limit"].as_u64(),
         Some(333)
