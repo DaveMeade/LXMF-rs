@@ -1086,6 +1086,18 @@ impl RpcDaemon {
                     timeout_secs,
                 )?;
                 let cleanup = self.unpeer_local_state(parsed.peer.as_str())?;
+                self.publish_event(RpcEvent {
+                    event_type: "peer_unpeer".into(),
+                    payload: json!({
+                        "peer": parsed.peer.as_str(),
+                        "remote": parsed.remote.as_str(),
+                        "removed": cleanup.removed,
+                        "propagation_cleared": cleanup.propagation_cleared,
+                        "propagation_cleared_bytes": cleanup.propagation_cleared_bytes,
+                        "messages": cleanup.messages.clone(),
+                        "result": result.clone(),
+                    }),
+                });
                 Ok(RpcResponse {
                     id: request.id,
                     result: Some(json!({
