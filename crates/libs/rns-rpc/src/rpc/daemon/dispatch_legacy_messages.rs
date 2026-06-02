@@ -40,6 +40,12 @@ impl RpcDaemon {
         };
         let (outgoing, incoming, offered, unhandled, offered_bytes, unhandled_bytes) =
             self.peer_message_stats(record.peer.as_str()).unwrap_or((0, 0, 0, 0, 0, 0));
+        let handled_ids =
+            self.store.list_peer_handled_propagation_ids(record.peer.as_str()).unwrap_or_default();
+        let unhandled_ids = self
+            .store
+            .list_peer_unhandled_propagation_ids(record.peer.as_str())
+            .unwrap_or_default();
         let messages = json!({
             "offered": offered,
             "outgoing": outgoing,
@@ -47,6 +53,8 @@ impl RpcDaemon {
             "unhandled": unhandled,
             "offered_bytes": offered_bytes,
             "unhandled_bytes": unhandled_bytes,
+            "handled_ids": handled_ids,
+            "unhandled_ids": unhandled_ids,
         });
         let propagation_sync = json!({
             "handled": 0,
@@ -711,6 +719,14 @@ impl RpcDaemon {
                 };
                 let (outgoing, incoming, offered, unhandled, offered_bytes, unhandled_bytes) =
                     self.peer_message_stats(record.peer.as_str()).unwrap_or((0, 0, 0, 0, 0, 0));
+                let handled_ids = self
+                    .store
+                    .list_peer_handled_propagation_ids(record.peer.as_str())
+                    .unwrap_or_default();
+                let unhandled_ids = self
+                    .store
+                    .list_peer_unhandled_propagation_ids(record.peer.as_str())
+                    .unwrap_or_default();
                 let messages = json!({
                     "offered": offered,
                     "outgoing": outgoing,
@@ -718,6 +734,8 @@ impl RpcDaemon {
                     "unhandled": unhandled,
                     "offered_bytes": offered_bytes,
                     "unhandled_bytes": unhandled_bytes,
+                    "handled_ids": handled_ids,
+                    "unhandled_ids": unhandled_ids,
                 });
                 let peer_type_value = record.peer_type.clone();
                 let peering_key = peer_peering_key_value(&record, self.identity_hash.as_str());
