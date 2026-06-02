@@ -1555,6 +1555,54 @@ fn peer_sync_marks_unhandled_propagation_entries_handled() {
 }
 
 #[test]
+fn list_peers_includes_propagation_marks_in_message_counters() {
+    let daemon = RpcDaemon::test_instance();
+    daemon
+        .handle_rpc(rpc_request(56, "peer_sync", json!({ "peer": "peer-propagation-stats" })))
+        .expect("peer sync");
+    let handled = PropagationEntryRecord {
+        transient_id: "ac".repeat(32),
+        destination: "13".repeat(16),
+        payload_hex: "13".repeat(16),
+        received_at: 1_700_000_606,
+        size_bytes: 16,
+        stamp_value: None,
+    };
+    let unhandled = PropagationEntryRecord {
+        transient_id: "ad".repeat(32),
+        destination: "14".repeat(16),
+        payload_hex: "14".repeat(16),
+        received_at: 1_700_000_607,
+        size_bytes: 16,
+        stamp_value: None,
+    };
+    daemon.store.upsert_propagation_entry(&handled).expect("store handled entry");
+    daemon.store.upsert_propagation_entry(&unhandled).expect("store unhandled entry");
+    daemon
+        .store
+        .mark_peer_handled_propagation("peer-propagation-stats", handled.transient_id.as_str())
+        .expect("mark handled");
+    daemon
+        .store
+        .mark_peer_unhandled_propagation("peer-propagation-stats", unhandled.transient_id.as_str())
+        .expect("mark unhandled");
+
+    let peers = daemon
+        .handle_rpc(RpcRequest { id: 57, method: "list_peers".to_string(), params: None })
+        .expect("list peers")
+        .result
+        .expect("list peers result");
+    let row = peers["peers"]
+        .as_array()
+        .expect("peer rows")
+        .iter()
+        .find(|row| row["peer"].as_str() == Some("peer-propagation-stats"))
+        .expect("peer row");
+    assert_eq!(row["messages"]["offered"].as_u64(), Some(2));
+    assert_eq!(row["messages"]["unhandled"].as_u64(), Some(1));
+}
+
+#[test]
 fn list_peers_exposes_peering_key_value_when_cost_is_known() {
     let store = MessagesStore::in_memory().expect("store");
     let daemon = RpcDaemon::with_store(store, hex::encode([2u8; 16]));

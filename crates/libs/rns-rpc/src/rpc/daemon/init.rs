@@ -517,7 +517,14 @@ impl RpcDaemon {
 
     pub fn peer_message_stats(&self, peer: &str) -> Result<(u64, u64, u64, u64), std::io::Error> {
         let stats = self.store.peer_message_stats(peer).map_err(std::io::Error::other)?;
-        Ok((stats.outgoing, stats.incoming, stats.offered, stats.unhandled))
+        let (propagation_offered, propagation_unhandled) =
+            self.store.peer_propagation_message_stats(peer).map_err(std::io::Error::other)?;
+        Ok((
+            stats.outgoing,
+            stats.incoming,
+            stats.offered.saturating_add(propagation_offered),
+            stats.unhandled.saturating_add(propagation_unhandled),
+        ))
     }
 
     pub fn record_inbound_peer_activity(&self, peer: &str, bytes: usize) {
