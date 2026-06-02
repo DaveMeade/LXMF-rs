@@ -57,6 +57,9 @@ impl RpcDaemon {
             "unhandled_ids": unhandled_ids,
         });
         let propagation_sync = json!({
+            "synced": false,
+            "postponed": true,
+            "postpone_reason": postpone_reason,
             "handled": 0,
             "skipped": 0,
             "offered": 0,
@@ -95,6 +98,7 @@ impl RpcDaemon {
                 "sync_backoff": sync_backoff,
                 "sync_transfer_rate": sync_transfer_rate,
                 "str": sync_transfer_rate as u64,
+                "synced": false,
                 "postponed": true,
                 "postpone_reason": postpone_reason,
                 "propagation_transfer_limit": record.propagation_transfer_limit,
@@ -674,6 +678,8 @@ impl RpcDaemon {
                     propagation_messages.push(propagation_message);
                 }
                 let mut propagation_sync = json!({
+                    "synced": true,
+                    "postponed": false,
                     "handled": propagation_handled,
                     "skipped": propagation_skipped,
                     "offered": propagation_handled.saturating_add(propagation_skipped),
@@ -783,6 +789,7 @@ impl RpcDaemon {
                         "sync_backoff": sync_backoff,
                         "sync_transfer_rate": sync_transfer_rate,
                         "str": sync_transfer_rate as u64,
+                        "synced": true,
                         "propagation_transfer_limit": record.propagation_transfer_limit,
                         "propagation_sync_limit": record.propagation_sync_limit,
                         "propagation_stamp_cost": record.propagation_stamp_cost,

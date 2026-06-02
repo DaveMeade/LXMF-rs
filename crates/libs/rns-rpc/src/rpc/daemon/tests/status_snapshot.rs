@@ -1566,6 +1566,9 @@ fn peer_sync_during_backoff_postpones_skipped_offers() {
     assert_eq!(result["synced"].as_bool(), Some(false));
     assert_eq!(result["postponed"].as_bool(), Some(true));
     assert_eq!(result["postpone_reason"].as_str(), Some("backoff"));
+    assert_eq!(result["propagation"]["synced"].as_bool(), Some(false));
+    assert_eq!(result["propagation"]["postponed"].as_bool(), Some(true));
+    assert_eq!(result["propagation"]["postpone_reason"].as_str(), Some("backoff"));
     assert_eq!(result["propagation"]["offered"].as_u64(), Some(0));
     assert_eq!(result["propagation"]["handled"].as_u64(), Some(0));
     assert_eq!(result["propagation"]["skipped"].as_u64(), Some(0));
@@ -1629,6 +1632,12 @@ fn peer_sync_postpones_offers_until_stamp_policy_is_known() {
     assert_eq!(result["synced"].as_bool(), Some(false));
     assert_eq!(result["postponed"].as_bool(), Some(true));
     assert_eq!(result["postpone_reason"].as_str(), Some("stamp_policy"));
+    assert_eq!(result["propagation"]["synced"].as_bool(), Some(false));
+    assert_eq!(result["propagation"]["postponed"].as_bool(), Some(true));
+    assert_eq!(
+        result["propagation"]["postpone_reason"].as_str(),
+        Some("stamp_policy")
+    );
     assert_eq!(result["propagation"]["offered"].as_u64(), Some(0));
     assert_eq!(result["propagation"]["handled"].as_u64(), Some(0));
     assert_eq!(result["propagation"]["skipped"].as_u64(), Some(0));
@@ -2477,6 +2486,9 @@ fn peer_sync_reports_propagation_transfer_accounting() {
     assert_eq!(event.payload["propagation"]["offered_bytes"].as_u64(), Some(120));
     assert_eq!(event.payload["propagation"]["remaining"].as_u64(), Some(1));
     assert_eq!(event.payload["propagation"]["remaining_bytes"].as_u64(), Some(100));
+    assert_eq!(event.payload["synced"].as_bool(), Some(true));
+    assert_eq!(event.payload["propagation"]["synced"].as_bool(), Some(true));
+    assert_eq!(event.payload["propagation"]["postponed"].as_bool(), Some(false));
     assert_eq!(event.payload["acceptance_rate"].as_f64(), Some(0.5));
     assert_eq!(
         event.payload["propagation"]["handled_ids"].as_array().expect("event handled ids"),
