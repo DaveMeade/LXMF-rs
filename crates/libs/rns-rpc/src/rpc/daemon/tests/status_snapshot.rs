@@ -1526,6 +1526,8 @@ fn peer_sync_during_backoff_postpones_skipped_offers() {
         let mut peers = daemon.peers.lock().expect("peers mutex poisoned");
         let peer = peers.get_mut("peer-backoff-skipped").expect("peer record");
         peer.propagation_sync_limit = Some(24);
+        peer.peering_timebase = 1_700_000_000;
+        peer.network_distance = 3;
     }
     let entry = PropagationEntryRecord {
         transient_id: "ee".repeat(32),
@@ -1569,6 +1571,10 @@ fn peer_sync_during_backoff_postpones_skipped_offers() {
     assert_eq!(result["state"].as_u64(), Some(0));
     assert_eq!(result["sync_strategy"].as_u64(), Some(2));
     assert_eq!(result["ler"].as_u64(), Some(0));
+    assert_eq!(result["network_distance"].as_u64(), Some(3));
+    assert_eq!(result["peering_timebase"].as_i64(), Some(1_700_000_000));
+    assert_eq!(result["rx_bytes"].as_u64(), Some(0));
+    assert_eq!(result["tx_bytes"].as_u64(), Some(64));
     assert!(result["last_heard"].as_i64().is_some_and(|value| value > 0));
     assert_eq!(result["propagation"]["synced"].as_bool(), Some(false));
     assert_eq!(result["propagation"]["postponed"].as_bool(), Some(true));
@@ -2720,6 +2726,10 @@ fn peer_sync_result_and_event_report_transfer_and_stamp_policy() {
         peer.propagation_stamp_cost = Some(8);
         peer.propagation_stamp_cost_flexibility = Some(2);
         peer.sync_transfer_rate = 12_345.0;
+        peer.peering_timebase = 1_700_000_123;
+        peer.network_distance = 4;
+        peer.rx_bytes = 55;
+        peer.tx_bytes = 77;
     }
 
     let result = daemon
@@ -2731,6 +2741,10 @@ fn peer_sync_result_and_event_report_transfer_and_stamp_policy() {
     assert_eq!(result["state"].as_u64(), Some(0));
     assert_eq!(result["sync_strategy"].as_u64(), Some(2));
     assert_eq!(result["ler"].as_u64(), Some(0));
+    assert_eq!(result["network_distance"].as_u64(), Some(4));
+    assert_eq!(result["peering_timebase"].as_i64(), Some(1_700_000_123));
+    assert_eq!(result["rx_bytes"].as_u64(), Some(55));
+    assert_eq!(result["tx_bytes"].as_u64(), Some(77));
     assert_eq!(result["propagation_transfer_limit"].as_u64(), Some(333));
     assert_eq!(result["propagation_sync_limit"].as_u64(), Some(999));
     assert_eq!(result["propagation_stamp_cost"].as_u64(), Some(8));
@@ -2759,6 +2773,10 @@ fn peer_sync_result_and_event_report_transfer_and_stamp_policy() {
     assert_eq!(event.payload["state"].as_u64(), Some(0));
     assert_eq!(event.payload["sync_strategy"].as_u64(), Some(2));
     assert_eq!(event.payload["ler"].as_u64(), Some(0));
+    assert_eq!(event.payload["network_distance"].as_u64(), Some(4));
+    assert_eq!(event.payload["peering_timebase"].as_i64(), Some(1_700_000_123));
+    assert_eq!(event.payload["rx_bytes"].as_u64(), Some(55));
+    assert_eq!(event.payload["tx_bytes"].as_u64(), Some(77));
     assert_eq!(
         event.payload["propagation_transfer_limit"].as_u64(),
         Some(333)
