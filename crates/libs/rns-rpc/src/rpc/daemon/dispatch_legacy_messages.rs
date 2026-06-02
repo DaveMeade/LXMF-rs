@@ -428,7 +428,9 @@ impl RpcDaemon {
                 let propagation_sync = json!({
                     "handled": propagation_handled,
                     "skipped": propagation_skipped,
+                    "offered": propagation_handled.saturating_add(propagation_skipped),
                     "bytes": propagation_bytes,
+                    "offered_bytes": propagation_bytes.saturating_add(propagation_remaining_bytes),
                     "remaining": propagation_skipped,
                     "remaining_bytes": propagation_remaining_bytes,
                     "handled_ids": propagation_handled_ids,

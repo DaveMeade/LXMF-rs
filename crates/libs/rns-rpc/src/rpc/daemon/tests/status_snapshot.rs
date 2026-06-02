@@ -1706,7 +1706,9 @@ fn peer_sync_reports_propagation_transfer_accounting() {
         .expect("peer sync result");
     assert_eq!(result["propagation"]["handled"].as_u64(), Some(1));
     assert_eq!(result["propagation"]["skipped"].as_u64(), Some(1));
+    assert_eq!(result["propagation"]["offered"].as_u64(), Some(2));
     assert_eq!(result["propagation"]["bytes"].as_u64(), Some(20));
+    assert_eq!(result["propagation"]["offered_bytes"].as_u64(), Some(120));
     assert_eq!(result["propagation"]["remaining"].as_u64(), Some(1));
     assert_eq!(result["propagation"]["remaining_bytes"].as_u64(), Some(100));
     assert_eq!(result["propagation"]["sync_limit"].as_u64(), Some((24 + 20 + 32 + 16) as u64));
@@ -1730,7 +1732,9 @@ fn peer_sync_reports_propagation_transfer_accounting() {
         .expect("peer sync event");
     assert_eq!(event.payload["propagation"]["handled"].as_u64(), Some(1));
     assert_eq!(event.payload["propagation"]["skipped"].as_u64(), Some(1));
+    assert_eq!(event.payload["propagation"]["offered"].as_u64(), Some(2));
     assert_eq!(event.payload["propagation"]["bytes"].as_u64(), Some(20));
+    assert_eq!(event.payload["propagation"]["offered_bytes"].as_u64(), Some(120));
     assert_eq!(event.payload["propagation"]["remaining"].as_u64(), Some(1));
     assert_eq!(event.payload["propagation"]["remaining_bytes"].as_u64(), Some(100));
     assert_eq!(
