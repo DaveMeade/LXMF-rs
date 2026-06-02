@@ -2906,6 +2906,7 @@ fn peer_sync_result_and_event_expose_peering_key_value_when_cost_is_known() {
         .expect("peer sync result");
     let peering_key = result["peering_key"].as_u64().expect("peering key");
     assert!(peering_key >= 1);
+    assert_eq!(result["propagation"]["peering_key"].as_u64(), Some(peering_key));
 
     let event = daemon
         .event_queue
@@ -2917,6 +2918,7 @@ fn peer_sync_result_and_event_expose_peering_key_value_when_cost_is_known() {
         .cloned()
         .expect("peer sync event");
     assert_eq!(event.payload["peering_key"].as_u64(), Some(peering_key));
+    assert_eq!(event.payload["propagation"]["peering_key"].as_u64(), Some(peering_key));
 }
 
 #[test]

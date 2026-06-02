@@ -77,6 +77,8 @@ impl RpcDaemon {
         });
         let peer_type_value = record.peer_type.clone();
         let peering_key = peer_peering_key_value(record, self.identity_hash.as_str());
+        let mut propagation_sync = propagation_sync;
+        propagation_sync["peering_key"] = peering_key.map_or(JsonValue::Null, JsonValue::from);
         let event = RpcEvent {
             event_type: "peer_sync".into(),
             payload: json!({
@@ -671,7 +673,7 @@ impl RpcDaemon {
                     propagation_handled_ids.push(transient_id);
                     propagation_messages.push(propagation_message);
                 }
-                let propagation_sync = json!({
+                let mut propagation_sync = json!({
                     "handled": propagation_handled,
                     "skipped": propagation_skipped,
                     "offered": propagation_handled.saturating_add(propagation_skipped),
@@ -759,6 +761,12 @@ impl RpcDaemon {
                 });
                 let peer_type_value = record.peer_type.clone();
                 let peering_key = peer_peering_key_value(&record, self.identity_hash.as_str());
+                if let Some(propagation) = propagation_sync.as_object_mut() {
+                    propagation.insert(
+                        "peering_key".to_string(),
+                        peering_key.map_or(JsonValue::Null, JsonValue::from),
+                    );
+                }
                 let event = RpcEvent {
                     event_type: "peer_sync".into(),
                     payload: json!({
