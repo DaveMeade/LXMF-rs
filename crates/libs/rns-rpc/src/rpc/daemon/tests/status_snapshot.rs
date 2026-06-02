@@ -3688,6 +3688,53 @@ fn propagation_remote_sync_updates_lifecycle_status() {
 }
 
 #[test]
+fn propagation_remote_sync_updates_peer_runtime_state() {
+    let daemon = RpcDaemon::test_instance();
+    daemon.set_remote_control_bridge(Arc::new(TestRemoteControlBridge {
+        result: Ok(json!({"synced": true})),
+    }));
+    daemon
+        .handle_rpc(rpc_request(73, "peer_sync", json!({ "peer": "peer-remote-sync-state" })))
+        .expect("initial peer sync");
+    {
+        let mut peers = daemon.peers.lock().expect("peers mutex poisoned");
+        let peer = peers.get_mut("peer-remote-sync-state").expect("peer record");
+        peer.alive = false;
+        peer.sync_backoff = 12 * 60;
+        peer.next_sync_attempt = 1_700_010_000;
+        peer.acceptance_rate = 0.25;
+    }
+
+    daemon
+        .handle_rpc(rpc_request(
+            74,
+            "propagation_remote_sync",
+            json!({
+                "remote": "remote-node",
+                "peer": "peer-remote-sync-state",
+            }),
+        ))
+        .expect("remote sync");
+
+    let peers = daemon
+        .handle_rpc(RpcRequest { id: 75, method: "list_peers".to_string(), params: None })
+        .expect("list peers")
+        .result
+        .expect("list peers result");
+    let row = peers["peers"]
+        .as_array()
+        .expect("peer rows")
+        .iter()
+        .find(|row| row["peer"].as_str() == Some("peer-remote-sync-state"))
+        .expect("peer row");
+    assert_eq!(row["alive"].as_bool(), Some(true));
+    assert!(row["last_sync_attempt"].as_i64().is_some_and(|value| value > 0));
+    assert_eq!(row["sync_backoff"].as_u64(), Some(0));
+    assert_eq!(row["next_sync_attempt"].as_i64(), Some(0));
+    assert!(row["acceptance_rate"].as_f64().is_some_and(|value| value > 0.25));
+}
+
+#[test]
 fn propagation_remote_sync_imports_payloads_into_local_store() {
     let payload = b"remote-sync-propagation-payload";
     let payload_hex = hex::encode(payload);
