@@ -3129,7 +3129,11 @@ fn peer_sync_result_and_event_report_transfer_and_stamp_policy() {
     {
         let mut peers = daemon.peers.lock().expect("peers mutex poisoned");
         let peer = peers.get_mut("peer-sync-policy").expect("peer record");
+        peer.name = Some("Policy Peer".to_string());
+        peer.name_source = Some("test".to_string());
         peer.peer_type = Some("static".to_string());
+        peer.first_seen = 1_700_000_111;
+        peer.seen_count = 3;
         peer.propagation_transfer_limit = Some(333);
         peer.propagation_sync_limit = Some(999);
         peer.propagation_stamp_cost = Some(8);
@@ -3147,6 +3151,10 @@ fn peer_sync_result_and_event_report_transfer_and_stamp_policy() {
         .result
         .expect("peer sync result");
     assert_eq!(result["peer_type"].as_str(), Some("static"));
+    assert_eq!(result["name"].as_str(), Some("Policy Peer"));
+    assert_eq!(result["name_source"].as_str(), Some("test"));
+    assert_eq!(result["first_seen"].as_i64(), Some(1_700_000_111));
+    assert_eq!(result["seen_count"].as_u64(), Some(4));
     assert_eq!(result["state"].as_u64(), Some(0));
     assert_eq!(result["sync_strategy"].as_u64(), Some(2));
     assert_eq!(result["ler"].as_u64(), Some(0));
@@ -3179,6 +3187,10 @@ fn peer_sync_result_and_event_report_transfer_and_stamp_policy() {
         .cloned()
         .expect("peer sync event");
     assert_eq!(event.payload["peer_type"].as_str(), Some("static"));
+    assert_eq!(event.payload["name"].as_str(), Some("Policy Peer"));
+    assert_eq!(event.payload["name_source"].as_str(), Some("test"));
+    assert_eq!(event.payload["first_seen"].as_i64(), Some(1_700_000_111));
+    assert_eq!(event.payload["seen_count"].as_u64(), Some(4));
     assert_eq!(event.payload["state"].as_u64(), Some(0));
     assert_eq!(event.payload["sync_strategy"].as_u64(), Some(2));
     assert_eq!(event.payload["ler"].as_u64(), Some(0));
