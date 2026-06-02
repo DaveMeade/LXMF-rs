@@ -942,6 +942,41 @@ impl RpcDaemon {
                             .get(parsed.peer.as_str())
                             .cloned()
                         {
+                            let (
+                                outgoing,
+                                incoming,
+                                offered,
+                                unhandled,
+                                offered_bytes,
+                                unhandled_bytes,
+                            ) = self
+                                .peer_message_stats(peer.peer.as_str())
+                                .unwrap_or((0, 0, 0, 0, 0, 0));
+                            let handled_ids = self
+                                .store
+                                .list_peer_handled_propagation_ids(peer.peer.as_str())
+                                .unwrap_or_default();
+                            let unhandled_ids = self
+                                .store
+                                .list_peer_unhandled_propagation_ids(peer.peer.as_str())
+                                .unwrap_or_default();
+                            let messages = json!({
+                                "offered": offered,
+                                "outgoing": outgoing,
+                                "incoming": incoming,
+                                "unhandled": unhandled,
+                                "offered_bytes": offered_bytes,
+                                "unhandled_bytes": unhandled_bytes,
+                                "handled_ids": handled_ids,
+                                "unhandled_ids": unhandled_ids,
+                            });
+                            let propagation = json!({
+                                "remote_sync": true,
+                                "synced": result.get("synced").and_then(JsonValue::as_bool).unwrap_or(true),
+                                "imported_count": imported.imported_count,
+                                "imported_ids": imported.imported_ids,
+                                "transferred_bytes": imported.transferred_bytes,
+                            });
                             let peer_status_type = if self.is_static_peer(peer.peer.as_str()) {
                                 "static"
                             } else {
@@ -953,6 +988,9 @@ impl RpcDaemon {
                                     "peer": peer.peer,
                                     "peer_type": peer.peer_type,
                                     "type": peer_status_type,
+                                    "timestamp": now_i64(),
+                                    "name": peer.name,
+                                    "name_source": peer.name_source,
                                     "remote": parsed.remote.as_str(),
                                     "remote_sync": true,
                                     "synced": true,
@@ -981,6 +1019,8 @@ impl RpcDaemon {
                                     "sync_limit": peer.propagation_sync_limit,
                                     "target_stamp_cost": peer.propagation_stamp_cost,
                                     "stamp_cost_flexibility": peer.propagation_stamp_cost_flexibility,
+                                    "messages": messages,
+                                    "propagation": propagation,
                                 }),
                             });
                         }

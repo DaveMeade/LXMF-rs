@@ -3884,6 +3884,8 @@ fn propagation_remote_sync_updates_peer_runtime_state() {
     {
         let mut peers = daemon.peers.lock().expect("peers mutex poisoned");
         let peer = peers.get_mut("peer-remote-sync-state").expect("peer record");
+        peer.name = Some("Remote Sync State".to_string());
+        peer.name_source = Some("test".to_string());
         peer.alive = false;
         peer.sync_backoff = 12 * 60;
         peer.next_sync_attempt = 1_700_010_000;
@@ -3933,7 +3935,10 @@ fn propagation_remote_sync_updates_peer_runtime_state() {
         .cloned()
         .expect("peer sync event");
     assert_eq!(event.payload["peer"].as_str(), Some("peer-remote-sync-state"));
+    assert_eq!(event.payload["name"].as_str(), Some("Remote Sync State"));
+    assert_eq!(event.payload["name_source"].as_str(), Some("test"));
     assert_eq!(event.payload["remote"].as_str(), Some("remote-node"));
+    assert!(event.payload["timestamp"].as_i64().is_some_and(|value| value > 0));
     assert_eq!(event.payload["remote_sync"].as_bool(), Some(true));
     assert_eq!(event.payload["synced"].as_bool(), Some(true));
     assert_eq!(event.payload["type"].as_str(), Some("discovered"));
@@ -3957,6 +3962,22 @@ fn propagation_remote_sync_updates_peer_runtime_state() {
     assert_eq!(event.payload["next_sync_attempt"].as_i64(), Some(0));
     assert_eq!(event.payload["tx_bytes"].as_u64(), Some(payload.len() as u64));
     assert_eq!(event.payload["sync_transfer_rate"].as_f64(), Some(payload.len() as f64));
+    assert_eq!(event.payload["messages"]["outgoing"].as_u64(), Some(0));
+    assert_eq!(event.payload["messages"]["incoming"].as_u64(), Some(0));
+    assert_eq!(event.payload["messages"]["offered"].as_u64(), Some(0));
+    assert_eq!(event.payload["messages"]["unhandled"].as_u64(), Some(0));
+    assert_eq!(event.payload["messages"]["offered_bytes"].as_u64(), Some(0));
+    assert_eq!(event.payload["messages"]["unhandled_bytes"].as_u64(), Some(0));
+    assert_eq!(event.payload["propagation"]["remote_sync"].as_bool(), Some(true));
+    assert_eq!(event.payload["propagation"]["synced"].as_bool(), Some(true));
+    assert_eq!(
+        event.payload["propagation"]["imported_count"].as_u64(),
+        Some(1)
+    );
+    assert_eq!(
+        event.payload["propagation"]["transferred_bytes"].as_u64(),
+        Some(payload.len() as u64)
+    );
 }
 
 #[test]
