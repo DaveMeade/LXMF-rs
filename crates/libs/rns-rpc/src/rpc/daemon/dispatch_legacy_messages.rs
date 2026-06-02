@@ -397,6 +397,114 @@ impl RpcDaemon {
                     None,
                     peer_type,
                 )?;
+                if record.next_sync_attempt > 0 && timestamp < record.next_sync_attempt {
+                    let (acceptance_rate, last_sync_attempt, next_sync_attempt, sync_backoff) = {
+                        let mut guard = self.peers.lock().expect("peers mutex poisoned");
+                        if let Some(existing) = guard.get_mut(&record.peer) {
+                            existing.last_sync_attempt = timestamp;
+                            existing.alive = true;
+                            (
+                                existing.acceptance_rate,
+                                existing.last_sync_attempt,
+                                existing.next_sync_attempt,
+                                existing.sync_backoff,
+                            )
+                        } else {
+                            (
+                                record.acceptance_rate,
+                                timestamp,
+                                record.next_sync_attempt,
+                                record.sync_backoff,
+                            )
+                        }
+                    };
+                    let (outgoing, incoming, offered, unhandled, offered_bytes, unhandled_bytes) =
+                        self.peer_message_stats(record.peer.as_str()).unwrap_or((0, 0, 0, 0, 0, 0));
+                    let messages = json!({
+                        "offered": offered,
+                        "outgoing": outgoing,
+                        "incoming": incoming,
+                        "unhandled": unhandled,
+                        "offered_bytes": offered_bytes,
+                        "unhandled_bytes": unhandled_bytes,
+                    });
+                    let sync_limit_bytes = record
+                        .propagation_sync_limit
+                        .or(record.propagation_transfer_limit)
+                        .map(|limit| limit as usize);
+                    let propagation_sync = json!({
+                        "handled": 0,
+                        "skipped": 0,
+                        "offered": 0,
+                        "bytes": 0,
+                        "offered_bytes": 0,
+                        "remaining": 0,
+                        "remaining_bytes": 0,
+                        "handled_ids": [],
+                        "skipped_ids": [],
+                        "messages": [],
+                        "sync_limit": sync_limit_bytes,
+                    });
+                    let peer_type_value = record.peer_type.clone();
+                    let peering_key = peer_peering_key_value(&record, self.identity_hash.as_str());
+                    let event = RpcEvent {
+                        event_type: "peer_sync".into(),
+                        payload: json!({
+                            "peer": &record.peer,
+                            "peer_type": peer_type_value.clone(),
+                            "timestamp": timestamp,
+                            "name": &record.name,
+                            "name_source": &record.name_source,
+                            "first_seen": record.first_seen,
+                            "seen_count": record.seen_count,
+                            "acceptance_rate": acceptance_rate,
+                            "last_sync_attempt": last_sync_attempt,
+                            "next_sync_attempt": next_sync_attempt,
+                            "sync_backoff": sync_backoff,
+                            "postponed": true,
+                            "postpone_reason": "backoff",
+                            "propagation_transfer_limit": record.propagation_transfer_limit,
+                            "propagation_sync_limit": record.propagation_sync_limit,
+                            "propagation_stamp_cost": record.propagation_stamp_cost,
+                            "propagation_stamp_cost_flexibility": record.propagation_stamp_cost_flexibility,
+                            "peering_key": peering_key,
+                            "transfer_limit": record.propagation_transfer_limit,
+                            "sync_limit": record.propagation_sync_limit,
+                            "target_stamp_cost": record.propagation_stamp_cost,
+                            "stamp_cost_flexibility": record.propagation_stamp_cost_flexibility,
+                            "messages": messages.clone(),
+                            "propagation": propagation_sync.clone(),
+                        }),
+                    };
+                    self.publish_event(event);
+
+                    return Ok(RpcResponse {
+                        id: request.id,
+                        result: Some(json!({
+                            "peer": record.peer,
+                            "peer_type": peer_type_value,
+                            "synced": false,
+                            "postponed": true,
+                            "postpone_reason": "backoff",
+                            "acceptance_rate": acceptance_rate,
+                            "last_sync_attempt": last_sync_attempt,
+                            "next_sync_attempt": next_sync_attempt,
+                            "sync_backoff": sync_backoff,
+                            "propagation_transfer_limit": record.propagation_transfer_limit,
+                            "propagation_sync_limit": record.propagation_sync_limit,
+                            "propagation_stamp_cost": record.propagation_stamp_cost,
+                            "propagation_stamp_cost_flexibility": record.propagation_stamp_cost_flexibility,
+                            "peering_key": peering_key,
+                            "transfer_limit": record.propagation_transfer_limit,
+                            "sync_limit": record.propagation_sync_limit,
+                            "target_stamp_cost": record.propagation_stamp_cost,
+                            "stamp_cost_flexibility": record.propagation_stamp_cost_flexibility,
+                            "messages": messages,
+                            "propagation": propagation_sync,
+                        })),
+                        error: None,
+                    });
+                }
                 let sync_limit_bytes = record
                     .propagation_sync_limit
                     .or(record.propagation_transfer_limit)
