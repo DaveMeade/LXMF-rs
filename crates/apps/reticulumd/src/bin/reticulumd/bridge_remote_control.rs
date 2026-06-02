@@ -190,11 +190,7 @@ impl RemoteControlBridge for TransportBridge {
         )?;
         let transient_ids = rmpv_binary_array(&available)?;
         if transient_ids.is_empty() {
-            return Ok(json!({
-                "available_count": 0,
-                "fetched_count": 0,
-                "imported_count": 0,
-            }));
+            return Ok(propagation_remote_fetch_summary(0, &[], 0));
         }
 
         let fetched = self.run_remote_control_raw(
@@ -229,11 +225,7 @@ impl RemoteControlBridge for TransportBridge {
             }
         }
 
-        Ok(json!({
-            "available_count": transient_ids.len(),
-            "fetched_count": payloads.len(),
-            "imported_count": imported_count,
-        }))
+        Ok(propagation_remote_fetch_summary(transient_ids.len(), &payloads, imported_count))
     }
 
     fn propagation_remote_download(
@@ -323,6 +315,20 @@ impl RemoteControlBridge for TransportBridge {
     }
 }
 
+fn propagation_remote_fetch_summary(
+    available_count: usize,
+    payloads: &[Vec<u8>],
+    imported_count: usize,
+) -> JsonValue {
+    let transferred_bytes = payloads.iter().map(Vec::len).sum::<usize>();
+    json!({
+        "available_count": available_count,
+        "fetched_count": payloads.len(),
+        "imported_count": imported_count,
+        "transferred_bytes": transferred_bytes,
+    })
+}
+
 fn response_to_json(response: &rmpv::Value) -> Result<JsonValue, std::io::Error> {
     if let Some(error) = response_code_error(response) {
         return Err(error);
@@ -359,4 +365,24 @@ fn response_code_error(response: &rmpv::Value) -> Option<std::io::Error> {
         return Some(std::io::Error::new(kind, message));
     }
     None
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn propagation_remote_fetch_summary_reports_transferred_bytes() {
+        let payloads = vec![b"first".to_vec(), b"second-payload".to_vec()];
+
+        let summary = propagation_remote_fetch_summary(7, &payloads, 1);
+
+        assert_eq!(summary["available_count"].as_u64(), Some(7));
+        assert_eq!(summary["fetched_count"].as_u64(), Some(2));
+        assert_eq!(summary["imported_count"].as_u64(), Some(1));
+        assert_eq!(
+            summary["transferred_bytes"].as_u64(),
+            Some(payloads.iter().map(Vec::len).sum::<usize>() as u64)
+        );
+    }
 }

@@ -65,7 +65,7 @@ pub(super) async fn propagation_download_request(
     let wanted = binary_array_response(&list_response)?;
 
     if wanted.is_empty() {
-        return Ok((json!({ "available": 0, "downloaded": 0, "duplicates": 0 }), remote_identity));
+        return Ok((propagation_download_summary_json(0, &[], 0, 0), remote_identity));
     }
 
     let get_payload = build_link_request_payload(
@@ -122,13 +122,24 @@ pub(super) async fn propagation_download_request(
     }
 
     Ok((
-        json!({
-            "available": wanted.len(),
-            "downloaded": downloaded,
-            "duplicates": duplicates,
-        }),
+        propagation_download_summary_json(wanted.len(), &payloads, downloaded, duplicates),
         remote_identity,
     ))
+}
+
+fn propagation_download_summary_json(
+    available: usize,
+    payloads: &[Vec<u8>],
+    downloaded: usize,
+    duplicates: usize,
+) -> JsonValue {
+    let transferred_bytes = payloads.iter().map(Vec::len).sum::<usize>();
+    json!({
+        "available": available,
+        "downloaded": downloaded,
+        "duplicates": duplicates,
+        "transferred_bytes": transferred_bytes,
+    })
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -251,5 +262,25 @@ fn binary_array_response(response: &rmpv::Value) -> Result<Vec<Vec<u8>>, std::io
             std::io::ErrorKind::InvalidData,
             "propagation node returned non-list response",
         )),
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn propagation_download_summary_reports_transferred_bytes() {
+        let payloads = vec![b"downloaded".to_vec(), b"payload-two".to_vec()];
+
+        let summary = propagation_download_summary_json(5, &payloads, 1, 1);
+
+        assert_eq!(summary["available"].as_u64(), Some(5));
+        assert_eq!(summary["downloaded"].as_u64(), Some(1));
+        assert_eq!(summary["duplicates"].as_u64(), Some(1));
+        assert_eq!(
+            summary["transferred_bytes"].as_u64(),
+            Some(payloads.iter().map(Vec::len).sum::<usize>() as u64)
+        );
     }
 }
