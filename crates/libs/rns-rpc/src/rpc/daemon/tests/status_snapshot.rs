@@ -2530,6 +2530,42 @@ fn propagation_remote_fetch_derives_missing_transient_id_from_payload_bytes() {
 }
 
 #[test]
+fn propagation_remote_fetch_rejects_mismatched_transient_id() {
+    let payload_hex = hex::encode(b"remote-payload-with-mismatched-id");
+    let daemon = RpcDaemon::test_instance();
+    daemon.set_remote_control_bridge(Arc::new(TestRemoteControlBridge {
+        result: Ok(json!({
+            "available_count": 1,
+            "fetched_count": 1,
+            "imported_count": 1,
+            "messages": [{
+                "transient_id": "aa".repeat(32),
+                "payload_hex": payload_hex,
+            }],
+        })),
+    }));
+
+    let err = daemon
+        .handle_rpc(rpc_request(
+            76,
+            "propagation_remote_fetch",
+            json!({
+                "remote": "remote-node",
+            }),
+        ))
+        .expect_err("mismatched remote transient_id must be rejected");
+    assert_eq!(err.kind(), std::io::ErrorKind::InvalidInput);
+    assert!(err.to_string().contains("transient_id does not match propagation payload"));
+    assert!(
+        daemon
+            .store
+            .get_propagation_entry("aa".repeat(32).as_str())
+            .expect("load bogus transient id")
+            .is_none()
+    );
+}
+
+#[test]
 fn propagation_remote_download_imports_payloads_into_local_store() {
     let payload = b"remote-download-propagation-payload";
     let payload_hex = hex::encode(payload);

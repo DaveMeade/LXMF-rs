@@ -52,15 +52,22 @@ impl RpcDaemon {
                     format!("invalid remote propagation payload hex: {err}"),
                 )
             })?;
+            let canonical_transient_id = {
+                let mut hasher = Sha256::new();
+                hasher.update(payload.as_slice());
+                encode_hex(hasher.finalize())
+            };
             let transient_id = message
                 .get("transient_id")
                 .and_then(JsonValue::as_str)
                 .map(normalize_propagation_transient_key)
-                .unwrap_or_else(|| {
-                    let mut hasher = Sha256::new();
-                    hasher.update(payload.as_slice());
-                    encode_hex(hasher.finalize())
-                });
+                .unwrap_or_else(|| canonical_transient_id.clone());
+            if transient_id != canonical_transient_id {
+                return Err(std::io::Error::new(
+                    std::io::ErrorKind::InvalidInput,
+                    "transient_id does not match propagation payload",
+                ));
+            }
             let destination = message
                 .get("destination")
                 .and_then(JsonValue::as_str)
