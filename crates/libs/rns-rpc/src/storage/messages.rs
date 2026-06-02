@@ -880,6 +880,21 @@ impl MessagesStore {
         })
     }
 
+    pub fn remove_peer_unhandled_propagation(
+        &self,
+        peer: &str,
+        transient_id: &str,
+    ) -> rusqlite::Result<bool> {
+        self.with_write_conn(|conn| {
+            let affected = conn.execute(
+                "DELETE FROM propagation_peer_entries
+                 WHERE peer = ?1 AND transient_id = ?2 AND state = 'unhandled'",
+                params![peer, normalize_hex_key(transient_id)],
+            )?;
+            Ok(affected > 0)
+        })
+    }
+
     pub fn list_peer_unhandled_propagation(
         &self,
         peer: &str,

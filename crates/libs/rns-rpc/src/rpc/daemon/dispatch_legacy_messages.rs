@@ -542,6 +542,28 @@ impl RpcDaemon {
                             sync_limit_bytes,
                         ));
                     }
+                    if let Some(min_accepted_stamp_value) =
+                        peer_minimum_accepted_stamp_value(&record)
+                    {
+                        let mut accepted_propagation =
+                            Vec::with_capacity(pending_propagation.len());
+                        for entry in pending_propagation {
+                            if entry
+                                .stamp_value
+                                .is_some_and(|value| value < min_accepted_stamp_value)
+                            {
+                                self.store
+                                    .remove_peer_unhandled_propagation(
+                                        peer_id,
+                                        entry.transient_id.as_str(),
+                                    )
+                                    .map_err(std::io::Error::other)?;
+                                continue;
+                            }
+                            accepted_propagation.push(entry);
+                        }
+                        pending_propagation = accepted_propagation;
+                    }
                 }
                 pending_propagation.sort_by(|left, right| {
                     let left_weight = propagation_peer_sync_weight(left, timestamp);
@@ -1268,6 +1290,12 @@ fn peer_stamp_policy_known(peer: &PeerRecord) -> bool {
     peer.propagation_stamp_cost.is_some()
         && peer.propagation_stamp_cost_flexibility.is_some()
         && peer.peering_cost.is_some()
+}
+
+fn peer_minimum_accepted_stamp_value(peer: &PeerRecord) -> Option<u32> {
+    let cost = peer.propagation_stamp_cost?;
+    let flexibility = peer.propagation_stamp_cost_flexibility?;
+    Some(cost.saturating_sub(flexibility))
 }
 
 fn propagation_peer_sync_weight(entry: &PropagationEntryRecord, now: i64) -> f64 {

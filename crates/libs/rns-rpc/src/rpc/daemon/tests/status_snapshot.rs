@@ -2429,6 +2429,71 @@ fn peer_sync_reports_transferred_propagation_messages() {
 }
 
 #[test]
+fn peer_sync_drops_low_value_stamped_entries_before_offer() {
+    let store = MessagesStore::in_memory().expect("store");
+    let daemon = RpcDaemon::with_store(store, hex::encode([2u8; 16]));
+    let peer_id = hex::encode([5u8; 16]);
+    daemon
+        .handle_rpc(rpc_request(63, "peer_sync", json!({ "peer": peer_id })))
+        .expect("initial peer sync");
+    {
+        let mut peers = daemon.peers.lock().expect("peers mutex poisoned");
+        let peer = peers.get_mut(peer_id.as_str()).expect("peer record");
+        peer.propagation_sync_limit = Some(1_000);
+        peer.propagation_stamp_cost = Some(8);
+        peer.propagation_stamp_cost_flexibility = Some(2);
+        peer.peering_cost = Some(1);
+    }
+
+    let low_value = PropagationEntryRecord {
+        transient_id: "d5".repeat(32),
+        destination: "18".repeat(16),
+        payload_hex: "23".repeat(24),
+        received_at: 1_700_000_617,
+        size_bytes: 24,
+        stamp_value: Some(5),
+    };
+    let accepted = PropagationEntryRecord {
+        transient_id: "d6".repeat(32),
+        destination: "18".repeat(16),
+        payload_hex: "24".repeat(24),
+        received_at: 1_700_000_618,
+        size_bytes: 24,
+        stamp_value: Some(6),
+    };
+    for entry in [&low_value, &accepted] {
+        daemon.store.upsert_propagation_entry(entry).expect("store propagation entry");
+        daemon
+            .store
+            .mark_peer_unhandled_propagation(peer_id.as_str(), entry.transient_id.as_str())
+            .expect("mark unhandled");
+    }
+
+    let result = daemon
+        .handle_rpc(rpc_request(64, "peer_sync", json!({ "peer": peer_id })))
+        .expect("peer sync")
+        .result
+        .expect("peer sync result");
+    assert_eq!(result["propagation"]["handled"].as_u64(), Some(1));
+    assert_eq!(result["propagation"]["skipped"].as_u64(), Some(0));
+    assert_eq!(
+        result["propagation"]["handled_ids"].as_array().expect("handled ids"),
+        &[json!(accepted.transient_id.as_str())]
+    );
+
+    let pending = daemon
+        .store
+        .list_peer_unhandled_propagation(peer_id.as_str())
+        .expect("pending propagation");
+    assert!(pending.is_empty());
+    let handled = daemon
+        .store
+        .list_peer_handled_propagation_ids(peer_id.as_str())
+        .expect("handled propagation");
+    assert_eq!(handled, vec![accepted.transient_id]);
+}
+
+#[test]
 fn peer_sync_result_and_event_report_message_accounting() {
     let store = MessagesStore::in_memory().expect("store");
     let daemon = RpcDaemon::with_store(store, hex::encode([2u8; 16]));
