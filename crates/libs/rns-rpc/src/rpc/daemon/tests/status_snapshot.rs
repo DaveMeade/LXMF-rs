@@ -3898,7 +3898,7 @@ fn propagation_remote_sync_updates_peer_runtime_state() {
         peer.peering_cost = Some(1);
     }
 
-    daemon
+    let remote_sync = daemon
         .handle_rpc(rpc_request(
             74,
             "propagation_remote_sync",
@@ -3907,7 +3907,26 @@ fn propagation_remote_sync_updates_peer_runtime_state() {
                 "peer": peer_id,
             }),
         ))
-        .expect("remote sync");
+        .expect("remote sync")
+        .result
+        .expect("remote sync result");
+    assert_eq!(remote_sync["peer_sync"]["peer"].as_str(), Some(peer_id.as_str()));
+    assert_eq!(remote_sync["peer_sync"]["remote_sync"].as_bool(), Some(true));
+    assert_eq!(remote_sync["peer_sync"]["synced"].as_bool(), Some(true));
+    assert_eq!(remote_sync["peer_sync"]["name"].as_str(), Some("Remote Sync State"));
+    assert_eq!(remote_sync["peer_sync"]["name_source"].as_str(), Some("test"));
+    assert_eq!(remote_sync["peer_sync"]["tx_bytes"].as_u64(), Some(payload.len() as u64));
+    assert_eq!(
+        remote_sync["peer_sync"]["sync_transfer_rate"].as_f64(),
+        Some(payload.len() as f64)
+    );
+    let response_peering_key =
+        remote_sync["peer_sync"]["peering_key"].as_u64().expect("response peering key");
+    assert!(response_peering_key >= 1);
+    assert_eq!(
+        remote_sync["peer_sync"]["propagation"]["peering_key"].as_u64(),
+        Some(response_peering_key)
+    );
 
     let peers = daemon
         .handle_rpc(RpcRequest { id: 75, method: "list_peers".to_string(), params: None })
