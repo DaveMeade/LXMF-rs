@@ -891,6 +891,36 @@ impl RpcDaemon {
                         });
                         self.ensure_peer_for_sync(parsed.peer.as_str(), now_i64())?;
                         self.record_outbound_peer_activity(parsed.peer.as_str(), 0, true);
+                        if let Some(peer) = self
+                            .peers
+                            .lock()
+                            .expect("peers mutex poisoned")
+                            .get(parsed.peer.as_str())
+                            .cloned()
+                        {
+                            self.publish_event(RpcEvent {
+                                event_type: "peer_sync".into(),
+                                payload: json!({
+                                    "peer": peer.peer,
+                                    "peer_type": peer.peer_type,
+                                    "remote": parsed.remote.as_str(),
+                                    "remote_sync": true,
+                                    "synced": true,
+                                    "alive": peer.alive,
+                                    "last_heard": peer.last_seen,
+                                    "first_seen": peer.first_seen,
+                                    "seen_count": peer.seen_count,
+                                    "rx_bytes": peer.rx_bytes,
+                                    "tx_bytes": peer.tx_bytes,
+                                    "acceptance_rate": peer.acceptance_rate,
+                                    "last_sync_attempt": peer.last_sync_attempt,
+                                    "next_sync_attempt": peer.next_sync_attempt,
+                                    "sync_backoff": peer.sync_backoff,
+                                    "sync_transfer_rate": peer.sync_transfer_rate,
+                                    "str": peer.sync_transfer_rate as u64,
+                                }),
+                            });
+                        }
                         result
                     }
                     Err(err) => {

@@ -3696,6 +3696,7 @@ fn propagation_remote_sync_updates_peer_runtime_state() {
     daemon
         .handle_rpc(rpc_request(73, "peer_sync", json!({ "peer": "peer-remote-sync-state" })))
         .expect("initial peer sync");
+    daemon.event_queue.lock().expect("event_queue mutex poisoned").clear();
     {
         let mut peers = daemon.peers.lock().expect("peers mutex poisoned");
         let peer = peers.get_mut("peer-remote-sync-state").expect("peer record");
@@ -3732,6 +3733,23 @@ fn propagation_remote_sync_updates_peer_runtime_state() {
     assert_eq!(row["sync_backoff"].as_u64(), Some(0));
     assert_eq!(row["next_sync_attempt"].as_i64(), Some(0));
     assert!(row["acceptance_rate"].as_f64().is_some_and(|value| value > 0.25));
+
+    let event = daemon
+        .event_queue
+        .lock()
+        .expect("event_queue mutex poisoned")
+        .iter()
+        .rev()
+        .find(|event| event.event_type == "peer_sync")
+        .cloned()
+        .expect("peer sync event");
+    assert_eq!(event.payload["peer"].as_str(), Some("peer-remote-sync-state"));
+    assert_eq!(event.payload["remote"].as_str(), Some("remote-node"));
+    assert_eq!(event.payload["remote_sync"].as_bool(), Some(true));
+    assert_eq!(event.payload["synced"].as_bool(), Some(true));
+    assert_eq!(event.payload["alive"].as_bool(), Some(true));
+    assert_eq!(event.payload["sync_backoff"].as_u64(), Some(0));
+    assert_eq!(event.payload["next_sync_attempt"].as_i64(), Some(0));
 }
 
 #[test]
