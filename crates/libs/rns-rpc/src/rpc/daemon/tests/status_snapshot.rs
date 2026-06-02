@@ -3888,6 +3888,9 @@ fn propagation_remote_sync_updates_peer_runtime_state() {
         peer.sync_backoff = 12 * 60;
         peer.next_sync_attempt = 1_700_010_000;
         peer.acceptance_rate = 0.25;
+        peer.propagation_sync_limit = Some(84_000);
+        peer.propagation_stamp_cost = Some(8);
+        peer.propagation_stamp_cost_flexibility = Some(2);
     }
 
     daemon
@@ -3933,7 +3936,23 @@ fn propagation_remote_sync_updates_peer_runtime_state() {
     assert_eq!(event.payload["remote"].as_str(), Some("remote-node"));
     assert_eq!(event.payload["remote_sync"].as_bool(), Some(true));
     assert_eq!(event.payload["synced"].as_bool(), Some(true));
+    assert_eq!(event.payload["type"].as_str(), Some("discovered"));
+    assert_eq!(event.payload["state"].as_u64(), Some(0));
+    assert_eq!(event.payload["sync_strategy"].as_u64(), Some(2));
+    assert_eq!(event.payload["ler"].as_u64(), Some(0));
+    assert_eq!(event.payload["network_distance"].as_u64(), Some(1));
     assert_eq!(event.payload["alive"].as_bool(), Some(true));
+    assert!(event.payload["propagation_transfer_limit"].is_null());
+    assert_eq!(event.payload["propagation_sync_limit"].as_u64(), Some(84_000));
+    assert_eq!(event.payload["propagation_stamp_cost"].as_u64(), Some(8));
+    assert_eq!(
+        event.payload["propagation_stamp_cost_flexibility"].as_u64(),
+        Some(2)
+    );
+    assert!(event.payload["transfer_limit"].is_null());
+    assert_eq!(event.payload["sync_limit"].as_u64(), Some(84_000));
+    assert_eq!(event.payload["target_stamp_cost"].as_u64(), Some(8));
+    assert_eq!(event.payload["stamp_cost_flexibility"].as_u64(), Some(2));
     assert_eq!(event.payload["sync_backoff"].as_u64(), Some(0));
     assert_eq!(event.payload["next_sync_attempt"].as_i64(), Some(0));
     assert_eq!(event.payload["tx_bytes"].as_u64(), Some(payload.len() as u64));

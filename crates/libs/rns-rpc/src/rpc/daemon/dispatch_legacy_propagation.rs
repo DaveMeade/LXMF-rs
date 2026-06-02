@@ -942,14 +942,25 @@ impl RpcDaemon {
                             .get(parsed.peer.as_str())
                             .cloned()
                         {
+                            let peer_status_type = if self.is_static_peer(peer.peer.as_str()) {
+                                "static"
+                            } else {
+                                "discovered"
+                            };
                             self.publish_event(RpcEvent {
                                 event_type: "peer_sync".into(),
                                 payload: json!({
                                     "peer": peer.peer,
                                     "peer_type": peer.peer_type,
+                                    "type": peer_status_type,
                                     "remote": parsed.remote.as_str(),
                                     "remote_sync": true,
                                     "synced": true,
+                                    "state": 0,
+                                    "sync_strategy": 2,
+                                    "ler": 0,
+                                    "peering_timebase": peer.peering_timebase,
+                                    "network_distance": peer.network_distance,
                                     "alive": peer.alive,
                                     "last_heard": peer.last_seen,
                                     "first_seen": peer.first_seen,
@@ -962,6 +973,14 @@ impl RpcDaemon {
                                     "sync_backoff": peer.sync_backoff,
                                     "sync_transfer_rate": peer.sync_transfer_rate,
                                     "str": peer.sync_transfer_rate as u64,
+                                    "propagation_transfer_limit": peer.propagation_transfer_limit,
+                                    "propagation_sync_limit": peer.propagation_sync_limit,
+                                    "propagation_stamp_cost": peer.propagation_stamp_cost,
+                                    "propagation_stamp_cost_flexibility": peer.propagation_stamp_cost_flexibility,
+                                    "transfer_limit": peer.propagation_transfer_limit,
+                                    "sync_limit": peer.propagation_sync_limit,
+                                    "target_stamp_cost": peer.propagation_stamp_cost,
+                                    "stamp_cost_flexibility": peer.propagation_stamp_cost_flexibility,
                                 }),
                             });
                         }
