@@ -387,6 +387,15 @@ impl RpcDaemon {
                     None,
                     peer_type,
                 )?;
+                let pending_propagation = self
+                    .store
+                    .list_peer_unhandled_propagation(peer_id)
+                    .map_err(std::io::Error::other)?;
+                for entry in pending_propagation {
+                    self.store
+                        .mark_peer_handled_propagation(peer_id, entry.transient_id.as_str())
+                        .map_err(std::io::Error::other)?;
+                }
                 {
                     let mut guard = self.peers.lock().expect("peers mutex poisoned");
                     if let Some(existing) = guard.get_mut(&record.peer) {

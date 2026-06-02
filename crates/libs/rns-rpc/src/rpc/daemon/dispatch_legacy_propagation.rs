@@ -6,6 +6,31 @@ const PR_IDLE: u32 = 0x00;
 const PR_FAILED: u32 = 0xfe;
 
 impl RpcDaemon {
+    fn store_propagation_payload_hex(
+        &self,
+        transient_id: &str,
+        payload_hex: &str,
+    ) -> Result<(), std::io::Error> {
+        let payload = hex::decode(payload_hex).map_err(|err| {
+            std::io::Error::new(
+                std::io::ErrorKind::InvalidInput,
+                format!("invalid propagation payload hex: {err}"),
+            )
+        })?;
+        let destination =
+            if payload.len() >= 16 { hex::encode(&payload[..16]) } else { String::new() };
+        self.store
+            .upsert_propagation_entry(&PropagationEntryRecord {
+                transient_id: normalize_propagation_transient_key(transient_id),
+                destination,
+                payload_hex: payload_hex.to_ascii_lowercase(),
+                received_at: now_i64(),
+                size_bytes: payload.len() as u64,
+                stamp_value: None,
+            })
+            .map_err(std::io::Error::other)
+    }
+
     pub fn note_client_propagation_messages_received(&self, ingested_count: usize) {
         let state = {
             let mut guard = self.propagation_state.lock().expect("propagation mutex poisoned");
@@ -78,10 +103,12 @@ impl RpcDaemon {
         };
         if let Some((_canonical_transient_id, payload)) = normalized {
             let payload_hex = hex::encode(payload);
+            self.store_propagation_payload_hex(transient_id, payload_hex.as_str())?;
             let mut guard =
                 self.propagation_payloads.lock().expect("propagation payload mutex poisoned");
             guard.insert(normalize_propagation_transient_key(transient_id), payload_hex.clone());
             for alias in aliases {
+                self.store_propagation_payload_hex(alias, payload_hex.as_str())?;
                 guard.insert(normalize_propagation_transient_key(alias), payload_hex.clone());
             }
         }
@@ -145,6 +172,7 @@ impl RpcDaemon {
             });
 
         if let Some((_canonical_transient_id, payload_hex)) = normalized_payload {
+            self.store_propagation_payload_hex(transient_id.as_str(), payload_hex.as_str())?;
             self.propagation_payloads
                 .lock()
                 .expect("propagation payload mutex poisoned")
@@ -179,6 +207,15 @@ impl RpcDaemon {
     }
 
     pub fn has_propagation_payload(&self, transient_id: &str) -> bool {
+        if self
+            .store
+            .get_propagation_entry(normalize_propagation_transient_key(transient_id).as_str())
+            .ok()
+            .flatten()
+            .is_some()
+        {
+            return true;
+        }
         self.propagation_payloads
             .lock()
             .expect("propagation payload mutex poisoned")
@@ -189,21 +226,39 @@ impl RpcDaemon {
         &self,
         destination: &[u8; 16],
     ) -> Vec<(Vec<u8>, usize)> {
+        let destination_hex = hex::encode(destination);
         let mut entries = self
-            .propagation_payloads
-            .lock()
-            .expect("propagation payload mutex poisoned")
-            .iter()
-            .filter_map(|(transient_id, payload_hex)| {
-                let transient_id = hex::decode(transient_id).ok()?;
-                if transient_id.len() != 32 {
-                    return None;
-                }
-                let payload = hex::decode(payload_hex).ok()?;
-                propagation_payload_matches_destination(payload.as_slice(), destination)
-                    .then_some((transient_id, payload.len()))
+            .store
+            .list_propagation_entries_for_destination(destination_hex.as_str())
+            .unwrap_or_default()
+            .into_iter()
+            .filter_map(|entry| {
+                let transient_id = hex::decode(entry.transient_id).ok()?;
+                (transient_id.len() == 32).then_some((transient_id, entry.size_bytes as usize))
             })
             .collect::<Vec<_>>();
+        let known = entries
+            .iter()
+            .map(|(transient_id, _)| hex::encode(transient_id))
+            .collect::<HashSet<_>>();
+        entries.extend(
+            self.propagation_payloads
+                .lock()
+                .expect("propagation payload mutex poisoned")
+                .iter()
+                .filter_map(|(transient_id, payload_hex)| {
+                    if known.contains(transient_id) {
+                        return None;
+                    }
+                    let transient_id = hex::decode(transient_id).ok()?;
+                    if transient_id.len() != 32 {
+                        return None;
+                    }
+                    let payload = hex::decode(payload_hex).ok()?;
+                    propagation_payload_matches_destination(payload.as_slice(), destination)
+                        .then_some((transient_id, payload.len()))
+                }),
+        );
         entries.sort_by_key(|(_transient_id, size)| *size);
         entries
     }
@@ -214,8 +269,30 @@ impl RpcDaemon {
         wanted: &[Vec<u8>],
         transfer_limit_bytes: Option<usize>,
     ) -> Vec<Vec<u8>> {
+        let destination_hex = hex::encode(destination);
+        let wanted_hex = wanted.iter().map(hex::encode).collect::<Vec<_>>();
+        let mut messages = self
+            .store
+            .fetch_propagation_payloads_for_destination(
+                destination_hex.as_str(),
+                &wanted_hex,
+                transfer_limit_bytes,
+            )
+            .unwrap_or_default();
+        if !messages.is_empty() {
+            let state = {
+                let mut guard = self.propagation_state.lock().expect("propagation mutex poisoned");
+                guard.client_propagation_messages_served =
+                    guard.client_propagation_messages_served.saturating_add(messages.len());
+                guard.clone()
+            };
+            self.update_daemon_status_snapshot(|snapshot| {
+                snapshot.propagation = state;
+            });
+            return messages;
+        }
+
         let guard = self.propagation_payloads.lock().expect("propagation payload mutex poisoned");
-        let mut messages = Vec::new();
         let per_message_overhead = 16usize;
         let mut cumulative_size = 24usize;
         for transient_id in wanted {
@@ -262,9 +339,14 @@ impl RpcDaemon {
         destination: &[u8; 16],
         haves: &[Vec<u8>],
     ) -> usize {
+        let destination_hex = hex::encode(destination);
+        let haves_hex = haves.iter().map(hex::encode).collect::<Vec<_>>();
+        let mut purged = self
+            .store
+            .purge_propagation_entries_for_destination(destination_hex.as_str(), &haves_hex)
+            .unwrap_or_default();
         let mut guard =
             self.propagation_payloads.lock().expect("propagation payload mutex poisoned");
-        let mut purged = 0usize;
         for transient_id in haves {
             if transient_id.len() != 32 {
                 continue;

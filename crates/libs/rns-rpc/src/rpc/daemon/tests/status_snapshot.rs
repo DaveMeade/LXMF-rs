@@ -1518,6 +1518,43 @@ fn list_peers_exposes_python_style_message_counters() {
 }
 
 #[test]
+fn peer_sync_marks_unhandled_propagation_entries_handled() {
+    let daemon = RpcDaemon::test_instance();
+    let entry = PropagationEntryRecord {
+        transient_id: "ab".repeat(32),
+        destination: "12".repeat(16),
+        payload_hex: "12".repeat(16),
+        received_at: 1_700_000_605,
+        size_bytes: 16,
+        stamp_value: None,
+    };
+    daemon.store.upsert_propagation_entry(&entry).expect("store propagation entry");
+    daemon
+        .store
+        .mark_peer_unhandled_propagation("peer-propagation-sync", entry.transient_id.as_str())
+        .expect("mark propagation unhandled");
+
+    daemon
+        .handle_rpc(rpc_request(55, "peer_sync", json!({ "peer": "peer-propagation-sync" })))
+        .expect("peer sync");
+
+    assert!(
+        daemon
+            .store
+            .list_peer_unhandled_propagation("peer-propagation-sync")
+            .expect("list unhandled")
+            .is_empty()
+    );
+    assert_eq!(
+        daemon
+            .store
+            .list_peer_handled_propagation_ids("peer-propagation-sync")
+            .expect("list handled"),
+        vec![entry.transient_id]
+    );
+}
+
+#[test]
 fn list_peers_exposes_peering_key_value_when_cost_is_known() {
     let store = MessagesStore::in_memory().expect("store");
     let daemon = RpcDaemon::with_store(store, hex::encode([2u8; 16]));
