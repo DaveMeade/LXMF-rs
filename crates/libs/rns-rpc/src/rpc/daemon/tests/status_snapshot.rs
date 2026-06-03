@@ -5448,6 +5448,32 @@ fn propagation_remote_status_trims_remote_before_bridge_and_response() {
     assert_eq!(result["status"]["remote"].as_str(), Some("remote-status-trimmed"));
 }
 
+#[test]
+fn propagation_remote_status_rejects_blank_remote_before_bridge_call() {
+    let daemon = RpcDaemon::test_instance();
+    let status_calls = Arc::new(std::sync::atomic::AtomicUsize::new(0));
+    daemon.set_remote_control_bridge(Arc::new(CountingRemoteControlBridge {
+        status_calls: Arc::clone(&status_calls),
+        sync_calls: Arc::new(std::sync::atomic::AtomicUsize::new(0)),
+        unpeer_calls: Arc::new(std::sync::atomic::AtomicUsize::new(0)),
+    }));
+
+    let rejected = daemon
+        .handle_rpc(rpc_request(
+            72,
+            "propagation_remote_status",
+            json!({
+                "remote": "   ",
+            }),
+        ))
+        .expect_err("blank remote status node should be rejected");
+    assert!(
+        rejected.to_string().contains("remote is required"),
+        "unexpected rejection error: {rejected}"
+    );
+    assert_eq!(status_calls.load(std::sync::atomic::Ordering::SeqCst), 0);
+}
+
 struct TestRemoteControlBridge {
     result: Result<JsonValue, std::io::ErrorKind>,
 }
@@ -5463,6 +5489,7 @@ struct FailingTransferLimitRemoteControlBridge {
 }
 
 struct CountingRemoteControlBridge {
+    status_calls: Arc<std::sync::atomic::AtomicUsize>,
     sync_calls: Arc<std::sync::atomic::AtomicUsize>,
     unpeer_calls: Arc<std::sync::atomic::AtomicUsize>,
 }
@@ -5552,6 +5579,7 @@ impl RemoteControlBridge for CountingRemoteControlBridge {
         _identity_private_key_hex: Option<&str>,
         _timeout_secs: f64,
     ) -> Result<JsonValue, std::io::Error> {
+        self.status_calls.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
         Ok(json!({"status": "ok"}))
     }
 
@@ -5974,6 +6002,7 @@ fn rejected_propagation_remote_sync_does_not_call_bridge_or_update_lifecycle() {
         .expect("fill peer capacity");
     let sync_calls = Arc::new(std::sync::atomic::AtomicUsize::new(0));
     daemon.set_remote_control_bridge(Arc::new(CountingRemoteControlBridge {
+        status_calls: Arc::new(std::sync::atomic::AtomicUsize::new(0)),
         sync_calls: Arc::clone(&sync_calls),
         unpeer_calls: Arc::new(std::sync::atomic::AtomicUsize::new(0)),
     }));
@@ -6025,6 +6054,7 @@ fn propagation_remote_sync_rejects_blank_peer_before_bridge_call() {
     let daemon = RpcDaemon::test_instance();
     let sync_calls = Arc::new(std::sync::atomic::AtomicUsize::new(0));
     daemon.set_remote_control_bridge(Arc::new(CountingRemoteControlBridge {
+        status_calls: Arc::new(std::sync::atomic::AtomicUsize::new(0)),
         sync_calls: Arc::clone(&sync_calls),
         unpeer_calls: Arc::new(std::sync::atomic::AtomicUsize::new(0)),
     }));
@@ -6123,6 +6153,7 @@ fn propagation_remote_unpeer_rejects_blank_peer_before_bridge_call() {
     let sync_calls = Arc::new(std::sync::atomic::AtomicUsize::new(0));
     let unpeer_calls = Arc::new(std::sync::atomic::AtomicUsize::new(0));
     daemon.set_remote_control_bridge(Arc::new(CountingRemoteControlBridge {
+        status_calls: Arc::new(std::sync::atomic::AtomicUsize::new(0)),
         sync_calls,
         unpeer_calls: Arc::clone(&unpeer_calls),
     }));
