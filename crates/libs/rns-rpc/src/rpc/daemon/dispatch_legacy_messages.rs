@@ -694,7 +694,11 @@ impl RpcDaemon {
                             propagation_transfer_limited.saturating_add(1);
                         propagation_transfer_limited_bytes =
                             propagation_transfer_limited_bytes.saturating_add(entry.size_bytes);
-                        propagation_transfer_limited_ids.push(entry.transient_id);
+                        let transient_id = entry.transient_id;
+                        self.store
+                            .mark_peer_handled_propagation(peer_id, transient_id.as_str())
+                            .map_err(std::io::Error::other)?;
+                        propagation_transfer_limited_ids.push(transient_id);
                         continue;
                     }
                     let next_size = cumulative_size.saturating_add(transfer_size);
@@ -757,8 +761,7 @@ impl RpcDaemon {
                     if let Some(existing) = guard.get_mut(&record.peer) {
                         let propagation_offered =
                             propagation_handled.saturating_add(propagation_skipped);
-                        let propagation_pending =
-                            propagation_offered.saturating_add(propagation_transfer_limited);
+                        let propagation_pending = propagation_offered;
                         existing.last_sync_attempt = timestamp;
                         existing.alive = propagation_handled > 0
                             || existing.last_sync_attempt < existing.last_seen;

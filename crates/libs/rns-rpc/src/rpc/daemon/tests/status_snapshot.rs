@@ -2520,7 +2520,7 @@ fn peer_sync_uses_transfer_limit_when_sync_limit_is_absent() {
 }
 
 #[test]
-fn peer_sync_leaves_entries_above_transfer_limit_unhandled_like_python() {
+fn peer_sync_marks_entries_above_transfer_limit_handled_like_python() {
     let daemon = RpcDaemon::test_instance();
     daemon
         .handle_rpc(rpc_request(60, "peer_sync", json!({ "peer": "peer-transfer-oversize" })))
@@ -2563,21 +2563,21 @@ fn peer_sync_leaves_entries_above_transfer_limit_unhandled_like_python() {
         &[json!(oversized_id.as_str())]
     );
     assert_eq!(result["messages"]["offered"].as_u64(), Some(1));
-    assert_eq!(result["messages"]["unhandled"].as_u64(), Some(1));
-    assert_eq!(result["sync_backoff"].as_u64(), Some(12 * 60));
-    let last_sync_attempt = result["last_sync_attempt"].as_i64().expect("last sync attempt");
-    assert_eq!(result["next_sync_attempt"].as_i64(), Some(last_sync_attempt + 12 * 60));
+    assert_eq!(result["messages"]["unhandled"].as_u64(), Some(0));
+    assert_eq!(result["sync_backoff"].as_u64(), Some(0));
+    assert!(result["last_sync_attempt"].as_i64().is_some_and(|value| value > 0));
+    assert_eq!(result["next_sync_attempt"].as_i64(), Some(0));
 
     let handled = daemon
         .store
         .list_peer_handled_propagation_ids("peer-transfer-oversize")
         .expect("handled ids");
-    assert!(handled.is_empty());
+    assert_eq!(handled, vec![oversized_id.clone()]);
     let pending = daemon
         .store
         .list_peer_unhandled_propagation("peer-transfer-oversize")
         .expect("pending propagation");
-    assert_eq!(pending, vec![oversized]);
+    assert!(pending.is_empty());
 
     let event = daemon
         .event_queue
@@ -2598,12 +2598,9 @@ fn peer_sync_leaves_entries_above_transfer_limit_unhandled_like_python() {
         &[json!(oversized_id.as_str())]
     );
     assert_eq!(event.payload["messages"]["offered"].as_u64(), Some(1));
-    assert_eq!(event.payload["messages"]["unhandled"].as_u64(), Some(1));
-    assert_eq!(event.payload["sync_backoff"].as_u64(), Some(12 * 60));
-    assert_eq!(
-        event.payload["next_sync_attempt"].as_i64(),
-        Some(last_sync_attempt + 12 * 60)
-    );
+    assert_eq!(event.payload["messages"]["unhandled"].as_u64(), Some(0));
+    assert_eq!(event.payload["sync_backoff"].as_u64(), Some(0));
+    assert_eq!(event.payload["next_sync_attempt"].as_i64(), Some(0));
 }
 
 #[test]
