@@ -119,7 +119,10 @@ pub(super) fn handle_offer_request(
             wanted.push(bytes.clone());
         }
     }
-    let _ = daemon.record_propagation_offer_peer(hex::encode(remote_propagation_hash).as_str());
+    if daemon.record_propagation_offer_peer(hex::encode(remote_propagation_hash).as_str()).is_err()
+    {
+        return ControlResponse::Code(error_no_access);
+    }
 
     if wanted.is_empty() {
         ControlResponse::Bool(false)
@@ -394,6 +397,77 @@ mod tests {
                 .iter()
                 .all(|row| row["peer"].as_str() != Some(remote_propagation_hash.as_str())),
             "invalid offer data must not create a peer record"
+        );
+    }
+
+    #[test]
+    fn offer_request_rejects_capacity_limited_peer_admission() {
+        let daemon = RpcDaemon::test_instance();
+        daemon
+            .handle_rpc(RpcRequest {
+                id: 10,
+                method: "propagation_enable".to_string(),
+                params: Some(json!({
+                    "enabled": true,
+                    "peering_cost": 1,
+                    "max_peers": 1,
+                })),
+            })
+            .expect("enable propagation");
+        daemon
+            .handle_rpc(RpcRequest {
+                id: 11,
+                method: "peer_sync".to_string(),
+                params: Some(json!({ "peer": "peer-capacity-existing" })),
+            })
+            .expect("fill peer capacity");
+
+        let local_identity_hash = [0x11; 16];
+        let remote_private =
+            rns_transport::identity::PrivateIdentity::new_from_rand(rand_core::OsRng);
+        let remote_identity = *remote_private.as_identity();
+        let remote_propagation_hash =
+            hex::encode(propagation_destination_hash_for_identity(&remote_identity));
+        let offered = [0xBB; 32];
+        let mut peering_id = Vec::with_capacity(32);
+        peering_id.extend_from_slice(local_identity_hash.as_slice());
+        peering_id.extend_from_slice(remote_identity.address_hash.as_slice());
+        let peering_key = generate_peering_key(peering_id.as_slice(), 1).expect("peering key");
+        let control = PropagationControlContext {
+            enabled: true,
+            local_identity_hash,
+            propagation_destination_hash_hex: Some("propagation".to_string()),
+            control_destination_hash_hex: Some("control".to_string()),
+            delivery_destination: None,
+            allowed_control_identities: Vec::new(),
+        };
+
+        let response = handle_offer_request(
+            &daemon,
+            &control,
+            &remote_identity,
+            Some(rmpv::Value::Array(vec![
+                rmpv::Value::Binary(peering_key),
+                rmpv::Value::Array(vec![rmpv::Value::Binary(offered.to_vec())]),
+            ])),
+            0xF1,
+            0xF3,
+            0xF4,
+        );
+
+        assert!(matches!(response, ControlResponse::Code(0xF1)));
+        let peers = daemon
+            .handle_rpc(RpcRequest { id: 12, method: "list_peers".to_string(), params: None })
+            .expect("list peers")
+            .result
+            .expect("list peers result");
+        assert!(
+            peers["peers"]
+                .as_array()
+                .expect("peer rows")
+                .iter()
+                .all(|row| row["peer"].as_str() != Some(remote_propagation_hash.as_str())),
+            "capacity-limited offer must not create a peer record"
         );
     }
 
