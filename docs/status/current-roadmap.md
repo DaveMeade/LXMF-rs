@@ -62,6 +62,8 @@ gap, even though deeper propagation-router parity remains open.
   bridge lookup. Remote fetch and download imports now treat an active remote
   source peer as already received and queue the imported payload only for other
   active peers, matching the source-peer handling already used by remote sync.
+  Those fetch/download source peers now also record inbound runtime activity
+  and received-byte counters.
 - Daemon receipt status and peer-activity bookkeeping now preserve Python's
   distinction between transport `sent:*` states and final `delivered` receipts:
   send/resource completion records sent-only peer tx bookkeeping, while actual

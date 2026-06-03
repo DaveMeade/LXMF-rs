@@ -6968,6 +6968,19 @@ fn propagation_remote_fetch_marks_source_received_and_queues_other_peers() {
             .expect("source handled ids"),
         vec![transient_id.clone()]
     );
+    let peers = daemon
+        .handle_rpc(RpcRequest { id: 75, method: "list_peers".to_string(), params: None })
+        .expect("list peers")
+        .result
+        .expect("list peers result");
+    let source_row = peers["peers"]
+        .as_array()
+        .expect("peer rows")
+        .iter()
+        .find(|row| row["peer"].as_str() == Some(source_peer))
+        .expect("source peer row");
+    assert_eq!(source_row["rx_bytes"].as_u64(), Some(payload.len() as u64));
+    assert_eq!(source_row["alive"].as_bool(), Some(true));
     let relay_pending = daemon
         .store
         .list_peer_unhandled_propagation(relay_peer)
@@ -7419,6 +7432,19 @@ fn propagation_remote_download_marks_source_received_and_queues_other_peers() {
             .expect("source handled ids"),
         vec![transient_id.clone()]
     );
+    let peers = daemon
+        .handle_rpc(RpcRequest { id: 81, method: "list_peers".to_string(), params: None })
+        .expect("list peers")
+        .result
+        .expect("list peers result");
+    let source_row = peers["peers"]
+        .as_array()
+        .expect("peer rows")
+        .iter()
+        .find(|row| row["peer"].as_str() == Some(source_peer))
+        .expect("source peer row");
+    assert_eq!(source_row["rx_bytes"].as_u64(), Some(payload.len() as u64));
+    assert_eq!(source_row["alive"].as_bool(), Some(true));
     let relay_pending = daemon
         .store
         .list_peer_unhandled_propagation(relay_peer)

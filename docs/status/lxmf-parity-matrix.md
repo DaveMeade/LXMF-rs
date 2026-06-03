@@ -83,7 +83,8 @@ names are `lxmf-wire` and `reticulum-rs-rpc`.
   bridge is available, while still allowing existing peers in backoff to
   postpone without a bridge. Remote fetch and download imports now mark an
   active source peer as received and avoid re-offering that peer its own
-  payload while still queueing other active peers.
+  payload while still queueing other active peers, and they record source-peer
+  inbound runtime byte counters.
 - Peer parity is incomplete. Peer records, configured static peers, events,
   runtime counters, acceptance-rate/backoff fields, Python-style message
   accounting, per-peer propagation transfer/sync limits, propagation stamp
