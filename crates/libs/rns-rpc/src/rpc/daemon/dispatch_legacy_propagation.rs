@@ -521,6 +521,19 @@ impl RpcDaemon {
             .contains_key(normalize_propagation_transient_key(transient_id).as_str())
     }
 
+    pub fn record_peer_received_propagation(
+        &self,
+        peer: &str,
+        transient_id: &str,
+    ) -> Result<(), std::io::Error> {
+        self.store
+            .mark_peer_received_propagation(
+                peer,
+                normalize_propagation_transient_key(transient_id).as_str(),
+            )
+            .map_err(std::io::Error::other)
+    }
+
     pub fn list_propagation_payloads_for_destination(
         &self,
         destination: &[u8; 16],
