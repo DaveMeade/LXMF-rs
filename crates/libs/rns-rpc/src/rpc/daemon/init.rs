@@ -1195,6 +1195,12 @@ impl RpcDaemon {
         peer: &str,
         timestamp: i64,
     ) -> Result<(), std::io::Error> {
+        let propagation_stats =
+            self.store.peer_propagation_message_stats(peer).map_err(std::io::Error::other)?;
+        let handled_ids =
+            self.store.list_peer_handled_propagation_ids(peer).map_err(std::io::Error::other)?;
+        let unhandled_ids =
+            self.store.list_peer_unhandled_propagation_ids(peer).map_err(std::io::Error::other)?;
         let mut guard = self.peers.lock().expect("peers mutex poisoned");
         let should_remove = guard.get(peer).is_some_and(|existing| {
             existing.peer_type.as_deref() == Some("auto") && timestamp >= existing.peering_timebase
@@ -1212,6 +1218,44 @@ impl RpcDaemon {
             snapshot.peer_count = peer_count;
         });
         self.store.clear_peer_propagation_marks(peer).map_err(std::io::Error::other)?;
+        let messages = json!({
+            "offered": propagation_stats.offered,
+            "unhandled": propagation_stats.unhandled,
+            "offered_bytes": propagation_stats.offered_bytes,
+            "unhandled_bytes": propagation_stats.unhandled_bytes,
+            "handled_ids": handled_ids,
+            "unhandled_ids": unhandled_ids,
+        });
+        self.publish_event(RpcEvent {
+            event_type: "peer_unpeer".into(),
+            payload: json!({
+                "peer": peer,
+                "removed": true,
+                "reason": "peering_cost_policy",
+                "propagation_cleared": propagation_stats.offered,
+                "propagation_cleared_bytes": propagation_stats.offered_bytes,
+                "messages": messages,
+            }),
+        });
+        let mut cleared_selected_node = false;
+        {
+            let mut selected =
+                self.outbound_propagation_node.lock().expect("propagation node mutex poisoned");
+            if selected.as_deref() == Some(peer) {
+                *selected = None;
+                cleared_selected_node = true;
+            }
+        }
+        if cleared_selected_node {
+            let state = {
+                let mut guard = self.propagation_state.lock().expect("propagation mutex poisoned");
+                guard.selected_node = None;
+                guard.clone()
+            };
+            self.update_daemon_status_snapshot(|snapshot| {
+                snapshot.propagation = state;
+            });
+        }
         Ok(())
     }
 

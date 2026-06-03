@@ -1820,6 +1820,14 @@ fn peering_cost_policy_blocks_and_breaks_autopeers() {
             .expect("queued autopeer propagation"),
         vec![entry.clone()]
     );
+    daemon
+        .handle_rpc(rpc_request(
+            51,
+            "set_outbound_propagation_node",
+            json!({ "peer": "peer-auto" }),
+        ))
+        .expect("select autopeer");
+    daemon.event_queue.lock().expect("event_queue mutex poisoned").clear();
 
     daemon
         .accept_announce_with_metadata(
@@ -1845,7 +1853,7 @@ fn peering_cost_policy_blocks_and_breaks_autopeers() {
         .expect("accept high-cost announce");
 
     let peers = daemon
-        .handle_rpc(RpcRequest { id: 51, method: "list_peers".to_string(), params: None })
+        .handle_rpc(RpcRequest { id: 52, method: "list_peers".to_string(), params: None })
         .expect("list peers")
         .result
         .expect("list peers result");
@@ -1858,6 +1866,30 @@ fn peering_cost_policy_blocks_and_breaks_autopeers() {
             .is_empty(),
         "breaking an autopeer should clear stale propagation queue marks"
     );
+    let event = daemon
+        .event_queue
+        .lock()
+        .expect("event_queue mutex poisoned")
+        .iter()
+        .rev()
+        .find(|event| event.event_type == "peer_unpeer")
+        .cloned()
+        .expect("autopeer removal event");
+    assert_eq!(event.payload["peer"].as_str(), Some("peer-auto"));
+    assert_eq!(event.payload["removed"].as_bool(), Some(true));
+    assert_eq!(event.payload["reason"].as_str(), Some("peering_cost_policy"));
+    assert_eq!(event.payload["propagation_cleared"].as_u64(), Some(1));
+
+    let selected = daemon
+        .handle_rpc(RpcRequest {
+            id: 53,
+            method: "get_outbound_propagation_node".to_string(),
+            params: None,
+        })
+        .expect("get selected propagation node")
+        .result
+        .expect("selected propagation node result");
+    assert_eq!(selected["peer"], JsonValue::Null);
 }
 
 #[test]
