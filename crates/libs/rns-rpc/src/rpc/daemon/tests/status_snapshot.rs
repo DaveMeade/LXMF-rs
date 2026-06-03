@@ -4462,9 +4462,12 @@ fn propagation_remote_sync_updates_peer_runtime_state() {
     assert_eq!(event.payload["sync_transfer_rate"].as_f64(), Some(payload.len() as f64));
     assert_eq!(event.payload["messages"]["outgoing"].as_u64(), Some(0));
     assert_eq!(event.payload["messages"]["incoming"].as_u64(), Some(0));
-    assert_eq!(event.payload["messages"]["offered"].as_u64(), Some(0));
+    assert_eq!(event.payload["messages"]["offered"].as_u64(), Some(1));
     assert_eq!(event.payload["messages"]["unhandled"].as_u64(), Some(0));
-    assert_eq!(event.payload["messages"]["offered_bytes"].as_u64(), Some(0));
+    assert_eq!(
+        event.payload["messages"]["offered_bytes"].as_u64(),
+        Some(payload.len() as u64)
+    );
     assert_eq!(event.payload["messages"]["unhandled_bytes"].as_u64(), Some(0));
     assert_eq!(event.payload["propagation"]["remote_sync"].as_bool(), Some(true));
     assert_eq!(event.payload["propagation"]["synced"].as_bool(), Some(true));
@@ -4476,6 +4479,74 @@ fn propagation_remote_sync_updates_peer_runtime_state() {
         event.payload["propagation"]["transferred_bytes"].as_u64(),
         Some(payload.len() as u64)
     );
+}
+
+#[test]
+fn propagation_remote_sync_marks_source_handled_and_queues_other_peers() {
+    let payload = b"remote-sync-distribution-payload";
+    let payload_hex = hex::encode(payload);
+    let transient_id = hex::encode(Sha256::digest(payload));
+    let source_peer = hex::encode([3u8; 16]);
+    let relay_peer = hex::encode([4u8; 16]);
+    let daemon =
+        RpcDaemon::with_store(MessagesStore::in_memory().expect("store"), hex::encode([2u8; 16]));
+    daemon.set_remote_control_bridge(Arc::new(TestRemoteControlBridge {
+        result: Ok(json!({
+            "synced": true,
+            "messages": [{
+                "transient_id": transient_id,
+                "payload_hex": payload_hex,
+            }],
+        })),
+    }));
+    daemon
+        .handle_rpc(rpc_request(74, "peer_sync", json!({ "peer": source_peer })))
+        .expect("seed source peer");
+    daemon
+        .handle_rpc(rpc_request(75, "peer_sync", json!({ "peer": relay_peer })))
+        .expect("seed relay peer");
+
+    let remote_sync = daemon
+        .handle_rpc(rpc_request(
+            76,
+            "propagation_remote_sync",
+            json!({
+                "remote": "remote-node",
+                "peer": source_peer,
+            }),
+        ))
+        .expect("remote sync")
+        .result
+        .expect("remote sync result");
+    assert_eq!(
+        remote_sync["peer_sync"]["messages"]["handled_ids"]
+            .as_array()
+            .expect("source handled ids"),
+        &[json!(transient_id.as_str())]
+    );
+    assert!(
+        remote_sync["peer_sync"]["messages"]["unhandled_ids"]
+            .as_array()
+            .expect("source unhandled ids")
+            .is_empty()
+    );
+
+    let source_handled = daemon
+        .store
+        .list_peer_handled_propagation_ids(source_peer.as_str())
+        .expect("source handled");
+    assert_eq!(source_handled, vec![transient_id.clone()]);
+    let source_unhandled = daemon
+        .store
+        .list_peer_unhandled_propagation(source_peer.as_str())
+        .expect("source unhandled");
+    assert!(source_unhandled.is_empty());
+    let relay_unhandled = daemon
+        .store
+        .list_peer_unhandled_propagation(relay_peer.as_str())
+        .expect("relay unhandled");
+    assert_eq!(relay_unhandled.len(), 1);
+    assert_eq!(relay_unhandled[0].transient_id, transient_id);
 }
 
 #[test]
