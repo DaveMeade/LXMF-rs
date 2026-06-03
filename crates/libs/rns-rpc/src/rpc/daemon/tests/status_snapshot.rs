@@ -3739,9 +3739,9 @@ fn peer_sync_marks_entries_above_transfer_limit_handled_like_python() {
         result["propagation"]["transfer_limited_ids"].as_array().expect("transfer limited ids"),
         &[json!(oversized_id.as_str())]
     );
-    assert_eq!(result["messages"]["offered"].as_u64(), Some(0));
+    assert_eq!(result["messages"]["offered"].as_u64(), Some(1));
     assert_eq!(result["messages"]["unhandled"].as_u64(), Some(0));
-    assert_eq!(result["messages"]["offered_bytes"].as_u64(), Some(0));
+    assert_eq!(result["messages"]["offered_bytes"].as_u64(), Some(100));
     assert_eq!(
         result["messages"]["handled_ids"].as_array().expect("message handled ids"),
         &[json!(oversized_id.as_str())]
@@ -3779,9 +3779,9 @@ fn peer_sync_marks_entries_above_transfer_limit_handled_like_python() {
             .expect("event transfer limited ids"),
         &[json!(oversized_id.as_str())]
     );
-    assert_eq!(event.payload["messages"]["offered"].as_u64(), Some(0));
+    assert_eq!(event.payload["messages"]["offered"].as_u64(), Some(1));
     assert_eq!(event.payload["messages"]["unhandled"].as_u64(), Some(0));
-    assert_eq!(event.payload["messages"]["offered_bytes"].as_u64(), Some(0));
+    assert_eq!(event.payload["messages"]["offered_bytes"].as_u64(), Some(100));
     assert_eq!(
         event.payload["messages"]["handled_ids"].as_array().expect("event handled ids"),
         &[json!(oversized_id.as_str())]

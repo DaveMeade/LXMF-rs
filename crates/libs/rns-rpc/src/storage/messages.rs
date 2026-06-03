@@ -1011,9 +1011,9 @@ impl MessagesStore {
                 Option<i64>,
             ) = conn.query_row(
                 "SELECT
-                    COALESCE(SUM(CASE WHEN e.transient_id IS NOT NULL AND state IN ('handled', 'unhandled') THEN 1 ELSE 0 END), 0),
+                    COALESCE(SUM(CASE WHEN e.transient_id IS NOT NULL AND state IN ('handled', 'unhandled', 'transfer_limited') THEN 1 ELSE 0 END), 0),
                     COALESCE(SUM(CASE WHEN e.transient_id IS NOT NULL AND state = 'unhandled' THEN 1 ELSE 0 END), 0),
-                    COALESCE(SUM(CASE WHEN e.transient_id IS NOT NULL AND state IN ('handled', 'unhandled') THEN e.size_bytes ELSE 0 END), 0),
+                    COALESCE(SUM(CASE WHEN e.transient_id IS NOT NULL AND state IN ('handled', 'unhandled', 'transfer_limited') THEN e.size_bytes ELSE 0 END), 0),
                     COALESCE(SUM(CASE WHEN e.transient_id IS NOT NULL AND state = 'unhandled' THEN e.size_bytes ELSE 0 END), 0)
                  FROM propagation_peer_entries p
                  LEFT JOIN propagation_entries e
@@ -2268,6 +2268,9 @@ mod tests {
             .mark_peer_handled_propagation("peer-a", handled.transient_id.as_str())
             .expect("mark handled");
         store
+            .mark_peer_transfer_limited_propagation("peer-a", other.transient_id.as_str())
+            .expect("mark transfer limited");
+        store
             .mark_peer_unhandled_propagation("peer-a", unhandled.transient_id.as_str())
             .expect("mark unhandled");
         store
@@ -2280,9 +2283,9 @@ mod tests {
         assert_eq!(
             store.peer_propagation_message_stats("peer-a").expect("peer-a stats"),
             PeerPropagationMessageStats {
-                offered: 2,
+                offered: 3,
                 unhandled: 1,
-                offered_bytes: 36,
+                offered_bytes: 72,
                 unhandled_bytes: 24,
             }
         );
