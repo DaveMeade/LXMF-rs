@@ -889,6 +889,10 @@ impl RpcDaemon {
                         .expect("propagation node mutex poisoned");
                     *guard = peer.clone();
                 }
+                if let Some(peer_id) = peer.as_deref() {
+                    self.ensure_peer_for_sync(peer_id, now_i64())?;
+                    self.queue_existing_propagation_for_peer(peer_id)?;
+                }
                 let state = {
                     let mut guard =
                         self.propagation_state.lock().expect("propagation mutex poisoned");

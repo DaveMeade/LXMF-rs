@@ -4284,6 +4284,58 @@ fn selected_propagation_node_updates_status_snapshot() {
 }
 
 #[test]
+fn selected_propagation_node_queues_existing_entries_for_peer_sync() {
+    let daemon = RpcDaemon::test_instance();
+    let entry = PropagationEntryRecord {
+        transient_id: "ad".repeat(32),
+        destination: "12".repeat(16),
+        payload_hex: "34".repeat(24),
+        received_at: 1_700_000_607,
+        size_bytes: 24,
+        stamp_value: None,
+    };
+    daemon.store.upsert_propagation_entry(&entry).expect("store propagation entry");
+
+    let result = daemon
+        .handle_rpc(rpc_request(
+            73,
+            "set_outbound_propagation_node",
+            json!({ "peer": "peer-selected-queue" }),
+        ))
+        .expect("set propagation node")
+        .result
+        .expect("set propagation node result");
+    assert_eq!(result["peer"].as_str(), Some("peer-selected-queue"));
+
+    let peers = daemon
+        .handle_rpc(RpcRequest { id: 74, method: "list_peers".to_string(), params: None })
+        .expect("list peers")
+        .result
+        .expect("list peers result");
+    let row = peers["peers"]
+        .as_array()
+        .expect("peer rows")
+        .iter()
+        .find(|row| row["peer"].as_str() == Some("peer-selected-queue"))
+        .expect("selected peer row");
+    assert_eq!(row["peer_type"].as_str(), Some("manual"));
+    assert_eq!(row["messages"]["offered"].as_u64(), Some(1));
+    assert_eq!(row["messages"]["unhandled"].as_u64(), Some(1));
+    assert_eq!(
+        row["messages"]["unhandled_ids"].as_array().expect("message unhandled ids"),
+        &[json!(entry.transient_id.as_str())]
+    );
+    assert_eq!(
+        daemon
+            .store
+            .list_peer_unhandled_propagation("peer-selected-queue")
+            .expect("list selected peer unhandled")
+            .len(),
+        1
+    );
+}
+
+#[test]
 fn propagation_remote_sync_updates_lifecycle_status() {
     let daemon = RpcDaemon::test_instance();
     daemon.set_remote_control_bridge(Arc::new(TestRemoteControlBridge {
