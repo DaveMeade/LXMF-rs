@@ -188,6 +188,8 @@ The following contract is mandatory in v1:
 : Params keys: `transient_id`
 - `propagation_remote_sync`
 : Params keys: `remote`, `peer` (optional: `identity_private_key_hex`, `timeout_secs`).
+  `remote` is trimmed and must not be blank; invalid remotes are rejected
+  before the bridge is called or local peer/sync state is updated.
   `propagation_status.propagation.sync_state` uses Python `LXMRouter.PR_*`
   values for remote sync lifecycle: request sent `0x04`, complete `0x07`,
   failed `0xfe`.
@@ -199,6 +201,8 @@ The following contract is mandatory in v1:
 : Mirrors local `peer_unpeer` cleanup accounting for the local peer state after
   the remote unpeer call succeeds, and includes the remote bridge `result`.
 : Params keys: `remote`, `peer` (optional: `identity_private_key_hex`, `timeout_secs`).
+  `remote` is trimmed and must not be blank; invalid remotes are rejected
+  before the bridge is called or local peer state is removed.
 
 ### Stamp / tickets
 - `stamp_policy_get` (no params)

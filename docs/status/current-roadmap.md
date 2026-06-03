@@ -1,6 +1,6 @@
 # Current Roadmap Status
 
-Last updated: 2026-06-02
+Last updated: 2026-06-03
 
 This document is the current source of truth for repository-wide delivery
 status. Update this file first when parity status, release confidence, or the
@@ -53,7 +53,10 @@ gap, even though deeper propagation-router parity remains open.
   unauthenticated remote TCP binds, handles graceful listener shutdown, and
   documents service-manager deployment in
   `docs/runbooks/reticulumd-operational-deployment.md`.
-- Propagation-router behavior is still partial relative to Python LXMF.
+- Propagation-router behavior is still partial relative to Python LXMF. Remote
+  propagation status, sync, download, fetch, and unpeer RPCs now trim remote
+  identifiers and reject blank remotes before bridge calls or local sync/peer
+  side effects.
 - Daemon receipt status and peer-activity bookkeeping now preserve Python's
   distinction between transport `sent:*` states and final `delivered` receipts:
   send/resource completion records sent-only peer tx bookkeeping, while actual

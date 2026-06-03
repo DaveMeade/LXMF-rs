@@ -74,7 +74,11 @@ names are `lxmf-wire` and `reticulum-rs-rpc`.
   distinction for active send/resource completion and delivery-receipt paths.
 - Tracked outbound resource timeout now propagates as a failed daemon receipt
   instead of silently dropping transport state.
-- Propagation-node parity is incomplete. The active RPC propagation flow is mostly a local payload store and metadata layer, not full LXMF peer/node sync behavior.
+- Propagation-node parity is incomplete. The active RPC propagation flow is
+  mostly a local payload store and metadata layer, not full LXMF peer/node sync
+  behavior, but remote propagation status, sync, download, fetch, and unpeer
+  RPCs now reject blank remote identifiers before bridge calls or local
+  lifecycle side effects.
 - Peer parity is incomplete. Peer records, configured static peers, events,
   runtime counters, acceptance-rate/backoff fields, Python-style message
   accounting, per-peer propagation transfer/sync limits, propagation stamp
