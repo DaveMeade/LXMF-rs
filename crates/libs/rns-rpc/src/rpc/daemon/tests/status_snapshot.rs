@@ -7517,6 +7517,46 @@ fn propagation_remote_unpeer_publishes_peer_removed_event() {
 }
 
 #[test]
+fn propagation_remote_unpeer_trims_remote_before_bridge_event_and_response() {
+    let daemon = RpcDaemon::test_instance();
+    daemon.set_remote_control_bridge(Arc::new(TestRemoteControlBridge {
+        result: Ok(json!({})),
+    }));
+    daemon
+        .handle_rpc(rpc_request(81, "peer_sync", json!({ "peer": "peer-remote-unpeer-trim" })))
+        .expect("peer sync");
+    daemon.event_queue.lock().expect("event_queue mutex poisoned").clear();
+
+    let result = daemon
+        .handle_rpc(rpc_request(
+            82,
+            "propagation_remote_unpeer",
+            json!({
+                "remote": "  remote-unpeer-trimmed  ",
+                "peer": "peer-remote-unpeer-trim",
+            }),
+        ))
+        .expect("remote unpeer with padded remote")
+        .result
+        .expect("remote unpeer result");
+
+    assert_eq!(result["remote"].as_str(), Some("remote-unpeer-trimmed"));
+    assert_eq!(result["result"]["remote"].as_str(), Some("remote-unpeer-trimmed"));
+
+    let event = daemon
+        .event_queue
+        .lock()
+        .expect("event_queue mutex poisoned")
+        .iter()
+        .rev()
+        .find(|event| event.event_type == "peer_unpeer")
+        .cloned()
+        .expect("peer unpeer event");
+    assert_eq!(event.payload["remote"].as_str(), Some("remote-unpeer-trimmed"));
+    assert_eq!(event.payload["result"]["remote"].as_str(), Some("remote-unpeer-trimmed"));
+}
+
+#[test]
 fn failed_propagation_remote_unpeer_preserves_local_peer_and_queue_state() {
     let daemon = RpcDaemon::test_instance();
     daemon.set_remote_control_bridge(Arc::new(TestRemoteControlBridge {
