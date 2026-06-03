@@ -4562,6 +4562,7 @@ fn failed_propagation_remote_sync_updates_peer_backoff() {
         peer.next_sync_attempt = 0;
         peer.acceptance_rate = 0.5;
     }
+    daemon.event_queue.lock().expect("event_queue mutex poisoned").clear();
 
     let err = daemon
         .handle_rpc(rpc_request(
@@ -4592,6 +4593,33 @@ fn failed_propagation_remote_sync_updates_peer_backoff() {
     assert!(last_sync_attempt > 0);
     assert_eq!(row["next_sync_attempt"].as_i64(), Some(last_sync_attempt + 12 * 60));
     assert!(row["acceptance_rate"].as_f64().is_some_and(|value| value < 0.5));
+
+    let event = daemon
+        .event_queue
+        .lock()
+        .expect("event_queue mutex poisoned")
+        .iter()
+        .rev()
+        .find(|event| event.event_type == "peer_sync")
+        .cloned()
+        .expect("failed remote peer sync event");
+    assert_eq!(event.payload["peer"].as_str(), Some("peer-remote-sync-fail"));
+    assert_eq!(event.payload["remote"].as_str(), Some("remote-node"));
+    assert_eq!(event.payload["remote_sync"].as_bool(), Some(true));
+    assert_eq!(event.payload["synced"].as_bool(), Some(false));
+    assert_eq!(event.payload["alive"].as_bool(), Some(false));
+    assert_eq!(event.payload["sync_backoff"].as_u64(), Some(12 * 60));
+    assert_eq!(event.payload["last_sync_attempt"].as_i64(), Some(last_sync_attempt));
+    assert_eq!(
+        event.payload["next_sync_attempt"].as_i64(),
+        Some(last_sync_attempt + 12 * 60)
+    );
+    assert_eq!(event.payload["propagation"]["remote_sync"].as_bool(), Some(true));
+    assert_eq!(event.payload["propagation"]["synced"].as_bool(), Some(false));
+    assert_eq!(
+        event.payload["propagation"]["error"].as_str(),
+        Some("remote sync failed")
+    );
 }
 
 #[test]

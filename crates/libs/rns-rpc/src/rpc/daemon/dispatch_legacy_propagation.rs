@@ -12,6 +12,83 @@ struct RemotePropagationImportSummary {
 }
 
 impl RpcDaemon {
+    fn publish_failed_remote_peer_sync_event(&self, peer_id: &str, remote: &str, error: &str) {
+        let Some(peer) = self.peers.lock().expect("peers mutex poisoned").get(peer_id).cloned()
+        else {
+            return;
+        };
+        let (outgoing, incoming, offered, unhandled, offered_bytes, unhandled_bytes) =
+            self.peer_message_stats(peer.peer.as_str()).unwrap_or((0, 0, 0, 0, 0, 0));
+        let handled_ids =
+            self.store.list_peer_handled_propagation_ids(peer.peer.as_str()).unwrap_or_default();
+        let unhandled_ids =
+            self.store.list_peer_unhandled_propagation_ids(peer.peer.as_str()).unwrap_or_default();
+        let peering_key = super::dispatch_legacy_messages::peer_peering_key_value(
+            &peer,
+            self.identity_hash.as_str(),
+        );
+        let peer_status_type =
+            if self.is_static_peer(peer.peer.as_str()) { "static" } else { "discovered" };
+        let messages = json!({
+            "offered": offered,
+            "outgoing": outgoing,
+            "incoming": incoming,
+            "unhandled": unhandled,
+            "offered_bytes": offered_bytes,
+            "unhandled_bytes": unhandled_bytes,
+            "handled_ids": handled_ids,
+            "unhandled_ids": unhandled_ids,
+        });
+        let propagation = json!({
+            "remote_sync": true,
+            "synced": false,
+            "error": error,
+            "peering_key": peering_key,
+        });
+        self.publish_event(RpcEvent {
+            event_type: "peer_sync".into(),
+            payload: json!({
+                "peer": peer.peer,
+                "peer_type": peer.peer_type,
+                "type": peer_status_type,
+                "timestamp": now_i64(),
+                "name": peer.name,
+                "name_source": peer.name_source,
+                "remote": remote,
+                "remote_sync": true,
+                "synced": false,
+                "state": 0,
+                "sync_strategy": 2,
+                "ler": 0,
+                "peering_timebase": peer.peering_timebase,
+                "network_distance": peer.network_distance,
+                "alive": peer.alive,
+                "last_heard": peer.last_seen,
+                "first_seen": peer.first_seen,
+                "seen_count": peer.seen_count,
+                "rx_bytes": peer.rx_bytes,
+                "tx_bytes": peer.tx_bytes,
+                "acceptance_rate": peer.acceptance_rate,
+                "last_sync_attempt": peer.last_sync_attempt,
+                "next_sync_attempt": peer.next_sync_attempt,
+                "sync_backoff": peer.sync_backoff,
+                "sync_transfer_rate": peer.sync_transfer_rate,
+                "str": peer.sync_transfer_rate as u64,
+                "propagation_transfer_limit": peer.propagation_transfer_limit,
+                "propagation_sync_limit": peer.propagation_sync_limit,
+                "propagation_stamp_cost": peer.propagation_stamp_cost,
+                "propagation_stamp_cost_flexibility": peer.propagation_stamp_cost_flexibility,
+                "peering_key": peering_key,
+                "transfer_limit": peer.propagation_transfer_limit,
+                "sync_limit": peer.propagation_sync_limit,
+                "target_stamp_cost": peer.propagation_stamp_cost,
+                "stamp_cost_flexibility": peer.propagation_stamp_cost_flexibility,
+                "messages": messages,
+                "propagation": propagation,
+            }),
+        });
+    }
+
     fn store_propagation_payload_hex(
         &self,
         transient_id: &str,
@@ -904,6 +981,11 @@ impl RpcDaemon {
                                     state.last_sync_error = Some(err.to_string());
                                 });
                                 self.record_outbound_peer_activity(parsed.peer.as_str(), 0, false);
+                                self.publish_failed_remote_peer_sync_event(
+                                    parsed.peer.as_str(),
+                                    parsed.remote.as_str(),
+                                    err.to_string().as_str(),
+                                );
                                 return Err(err);
                             }
                         };
@@ -1044,6 +1126,11 @@ impl RpcDaemon {
                             state.last_sync_error = Some(err.to_string());
                         });
                         self.record_outbound_peer_activity(parsed.peer.as_str(), 0, false);
+                        self.publish_failed_remote_peer_sync_event(
+                            parsed.peer.as_str(),
+                            parsed.remote.as_str(),
+                            err.to_string().as_str(),
+                        );
                         return Err(err);
                     }
                 };
