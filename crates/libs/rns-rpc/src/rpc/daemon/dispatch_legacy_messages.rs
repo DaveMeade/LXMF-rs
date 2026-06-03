@@ -588,6 +588,7 @@ impl RpcDaemon {
                     None,
                     peer_type,
                 )?;
+                self.queue_existing_propagation_for_peer(record.peer.as_str())?;
                 let record_transfer_limit_bytes =
                     record.propagation_transfer_limit.map(|limit| limit as usize);
                 let requested_transfer_limit_bytes =

@@ -1213,6 +1213,73 @@ fn autopeered_announce_records_propagation_peer_state() {
 }
 
 #[test]
+fn autopeered_announce_queues_existing_propagation_entries() {
+    let daemon = RpcDaemon::test_instance();
+    daemon
+        .handle_rpc(rpc_request(
+            45,
+            "propagation_enable",
+            json!({
+                "enabled": true,
+                "autopeer": true,
+                "autopeer_maxdepth": 2,
+            }),
+        ))
+        .expect("enable propagation");
+    let entry = PropagationEntryRecord {
+        transient_id: "ad".repeat(32),
+        destination: "12".repeat(16),
+        payload_hex: "12".repeat(24),
+        received_at: 1_700_000_105,
+        size_bytes: 24,
+        stamp_value: None,
+    };
+    daemon.store.upsert_propagation_entry(&entry).expect("store propagation entry");
+
+    daemon
+        .accept_announce_with_metadata(
+            "peer-auto-queue".to_string(),
+            1_700_000_106,
+            Some("Peer Auto Queue".to_string()),
+            Some("announce".to_string()),
+            None,
+            Some(vec!["propagation".to_string()]),
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+            Some(1),
+            None,
+            None,
+            None,
+            None,
+        )
+        .expect("accept announce");
+
+    let peers = daemon
+        .handle_rpc(RpcRequest { id: 46, method: "list_peers".to_string(), params: None })
+        .expect("list peers")
+        .result
+        .expect("list peers result");
+    let row = peers["peers"]
+        .as_array()
+        .expect("peer rows")
+        .iter()
+        .find(|row| row["peer"].as_str() == Some("peer-auto-queue"))
+        .expect("peer row");
+    assert_eq!(row["peer_type"].as_str(), Some("auto"));
+    assert_eq!(row["messages"]["offered"].as_u64(), Some(1));
+    assert_eq!(row["messages"]["unhandled"].as_u64(), Some(1));
+    assert_eq!(
+        row["messages"]["unhandled_ids"].as_array().expect("message unhandled ids"),
+        &[json!(entry.transient_id.as_str())]
+    );
+}
+
+#[test]
 fn stale_announce_does_not_regress_propagation_peer_state() {
     let daemon = RpcDaemon::test_instance();
     daemon
@@ -2114,6 +2181,38 @@ fn peer_sync_marks_unhandled_propagation_entries_handled() {
             .list_peer_handled_propagation_ids("peer-propagation-sync")
             .expect("list handled"),
         vec![entry.transient_id]
+    );
+}
+
+#[test]
+fn peer_sync_queues_existing_entries_for_new_manual_peer() {
+    let daemon = RpcDaemon::test_instance();
+    let entry = PropagationEntryRecord {
+        transient_id: "ac".repeat(32),
+        destination: "12".repeat(16),
+        payload_hex: "12".repeat(24),
+        received_at: 1_700_000_606,
+        size_bytes: 24,
+        stamp_value: None,
+    };
+    daemon.store.upsert_propagation_entry(&entry).expect("store propagation entry");
+
+    let result = daemon
+        .handle_rpc(rpc_request(55, "peer_sync", json!({ "peer": "peer-manual-queue" })))
+        .expect("peer sync")
+        .result
+        .expect("peer sync result");
+    assert_eq!(result["peer_type"].as_str(), Some("manual"));
+    assert_eq!(result["propagation"]["handled"].as_u64(), Some(1));
+    assert_eq!(
+        result["propagation"]["handled_ids"].as_array().expect("handled ids"),
+        &[json!(entry.transient_id.as_str())]
+    );
+    assert_eq!(result["messages"]["offered"].as_u64(), Some(1));
+    assert_eq!(result["messages"]["unhandled"].as_u64(), Some(0));
+    assert_eq!(
+        result["messages"]["handled_ids"].as_array().expect("message handled ids"),
+        &[json!(entry.transient_id.as_str())]
     );
 }
 
@@ -5300,8 +5399,12 @@ fn peer_unpeer_clears_persisted_propagation_queue_marks() {
         .result
         .expect("list peers result");
     let row = peers["peers"].as_array().and_then(|rows| rows.first()).expect("peer row");
-    assert_eq!(row["messages"]["offered"].as_u64(), Some(0));
+    assert_eq!(row["messages"]["offered"].as_u64(), Some(1));
     assert_eq!(row["messages"]["unhandled"].as_u64(), Some(0));
+    assert_eq!(
+        row["messages"]["handled_ids"].as_array().expect("message handled ids"),
+        &[json!(entry.transient_id.as_str())]
+    );
 }
 
 #[test]

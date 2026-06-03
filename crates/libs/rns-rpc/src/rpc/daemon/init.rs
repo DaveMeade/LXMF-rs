@@ -33,6 +33,16 @@ impl RpcDaemon {
             .collect()
     }
 
+    pub(super) fn queue_existing_propagation_for_peer(
+        &self,
+        peer: &str,
+    ) -> Result<(), std::io::Error> {
+        self.store
+            .mark_all_propagation_unhandled_for_peer(peer)
+            .map(|_| ())
+            .map_err(std::io::Error::other)
+    }
+
     pub(super) fn next_announce_seq(&self) -> u64 {
         let mut guard = self.announce_next_seq.lock().expect("announce_next_seq mutex poisoned");
         *guard = guard.wrapping_add(1);
@@ -800,6 +810,7 @@ impl RpcDaemon {
                 timestamp,
                 propagation_peer_state,
             );
+            self.queue_existing_propagation_for_peer(record.peer.as_str())?;
             record
         } else {
             self.transient_peer_record(
@@ -1011,9 +1022,7 @@ impl RpcDaemon {
             snapshot.peer_count = peer_count;
         });
         for peer in activated_peers {
-            self.store
-                .mark_all_propagation_unhandled_for_peer(peer.as_str())
-                .map_err(std::io::Error::other)?;
+            self.queue_existing_propagation_for_peer(peer.as_str())?;
         }
         Ok(())
     }
