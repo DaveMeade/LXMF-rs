@@ -7,7 +7,8 @@ pub(super) fn handle_peer_command(
     error_invalid_data: u8,
     error_not_found: u8,
 ) -> Option<ControlResponse> {
-    let method = if path_hash == control_path_hash("/pn/peer/sync") {
+    let sync_command = path_hash == control_path_hash("/pn/peer/sync");
+    let method = if sync_command {
         "peer_sync"
     } else if path_hash == control_path_hash("/pn/peer/unpeer") {
         "peer_unpeer"
@@ -24,8 +25,15 @@ pub(super) fn handle_peer_command(
     if let Some(transfer_limit_kb) = transfer_limit_kb {
         params["transfer_limit_kb"] = json!(transfer_limit_kb);
     }
-    let _ =
+    let result =
         daemon.handle_rpc(RpcRequest { id: 0, method: method.to_string(), params: Some(params) });
+    if sync_command {
+        return result
+            .ok()
+            .and_then(|response| response.result)
+            .map(ControlResponse::Value)
+            .or(Some(ControlResponse::Code(error_invalid_data)));
+    }
     Some(ControlResponse::Bool(true))
 }
 
@@ -168,6 +176,53 @@ mod tests {
 
         assert_eq!(peer_hex, hex::encode(peer_bytes));
         assert_eq!(transfer_limit_kb, Some(0.0));
+    }
+
+    #[test]
+    fn peer_sync_command_returns_daemon_sync_result() {
+        let peer_bytes = [0xC7; 16];
+        let peer_hex = hex::encode(peer_bytes);
+        let payload_hex = format!("{}{}", "23".repeat(16), "45".repeat(24));
+        let daemon = RpcDaemon::test_instance();
+        daemon
+            .handle_rpc(RpcRequest {
+                id: 1,
+                method: "propagation_enable".to_string(),
+                params: Some(json!({
+                    "enabled": true,
+                    "static_peers": [peer_hex],
+                })),
+            })
+            .expect("enable propagation");
+        let ingest = daemon
+            .handle_rpc(RpcRequest {
+                id: 2,
+                method: "propagation_ingest".to_string(),
+                params: Some(json!({ "payload_hex": payload_hex })),
+            })
+            .expect("ingest propagation")
+            .result
+            .expect("ingest result");
+        let transient_id = ingest["transient_id"].as_str().expect("transient id");
+
+        let response = handle_peer_command(
+            &daemon,
+            control_path_hash("/pn/peer/sync"),
+            Some(rmpv::Value::Binary(peer_bytes.to_vec())),
+            ERROR_INVALID_DATA,
+            ERROR_NOT_FOUND,
+        )
+        .expect("peer sync command response");
+
+        let ControlResponse::Value(result) = response else {
+            panic!("expected peer sync result value");
+        };
+        assert_eq!(result["peer"].as_str(), Some(peer_hex.as_str()));
+        assert_eq!(result["synced"].as_bool(), Some(true));
+        assert_eq!(result["propagation"]["handled"].as_u64(), Some(1));
+        assert_eq!(result["propagation"]["transferred"].as_u64(), Some(1));
+        assert_eq!(result["propagation"]["transferred_ids"], json!([transient_id]));
+        assert_eq!(result["propagation"]["messages"].as_array().map(Vec::len), Some(1));
     }
 
     #[test]
