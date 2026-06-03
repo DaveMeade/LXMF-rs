@@ -534,6 +534,19 @@ impl RpcDaemon {
             .map_err(std::io::Error::other)
     }
 
+    pub fn record_peer_transferred_propagation(
+        &self,
+        peer: &str,
+        transient_id: &str,
+    ) -> Result<(), std::io::Error> {
+        self.store
+            .mark_peer_transferred_propagation(
+                peer,
+                normalize_propagation_transient_key(transient_id).as_str(),
+            )
+            .map_err(std::io::Error::other)
+    }
+
     pub fn list_propagation_payloads_for_destination(
         &self,
         destination: &[u8; 16],
@@ -581,6 +594,22 @@ impl RpcDaemon {
         wanted: &[Vec<u8>],
         transfer_limit_bytes: Option<usize>,
     ) -> Vec<Vec<u8>> {
+        self.fetch_propagation_payloads_for_destination_with_ids(
+            destination,
+            wanted,
+            transfer_limit_bytes,
+        )
+        .into_iter()
+        .map(|(_transient_id, payload)| payload)
+        .collect()
+    }
+
+    pub fn fetch_propagation_payloads_for_destination_with_ids(
+        &self,
+        destination: &[u8; 16],
+        wanted: &[Vec<u8>],
+        transfer_limit_bytes: Option<usize>,
+    ) -> Vec<(String, Vec<u8>)> {
         let destination_hex = hex::encode(destination);
         let per_message_overhead = 16usize;
         let mut cumulative_size = 24usize;
@@ -625,7 +654,7 @@ impl RpcDaemon {
                 continue;
             }
             cumulative_size = next_size;
-            messages.push(payload);
+            messages.push((transient_hex, payload));
         }
 
         if !messages.is_empty() {
