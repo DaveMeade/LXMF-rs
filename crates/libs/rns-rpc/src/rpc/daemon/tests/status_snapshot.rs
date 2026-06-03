@@ -6940,6 +6940,32 @@ fn propagation_remote_download_imports_payloads_into_local_store() {
 }
 
 #[test]
+fn propagation_remote_download_trims_remote_before_bridge_and_response() {
+    let daemon = RpcDaemon::test_instance();
+    daemon.set_remote_control_bridge(Arc::new(TestRemoteControlBridge {
+        result: Ok(json!({
+            "downloaded_count": 0,
+            "messages": [],
+        })),
+    }));
+
+    let result = daemon
+        .handle_rpc(rpc_request(
+            79,
+            "propagation_remote_download",
+            json!({
+                "remote": "  remote-download-trimmed  ",
+            }),
+        ))
+        .expect("remote download with padded remote")
+        .result
+        .expect("remote download result");
+
+    assert_eq!(result["remote"].as_str(), Some("remote-download-trimmed"));
+    assert_eq!(result["result"]["remote"].as_str(), Some("remote-download-trimmed"));
+}
+
+#[test]
 fn duplicate_propagation_remote_download_queues_known_payload_without_double_counting() {
     let payload = b"duplicate-remote-download-propagation-payload";
     let payload_hex = hex::encode(payload);
