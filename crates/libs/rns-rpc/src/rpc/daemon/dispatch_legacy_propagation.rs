@@ -1550,12 +1550,6 @@ impl RpcDaemon {
                         "remote is required",
                     ));
                 }
-                let bridge = self
-                    .remote_control_bridge
-                    .lock()
-                    .expect("remote control bridge mutex poisoned")
-                    .clone()
-                    .ok_or_else(|| std::io::Error::other("remote control bridge unavailable"))?;
                 let peer_id = parsed.peer.trim();
                 if peer_id.is_empty() {
                     return Err(std::io::Error::new(
@@ -1563,6 +1557,12 @@ impl RpcDaemon {
                         "peer is required",
                     ));
                 }
+                let bridge = self
+                    .remote_control_bridge
+                    .lock()
+                    .expect("remote control bridge mutex poisoned")
+                    .clone()
+                    .ok_or_else(|| std::io::Error::other("remote control bridge unavailable"))?;
                 let timeout_secs = parsed.timeout_secs.unwrap_or(5.0).max(0.1);
                 let result = bridge.propagation_remote_unpeer(
                     remote_id.as_str(),

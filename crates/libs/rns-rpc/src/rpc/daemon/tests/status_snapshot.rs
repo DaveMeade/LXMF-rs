@@ -6315,6 +6315,26 @@ fn propagation_remote_unpeer_rejects_blank_peer_before_bridge_call() {
 }
 
 #[test]
+fn propagation_remote_unpeer_rejects_blank_peer_without_bridge() {
+    let daemon = RpcDaemon::test_instance();
+
+    let rejected = daemon
+        .handle_rpc(rpc_request(
+            87,
+            "propagation_remote_unpeer",
+            json!({
+                "remote": "remote-blank-peer",
+                "peer": "   ",
+            }),
+        ))
+        .expect_err("blank remote-unpeer peer should be rejected before bridge lookup");
+    assert!(
+        rejected.to_string().contains("peer is required"),
+        "unexpected rejection error: {rejected}"
+    );
+}
+
+#[test]
 fn propagation_remote_sync_updates_lifecycle_status() {
     let daemon = RpcDaemon::test_instance();
     daemon.set_remote_control_bridge(Arc::new(TestRemoteControlBridge {
