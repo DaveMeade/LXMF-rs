@@ -149,6 +149,10 @@ fn propagation_download_summary_json(
 ) -> JsonValue {
     let transferred_bytes = payloads.iter().map(Vec::len).sum::<usize>();
     json!({
+        "available_count": available,
+        "downloaded_count": downloaded,
+        "duplicate_count": duplicates,
+        "rejected_count": rejected,
         "available": available,
         "downloaded": downloaded,
         "duplicates": duplicates,
@@ -298,6 +302,10 @@ mod tests {
 
         let summary = propagation_download_summary_json(5, &payloads, 1, 1, 2);
 
+        assert_eq!(summary["available_count"].as_u64(), Some(5));
+        assert_eq!(summary["downloaded_count"].as_u64(), Some(1));
+        assert_eq!(summary["duplicate_count"].as_u64(), Some(1));
+        assert_eq!(summary["rejected_count"].as_u64(), Some(2));
         assert_eq!(summary["available"].as_u64(), Some(5));
         assert_eq!(summary["downloaded"].as_u64(), Some(1));
         assert_eq!(summary["duplicates"].as_u64(), Some(1));
