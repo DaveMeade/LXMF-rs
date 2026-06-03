@@ -1,3 +1,4 @@
+use super::dispatch_legacy_messages::LocalUnpeerCleanup;
 use super::*;
 
 pub(super) const LXMF_PEER_SYNC_BACKOFF_STEP_SECS: u32 = 12 * 60;
@@ -1280,14 +1281,11 @@ impl RpcDaemon {
             if cleanup.removed {
                 self.publish_event(RpcEvent {
                     event_type: "peer_unpeer".into(),
-                    payload: json!({
-                        "peer": peer,
-                        "removed": true,
-                        "reason": "static_only_policy",
-                        "propagation_cleared": cleanup.propagation_cleared,
-                        "propagation_cleared_bytes": cleanup.propagation_cleared_bytes,
-                        "messages": cleanup.messages,
-                    }),
+                    payload: policy_unpeer_event_payload(
+                        peer.as_str(),
+                        "static_only_policy",
+                        &cleanup,
+                    ),
                 });
             }
         }
@@ -1312,14 +1310,11 @@ impl RpcDaemon {
             if cleanup.removed {
                 self.publish_event(RpcEvent {
                     event_type: "peer_unpeer".into(),
-                    payload: json!({
-                        "peer": peer,
-                        "removed": true,
-                        "reason": "autopeer_disabled",
-                        "propagation_cleared": cleanup.propagation_cleared,
-                        "propagation_cleared_bytes": cleanup.propagation_cleared_bytes,
-                        "messages": cleanup.messages,
-                    }),
+                    payload: policy_unpeer_event_payload(
+                        peer.as_str(),
+                        "autopeer_disabled",
+                        &cleanup,
+                    ),
                 });
             }
         }
@@ -1347,14 +1342,11 @@ impl RpcDaemon {
             if cleanup.removed {
                 self.publish_event(RpcEvent {
                     event_type: "peer_unpeer".into(),
-                    payload: json!({
-                        "peer": peer,
-                        "removed": true,
-                        "reason": "autopeer_maxdepth",
-                        "propagation_cleared": cleanup.propagation_cleared,
-                        "propagation_cleared_bytes": cleanup.propagation_cleared_bytes,
-                        "messages": cleanup.messages,
-                    }),
+                    payload: policy_unpeer_event_payload(
+                        peer.as_str(),
+                        "autopeer_maxdepth",
+                        &cleanup,
+                    ),
                 });
             }
         }
@@ -1525,14 +1517,7 @@ impl RpcDaemon {
         if cleanup.removed {
             self.publish_event(RpcEvent {
                 event_type: "peer_unpeer".into(),
-                payload: json!({
-                    "peer": peer,
-                    "removed": true,
-                    "reason": "propagation_disabled",
-                    "propagation_cleared": cleanup.propagation_cleared,
-                    "propagation_cleared_bytes": cleanup.propagation_cleared_bytes,
-                    "messages": cleanup.messages,
-                }),
+                payload: policy_unpeer_event_payload(peer, "propagation_disabled", &cleanup),
             });
         }
         Ok(())
@@ -1584,4 +1569,25 @@ impl RpcDaemon {
     ) -> Result<(), std::io::Error> {
         self.accept_inbound(record)
     }
+}
+
+fn policy_unpeer_event_payload(
+    peer: &str,
+    reason: &str,
+    cleanup: &LocalUnpeerCleanup,
+) -> JsonValue {
+    let offered = cleanup.messages["offered"].as_u64().unwrap_or(0);
+    let outgoing = cleanup.messages["outgoing"].as_u64().unwrap_or(0);
+    let incoming = cleanup.messages["incoming"].as_u64().unwrap_or(0);
+    json!({
+        "peer": peer,
+        "removed": true,
+        "reason": reason,
+        "propagation_cleared": cleanup.propagation_cleared,
+        "propagation_cleared_bytes": cleanup.propagation_cleared_bytes,
+        "offered": offered,
+        "outgoing": outgoing,
+        "incoming": incoming,
+        "messages": cleanup.messages.clone(),
+    })
 }

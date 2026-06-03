@@ -1020,6 +1020,10 @@ fn propagation_enable_autopeer_false_unpeers_existing_autopeers() {
     assert_eq!(event.payload["removed"].as_bool(), Some(true));
     assert_eq!(event.payload["reason"].as_str(), Some("autopeer_disabled"));
     assert_eq!(event.payload["propagation_cleared"].as_u64(), Some(1));
+    assert_eq!(event.payload["offered"].as_u64(), Some(1));
+    assert_eq!(event.payload["outgoing"].as_u64(), Some(0));
+    assert_eq!(event.payload["incoming"].as_u64(), Some(0));
+    assert_eq!(event.payload["messages"]["offered"].as_u64(), Some(1));
 
     let selected = daemon
         .handle_rpc(RpcRequest {
