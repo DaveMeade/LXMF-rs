@@ -27,14 +27,11 @@ pub(super) fn handle_peer_command(
     }
     let result =
         daemon.handle_rpc(RpcRequest { id: 0, method: method.to_string(), params: Some(params) });
-    if sync_command {
-        return result
-            .ok()
-            .and_then(|response| response.result)
-            .map(ControlResponse::Value)
-            .or(Some(ControlResponse::Code(error_invalid_data)));
-    }
-    Some(ControlResponse::Bool(true))
+    result
+        .ok()
+        .and_then(|response| response.result)
+        .map(ControlResponse::Value)
+        .or(Some(ControlResponse::Code(error_invalid_data)))
 }
 
 fn peer_request_from_data(data: Option<rmpv::Value>) -> Option<(String, Option<f64>)> {
@@ -226,17 +223,28 @@ mod tests {
     }
 
     #[test]
-    fn peer_unpeer_command_delegates_to_daemon_rpc() {
+    fn peer_unpeer_command_returns_daemon_cleanup_result() {
         let daemon = RpcDaemon::test_instance();
         let peer_bytes = [0xB6; 16];
         let peer_hex = hex::encode(peer_bytes);
+        let payload_hex = format!("{}{}", "19".repeat(16), "57".repeat(24));
         daemon
             .handle_rpc(RpcRequest {
                 id: 1,
-                method: "peer_sync".to_string(),
-                params: Some(json!({ "peer": peer_hex })),
+                method: "propagation_enable".to_string(),
+                params: Some(json!({
+                    "enabled": true,
+                    "static_peers": [peer_hex],
+                })),
             })
-            .expect("seed peer");
+            .expect("enable propagation");
+        daemon
+            .handle_rpc(RpcRequest {
+                id: 2,
+                method: "propagation_ingest".to_string(),
+                params: Some(json!({ "payload_hex": payload_hex })),
+            })
+            .expect("ingest propagation");
 
         let response = handle_peer_command(
             &daemon,
@@ -246,7 +254,13 @@ mod tests {
             ERROR_NOT_FOUND,
         );
 
-        assert!(matches!(response, Some(ControlResponse::Bool(true))));
+        let Some(ControlResponse::Value(result)) = response else {
+            panic!("expected peer unpeer result value");
+        };
+        assert_eq!(result["peer"].as_str(), Some(peer_hex.as_str()));
+        assert_eq!(result["removed"].as_bool(), Some(true));
+        assert_eq!(result["propagation_cleared"].as_u64(), Some(1));
+        assert_eq!(result["messages"]["unhandled"].as_u64(), Some(1));
         let peers = daemon
             .handle_rpc(RpcRequest { id: 2, method: "list_peers".to_string(), params: None })
             .expect("list peers")
