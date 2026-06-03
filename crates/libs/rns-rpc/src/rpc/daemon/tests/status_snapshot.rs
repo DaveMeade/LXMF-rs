@@ -2714,6 +2714,42 @@ fn list_peers_reports_zero_acceptance_rate_when_no_offers_like_python() {
 }
 
 #[test]
+fn list_peers_preserves_python_peer_message_counters() {
+    let daemon = RpcDaemon::test_instance();
+    let peer: PeerRecord = serde_json::from_value(json!({
+        "peer": "peer-python-counters",
+        "last_seen": 1_700_001_100,
+        "offered": 7,
+        "outgoing": 5,
+        "incoming": 3,
+        "acceptance_rate": 0.9,
+    }))
+    .expect("deserialize python counter peer");
+    daemon
+        .peers
+        .lock()
+        .expect("peers mutex poisoned")
+        .insert(peer.peer.clone(), peer);
+
+    let peers = daemon
+        .handle_rpc(RpcRequest { id: 54, method: "list_peers".to_string(), params: None })
+        .expect("list peers")
+        .result
+        .expect("list peers result");
+    let row = peers["peers"]
+        .as_array()
+        .expect("peer rows")
+        .iter()
+        .find(|row| row["peer"].as_str() == Some("peer-python-counters"))
+        .expect("peer row");
+
+    assert_eq!(row["messages"]["offered"].as_u64(), Some(7));
+    assert_eq!(row["messages"]["outgoing"].as_u64(), Some(5));
+    assert_eq!(row["messages"]["incoming"].as_u64(), Some(3));
+    assert_eq!(row["acceptance_rate"].as_f64(), Some(5.0 / 7.0));
+}
+
+#[test]
 fn peer_sync_without_offers_preserves_failure_backoff() {
     let daemon = RpcDaemon::test_instance();
     daemon
@@ -4703,7 +4739,7 @@ fn list_peers_includes_propagation_marks_in_message_counters() {
         .expect("peer row");
     assert_eq!(row["messages"]["offered"].as_u64(), Some(2));
     assert_eq!(row["messages"]["unhandled"].as_u64(), Some(1));
-    assert_eq!(row["acceptance_rate"].as_f64(), Some(0.5));
+    assert_eq!(row["acceptance_rate"].as_f64(), Some(0.0));
     assert_eq!(row["messages"]["offered_bytes"].as_u64(), Some(40));
     assert_eq!(row["messages"]["unhandled_bytes"].as_u64(), Some(24));
     assert_eq!(
@@ -5793,11 +5829,11 @@ fn propagation_remote_sync_updates_peer_runtime_state() {
     assert_eq!(event.payload["sync_transfer_rate"].as_f64(), Some(payload.len() as f64));
     assert_eq!(event.payload["messages"]["outgoing"].as_u64(), Some(0));
     assert_eq!(event.payload["messages"]["incoming"].as_u64(), Some(1));
-    assert_eq!(event.payload["messages"]["offered"].as_u64(), Some(1));
+    assert_eq!(event.payload["messages"]["offered"].as_u64(), Some(0));
     assert_eq!(event.payload["messages"]["unhandled"].as_u64(), Some(0));
     assert_eq!(
         event.payload["messages"]["offered_bytes"].as_u64(),
-        Some(payload.len() as u64)
+        Some(0)
     );
     assert_eq!(event.payload["messages"]["unhandled_bytes"].as_u64(), Some(0));
     assert_eq!(event.payload["propagation"]["remote_sync"].as_bool(), Some(true));

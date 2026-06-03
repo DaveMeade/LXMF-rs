@@ -46,7 +46,7 @@ impl RpcDaemon {
         let (outgoing, incoming, offered, unhandled, offered_bytes, unhandled_bytes) =
             self.peer_message_stats(record.peer.as_str()).unwrap_or((0, 0, 0, 0, 0, 0));
         let acceptance_rate =
-            peer_acceptance_rate_for_reporting(acceptance_rate, offered, unhandled, alive);
+            peer_acceptance_rate_for_reporting(acceptance_rate, outgoing, offered, alive);
         let handled_ids =
             self.store.list_peer_handled_propagation_ids(record.peer.as_str()).unwrap_or_default();
         let unhandled_ids = self
@@ -294,8 +294,8 @@ impl RpcDaemon {
                             peer_peering_key_value(&peer, self.identity_hash.as_str());
                         let acceptance_rate = peer_acceptance_rate_for_reporting(
                             peer.acceptance_rate,
+                            outgoing,
                             offered,
-                            unhandled,
                             peer.alive,
                         );
                         let handled_ids = self
@@ -1509,13 +1509,12 @@ pub(super) fn peer_peering_key_value(peer: &PeerRecord, local_identity_hash: &st
 
 pub(super) fn peer_acceptance_rate_for_reporting(
     cached_rate: f64,
+    outgoing: u64,
     offered: u64,
-    unhandled: u64,
     alive: bool,
 ) -> f64 {
     if offered > 0 {
-        let accepted = offered.saturating_sub(unhandled);
-        (accepted as f64 / offered as f64).clamp(0.0, 1.0)
+        (outgoing as f64 / offered as f64).clamp(0.0, 1.0)
     } else if !alive {
         0.0
     } else {

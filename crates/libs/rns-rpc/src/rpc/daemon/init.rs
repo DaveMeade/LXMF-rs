@@ -557,10 +557,18 @@ impl RpcDaemon {
         let stats = self.store.peer_message_stats(peer).map_err(std::io::Error::other)?;
         let propagation =
             self.store.peer_propagation_message_stats(peer).map_err(std::io::Error::other)?;
+        let (record_offered, record_outgoing, record_incoming) = self
+            .peers
+            .lock()
+            .ok()
+            .and_then(|guard| {
+                guard.get(peer).map(|record| (record.offered, record.outgoing, record.incoming))
+            })
+            .unwrap_or((0, 0, 0));
         Ok((
-            stats.outgoing.saturating_add(propagation.outgoing),
-            stats.incoming.saturating_add(propagation.incoming),
-            stats.offered.saturating_add(propagation.offered),
+            record_outgoing.saturating_add(stats.outgoing).saturating_add(propagation.outgoing),
+            record_incoming.saturating_add(stats.incoming).saturating_add(propagation.incoming),
+            record_offered.saturating_add(stats.offered).saturating_add(propagation.offered),
             stats.unhandled.saturating_add(propagation.unhandled),
             propagation.offered_bytes,
             propagation.unhandled_bytes,
@@ -1068,6 +1076,9 @@ impl RpcDaemon {
             next_sync_attempt: 0,
             sync_backoff: 0,
             network_distance: 1,
+            offered: 0,
+            outgoing: 0,
+            incoming: 0,
             rx_bytes: 0,
             tx_bytes: 0,
             sync_transfer_rate: 0.0,
@@ -1156,6 +1167,9 @@ impl RpcDaemon {
                     next_sync_attempt: 0,
                     sync_backoff: 0,
                     network_distance: 1,
+                    offered: 0,
+                    outgoing: 0,
+                    incoming: 0,
                     rx_bytes: 0,
                     tx_bytes: 0,
                     sync_transfer_rate: 0.0,
@@ -1539,6 +1553,9 @@ impl RpcDaemon {
             next_sync_attempt: 0,
             sync_backoff: 0,
             network_distance: 1,
+            offered: 0,
+            outgoing: 0,
+            incoming: 0,
             rx_bytes: 0,
             tx_bytes: 0,
             sync_transfer_rate: 0.0,

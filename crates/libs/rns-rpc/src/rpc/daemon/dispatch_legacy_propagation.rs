@@ -21,8 +21,8 @@ impl RpcDaemon {
         transfer_limit: Option<u64>,
         sync_limit: Option<u64>,
     ) {
-        let Some(peer) = self.peers.lock().expect("peers mutex poisoned").get(peer_id).cloned()
-        else {
+        let peer = self.peers.lock().expect("peers mutex poisoned").get(peer_id).cloned();
+        let Some(peer) = peer else {
             return;
         };
         let (outgoing, incoming, offered, unhandled, offered_bytes, unhandled_bytes) =
@@ -37,8 +37,8 @@ impl RpcDaemon {
         );
         let acceptance_rate = super::dispatch_legacy_messages::peer_acceptance_rate_for_reporting(
             peer.acceptance_rate,
+            outgoing,
             offered,
-            unhandled,
             peer.alive,
         );
         let peer_status_type =
@@ -1153,13 +1153,13 @@ impl RpcDaemon {
                                 peer.sync_transfer_rate = imported.transferred_bytes as f64;
                             }
                         }
-                        if let Some(peer) = self
+                        let peer = self
                             .peers
                             .lock()
                             .expect("peers mutex poisoned")
                             .get(parsed.peer.as_str())
-                            .cloned()
-                        {
+                            .cloned();
+                        if let Some(peer) = peer {
                             let (
                                 outgoing,
                                 incoming,
@@ -1186,8 +1186,8 @@ impl RpcDaemon {
                             let acceptance_rate =
                                 super::dispatch_legacy_messages::peer_acceptance_rate_for_reporting(
                                     peer.acceptance_rate,
+                                    outgoing,
                                     offered,
-                                    unhandled,
                                     peer.alive,
                                 );
                             let messages = json!({

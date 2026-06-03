@@ -667,6 +667,9 @@ pub struct PeerRecord {
     pub next_sync_attempt: i64,
     pub sync_backoff: u32,
     pub network_distance: u32,
+    pub offered: u64,
+    pub outgoing: u64,
+    pub incoming: u64,
     pub rx_bytes: u64,
     pub tx_bytes: u64,
     pub sync_transfer_rate: f64,
@@ -699,6 +702,9 @@ impl serde::Serialize for PeerRecord {
         map.serialize_entry("next_sync_attempt", &self.next_sync_attempt)?;
         map.serialize_entry("sync_backoff", &self.sync_backoff)?;
         map.serialize_entry("network_distance", &self.network_distance)?;
+        map.serialize_entry("offered", &self.offered)?;
+        map.serialize_entry("outgoing", &self.outgoing)?;
+        map.serialize_entry("incoming", &self.incoming)?;
         map.serialize_entry("rx_bytes", &self.rx_bytes)?;
         map.serialize_entry("tx_bytes", &self.tx_bytes)?;
         map.serialize_entry("sync_transfer_rate", &self.sync_transfer_rate)?;
@@ -755,6 +761,12 @@ struct PeerRecordWire {
     sync_backoff: u32,
     #[serde(default = "default_network_distance")]
     network_distance: u32,
+    #[serde(default)]
+    offered: u64,
+    #[serde(default)]
+    outgoing: u64,
+    #[serde(default)]
+    incoming: u64,
     #[serde(default)]
     rx_bytes: u64,
     #[serde(default)]
@@ -814,6 +826,9 @@ impl<'de> Deserialize<'de> for PeerRecord {
             next_sync_attempt: wire.next_sync_attempt,
             sync_backoff: wire.sync_backoff,
             network_distance: wire.network_distance,
+            offered: wire.offered,
+            outgoing: wire.outgoing,
+            incoming: wire.incoming,
             rx_bytes: wire.rx_bytes,
             tx_bytes: wire.tx_bytes,
             sync_transfer_rate,
@@ -913,6 +928,9 @@ mod peer_record_serde_tests {
             "peer": "peer-python-status",
             "last_heard": 1_700_001_004,
             "str": 4096.0,
+            "offered": 7,
+            "outgoing": 5,
+            "incoming": 3,
             "transfer_limit": 333,
             "sync_limit": 444,
             "target_stamp_cost": 7,
@@ -928,6 +946,10 @@ mod peer_record_serde_tests {
         assert_eq!(record.propagation_sync_limit, Some(444));
         assert_eq!(record.propagation_stamp_cost, Some(7));
         assert_eq!(record.propagation_stamp_cost_flexibility, Some(2));
+        let value = serde_json::to_value(record).expect("serialize python status peer");
+        assert_eq!(value["offered"].as_u64(), Some(7));
+        assert_eq!(value["outgoing"].as_u64(), Some(5));
+        assert_eq!(value["incoming"].as_u64(), Some(3));
     }
 
     #[test]
@@ -964,6 +986,9 @@ mod peer_record_serde_tests {
             next_sync_attempt: 1_700_001_720,
             sync_backoff: 720,
             network_distance: 3,
+            offered: 7,
+            outgoing: 5,
+            incoming: 3,
             rx_bytes: 123,
             tx_bytes: 456,
             sync_transfer_rate: 2048.0,
@@ -983,6 +1008,9 @@ mod peer_record_serde_tests {
         assert_eq!(value["last_heard"].as_i64(), Some(1_700_001_005));
         assert_eq!(value["sync_transfer_rate"].as_f64(), Some(2048.0));
         assert_eq!(value["str"].as_f64(), Some(2048.0));
+        assert_eq!(value["offered"].as_u64(), Some(7));
+        assert_eq!(value["outgoing"].as_u64(), Some(5));
+        assert_eq!(value["incoming"].as_u64(), Some(3));
         assert_eq!(value["propagation_transfer_limit"].as_u64(), Some(333));
         assert_eq!(value["transfer_limit"].as_u64(), Some(333));
         assert_eq!(value["propagation_sync_limit"].as_u64(), Some(444));
@@ -1007,6 +1035,9 @@ mod peer_record_serde_tests {
             next_sync_attempt: 1_700_001_721,
             sync_backoff: 720,
             network_distance: 2,
+            offered: 9,
+            outgoing: 6,
+            incoming: 4,
             rx_bytes: 12,
             tx_bytes: 34,
             sync_transfer_rate: 1024.0,
