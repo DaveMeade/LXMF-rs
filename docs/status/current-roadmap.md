@@ -56,7 +56,10 @@ gap, even though deeper propagation-router parity remains open.
 - Propagation-router behavior is still partial relative to Python LXMF. Remote
   propagation status, sync, download, fetch, and unpeer RPCs now trim remote
   identifiers and reject blank remotes before bridge calls or local sync/peer
-  side effects.
+  side effects. Remote sync also rejects blank peers before bridge lookup and
+  does not create local peer state when the remote-control bridge is
+  unavailable, while preserving existing-peer backoff postponement before
+  bridge lookup.
 - Daemon receipt status and peer-activity bookkeeping now preserve Python's
   distinction between transport `sent:*` states and final `delivered` receipts:
   send/resource completion records sent-only peer tx bookkeeping, while actual

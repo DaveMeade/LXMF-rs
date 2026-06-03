@@ -78,7 +78,10 @@ names are `lxmf-wire` and `reticulum-rs-rpc`.
   mostly a local payload store and metadata layer, not full LXMF peer/node sync
   behavior, but remote propagation status, sync, download, fetch, and unpeer
   RPCs now reject blank remote identifiers before bridge calls or local
-  lifecycle side effects.
+  lifecycle side effects. Remote sync additionally rejects blank peers before
+  bridge lookup and avoids creating local peer records when no remote-control
+  bridge is available, while still allowing existing peers in backoff to
+  postpone without a bridge.
 - Peer parity is incomplete. Peer records, configured static peers, events,
   runtime counters, acceptance-rate/backoff fields, Python-style message
   accounting, per-peer propagation transfer/sync limits, propagation stamp
@@ -125,6 +128,7 @@ Recent focused evidence:
 - `cargo test -p reticulum-rs-rpc --lib ticket_generate_reuses_persisted_ticket_after_daemon_restart -- --nocapture`
 - `cargo test -p reticulum-rs-rpc --lib outbound_lxm -- --nocapture`
 - `cargo test -p reticulum-rs-rpc --lib propagation_remote_sync -- --nocapture`
+- `cargo test -p reticulum-rs-rpc --lib propagation_remote_sync_missing_bridge_does_not_create_peer -- --nocapture`
 - PR #215 GitHub CI rollup at `0c4588c`, including the pinned
   Python-reference interop workflow and `CI / unused-deps (pull_request)`.
 - `cargo test -p reticulum-rs-rpc --lib propagation_acknowledge_sync_completion -- --nocapture`
