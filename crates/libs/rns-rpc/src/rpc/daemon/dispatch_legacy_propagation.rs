@@ -38,6 +38,7 @@ impl RpcDaemon {
         let acceptance_rate = super::dispatch_legacy_messages::peer_acceptance_rate_for_reporting(
             peer.acceptance_rate,
             offered,
+            unhandled,
             peer.alive,
         );
         let peer_status_type =
@@ -1186,6 +1187,7 @@ impl RpcDaemon {
                                 super::dispatch_legacy_messages::peer_acceptance_rate_for_reporting(
                                     peer.acceptance_rate,
                                     offered,
+                                    unhandled,
                                     peer.alive,
                                 );
                             let messages = json!({

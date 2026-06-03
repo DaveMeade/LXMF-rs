@@ -4118,7 +4118,7 @@ fn peer_sync_reports_propagation_transfer_accounting() {
         .expect("peer row");
     assert_eq!(row["tx_bytes"].as_u64(), Some(20));
     assert_eq!(row["alive"].as_bool(), Some(true));
-    assert_eq!(row["acceptance_rate"].as_f64(), Some(1.0));
+    assert_eq!(row["acceptance_rate"].as_f64(), Some(0.5));
 }
 
 #[test]
@@ -4655,6 +4655,11 @@ fn list_peers_includes_propagation_marks_in_message_counters() {
     daemon
         .handle_rpc(rpc_request(56, "peer_sync", json!({ "peer": "peer-propagation-stats" })))
         .expect("peer sync");
+    {
+        let mut peers = daemon.peers.lock().expect("peers mutex poisoned");
+        let peer = peers.get_mut("peer-propagation-stats").expect("peer record");
+        peer.acceptance_rate = 0.9;
+    }
     let handled = PropagationEntryRecord {
         transient_id: "ac".repeat(32),
         destination: "13".repeat(16),
@@ -4695,6 +4700,7 @@ fn list_peers_includes_propagation_marks_in_message_counters() {
         .expect("peer row");
     assert_eq!(row["messages"]["offered"].as_u64(), Some(2));
     assert_eq!(row["messages"]["unhandled"].as_u64(), Some(1));
+    assert_eq!(row["acceptance_rate"].as_f64(), Some(0.5));
     assert_eq!(row["messages"]["offered_bytes"].as_u64(), Some(40));
     assert_eq!(row["messages"]["unhandled_bytes"].as_u64(), Some(24));
     assert_eq!(
