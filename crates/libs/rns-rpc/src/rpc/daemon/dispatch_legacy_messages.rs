@@ -732,9 +732,9 @@ impl RpcDaemon {
                     "postponed": false,
                     "handled": propagation_handled,
                     "skipped": propagation_skipped,
-                    "offered": propagation_handled.saturating_add(propagation_skipped),
+                    "offered": propagation_handled,
                     "bytes": propagation_bytes,
-                    "offered_bytes": propagation_bytes.saturating_add(propagation_remaining_bytes),
+                    "offered_bytes": propagation_bytes,
                     "remaining": propagation_skipped,
                     "remaining_bytes": propagation_remaining_bytes,
                     "handled_ids": propagation_handled_ids,
@@ -759,9 +759,8 @@ impl RpcDaemon {
                 ) = {
                     let mut guard = self.peers.lock().expect("peers mutex poisoned");
                     if let Some(existing) = guard.get_mut(&record.peer) {
-                        let propagation_offered =
-                            propagation_handled.saturating_add(propagation_skipped);
-                        let propagation_pending = propagation_offered;
+                        let propagation_offered = propagation_handled;
+                        let propagation_pending = propagation_skipped;
                         existing.last_sync_attempt = timestamp;
                         existing.alive = propagation_handled > 0
                             || existing.last_sync_attempt < existing.last_seen;

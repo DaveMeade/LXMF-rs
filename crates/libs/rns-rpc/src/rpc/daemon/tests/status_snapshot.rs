@@ -2021,7 +2021,8 @@ fn peer_sync_with_only_skipped_offers_schedules_initial_backoff() {
         .expect("skipped peer sync")
         .result
         .expect("peer sync result");
-    assert_eq!(result["propagation"]["offered"].as_u64(), Some(1));
+    assert_eq!(result["propagation"]["offered"].as_u64(), Some(0));
+    assert_eq!(result["propagation"]["offered_bytes"].as_u64(), Some(0));
     assert_eq!(result["propagation"]["handled"].as_u64(), Some(0));
     assert_eq!(result["propagation"]["skipped"].as_u64(), Some(1));
     assert_eq!(result["acceptance_rate"].as_f64(), Some(0.0));
@@ -2400,7 +2401,8 @@ fn peer_sync_skips_entry_at_exact_sync_limit_like_python() {
         .expect("peer sync result");
     assert_eq!(result["propagation"]["handled"].as_u64(), Some(0));
     assert_eq!(result["propagation"]["skipped"].as_u64(), Some(1));
-    assert_eq!(result["propagation"]["offered"].as_u64(), Some(1));
+    assert_eq!(result["propagation"]["offered"].as_u64(), Some(0));
+    assert_eq!(result["propagation"]["offered_bytes"].as_u64(), Some(0));
     assert_eq!(
         result["propagation"]["skipped_ids"].as_array().expect("skipped ids"),
         &[json!(entry.transient_id.as_str())]
@@ -2876,9 +2878,9 @@ fn peer_sync_reports_propagation_transfer_accounting() {
         .expect("peer sync result");
     assert_eq!(result["propagation"]["handled"].as_u64(), Some(1));
     assert_eq!(result["propagation"]["skipped"].as_u64(), Some(1));
-    assert_eq!(result["propagation"]["offered"].as_u64(), Some(2));
+    assert_eq!(result["propagation"]["offered"].as_u64(), Some(1));
     assert_eq!(result["propagation"]["bytes"].as_u64(), Some(20));
-    assert_eq!(result["propagation"]["offered_bytes"].as_u64(), Some(120));
+    assert_eq!(result["propagation"]["offered_bytes"].as_u64(), Some(20));
     assert_eq!(result["propagation"]["remaining"].as_u64(), Some(1));
     assert_eq!(result["propagation"]["remaining_bytes"].as_u64(), Some(100));
     assert_eq!(
@@ -2887,7 +2889,7 @@ fn peer_sync_reports_propagation_transfer_accounting() {
     );
     assert_eq!(result["tx_bytes"].as_u64(), Some(20));
     assert_eq!(result["alive"].as_bool(), Some(true));
-    assert_eq!(result["acceptance_rate"].as_f64(), Some(0.5));
+    assert_eq!(result["acceptance_rate"].as_f64(), Some(1.0));
     assert_eq!(
         result["propagation"]["handled_ids"].as_array().expect("handled ids"),
         &[json!(small.transient_id.as_str())]
@@ -2908,9 +2910,9 @@ fn peer_sync_reports_propagation_transfer_accounting() {
         .expect("peer sync event");
     assert_eq!(event.payload["propagation"]["handled"].as_u64(), Some(1));
     assert_eq!(event.payload["propagation"]["skipped"].as_u64(), Some(1));
-    assert_eq!(event.payload["propagation"]["offered"].as_u64(), Some(2));
+    assert_eq!(event.payload["propagation"]["offered"].as_u64(), Some(1));
     assert_eq!(event.payload["propagation"]["bytes"].as_u64(), Some(20));
-    assert_eq!(event.payload["propagation"]["offered_bytes"].as_u64(), Some(120));
+    assert_eq!(event.payload["propagation"]["offered_bytes"].as_u64(), Some(20));
     assert_eq!(event.payload["propagation"]["remaining"].as_u64(), Some(1));
     assert_eq!(event.payload["propagation"]["remaining_bytes"].as_u64(), Some(100));
     assert_eq!(event.payload["synced"].as_bool(), Some(true));
@@ -2918,7 +2920,7 @@ fn peer_sync_reports_propagation_transfer_accounting() {
     assert_eq!(event.payload["propagation"]["postponed"].as_bool(), Some(false));
     assert_eq!(event.payload["tx_bytes"].as_u64(), Some(20));
     assert_eq!(event.payload["alive"].as_bool(), Some(true));
-    assert_eq!(event.payload["acceptance_rate"].as_f64(), Some(0.5));
+    assert_eq!(event.payload["acceptance_rate"].as_f64(), Some(1.0));
     assert_eq!(
         event.payload["propagation"]["handled_ids"].as_array().expect("event handled ids"),
         &[json!(small.transient_id.as_str())]
@@ -2941,7 +2943,7 @@ fn peer_sync_reports_propagation_transfer_accounting() {
         .expect("peer row");
     assert_eq!(row["tx_bytes"].as_u64(), Some(20));
     assert_eq!(row["alive"].as_bool(), Some(true));
-    assert_eq!(row["acceptance_rate"].as_f64(), Some(0.5));
+    assert_eq!(row["acceptance_rate"].as_f64(), Some(1.0));
 }
 
 #[test]
