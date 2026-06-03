@@ -1061,9 +1061,40 @@ impl RpcDaemon {
         });
         let mut cleared_selected_node = false;
         for peer in removed_static_peers {
+            let propagation_stats = self
+                .store
+                .peer_propagation_message_stats(peer.as_str())
+                .map_err(std::io::Error::other)?;
+            let handled_ids = self
+                .store
+                .list_peer_handled_propagation_ids(peer.as_str())
+                .map_err(std::io::Error::other)?;
+            let unhandled_ids = self
+                .store
+                .list_peer_unhandled_propagation_ids(peer.as_str())
+                .map_err(std::io::Error::other)?;
             self.store
                 .clear_peer_propagation_marks(peer.as_str())
                 .map_err(std::io::Error::other)?;
+            let messages = json!({
+                "offered": propagation_stats.offered,
+                "unhandled": propagation_stats.unhandled,
+                "offered_bytes": propagation_stats.offered_bytes,
+                "unhandled_bytes": propagation_stats.unhandled_bytes,
+                "handled_ids": handled_ids,
+                "unhandled_ids": unhandled_ids,
+            });
+            self.publish_event(RpcEvent {
+                event_type: "peer_unpeer".into(),
+                payload: json!({
+                    "peer": peer.as_str(),
+                    "removed": true,
+                    "reason": "static_only_policy",
+                    "propagation_cleared": propagation_stats.offered,
+                    "propagation_cleared_bytes": propagation_stats.offered_bytes,
+                    "messages": messages,
+                }),
+            });
             let mut selected =
                 self.outbound_propagation_node.lock().expect("propagation node mutex poisoned");
             if selected.as_deref() == Some(peer.as_str()) {

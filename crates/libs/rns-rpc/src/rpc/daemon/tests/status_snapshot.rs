@@ -347,6 +347,7 @@ fn propagation_enable_unpeers_removed_static_peers_when_static_only() {
             json!({ "peer": "peer-static-old" }),
         ))
         .expect("select old static peer");
+    daemon.event_queue.lock().expect("event_queue mutex poisoned").clear();
 
     let update = daemon
         .handle_rpc(rpc_request(
@@ -382,6 +383,19 @@ fn propagation_enable_unpeers_removed_static_peers_when_static_only() {
         .list_peer_unhandled_propagation("peer-static-old")
         .expect("old peer pending propagation");
     assert!(old_pending.is_empty());
+    let event = daemon
+        .event_queue
+        .lock()
+        .expect("event_queue mutex poisoned")
+        .iter()
+        .rev()
+        .find(|event| event.event_type == "peer_unpeer")
+        .cloned()
+        .expect("static-only peer removal event");
+    assert_eq!(event.payload["peer"].as_str(), Some("peer-static-old"));
+    assert_eq!(event.payload["removed"].as_bool(), Some(true));
+    assert_eq!(event.payload["propagation_cleared"].as_u64(), Some(1));
+    assert_eq!(event.payload["reason"].as_str(), Some("static_only_policy"));
 
     let status = daemon
         .handle_rpc(RpcRequest { id: 41, method: "daemon_status_ex".to_string(), params: None })
