@@ -5986,6 +5986,41 @@ fn rejected_propagation_remote_sync_does_not_call_bridge_or_update_lifecycle() {
 }
 
 #[test]
+fn propagation_remote_sync_rejects_blank_peer_before_bridge_call() {
+    let daemon = RpcDaemon::test_instance();
+    let sync_calls = Arc::new(std::sync::atomic::AtomicUsize::new(0));
+    daemon.set_remote_control_bridge(Arc::new(CountingRemoteControlBridge {
+        sync_calls: Arc::clone(&sync_calls),
+    }));
+
+    let rejected = daemon
+        .handle_rpc(rpc_request(
+            85,
+            "propagation_remote_sync",
+            json!({
+                "remote": "remote-blank-peer",
+                "peer": "   ",
+            }),
+        ))
+        .expect_err("blank remote-sync peer should be rejected");
+    assert!(
+        rejected.to_string().contains("peer is required"),
+        "unexpected rejection error: {rejected}"
+    );
+    assert_eq!(sync_calls.load(std::sync::atomic::Ordering::SeqCst), 0);
+
+    let peers = daemon
+        .handle_rpc(RpcRequest { id: 86, method: "list_peers".to_string(), params: None })
+        .expect("list peers")
+        .result
+        .expect("list peers result");
+    assert!(
+        peers["peers"].as_array().expect("peer rows").is_empty(),
+        "blank remote-sync peer should not create a peer record"
+    );
+}
+
+#[test]
 fn propagation_remote_sync_updates_lifecycle_status() {
     let daemon = RpcDaemon::test_instance();
     daemon.set_remote_control_bridge(Arc::new(TestRemoteControlBridge {

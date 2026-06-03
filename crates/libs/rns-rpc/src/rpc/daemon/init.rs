@@ -1106,6 +1106,10 @@ impl RpcDaemon {
         peer: &str,
         timestamp: i64,
     ) -> Result<PeerRecord, std::io::Error> {
+        let peer = peer.trim();
+        if peer.is_empty() {
+            return Err(std::io::Error::new(std::io::ErrorKind::InvalidInput, "peer is required"));
+        }
         let existing_peer_type = self
             .peers
             .lock()
