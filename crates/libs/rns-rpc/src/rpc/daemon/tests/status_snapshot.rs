@@ -6097,6 +6097,45 @@ fn propagation_remote_sync_rejects_blank_peer_before_bridge_call() {
 }
 
 #[test]
+fn propagation_remote_sync_rejects_blank_remote_before_bridge_call() {
+    let daemon = RpcDaemon::test_instance();
+    let sync_calls = Arc::new(std::sync::atomic::AtomicUsize::new(0));
+    daemon.set_remote_control_bridge(Arc::new(CountingRemoteControlBridge {
+        status_calls: Arc::new(std::sync::atomic::AtomicUsize::new(0)),
+        download_calls: Arc::new(std::sync::atomic::AtomicUsize::new(0)),
+        fetch_calls: Arc::new(std::sync::atomic::AtomicUsize::new(0)),
+        sync_calls: Arc::clone(&sync_calls),
+        unpeer_calls: Arc::new(std::sync::atomic::AtomicUsize::new(0)),
+    }));
+
+    let rejected = daemon
+        .handle_rpc(rpc_request(
+            87,
+            "propagation_remote_sync",
+            json!({
+                "remote": "   ",
+                "peer": "peer-blank-remote",
+            }),
+        ))
+        .expect_err("blank remote-sync remote should be rejected");
+    assert!(
+        rejected.to_string().contains("remote is required"),
+        "unexpected rejection error: {rejected}"
+    );
+    assert_eq!(sync_calls.load(std::sync::atomic::Ordering::SeqCst), 0);
+
+    let peers = daemon
+        .handle_rpc(RpcRequest { id: 88, method: "list_peers".to_string(), params: None })
+        .expect("list peers")
+        .result
+        .expect("list peers result");
+    assert!(
+        peers["peers"].as_array().expect("peer rows").is_empty(),
+        "blank remote-sync remote should not create a peer record"
+    );
+}
+
+#[test]
 fn propagation_remote_sync_trims_peer_before_bridge_and_response() {
     let daemon = RpcDaemon::test_instance();
     daemon.set_remote_control_bridge(Arc::new(TestRemoteControlBridge {
@@ -7738,6 +7777,52 @@ fn propagation_remote_unpeer_trims_remote_before_bridge_event_and_response() {
         .expect("peer unpeer event");
     assert_eq!(event.payload["remote"].as_str(), Some("remote-unpeer-trimmed"));
     assert_eq!(event.payload["result"]["remote"].as_str(), Some("remote-unpeer-trimmed"));
+}
+
+#[test]
+fn propagation_remote_unpeer_rejects_blank_remote_before_bridge_call() {
+    let daemon = RpcDaemon::test_instance();
+    let unpeer_calls = Arc::new(std::sync::atomic::AtomicUsize::new(0));
+    daemon.set_remote_control_bridge(Arc::new(CountingRemoteControlBridge {
+        status_calls: Arc::new(std::sync::atomic::AtomicUsize::new(0)),
+        download_calls: Arc::new(std::sync::atomic::AtomicUsize::new(0)),
+        fetch_calls: Arc::new(std::sync::atomic::AtomicUsize::new(0)),
+        sync_calls: Arc::new(std::sync::atomic::AtomicUsize::new(0)),
+        unpeer_calls: Arc::clone(&unpeer_calls),
+    }));
+    daemon
+        .handle_rpc(rpc_request(83, "peer_sync", json!({ "peer": "peer-unpeer-blank-remote" })))
+        .expect("peer sync");
+
+    let rejected = daemon
+        .handle_rpc(rpc_request(
+            84,
+            "propagation_remote_unpeer",
+            json!({
+                "remote": "   ",
+                "peer": "peer-unpeer-blank-remote",
+            }),
+        ))
+        .expect_err("blank remote-unpeer remote should be rejected");
+    assert!(
+        rejected.to_string().contains("remote is required"),
+        "unexpected rejection error: {rejected}"
+    );
+    assert_eq!(unpeer_calls.load(std::sync::atomic::Ordering::SeqCst), 0);
+
+    let peers = daemon
+        .handle_rpc(RpcRequest { id: 85, method: "list_peers".to_string(), params: None })
+        .expect("list peers")
+        .result
+        .expect("list peers result");
+    assert!(
+        peers["peers"]
+            .as_array()
+            .expect("peer rows")
+            .iter()
+            .any(|row| row["peer"].as_str() == Some("peer-unpeer-blank-remote")),
+        "blank remote-unpeer remote should preserve the local peer"
+    );
 }
 
 #[test]
