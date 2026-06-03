@@ -514,6 +514,54 @@ mod tests {
     }
 
     #[test]
+    fn python_status_reports_peer_sync_transfer_rate_counter() {
+        let peer = "peer-sync-transfer-rate".to_string();
+        let daemon = RpcDaemon::test_instance();
+        daemon
+            .handle_rpc(RpcRequest {
+                id: 1,
+                method: "propagation_enable".to_string(),
+                params: Some(json!({ "enabled": true })),
+            })
+            .expect("enable propagation");
+        daemon
+            .handle_rpc(RpcRequest {
+                id: 2,
+                method: "propagation_ingest".to_string(),
+                params: Some(json!({ "payload_hex": "19".repeat(24) })),
+            })
+            .expect("ingest propagation");
+        let sync = daemon
+            .handle_rpc(RpcRequest {
+                id: 3,
+                method: "peer_sync".to_string(),
+                params: Some(json!({ "peer": peer })),
+            })
+            .expect("peer sync")
+            .result
+            .expect("peer sync result");
+        let transferred_bytes =
+            sync["sync_transfer_rate"].as_f64().expect("sync transfer rate counter") as u64;
+        assert!(transferred_bytes > 0);
+
+        let status = status::compose_python_status(
+            &daemon,
+            &PropagationControlContext {
+                enabled: true,
+                local_identity_hash: [0u8; 16],
+                propagation_destination_hash_hex: Some("propagation".to_string()),
+                control_destination_hash_hex: Some("control".to_string()),
+                delivery_destination: None,
+                allowed_control_identities: Vec::new(),
+            },
+        );
+
+        let peer_status = &status["peers"][peer.as_str()];
+        assert_eq!(peer_status["sync_transfer_rate"].as_f64(), Some(transferred_bytes as f64));
+        assert_eq!(peer_status["str"].as_u64(), Some(transferred_bytes));
+    }
+
+    #[test]
     fn python_status_preserves_unknown_peer_propagation_policy_as_null() {
         let peer = "peer-unknown-policy".to_string();
         let daemon = RpcDaemon::test_instance();

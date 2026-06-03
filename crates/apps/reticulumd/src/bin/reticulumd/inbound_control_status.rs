@@ -62,6 +62,8 @@ pub(super) fn compose_python_status(
                         .get("propagation_stamp_cost_flexibility")
                         .cloned()
                         .unwrap_or(Value::Null);
+                    let sync_transfer_rate =
+                        row.get("sync_transfer_rate").and_then(Value::as_f64).unwrap_or(0.0);
                     Some((
                         peer,
                         json!({
@@ -75,7 +77,8 @@ pub(super) fn compose_python_status(
                             "sync_backoff": row.get("sync_backoff").and_then(Value::as_u64).unwrap_or(0),
                             "peering_timebase": row.get("peering_timebase").and_then(Value::as_i64).unwrap_or(0),
                             "ler": 0,
-                            "str": 0,
+                            "str": sync_transfer_rate as u64,
+                            "sync_transfer_rate": sync_transfer_rate,
                             "transfer_limit": row.get("propagation_transfer_limit").cloned().unwrap_or(Value::Null),
                             "sync_limit": row.get("propagation_sync_limit").cloned().unwrap_or(Value::Null),
                             "target_stamp_cost": target_stamp_cost,
