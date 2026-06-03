@@ -254,6 +254,66 @@ fn propagation_enable_partial_update_preserves_static_peer_config_and_type() {
 }
 
 #[test]
+fn propagation_enable_clears_selected_node_when_static_policy_rejects_it() {
+    let daemon = RpcDaemon::test_instance();
+    daemon
+        .handle_rpc(rpc_request(
+            31,
+            "propagation_enable",
+            json!({
+                "enabled": true,
+                "from_static_only": true,
+                "static_peers": ["peer-static-old"],
+            }),
+        ))
+        .expect("enable old static peer");
+    daemon
+        .handle_rpc(rpc_request(
+            32,
+            "set_outbound_propagation_node",
+            json!({ "peer": "peer-static-old" }),
+        ))
+        .expect("select old static peer");
+
+    daemon
+        .handle_rpc(rpc_request(
+            33,
+            "propagation_enable",
+            json!({
+                "enabled": true,
+                "from_static_only": true,
+                "static_peers": ["peer-static-new"],
+            }),
+        ))
+        .expect("replace static peer list");
+
+    let selected = daemon
+        .handle_rpc(RpcRequest {
+            id: 34,
+            method: "get_outbound_propagation_node".to_string(),
+            params: None,
+        })
+        .expect("get selected propagation node")
+        .result
+        .expect("selected propagation node result");
+    assert_eq!(selected["peer"], JsonValue::Null);
+
+    let status = daemon
+        .handle_rpc(RpcRequest { id: 35, method: "propagation_status".to_string(), params: None })
+        .expect("propagation status")
+        .result
+        .expect("propagation status result");
+    assert_eq!(status["propagation"]["selected_node"], JsonValue::Null);
+
+    let daemon_status = daemon
+        .handle_rpc(RpcRequest { id: 36, method: "daemon_status_ex".to_string(), params: None })
+        .expect("daemon status")
+        .result
+        .expect("daemon status result");
+    assert_eq!(daemon_status["propagation"]["selected_node"], JsonValue::Null);
+}
+
+#[test]
 fn propagation_enable_queues_existing_entries_for_static_peers() {
     let daemon = RpcDaemon::test_instance();
     let entry = PropagationEntryRecord {

@@ -673,7 +673,7 @@ impl RpcDaemon {
                     .map_err(|err| std::io::Error::new(std::io::ErrorKind::InvalidInput, err))?;
 
                 let mut static_peers_to_activate = None;
-                let state = {
+                let mut state = {
                     let mut guard =
                         self.propagation_state.lock().expect("propagation mutex poisoned");
                     guard.enabled = parsed.enabled;
@@ -730,6 +730,40 @@ impl RpcDaemon {
                 });
                 if let Some(static_peers_to_activate) = static_peers_to_activate {
                     self.activate_static_peers(&static_peers_to_activate)?;
+                }
+                let selected_node_rejected = {
+                    let selected = self
+                        .outbound_propagation_node
+                        .lock()
+                        .expect("propagation node mutex poisoned")
+                        .clone();
+                    let propagation =
+                        self.propagation_state.lock().expect("propagation mutex poisoned");
+                    selected.as_deref().is_some_and(|peer| {
+                        propagation.from_static_only
+                            && !propagation
+                                .static_peers
+                                .iter()
+                                .any(|candidate| candidate.eq_ignore_ascii_case(peer))
+                    })
+                };
+                if selected_node_rejected {
+                    {
+                        let mut guard = self
+                            .outbound_propagation_node
+                            .lock()
+                            .expect("propagation node mutex poisoned");
+                        *guard = None;
+                    }
+                    state = {
+                        let mut guard =
+                            self.propagation_state.lock().expect("propagation mutex poisoned");
+                        guard.selected_node = None;
+                        guard.clone()
+                    };
+                    self.update_daemon_status_snapshot(|snapshot| {
+                        snapshot.propagation = state.clone();
+                    });
                 }
                 Ok(RpcResponse {
                     id: request.id,
