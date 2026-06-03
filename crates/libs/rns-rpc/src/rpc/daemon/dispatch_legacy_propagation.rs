@@ -858,9 +858,16 @@ impl RpcDaemon {
                 } else {
                     false
                 };
-                let ingested_count = usize::from(
-                    !payload_hex.is_empty() && !transient_id.is_empty() && !already_known,
-                );
+                let has_payload = normalized_payload.is_some();
+                let payload_bytes = normalized_payload
+                    .as_ref()
+                    .and_then(|(_transient_id, payload_hex)| hex::decode(payload_hex).ok())
+                    .map(|payload| payload.len())
+                    .unwrap_or(0);
+                let ingested_count =
+                    usize::from(has_payload && !transient_id.is_empty() && !already_known);
+                let duplicate_count =
+                    usize::from(has_payload && !transient_id.is_empty() && already_known);
 
                 if let Some(payload_hex) =
                     normalized_payload.map(|(_transient_id, payload_hex)| payload_hex)
@@ -893,6 +900,9 @@ impl RpcDaemon {
                     id: request.id,
                     result: Some(json!({
                         "ingested_count": state.last_ingest_count,
+                        "duplicate_count": duplicate_count,
+                        "payload_bytes": payload_bytes,
+                        "transferred_bytes": payload_bytes,
                         "transient_id": transient_id,
                     })),
                     error: None,

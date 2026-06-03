@@ -553,6 +553,9 @@ fn duplicate_propagation_ingest_does_not_double_count_received() {
             .expect("propagation ingest result");
     }
     assert_eq!(second["ingested_count"].as_u64(), Some(0));
+    assert_eq!(second["duplicate_count"].as_u64(), Some(1));
+    assert_eq!(second["payload_bytes"].as_u64(), Some(payload.len() as u64));
+    assert_eq!(second["transferred_bytes"].as_u64(), Some(payload.len() as u64));
 
     let status = daemon
         .handle_rpc(RpcRequest { id: 80, method: "propagation_status".to_string(), params: None })
