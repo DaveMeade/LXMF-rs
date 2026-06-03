@@ -163,6 +163,107 @@ fn propagation_enable_activates_static_peers_like_python() {
 }
 
 #[test]
+fn propagation_enable_queues_existing_entries_for_static_peers() {
+    let daemon = RpcDaemon::test_instance();
+    let entry = PropagationEntryRecord {
+        transient_id: "a7".repeat(32),
+        destination: "12".repeat(16),
+        payload_hex: "12".repeat(24),
+        received_at: 1_700_000_101,
+        size_bytes: 24,
+        stamp_value: None,
+    };
+    daemon.store.upsert_propagation_entry(&entry).expect("store propagation entry");
+
+    daemon
+        .handle_rpc(rpc_request(
+            26,
+            "propagation_enable",
+            json!({
+                "enabled": true,
+                "static_peers": ["peer-static-queue"],
+            }),
+        ))
+        .expect("enable propagation");
+
+    let peers = daemon
+        .handle_rpc(RpcRequest { id: 27, method: "list_peers".to_string(), params: None })
+        .expect("list peers")
+        .result
+        .expect("list peers result");
+    let row = peers["peers"]
+        .as_array()
+        .expect("peer rows")
+        .iter()
+        .find(|row| row["peer"].as_str() == Some("peer-static-queue"))
+        .expect("peer row");
+    assert_eq!(row["messages"]["offered"].as_u64(), Some(1));
+    assert_eq!(row["messages"]["unhandled"].as_u64(), Some(1));
+    assert_eq!(
+        row["messages"]["unhandled_ids"].as_array().expect("message unhandled ids"),
+        &[json!(entry.transient_id.as_str())]
+    );
+
+    let result = daemon
+        .handle_rpc(rpc_request(28, "peer_sync", json!({ "peer": "peer-static-queue" })))
+        .expect("peer sync")
+        .result
+        .expect("peer sync result");
+    assert_eq!(result["propagation"]["handled"].as_u64(), Some(1));
+    assert_eq!(
+        result["propagation"]["handled_ids"].as_array().expect("handled ids"),
+        &[json!(entry.transient_id.as_str())]
+    );
+}
+
+#[test]
+fn propagation_ingest_queues_new_entries_for_static_peers() {
+    let daemon = RpcDaemon::test_instance();
+    daemon
+        .handle_rpc(rpc_request(
+            26,
+            "propagation_enable",
+            json!({
+                "enabled": true,
+                "static_peers": ["peer-static-ingest-queue"],
+            }),
+        ))
+        .expect("enable propagation");
+
+    let payload_hex = format!("{}{}", "12".repeat(16), "34".repeat(24));
+    let ingest = daemon
+        .handle_rpc(rpc_request(
+            27,
+            "propagation_ingest",
+            json!({
+                "payload_hex": payload_hex,
+            }),
+        ))
+        .expect("ingest propagation")
+        .result
+        .expect("ingest result");
+    let transient_id = ingest["transient_id"].as_str().expect("transient id");
+
+    let peers = daemon
+        .handle_rpc(RpcRequest { id: 28, method: "list_peers".to_string(), params: None })
+        .expect("list peers")
+        .result
+        .expect("list peers result");
+    let row = peers["peers"]
+        .as_array()
+        .expect("peer rows")
+        .iter()
+        .find(|row| row["peer"].as_str() == Some("peer-static-ingest-queue"))
+        .expect("peer row");
+    assert_eq!(row["messages"]["offered"].as_u64(), Some(1));
+    assert_eq!(row["messages"]["unhandled"].as_u64(), Some(1));
+    assert_eq!(
+        row["messages"]["unhandled_ids"].as_array().expect("message unhandled ids"),
+        &[json!(transient_id)]
+    );
+}
+
+#[test]
 fn message_storage_stats_track_count_and_bytes() {
     let daemon = RpcDaemon::test_instance();
     daemon

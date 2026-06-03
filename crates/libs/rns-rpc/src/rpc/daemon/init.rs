@@ -23,6 +23,16 @@ impl RpcDaemon {
         guard.values().filter(|record| record.peer_type.as_deref() != Some("unpeered")).count()
     }
 
+    pub(super) fn active_peer_ids(&self) -> Vec<String> {
+        self.peers
+            .lock()
+            .expect("peers mutex poisoned")
+            .values()
+            .filter(|record| record.peer_type.as_deref() != Some("unpeered"))
+            .map(|record| record.peer.clone())
+            .collect()
+    }
+
     pub(super) fn next_announce_seq(&self) -> u64 {
         let mut guard = self.announce_next_seq.lock().expect("announce_next_seq mutex poisoned");
         *guard = guard.wrapping_add(1);
@@ -944,17 +954,22 @@ impl RpcDaemon {
         self.upsert_peer(peer.to_string(), timestamp, Vec::new(), None, None, peer_type)
     }
 
-    pub(super) fn activate_static_peers(&self, static_peers: &[String]) {
+    pub(super) fn activate_static_peers(
+        &self,
+        static_peers: &[String],
+    ) -> Result<(), std::io::Error> {
         if static_peers.is_empty() {
-            return;
+            return Ok(());
         }
 
+        let mut activated_peers = Vec::new();
         let mut guard = self.peers.lock().expect("peers mutex poisoned");
         for peer in static_peers {
             let peer = peer.trim();
             if peer.is_empty() {
                 continue;
             }
+            activated_peers.push(peer.to_string());
 
             if let Some(existing) = guard.get_mut(peer) {
                 existing.peer_type = Some("static".to_string());
@@ -995,6 +1010,12 @@ impl RpcDaemon {
         self.update_daemon_status_snapshot(|snapshot| {
             snapshot.peer_count = peer_count;
         });
+        for peer in activated_peers {
+            self.store
+                .mark_all_propagation_unhandled_for_peer(peer.as_str())
+                .map_err(std::io::Error::other)?;
+        }
+        Ok(())
     }
 
     pub(super) fn ensure_peer_admission_allowed(

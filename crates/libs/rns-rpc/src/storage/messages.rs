@@ -862,6 +862,19 @@ impl MessagesStore {
         })
     }
 
+    pub fn mark_all_propagation_unhandled_for_peer(&self, peer: &str) -> rusqlite::Result<usize> {
+        self.with_write_conn(|conn| {
+            let affected = conn.execute(
+                "INSERT OR IGNORE INTO propagation_peer_entries
+                    (peer, transient_id, state, updated_at)
+                 SELECT ?1, transient_id, 'unhandled', ?2
+                 FROM propagation_entries",
+                params![peer, now_unix_secs()],
+            )?;
+            Ok(affected)
+        })
+    }
+
     pub fn mark_peer_handled_propagation(
         &self,
         peer: &str,

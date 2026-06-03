@@ -114,6 +114,18 @@ impl RpcDaemon {
             .map_err(std::io::Error::other)
     }
 
+    fn queue_propagation_entry_for_active_peers(
+        &self,
+        transient_id: &str,
+    ) -> Result<(), std::io::Error> {
+        for peer in self.active_peer_ids() {
+            self.store
+                .mark_peer_unhandled_propagation(peer.as_str(), transient_id)
+                .map_err(std::io::Error::other)?;
+        }
+        Ok(())
+    }
+
     fn import_remote_propagation_payloads(
         &self,
         result: &JsonValue,
@@ -278,6 +290,7 @@ impl RpcDaemon {
         if let Some((_canonical_transient_id, payload)) = normalized {
             let payload_hex = hex::encode(payload);
             self.store_propagation_payload_hex(transient_id, payload_hex.as_str())?;
+            self.queue_propagation_entry_for_active_peers(transient_id)?;
             let mut guard =
                 self.propagation_payloads.lock().expect("propagation payload mutex poisoned");
             guard.insert(normalize_propagation_transient_key(transient_id), payload_hex.clone());
@@ -347,6 +360,7 @@ impl RpcDaemon {
 
         if let Some((_canonical_transient_id, payload_hex)) = normalized_payload {
             self.store_propagation_payload_hex(transient_id.as_str(), payload_hex.as_str())?;
+            self.queue_propagation_entry_for_active_peers(transient_id.as_str())?;
             self.propagation_payloads
                 .lock()
                 .expect("propagation payload mutex poisoned")
@@ -659,7 +673,7 @@ impl RpcDaemon {
                 self.update_daemon_status_snapshot(|snapshot| {
                     snapshot.propagation = state.clone();
                 });
-                self.activate_static_peers(&static_peers_to_activate);
+                self.activate_static_peers(&static_peers_to_activate)?;
                 Ok(RpcResponse {
                     id: request.id,
                     result: Some(json!({ "propagation": state })),
@@ -714,6 +728,7 @@ impl RpcDaemon {
                         transient_id.as_str(),
                         payload_hex.as_str(),
                     )?;
+                    self.queue_propagation_entry_for_active_peers(transient_id.as_str())?;
                     self.propagation_payloads
                         .lock()
                         .expect("propagation payload mutex poisoned")
