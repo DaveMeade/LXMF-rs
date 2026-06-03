@@ -4063,6 +4063,7 @@ fn peer_sync_reports_propagation_transfer_accounting() {
         Some((24 + 20 + 32 + 16 + 1) as u64)
     );
     assert_eq!(result["tx_bytes"].as_u64(), Some(20));
+    assert_eq!(result["messages"]["outgoing"].as_u64(), Some(1));
     assert_eq!(result["alive"].as_bool(), Some(true));
     assert_eq!(result["acceptance_rate"].as_f64(), Some(1.0));
     assert_eq!(
@@ -4094,6 +4095,7 @@ fn peer_sync_reports_propagation_transfer_accounting() {
     assert_eq!(event.payload["propagation"]["synced"].as_bool(), Some(true));
     assert_eq!(event.payload["propagation"]["postponed"].as_bool(), Some(false));
     assert_eq!(event.payload["tx_bytes"].as_u64(), Some(20));
+    assert_eq!(event.payload["messages"]["outgoing"].as_u64(), Some(1));
     assert_eq!(event.payload["alive"].as_bool(), Some(true));
     assert_eq!(event.payload["acceptance_rate"].as_f64(), Some(1.0));
     assert_eq!(
@@ -4117,6 +4119,7 @@ fn peer_sync_reports_propagation_transfer_accounting() {
         .find(|row| row["peer"].as_str() == Some("peer-sync-report"))
         .expect("peer row");
     assert_eq!(row["tx_bytes"].as_u64(), Some(20));
+    assert_eq!(row["messages"]["outgoing"].as_u64(), Some(1));
     assert_eq!(row["alive"].as_bool(), Some(true));
     assert_eq!(row["acceptance_rate"].as_f64(), Some(0.5));
 }

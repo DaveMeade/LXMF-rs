@@ -558,7 +558,7 @@ impl RpcDaemon {
         let propagation =
             self.store.peer_propagation_message_stats(peer).map_err(std::io::Error::other)?;
         Ok((
-            stats.outgoing,
+            stats.outgoing.saturating_add(propagation.outgoing),
             stats.incoming,
             stats.offered.saturating_add(propagation.offered),
             stats.unhandled.saturating_add(propagation.unhandled),

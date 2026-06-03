@@ -127,6 +127,7 @@ pub struct PeerMessageStats {
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct PeerPropagationMessageStats {
+    pub outgoing: u64,
     pub offered: u64,
     pub unhandled: u64,
     pub offered_bytes: u64,
@@ -893,6 +894,24 @@ impl MessagesStore {
         })
     }
 
+    pub fn mark_peer_transferred_propagation(
+        &self,
+        peer: &str,
+        transient_id: &str,
+    ) -> rusqlite::Result<()> {
+        self.with_write_conn(|conn| {
+            conn.execute(
+                "INSERT INTO propagation_peer_entries (peer, transient_id, state, updated_at)
+                 VALUES (?1, ?2, 'transferred', ?3)
+                 ON CONFLICT(peer, transient_id) DO UPDATE SET
+                    state = 'transferred',
+                    updated_at = excluded.updated_at",
+                params![peer, normalize_hex_key(transient_id), now_unix_secs()],
+            )?;
+            Ok(())
+        })
+    }
+
     pub fn mark_peer_transfer_limited_propagation(
         &self,
         peer: &str,
@@ -968,7 +987,7 @@ impl MessagesStore {
                  FROM propagation_peer_entries p
                  INNER JOIN propagation_entries e
                     ON e.transient_id = p.transient_id
-                 WHERE p.peer = ?1 AND p.state IN ('handled', 'transfer_limited')
+                 WHERE p.peer = ?1 AND p.state IN ('handled', 'transferred', 'transfer_limited')
                  ORDER BY p.transient_id ASC",
             )?;
             let rows = stmt.query_map(params![peer], |row| row.get(0))?;
@@ -1004,25 +1023,28 @@ impl MessagesStore {
         peer: &str,
     ) -> rusqlite::Result<PeerPropagationMessageStats> {
         self.with_read_conn(|conn| {
-            let (offered, unhandled, offered_bytes, unhandled_bytes): (
+            let (outgoing, offered, unhandled, offered_bytes, unhandled_bytes): (
+                i64,
                 i64,
                 i64,
                 Option<i64>,
                 Option<i64>,
             ) = conn.query_row(
                 "SELECT
-                    COALESCE(SUM(CASE WHEN e.transient_id IS NOT NULL AND state IN ('handled', 'unhandled', 'transfer_limited') THEN 1 ELSE 0 END), 0),
+                    COALESCE(SUM(CASE WHEN e.transient_id IS NOT NULL AND state = 'transferred' THEN 1 ELSE 0 END), 0),
+                    COALESCE(SUM(CASE WHEN e.transient_id IS NOT NULL AND state IN ('handled', 'transferred', 'unhandled', 'transfer_limited') THEN 1 ELSE 0 END), 0),
                     COALESCE(SUM(CASE WHEN e.transient_id IS NOT NULL AND state = 'unhandled' THEN 1 ELSE 0 END), 0),
-                    COALESCE(SUM(CASE WHEN e.transient_id IS NOT NULL AND state IN ('handled', 'unhandled', 'transfer_limited') THEN e.size_bytes ELSE 0 END), 0),
+                    COALESCE(SUM(CASE WHEN e.transient_id IS NOT NULL AND state IN ('handled', 'transferred', 'unhandled', 'transfer_limited') THEN e.size_bytes ELSE 0 END), 0),
                     COALESCE(SUM(CASE WHEN e.transient_id IS NOT NULL AND state = 'unhandled' THEN e.size_bytes ELSE 0 END), 0)
                  FROM propagation_peer_entries p
                  LEFT JOIN propagation_entries e
                     ON e.transient_id = p.transient_id
                  WHERE p.peer = ?1",
                 params![peer],
-                |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?, row.get(3)?)),
+                |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?, row.get(3)?, row.get(4)?)),
             )?;
             Ok(PeerPropagationMessageStats {
+                outgoing: outgoing.max(0) as u64,
                 offered: offered.max(0) as u64,
                 unhandled: unhandled.max(0) as u64,
                 offered_bytes: offered_bytes.unwrap_or(0).max(0) as u64,
@@ -2268,6 +2290,9 @@ mod tests {
             .mark_peer_handled_propagation("peer-a", handled.transient_id.as_str())
             .expect("mark handled");
         store
+            .mark_peer_transferred_propagation("peer-a", handled.transient_id.as_str())
+            .expect("mark transferred");
+        store
             .mark_peer_transfer_limited_propagation("peer-a", other.transient_id.as_str())
             .expect("mark transfer limited");
         store
@@ -2283,6 +2308,7 @@ mod tests {
         assert_eq!(
             store.peer_propagation_message_stats("peer-a").expect("peer-a stats"),
             PeerPropagationMessageStats {
+                outgoing: 1,
                 offered: 3,
                 unhandled: 1,
                 offered_bytes: 72,
@@ -2292,6 +2318,7 @@ mod tests {
         assert_eq!(
             store.peer_propagation_message_stats("peer-b").expect("peer-b stats"),
             PeerPropagationMessageStats {
+                outgoing: 0,
                 offered: 1,
                 unhandled: 1,
                 offered_bytes: 36,
