@@ -6246,6 +6246,45 @@ fn propagation_remote_sync_respects_peer_backoff_before_bridge_call() {
 }
 
 #[test]
+fn propagation_remote_sync_backoff_does_not_require_bridge() {
+    let daemon = RpcDaemon::test_instance();
+    daemon
+        .handle_rpc(rpc_request(92, "peer_sync", json!({ "peer": "peer-backoff-no-bridge" })))
+        .expect("seed peer");
+    {
+        let mut peers = daemon.peers.lock().expect("peers mutex poisoned");
+        let peer = peers.get_mut("peer-backoff-no-bridge").expect("peer record");
+        peer.sync_backoff = 12 * 60;
+        peer.next_sync_attempt = now_i64().saturating_add(12 * 60);
+        peer.alive = false;
+    }
+
+    let result = daemon
+        .handle_rpc(rpc_request(
+            93,
+            "propagation_remote_sync",
+            json!({
+                "remote": "remote-backoff-no-bridge",
+                "peer": "peer-backoff-no-bridge",
+            }),
+        ))
+        .expect("remote sync should postpone before bridge lookup")
+        .result
+        .expect("remote sync result");
+    assert_eq!(result["synced"].as_bool(), Some(false));
+    assert_eq!(result["postponed"].as_bool(), Some(true));
+    assert_eq!(result["postpone_reason"].as_str(), Some("backoff"));
+
+    let status = daemon
+        .handle_rpc(RpcRequest { id: 94, method: "propagation_status".to_string(), params: None })
+        .expect("propagation status")
+        .result
+        .expect("propagation status result");
+    assert_eq!(status["propagation"]["sync_state"].as_u64(), Some(0x00));
+    assert_eq!(status["propagation"]["last_sync_started"], JsonValue::Null);
+}
+
+#[test]
 fn propagation_remote_unpeer_rejects_blank_peer_before_bridge_call() {
     let daemon = RpcDaemon::test_instance();
     let sync_calls = Arc::new(std::sync::atomic::AtomicUsize::new(0));

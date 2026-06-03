@@ -1076,12 +1076,6 @@ impl RpcDaemon {
                         "remote is required",
                     ));
                 }
-                let bridge = self
-                    .remote_control_bridge
-                    .lock()
-                    .expect("remote control bridge mutex poisoned")
-                    .clone()
-                    .ok_or_else(|| std::io::Error::other("remote control bridge unavailable"))?;
                 let peer_id = parsed.peer.trim().to_string();
                 let timestamp = now_i64();
                 let record = self.ensure_peer_for_sync(peer_id.as_str(), timestamp)?;
@@ -1109,6 +1103,12 @@ impl RpcDaemon {
                         sync_limit.map(|limit| limit as usize),
                     ));
                 }
+                let bridge = self
+                    .remote_control_bridge
+                    .lock()
+                    .expect("remote control bridge mutex poisoned")
+                    .clone()
+                    .ok_or_else(|| std::io::Error::other("remote control bridge unavailable"))?;
                 self.update_propagation_sync_state(|state| {
                     state.sync_state = PR_REQUEST_SENT;
                     state.state_name = "syncing".to_string();
