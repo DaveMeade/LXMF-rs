@@ -997,6 +997,9 @@ impl RpcDaemon {
         static_peers: &[String],
     ) -> Result<(), std::io::Error> {
         let configured_static_peers = Self::normalize_static_peers(static_peers);
+        let from_static_only =
+            self.propagation_state.lock().expect("propagation mutex poisoned").from_static_only;
+        let mut removed_static_peers = Vec::new();
         let mut guard = self.peers.lock().expect("peers mutex poisoned");
         for existing in guard.values_mut() {
             let is_configured_static = configured_static_peers
@@ -1005,8 +1008,15 @@ impl RpcDaemon {
             if is_configured_static {
                 existing.peer_type = Some("static".to_string());
             } else if existing.peer_type.as_deref() == Some("static") {
-                existing.peer_type = Some("manual".to_string());
+                if from_static_only {
+                    removed_static_peers.push(existing.peer.clone());
+                } else {
+                    existing.peer_type = Some("manual".to_string());
+                }
             }
+        }
+        for peer in &removed_static_peers {
+            guard.remove(peer);
         }
 
         for peer in &configured_static_peers {
@@ -1049,6 +1059,28 @@ impl RpcDaemon {
         self.update_daemon_status_snapshot(|snapshot| {
             snapshot.peer_count = peer_count;
         });
+        let mut cleared_selected_node = false;
+        for peer in removed_static_peers {
+            self.store
+                .clear_peer_propagation_marks(peer.as_str())
+                .map_err(std::io::Error::other)?;
+            let mut selected =
+                self.outbound_propagation_node.lock().expect("propagation node mutex poisoned");
+            if selected.as_deref() == Some(peer.as_str()) {
+                *selected = None;
+                cleared_selected_node = true;
+            }
+        }
+        if cleared_selected_node {
+            let state = {
+                let mut guard = self.propagation_state.lock().expect("propagation mutex poisoned");
+                guard.selected_node = None;
+                guard.clone()
+            };
+            self.update_daemon_status_snapshot(|snapshot| {
+                snapshot.propagation = state;
+            });
+        }
         for peer in configured_static_peers {
             self.queue_existing_propagation_for_peer(peer.as_str())?;
         }

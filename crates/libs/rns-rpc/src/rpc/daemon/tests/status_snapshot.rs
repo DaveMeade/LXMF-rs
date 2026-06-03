@@ -314,6 +314,84 @@ fn propagation_enable_clears_selected_node_when_static_policy_rejects_it() {
 }
 
 #[test]
+fn propagation_enable_unpeers_removed_static_peers_when_static_only() {
+    let daemon = RpcDaemon::test_instance();
+    let entry = PropagationEntryRecord {
+        transient_id: "af".repeat(32),
+        destination: "12".repeat(16),
+        payload_hex: "12".repeat(24),
+        received_at: 1_700_000_105,
+        size_bytes: 24,
+        stamp_value: None,
+    };
+    daemon.store.upsert_propagation_entry(&entry).expect("store propagation entry");
+    daemon
+        .handle_rpc(rpc_request(
+            37,
+            "propagation_enable",
+            json!({
+                "enabled": true,
+                "from_static_only": true,
+                "static_peers": ["peer-static-old"],
+            }),
+        ))
+        .expect("enable old static peer");
+    daemon
+        .store
+        .mark_peer_unhandled_propagation("peer-static-old", entry.transient_id.as_str())
+        .expect("mark old peer unhandled");
+    daemon
+        .handle_rpc(rpc_request(
+            38,
+            "set_outbound_propagation_node",
+            json!({ "peer": "peer-static-old" }),
+        ))
+        .expect("select old static peer");
+
+    let update = daemon
+        .handle_rpc(rpc_request(
+            39,
+            "propagation_enable",
+            json!({
+                "enabled": true,
+                "from_static_only": true,
+                "static_peers": ["peer-static-new"],
+            }),
+        ))
+        .expect("replace static peer list")
+        .result
+        .expect("replace static peer result");
+    assert_eq!(update["propagation"]["selected_node"], JsonValue::Null);
+
+    let peers = daemon
+        .handle_rpc(RpcRequest { id: 40, method: "list_peers".to_string(), params: None })
+        .expect("list peers")
+        .result
+        .expect("list peers result");
+    let rows = peers["peers"].as_array().expect("peer rows");
+    assert!(rows.iter().all(|row| row["peer"].as_str() != Some("peer-static-old")));
+    let new_peer = rows
+        .iter()
+        .find(|row| row["peer"].as_str() == Some("peer-static-new"))
+        .expect("new static peer");
+    assert_eq!(new_peer["peer_type"].as_str(), Some("static"));
+    assert_eq!(new_peer["type"].as_str(), Some("static"));
+
+    let old_pending = daemon
+        .store
+        .list_peer_unhandled_propagation("peer-static-old")
+        .expect("old peer pending propagation");
+    assert!(old_pending.is_empty());
+
+    let status = daemon
+        .handle_rpc(RpcRequest { id: 41, method: "daemon_status_ex".to_string(), params: None })
+        .expect("daemon status")
+        .result
+        .expect("daemon status result");
+    assert_eq!(status["peer_count"].as_u64(), Some(1));
+}
+
+#[test]
 fn propagation_enable_queues_existing_entries_for_static_peers() {
     let daemon = RpcDaemon::test_instance();
     let entry = PropagationEntryRecord {
