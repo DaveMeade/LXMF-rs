@@ -1038,6 +1038,13 @@ impl MessagesStore {
         })
     }
 
+    pub fn clear_all_peer_propagation_marks(&self) -> rusqlite::Result<usize> {
+        self.with_write_conn(|conn| {
+            let affected = conn.execute("DELETE FROM propagation_peer_entries", [])?;
+            Ok(affected)
+        })
+    }
+
     pub fn peer_propagation_message_stats(
         &self,
         peer: &str,
@@ -2370,6 +2377,43 @@ mod tests {
                 unhandled_bytes: 36,
             }
         );
+    }
+
+    #[test]
+    fn clear_all_peer_propagation_marks_removes_every_peer_queue_mark() {
+        let store = MessagesStore::in_memory().expect("in-memory store");
+        let entry_a = PropagationEntryRecord {
+            transient_id: "ab".repeat(32),
+            destination: "11".repeat(16),
+            payload_hex: "11".repeat(8),
+            received_at: 1_700_000_010,
+            size_bytes: 8,
+            stamp_value: None,
+        };
+        let entry_b = PropagationEntryRecord {
+            transient_id: "bc".repeat(32),
+            destination: "22".repeat(16),
+            payload_hex: "22".repeat(8),
+            received_at: 1_700_000_011,
+            size_bytes: 8,
+            stamp_value: None,
+        };
+        store.upsert_propagation_entry(&entry_a).expect("upsert entry a");
+        store.upsert_propagation_entry(&entry_b).expect("upsert entry b");
+        store
+            .mark_peer_unhandled_propagation("peer-a", entry_a.transient_id.as_str())
+            .expect("mark peer-a unhandled");
+        store
+            .mark_peer_handled_propagation("peer-b", entry_b.transient_id.as_str())
+            .expect("mark peer-b handled");
+
+        assert_eq!(store.clear_all_peer_propagation_marks().expect("clear marks"), 2);
+
+        assert!(store.list_peer_unhandled_propagation("peer-a").expect("peer-a marks").is_empty());
+        assert!(store
+            .list_peer_handled_propagation_ids("peer-b")
+            .expect("peer-b marks")
+            .is_empty());
     }
 
     #[test]

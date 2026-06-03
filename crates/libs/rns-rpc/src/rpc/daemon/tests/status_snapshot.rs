@@ -7595,6 +7595,39 @@ fn peer_unpeer_clears_persisted_propagation_queue_marks() {
 }
 
 #[test]
+fn clear_peers_clears_persisted_propagation_queue_marks() {
+    let daemon = RpcDaemon::test_instance();
+    daemon
+        .handle_rpc(rpc_request(90, "peer_sync", json!({ "peer": "peer-clear-queue" })))
+        .expect("sync peer");
+    let entry = PropagationEntryRecord {
+        transient_id: "ca".repeat(32),
+        destination: "17".repeat(16),
+        payload_hex: "17".repeat(12),
+        received_at: 1_700_000_706,
+        size_bytes: 12,
+        stamp_value: None,
+    };
+    daemon.store.upsert_propagation_entry(&entry).expect("store propagation entry");
+    daemon
+        .store
+        .mark_peer_unhandled_propagation("peer-clear-queue", entry.transient_id.as_str())
+        .expect("mark unhandled");
+
+    daemon
+        .handle_rpc(RpcRequest { id: 91, method: "clear_peers".to_string(), params: None })
+        .expect("clear peers");
+
+    assert!(
+        daemon
+            .store
+            .list_peer_unhandled_propagation("peer-clear-queue")
+            .expect("list unhandled")
+            .is_empty()
+    );
+}
+
+#[test]
 fn peer_unpeer_clears_selected_propagation_node() {
     let daemon = RpcDaemon::test_instance();
     daemon

@@ -47,6 +47,7 @@ impl RpcDaemon {
                 })
             }
             "clear_peers" => {
+                self.store.clear_all_peer_propagation_marks().map_err(std::io::Error::other)?;
                 {
                     let mut guard = self.peers.lock().expect("peers mutex poisoned");
                     guard.clear();
@@ -65,6 +66,7 @@ impl RpcDaemon {
                 let _domain_state_guard = self.lock_and_restore_sdk_domain_snapshot()?;
                 self.store.clear_messages().map_err(std::io::Error::other)?;
                 self.store.clear_announces().map_err(std::io::Error::other)?;
+                self.store.clear_all_peer_propagation_marks().map_err(std::io::Error::other)?;
                 {
                     let mut guard = self.peers.lock().expect("peers mutex poisoned");
                     guard.clear();
