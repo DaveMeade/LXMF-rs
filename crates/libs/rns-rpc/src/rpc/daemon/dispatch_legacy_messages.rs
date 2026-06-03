@@ -52,7 +52,7 @@ impl RpcDaemon {
         row
     }
 
-    fn postponed_peer_sync_response(
+    pub(super) fn postponed_peer_sync_response(
         &self,
         request_id: u64,
         record: &PeerRecord,

@@ -6197,6 +6197,55 @@ fn propagation_remote_sync_trims_remote_before_bridge_event_and_response() {
 }
 
 #[test]
+fn propagation_remote_sync_respects_peer_backoff_before_bridge_call() {
+    let daemon = RpcDaemon::test_instance();
+    daemon
+        .handle_rpc(rpc_request(89, "peer_sync", json!({ "peer": "peer-remote-backoff" })))
+        .expect("seed peer");
+    {
+        let mut peers = daemon.peers.lock().expect("peers mutex poisoned");
+        let peer = peers.get_mut("peer-remote-backoff").expect("peer record");
+        peer.sync_backoff = 12 * 60;
+        peer.next_sync_attempt = now_i64().saturating_add(12 * 60);
+        peer.alive = false;
+    }
+    let sync_calls = Arc::new(std::sync::atomic::AtomicUsize::new(0));
+    daemon.set_remote_control_bridge(Arc::new(CountingRemoteControlBridge {
+        status_calls: Arc::new(std::sync::atomic::AtomicUsize::new(0)),
+        download_calls: Arc::new(std::sync::atomic::AtomicUsize::new(0)),
+        fetch_calls: Arc::new(std::sync::atomic::AtomicUsize::new(0)),
+        sync_calls: Arc::clone(&sync_calls),
+        unpeer_calls: Arc::new(std::sync::atomic::AtomicUsize::new(0)),
+    }));
+
+    let result = daemon
+        .handle_rpc(rpc_request(
+            90,
+            "propagation_remote_sync",
+            json!({
+                "remote": "remote-backoff",
+                "peer": "peer-remote-backoff",
+            }),
+        ))
+        .expect("remote sync should postpone")
+        .result
+        .expect("remote sync result");
+    assert_eq!(result["synced"].as_bool(), Some(false));
+    assert_eq!(result["postponed"].as_bool(), Some(true));
+    assert_eq!(result["postpone_reason"].as_str(), Some("backoff"));
+    assert_eq!(result["propagation"]["postpone_reason"].as_str(), Some("backoff"));
+    assert_eq!(sync_calls.load(std::sync::atomic::Ordering::SeqCst), 0);
+
+    let status = daemon
+        .handle_rpc(RpcRequest { id: 91, method: "propagation_status".to_string(), params: None })
+        .expect("propagation status")
+        .result
+        .expect("propagation status result");
+    assert_eq!(status["propagation"]["sync_state"].as_u64(), Some(0x00));
+    assert_eq!(status["propagation"]["last_sync_started"], JsonValue::Null);
+}
+
+#[test]
 fn propagation_remote_unpeer_rejects_blank_peer_before_bridge_call() {
     let daemon = RpcDaemon::test_instance();
     let sync_calls = Arc::new(std::sync::atomic::AtomicUsize::new(0));

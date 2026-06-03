@@ -1083,16 +1083,11 @@ impl RpcDaemon {
                     .clone()
                     .ok_or_else(|| std::io::Error::other("remote control bridge unavailable"))?;
                 let peer_id = parsed.peer.trim().to_string();
-                self.ensure_peer_for_sync(peer_id.as_str(), now_i64())?;
+                let timestamp = now_i64();
+                let record = self.ensure_peer_for_sync(peer_id.as_str(), timestamp)?;
                 let timeout_secs = parsed.timeout_secs.unwrap_or(5.0).max(0.1);
-                let peer_transfer_limit_kb = self
-                    .peers
-                    .lock()
-                    .expect("peers mutex poisoned")
-                    .get(peer_id.as_str())
-                    .and_then(|peer| {
-                        peer.propagation_transfer_limit.map(|limit| f64::from(limit) / 1000.0)
-                    });
+                let peer_transfer_limit_kb =
+                    record.propagation_transfer_limit.map(|limit| f64::from(limit) / 1000.0);
                 let request_transfer_limit_kb =
                     parsed.transfer_limit_kb.map(|limit| limit.max(0.0));
                 let transfer_limit_kb = match (peer_transfer_limit_kb, request_transfer_limit_kb) {
@@ -1103,13 +1098,17 @@ impl RpcDaemon {
                 };
                 let transfer_limit =
                     transfer_limit_kb.map(|limit| (limit.max(0.0) * 1000.0) as u64);
-                let sync_limit = self
-                    .peers
-                    .lock()
-                    .expect("peers mutex poisoned")
-                    .get(peer_id.as_str())
-                    .and_then(|peer| peer.propagation_sync_limit.map(u64::from))
-                    .or(transfer_limit);
+                let sync_limit = record.propagation_sync_limit.map(u64::from).or(transfer_limit);
+                if record.next_sync_attempt > 0 && timestamp < record.next_sync_attempt {
+                    return Ok(self.postponed_peer_sync_response(
+                        request.id,
+                        &record,
+                        timestamp,
+                        "backoff",
+                        transfer_limit.map(|limit| limit as usize),
+                        sync_limit.map(|limit| limit as usize),
+                    ));
+                }
                 self.update_propagation_sync_state(|state| {
                     state.sync_state = PR_REQUEST_SENT;
                     state.state_name = "syncing".to_string();
