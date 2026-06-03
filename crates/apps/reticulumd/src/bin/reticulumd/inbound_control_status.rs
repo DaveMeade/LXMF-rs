@@ -110,6 +110,7 @@ pub(super) fn compose_python_status(
                             "stamp_cost_flexibility": stamp_cost_flexibility,
                             "peering_cost": row.get("peering_cost").cloned().unwrap_or(Value::Null),
                             "peering_key": row.get("peering_key").cloned().unwrap_or(Value::Null),
+                            "peering_key_status": row.get("peering_key_status").cloned().unwrap_or(Value::Null),
                             "network_distance": row.get("network_distance").and_then(Value::as_u64).unwrap_or(1),
                             "rx_bytes": row.get("rx_bytes").and_then(Value::as_u64).unwrap_or(0),
                             "tx_bytes": row.get("tx_bytes").and_then(Value::as_u64).unwrap_or(0),

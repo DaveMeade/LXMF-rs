@@ -954,6 +954,92 @@ mod tests {
     }
 
     #[test]
+    fn python_status_exposes_peer_peering_key_status() {
+        let local_hash = [2u8; 16];
+        let ready_peer = hex::encode([3u8; 16]);
+        let daemon = RpcDaemon::with_store(
+            MessagesStore::in_memory().expect("store"),
+            hex::encode(local_hash),
+        );
+        daemon
+            .handle_rpc(RpcRequest {
+                id: 1,
+                method: "peer_sync".to_string(),
+                params: Some(json!({ "peer": "peer-unconfigured-key" })),
+            })
+            .expect("create unconfigured peer");
+        daemon
+            .accept_announce_with_metadata(
+                ready_peer.clone(),
+                1_700_000_620,
+                None,
+                None,
+                None,
+                Some(vec!["propagation".to_string()]),
+                None,
+                None,
+                None,
+                Some(1),
+                Some(Some(1)),
+                Some(Some(1)),
+                None,
+                Some(1),
+                None,
+                None,
+                None,
+                None,
+            )
+            .expect("accept propagation peer announce");
+        daemon
+            .accept_announce_with_metadata(
+                "peer-not-ready-key".to_string(),
+                1_700_000_621,
+                None,
+                None,
+                None,
+                Some(vec!["propagation".to_string()]),
+                None,
+                None,
+                None,
+                Some(1),
+                Some(Some(1)),
+                Some(Some(1)),
+                None,
+                Some(1),
+                None,
+                None,
+                None,
+                None,
+            )
+            .expect("accept invalid-hash propagation peer announce");
+
+        let status = status::compose_python_status(
+            &daemon,
+            &PropagationControlContext {
+                enabled: true,
+                local_identity_hash: local_hash,
+                propagation_destination_hash_hex: Some("propagation".to_string()),
+                control_destination_hash_hex: Some("control".to_string()),
+                delivery_destination: None,
+                allowed_control_identities: Vec::new(),
+            },
+        );
+
+        assert_eq!(
+            status["peers"]["peer-unconfigured-key"]["peering_key_status"].as_str(),
+            Some("unconfigured")
+        );
+        assert_eq!(
+            status["peers"][ready_peer.as_str()]["peering_key_status"].as_str(),
+            Some("ready")
+        );
+        assert_eq!(
+            status["peers"]["peer-not-ready-key"]["peering_key_status"].as_str(),
+            Some("not_ready")
+        );
+    }
+
+    #[test]
     fn python_status_prefers_peer_propagation_stamp_policy() {
         let peer = "peer-policy".to_string();
         let daemon = RpcDaemon::test_instance();
