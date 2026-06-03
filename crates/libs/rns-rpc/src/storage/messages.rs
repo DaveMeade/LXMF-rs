@@ -893,6 +893,24 @@ impl MessagesStore {
         })
     }
 
+    pub fn mark_peer_transfer_limited_propagation(
+        &self,
+        peer: &str,
+        transient_id: &str,
+    ) -> rusqlite::Result<()> {
+        self.with_write_conn(|conn| {
+            conn.execute(
+                "INSERT INTO propagation_peer_entries (peer, transient_id, state, updated_at)
+                 VALUES (?1, ?2, 'transfer_limited', ?3)
+                 ON CONFLICT(peer, transient_id) DO UPDATE SET
+                    state = 'transfer_limited',
+                    updated_at = excluded.updated_at",
+                params![peer, normalize_hex_key(transient_id), now_unix_secs()],
+            )?;
+            Ok(())
+        })
+    }
+
     pub fn remove_peer_unhandled_propagation(
         &self,
         peer: &str,
@@ -950,7 +968,7 @@ impl MessagesStore {
                  FROM propagation_peer_entries p
                  INNER JOIN propagation_entries e
                     ON e.transient_id = p.transient_id
-                 WHERE p.peer = ?1 AND p.state = 'handled'
+                 WHERE p.peer = ?1 AND p.state IN ('handled', 'transfer_limited')
                  ORDER BY p.transient_id ASC",
             )?;
             let rows = stmt.query_map(params![peer], |row| row.get(0))?;

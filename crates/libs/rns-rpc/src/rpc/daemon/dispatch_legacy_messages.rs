@@ -696,7 +696,7 @@ impl RpcDaemon {
                             propagation_transfer_limited_bytes.saturating_add(entry.size_bytes);
                         let transient_id = entry.transient_id;
                         self.store
-                            .mark_peer_handled_propagation(peer_id, transient_id.as_str())
+                            .mark_peer_transfer_limited_propagation(peer_id, transient_id.as_str())
                             .map_err(std::io::Error::other)?;
                         propagation_transfer_limited_ids.push(transient_id);
                         continue;
