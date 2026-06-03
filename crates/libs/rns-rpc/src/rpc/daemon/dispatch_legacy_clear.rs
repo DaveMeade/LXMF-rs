@@ -52,6 +52,7 @@ impl RpcDaemon {
                     let mut guard = self.peers.lock().expect("peers mutex poisoned");
                     guard.clear();
                 }
+                self.clear_selected_propagation_node_after_peer_clear();
                 self.update_daemon_status_snapshot(|snapshot| {
                     snapshot.peer_count = 0;
                 });
@@ -71,6 +72,7 @@ impl RpcDaemon {
                     let mut guard = self.peers.lock().expect("peers mutex poisoned");
                     guard.clear();
                 }
+                self.clear_selected_propagation_node_after_peer_clear();
                 self.update_daemon_status_snapshot(|snapshot| {
                     snapshot.peer_count = 0;
                 });
@@ -120,5 +122,21 @@ impl RpcDaemon {
             }
             _ => unreachable!("legacy clear route: {}", request.method),
         }
+    }
+
+    fn clear_selected_propagation_node_after_peer_clear(&self) {
+        {
+            let mut selected =
+                self.outbound_propagation_node.lock().expect("propagation node mutex poisoned");
+            *selected = None;
+        }
+        let state = {
+            let mut guard = self.propagation_state.lock().expect("propagation mutex poisoned");
+            guard.selected_node = None;
+            guard.clone()
+        };
+        self.update_daemon_status_snapshot(|snapshot| {
+            snapshot.propagation = state;
+        });
     }
 }

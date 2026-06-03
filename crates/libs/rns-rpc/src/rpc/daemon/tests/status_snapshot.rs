@@ -8467,6 +8467,81 @@ fn clear_peers_clears_persisted_propagation_queue_marks() {
 }
 
 #[test]
+fn clear_peers_clears_selected_propagation_node() {
+    let daemon = RpcDaemon::test_instance();
+    daemon
+        .handle_rpc(rpc_request(
+            92,
+            "set_outbound_propagation_node",
+            json!({ "peer": "peer-selected-clear" }),
+        ))
+        .expect("select propagation node");
+
+    daemon
+        .handle_rpc(RpcRequest { id: 93, method: "clear_peers".to_string(), params: None })
+        .expect("clear peers");
+
+    let selected = daemon
+        .handle_rpc(RpcRequest {
+            id: 94,
+            method: "get_outbound_propagation_node".to_string(),
+            params: None,
+        })
+        .expect("get selected propagation node")
+        .result
+        .expect("selected propagation node result");
+    assert_eq!(selected["peer"], JsonValue::Null);
+
+    let status = daemon
+        .handle_rpc(RpcRequest { id: 95, method: "propagation_status".to_string(), params: None })
+        .expect("propagation status")
+        .result
+        .expect("propagation status result");
+    assert_eq!(status["propagation"]["selected_node"], JsonValue::Null);
+
+    let daemon_status = daemon
+        .handle_rpc(RpcRequest { id: 96, method: "daemon_status_ex".to_string(), params: None })
+        .expect("daemon status")
+        .result
+        .expect("daemon status result");
+    assert_eq!(daemon_status["propagation"]["selected_node"], JsonValue::Null);
+}
+
+#[test]
+fn clear_all_clears_selected_propagation_node() {
+    let daemon = RpcDaemon::test_instance();
+    daemon
+        .handle_rpc(rpc_request(
+            92,
+            "set_outbound_propagation_node",
+            json!({ "peer": "peer-selected-clear-all" }),
+        ))
+        .expect("select propagation node");
+
+    daemon
+        .handle_rpc(RpcRequest { id: 93, method: "clear_all".to_string(), params: None })
+        .expect("clear all");
+
+    let selected = daemon
+        .handle_rpc(RpcRequest {
+            id: 94,
+            method: "get_outbound_propagation_node".to_string(),
+            params: None,
+        })
+        .expect("get selected propagation node")
+        .result
+        .expect("selected propagation node result");
+    assert_eq!(selected["peer"], JsonValue::Null);
+
+    let status = daemon
+        .handle_rpc(RpcRequest { id: 95, method: "propagation_status".to_string(), params: None })
+        .expect("propagation status")
+        .result
+        .expect("propagation status result");
+    assert_eq!(status["propagation"]["selected_node"], JsonValue::Null);
+}
+
+#[test]
 fn peer_unpeer_clears_selected_propagation_node() {
     let daemon = RpcDaemon::test_instance();
     daemon
