@@ -810,20 +810,34 @@ impl RpcDaemon {
             parse_capabilities_from_app_data_hex(app_data_hex.as_deref())
         };
         let record = if should_peer {
-            let record = self.upsert_peer(
-                peer,
+            let record = match self.upsert_peer(
+                peer.clone(),
                 timestamp,
                 capability_list.clone(),
-                name,
-                name_source,
+                name.clone(),
+                name_source.clone(),
                 peer_type,
-            )?;
-            self.refresh_peer_propagation_state(
-                record.peer.as_str(),
-                timestamp,
-                propagation_peer_state,
-            );
-            self.queue_existing_propagation_for_peer(record.peer.as_str())?;
+            ) {
+                Ok(record) => {
+                    self.refresh_peer_propagation_state(
+                        record.peer.as_str(),
+                        timestamp,
+                        propagation_peer_state,
+                    );
+                    self.queue_existing_propagation_for_peer(record.peer.as_str())?;
+                    record
+                }
+                Err(err) if err.kind() == std::io::ErrorKind::WouldBlock && !is_static => self
+                    .transient_peer_record(
+                        peer,
+                        timestamp,
+                        capability_list.clone(),
+                        name,
+                        name_source,
+                        Some("discovered".to_string()),
+                    ),
+                Err(err) => return Err(err),
+            };
             record
         } else {
             self.transient_peer_record(

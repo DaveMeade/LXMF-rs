@@ -1371,6 +1371,94 @@ fn autopeered_announce_queues_existing_propagation_entries() {
 }
 
 #[test]
+fn autopeer_capacity_rejects_peer_but_preserves_announce() {
+    let daemon = RpcDaemon::test_instance();
+    daemon
+        .handle_rpc(rpc_request(
+            47,
+            "propagation_enable",
+            json!({
+                "enabled": true,
+                "autopeer": true,
+                "autopeer_maxdepth": 2,
+                "max_peers": 1,
+            }),
+        ))
+        .expect("enable propagation");
+
+    daemon
+        .accept_announce_with_metadata(
+            "peer-auto-full-a".to_string(),
+            1_700_000_120,
+            Some("Peer Auto Full A".to_string()),
+            Some("announce".to_string()),
+            None,
+            Some(vec!["propagation".to_string()]),
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+            Some(1),
+            None,
+            None,
+            None,
+            None,
+        )
+        .expect("accept first autopeer announce");
+    daemon
+        .accept_announce_with_metadata(
+            "peer-auto-full-b".to_string(),
+            1_700_000_121,
+            Some("Peer Auto Full B".to_string()),
+            Some("announce".to_string()),
+            None,
+            Some(vec!["propagation".to_string()]),
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+            Some(1),
+            None,
+            None,
+            None,
+            None,
+        )
+        .expect("capacity-limited announce should still be accepted");
+
+    let peers = daemon
+        .handle_rpc(RpcRequest { id: 48, method: "list_peers".to_string(), params: None })
+        .expect("list peers")
+        .result
+        .expect("list peers result");
+    let peer_rows = peers["peers"].as_array().expect("peer rows");
+    assert_eq!(peer_rows.len(), 1);
+    assert_eq!(peer_rows[0]["peer"].as_str(), Some("peer-auto-full-a"));
+
+    let announces = daemon
+        .handle_rpc(RpcRequest { id: 49, method: "list_announces".to_string(), params: None })
+        .expect("list announces")
+        .result
+        .expect("list announces result");
+    let announce_rows = announces["announces"].as_array().expect("announce rows");
+    assert!(announce_rows.iter().any(|row| {
+        row["peer"].as_str() == Some("peer-auto-full-b")
+            && row["name"].as_str() == Some("Peer Auto Full B")
+    }));
+
+    let event = std::iter::from_fn(|| daemon.take_event())
+        .filter(|event| event.event_type == "announce_received")
+        .find(|event| event.payload["peer"].as_str() == Some("peer-auto-full-b"))
+        .expect("capacity-limited announce event");
+    assert_eq!(event.payload["name"].as_str(), Some("Peer Auto Full B"));
+}
+
+#[test]
 fn stale_announce_does_not_regress_propagation_peer_state() {
     let daemon = RpcDaemon::test_instance();
     daemon
