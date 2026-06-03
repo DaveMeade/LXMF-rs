@@ -38,7 +38,7 @@ fn peer_request_from_data(data: Option<rmpv::Value>) -> Option<(String, Option<f
                 _ => return None,
             };
             let transfer_limit_kb = match entries.get(1) {
-                Some(value) => Some(transfer_limit_kb_from_value(value)?),
+                Some(value) => transfer_limit_kb_from_value(value)?,
                 None => None,
             };
             Some((peer, transfer_limit_kb))
@@ -47,7 +47,7 @@ fn peer_request_from_data(data: Option<rmpv::Value>) -> Option<(String, Option<f
     }
 }
 
-fn transfer_limit_kb_from_value(value: &rmpv::Value) -> Option<f64> {
+fn transfer_limit_kb_from_value(value: &rmpv::Value) -> Option<Option<f64>> {
     let limit = match value {
         rmpv::Value::F64(value) => Some(*value),
         rmpv::Value::F32(value) => Some((*value).into()),
@@ -57,7 +57,13 @@ fn transfer_limit_kb_from_value(value: &rmpv::Value) -> Option<f64> {
         rmpv::Value::Boolean(value) => Some(f64::from(*value as u8)),
         _ => None,
     }?;
-    limit.is_finite().then_some(limit.max(0.0))
+    if limit.is_nan() {
+        None
+    } else if limit.is_infinite() && limit.is_sign_positive() {
+        Some(None)
+    } else {
+        Some(Some(limit.max(0.0)))
+    }
 }
 
 fn peer_exists(daemon: &RpcDaemon, peer_hex: &str) -> bool {
@@ -134,6 +140,34 @@ mod tests {
         ])));
 
         assert!(request.is_none());
+    }
+
+    #[test]
+    fn peer_request_positive_infinity_transfer_limit_omits_override() {
+        let peer_bytes = [0xA5; 16];
+
+        let (peer_hex, transfer_limit_kb) = peer_request_from_data(Some(rmpv::Value::Array(vec![
+            rmpv::Value::Binary(peer_bytes.to_vec()),
+            rmpv::Value::String("inf".into()),
+        ])))
+        .expect("peer request");
+
+        assert_eq!(peer_hex, hex::encode(peer_bytes));
+        assert_eq!(transfer_limit_kb, None);
+    }
+
+    #[test]
+    fn peer_request_negative_infinity_transfer_limit_clamps_to_zero() {
+        let peer_bytes = [0xA5; 16];
+
+        let (peer_hex, transfer_limit_kb) = peer_request_from_data(Some(rmpv::Value::Array(vec![
+            rmpv::Value::Binary(peer_bytes.to_vec()),
+            rmpv::Value::String("-inf".into()),
+        ])))
+        .expect("peer request");
+
+        assert_eq!(peer_hex, hex::encode(peer_bytes));
+        assert_eq!(transfer_limit_kb, Some(0.0));
     }
 
     #[test]
