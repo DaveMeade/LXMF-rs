@@ -6427,6 +6427,10 @@ fn propagation_remote_sync_updates_peer_runtime_state() {
         Some(1)
     );
     assert_eq!(
+        event.payload["propagation"]["duplicate_count"].as_u64(),
+        Some(0)
+    );
+    assert_eq!(
         event.payload["propagation"]["transferred_bytes"].as_u64(),
         Some(payload.len() as u64)
     );
@@ -6619,7 +6623,12 @@ fn duplicate_propagation_remote_sync_import_does_not_double_count_received() {
         second = result;
     }
     assert_eq!(second["result"]["imported_count"].as_u64(), Some(0));
+    assert_eq!(second["result"]["duplicate_count"].as_u64(), Some(1));
     assert_eq!(second["result"]["imported_ids"], json!([]));
+    assert_eq!(
+        second["peer_sync"]["propagation"]["duplicate_count"].as_u64(),
+        Some(1)
+    );
     assert_eq!(
         second["peer_sync"]["messages"]["handled_ids"]
             .as_array()
@@ -6810,6 +6819,7 @@ fn duplicate_propagation_remote_fetch_queues_known_payload_without_double_counti
         .result
         .expect("duplicate remote fetch result");
     assert_eq!(second["result"]["imported_count"].as_u64(), Some(0));
+    assert_eq!(second["result"]["duplicate_count"].as_u64(), Some(1));
     assert_eq!(second["result"]["imported_ids"], json!([]));
 
     let relay_pending = daemon
@@ -6873,6 +6883,7 @@ fn propagation_remote_fetch_reopens_transfer_limited_peer_queue_mark() {
         .result
         .expect("remote fetch result");
     assert_eq!(result["result"]["imported_count"].as_u64(), Some(0));
+    assert_eq!(result["result"]["duplicate_count"].as_u64(), Some(1));
     assert_eq!(result["result"]["imported_ids"], json!([]));
 
     let pending = daemon
@@ -7202,6 +7213,7 @@ fn duplicate_propagation_remote_download_queues_known_payload_without_double_cou
         .result
         .expect("duplicate remote download result");
     assert_eq!(second["result"]["imported_count"].as_u64(), Some(0));
+    assert_eq!(second["result"]["duplicate_count"].as_u64(), Some(1));
     assert_eq!(second["result"]["imported_ids"], json!([]));
 
     let relay_pending = daemon

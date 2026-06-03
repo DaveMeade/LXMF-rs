@@ -7,6 +7,7 @@ const PR_FAILED: u32 = 0xfe;
 
 struct RemotePropagationImportSummary {
     imported_count: usize,
+    duplicate_count: usize,
     imported_ids: Vec<String>,
     accepted_ids: Vec<String>,
     transferred_bytes: usize,
@@ -154,6 +155,7 @@ impl RpcDaemon {
         else {
             return Ok(RemotePropagationImportSummary {
                 imported_count: 0,
+                duplicate_count: 0,
                 imported_ids: Vec::new(),
                 accepted_ids: Vec::new(),
                 transferred_bytes: 0,
@@ -161,6 +163,7 @@ impl RpcDaemon {
         };
 
         let mut imported_count = 0usize;
+        let mut duplicate_count = 0usize;
         let mut imported_ids = Vec::new();
         let mut accepted_ids = Vec::new();
         let mut transferred_bytes = 0usize;
@@ -228,7 +231,9 @@ impl RpcDaemon {
                 .expect("propagation payload mutex poisoned")
                 .insert(transient_id.clone(), record.payload_hex);
             accepted_ids.push(transient_id.clone());
-            if !already_known {
+            if already_known {
+                duplicate_count = duplicate_count.saturating_add(1);
+            } else {
                 imported_count = imported_count.saturating_add(1);
                 imported_ids.push(transient_id);
             }
@@ -238,6 +243,7 @@ impl RpcDaemon {
         }
         Ok(RemotePropagationImportSummary {
             imported_count,
+            duplicate_count,
             imported_ids,
             accepted_ids,
             transferred_bytes,
@@ -1146,6 +1152,10 @@ impl RpcDaemon {
                                 "imported_count".to_string(),
                                 json!(imported.imported_count),
                             );
+                            result.insert(
+                                "duplicate_count".to_string(),
+                                json!(imported.duplicate_count),
+                            );
                             result.insert("imported_ids".to_string(), json!(imported.imported_ids));
                             result.insert(
                                 "transferred_bytes".to_string(),
@@ -1224,6 +1234,7 @@ impl RpcDaemon {
                                 "remote_sync": true,
                                 "synced": result.get("synced").and_then(JsonValue::as_bool).unwrap_or(true),
                                 "imported_count": imported.imported_count,
+                                "duplicate_count": imported.duplicate_count,
                                 "imported_ids": imported.imported_ids,
                                 "transferred_bytes": imported.transferred_bytes,
                                 "peering_key": peering_key,
@@ -1369,6 +1380,10 @@ impl RpcDaemon {
                                 "imported_count".to_string(),
                                 json!(imported.imported_count),
                             );
+                            result.insert(
+                                "duplicate_count".to_string(),
+                                json!(imported.duplicate_count),
+                            );
                             result.insert("imported_ids".to_string(), json!(imported.imported_ids));
                             result.insert(
                                 "transferred_bytes".to_string(),
@@ -1498,6 +1513,7 @@ impl RpcDaemon {
                 };
                 if let Some(result) = result.as_object_mut() {
                     result.insert("imported_count".to_string(), json!(imported.imported_count));
+                    result.insert("duplicate_count".to_string(), json!(imported.duplicate_count));
                     result.insert("imported_ids".to_string(), json!(imported.imported_ids));
                     result
                         .insert("transferred_bytes".to_string(), json!(imported.transferred_bytes));
