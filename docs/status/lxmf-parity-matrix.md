@@ -145,6 +145,7 @@ Recent focused evidence:
 - `cargo test -p reticulum-rs-rpc --lib list_peers_exposes_peering_key_value_when_cost_is_known -- --nocapture`
 - `cargo test -p reticulum-rs-rpc --lib list_peers_exposes_peering_key_status_values -- --nocapture`
 - `cargo test -p reticulum-rs-rpc --lib autopeered_announce_records_propagation_peer_state -- --nocapture`
+- `cargo test -p reticulum-rs-rpc --lib peer_sync_drops_low_value_stamped_entries_before_offer -- --nocapture`
 - `cargo test -p reticulumd --bin reticulumd python_status_exposes_peer_peering_key_value -- --nocapture`
 - `cargo test -p reticulumd --bin reticulumd python_status_exposes_peer_peering_key_status -- --nocapture`
 - `cargo test -p reticulumd --bin reticulumd peer_sync_command_reports_peering_key_status -- --nocapture`

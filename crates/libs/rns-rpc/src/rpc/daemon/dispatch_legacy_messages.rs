@@ -121,13 +121,16 @@ impl RpcDaemon {
             "postpone_reason": postpone_reason,
             "handled": 0,
             "skipped": 0,
+            "rejected": 0,
             "offered": 0,
             "bytes": 0,
             "offered_bytes": 0,
+            "rejected_bytes": 0,
             "remaining": 0,
             "remaining_bytes": 0,
             "handled_ids": [],
             "skipped_ids": [],
+            "rejected_ids": [],
             "transfer_limited": 0,
             "transfer_limited_bytes": 0,
             "transfer_limited_ids": [],
@@ -620,6 +623,9 @@ impl RpcDaemon {
                     .store
                     .list_peer_unhandled_propagation(peer_id)
                     .map_err(std::io::Error::other)?;
+                let mut propagation_rejected = 0usize;
+                let mut propagation_rejected_bytes = 0u64;
+                let mut propagation_rejected_ids = Vec::new();
                 let peer_policy_required = !pending_propagation.is_empty()
                     && (pending_propagation.iter().any(|entry| entry.stamp_value.is_some())
                         || peer_stamp_policy_partially_known(&record));
@@ -654,6 +660,10 @@ impl RpcDaemon {
                                 .stamp_value
                                 .is_some_and(|value| value < min_accepted_stamp_value)
                             {
+                                propagation_rejected = propagation_rejected.saturating_add(1);
+                                propagation_rejected_bytes =
+                                    propagation_rejected_bytes.saturating_add(entry.size_bytes);
+                                propagation_rejected_ids.push(entry.transient_id.clone());
                                 self.store
                                     .remove_peer_unhandled_propagation(
                                         peer_id,
@@ -748,14 +758,17 @@ impl RpcDaemon {
                     "handled": propagation_handled,
                     "transferred": propagation_transferred,
                     "skipped": propagation_skipped,
+                    "rejected": propagation_rejected,
                     "offered": propagation_handled,
                     "bytes": propagation_bytes,
                     "offered_bytes": propagation_offered_bytes,
+                    "rejected_bytes": propagation_rejected_bytes,
                     "remaining": propagation_skipped,
                     "remaining_bytes": propagation_remaining_bytes,
                     "handled_ids": propagation_handled_ids,
                     "transferred_ids": propagation_transferred_ids,
                     "skipped_ids": propagation_skipped_ids,
+                    "rejected_ids": propagation_rejected_ids,
                     "transfer_limited": propagation_transfer_limited,
                     "transfer_limited_bytes": propagation_transfer_limited_bytes,
                     "transfer_limited_ids": propagation_transfer_limited_ids,

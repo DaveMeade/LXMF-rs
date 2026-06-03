@@ -4879,10 +4879,30 @@ fn peer_sync_drops_low_value_stamped_entries_before_offer() {
         .result
         .expect("peer sync result");
     assert_eq!(result["propagation"]["handled"].as_u64(), Some(1));
+    assert_eq!(result["propagation"]["rejected"].as_u64(), Some(1));
+    assert_eq!(result["propagation"]["rejected_bytes"].as_u64(), Some(24));
     assert_eq!(result["propagation"]["skipped"].as_u64(), Some(0));
     assert_eq!(
         result["propagation"]["handled_ids"].as_array().expect("handled ids"),
         &[json!(accepted.transient_id.as_str())]
+    );
+    assert_eq!(
+        result["propagation"]["rejected_ids"].as_array().expect("rejected ids"),
+        &[json!(low_value.transient_id.as_str())]
+    );
+    let event = daemon
+        .event_queue
+        .lock()
+        .expect("event_queue mutex poisoned")
+        .iter()
+        .rev()
+        .find(|event| event.event_type == "peer_sync")
+        .cloned()
+        .expect("peer sync event");
+    assert_eq!(event.payload["propagation"]["rejected"].as_u64(), Some(1));
+    assert_eq!(
+        event.payload["propagation"]["rejected_ids"].as_array().expect("event rejected ids"),
+        &[json!(low_value.transient_id.as_str())]
     );
 
     let pending = daemon
