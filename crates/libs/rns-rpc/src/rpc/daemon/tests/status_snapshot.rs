@@ -6061,6 +6061,31 @@ fn propagation_remote_sync_trims_peer_before_bridge_and_response() {
 }
 
 #[test]
+fn propagation_remote_sync_trims_remote_before_bridge_event_and_response() {
+    let daemon = RpcDaemon::test_instance();
+    daemon.set_remote_control_bridge(Arc::new(TestRemoteControlBridge {
+        result: Ok(json!({"synced": true})),
+    }));
+
+    let result = daemon
+        .handle_rpc(rpc_request(
+            89,
+            "propagation_remote_sync",
+            json!({
+                "remote": "  remote-trimmed  ",
+                "peer": "peer-trim-remote",
+            }),
+        ))
+        .expect("remote sync with padded remote")
+        .result
+        .expect("remote sync result");
+
+    assert_eq!(result["remote"].as_str(), Some("remote-trimmed"));
+    assert_eq!(result["result"]["remote"].as_str(), Some("remote-trimmed"));
+    assert_eq!(result["peer_sync"]["remote"].as_str(), Some("remote-trimmed"));
+}
+
+#[test]
 fn propagation_remote_unpeer_rejects_blank_peer_before_bridge_call() {
     let daemon = RpcDaemon::test_instance();
     let sync_calls = Arc::new(std::sync::atomic::AtomicUsize::new(0));

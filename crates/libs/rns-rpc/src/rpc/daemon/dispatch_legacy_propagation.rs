@@ -1062,6 +1062,7 @@ impl RpcDaemon {
                     .expect("remote control bridge mutex poisoned")
                     .clone()
                     .ok_or_else(|| std::io::Error::other("remote control bridge unavailable"))?;
+                let remote_id = parsed.remote.trim().to_string();
                 let peer_id = parsed.peer.trim().to_string();
                 self.ensure_peer_for_sync(peer_id.as_str(), now_i64())?;
                 let timeout_secs = parsed.timeout_secs.unwrap_or(5.0).max(0.1);
@@ -1100,7 +1101,7 @@ impl RpcDaemon {
                 });
                 let mut peer_sync_result = JsonValue::Null;
                 let result = match bridge.propagation_remote_sync(
-                    parsed.remote.as_str(),
+                    remote_id.as_str(),
                     peer_id.as_str(),
                     parsed.identity_private_key_hex.as_deref(),
                     timeout_secs,
@@ -1119,7 +1120,7 @@ impl RpcDaemon {
                                 self.record_outbound_peer_activity(peer_id.as_str(), 0, false);
                                 self.publish_failed_remote_peer_sync_event(
                                     peer_id.as_str(),
-                                    parsed.remote.as_str(),
+                                    remote_id.as_str(),
                                     err.to_string().as_str(),
                                     transfer_limit,
                                     sync_limit,
@@ -1228,7 +1229,7 @@ impl RpcDaemon {
                                 "timestamp": now_i64(),
                                 "name": peer.name,
                                 "name_source": peer.name_source,
-                                "remote": parsed.remote.as_str(),
+                                "remote": remote_id.as_str(),
                                 "remote_sync": true,
                                 "synced": true,
                                 "state": 0,
@@ -1281,7 +1282,7 @@ impl RpcDaemon {
                         self.record_outbound_peer_activity(peer_id.as_str(), 0, false);
                         self.publish_failed_remote_peer_sync_event(
                             peer_id.as_str(),
-                            parsed.remote.as_str(),
+                            remote_id.as_str(),
                             err.to_string().as_str(),
                             transfer_limit,
                             sync_limit,
@@ -1294,7 +1295,7 @@ impl RpcDaemon {
                 Ok(RpcResponse {
                     id: request.id,
                     result: Some(json!({
-                        "remote": parsed.remote,
+                        "remote": remote_id,
                         "peer": peer_id,
                         "propagation": propagation,
                         "peer_sync": peer_sync_result,
