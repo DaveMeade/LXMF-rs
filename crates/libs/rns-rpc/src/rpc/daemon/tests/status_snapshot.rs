@@ -2642,6 +2642,21 @@ fn peer_sync_applies_request_transfer_limit_without_persisting_it() {
     assert_eq!(result["propagation"]["handled"].as_u64(), Some(0));
     assert_eq!(result["propagation"]["transfer_limited"].as_u64(), Some(1));
     assert_eq!(result["propagation"]["transfer_limit"].as_u64(), Some(80));
+    assert_eq!(result["transfer_limit"].as_u64(), Some(80));
+    assert_eq!(result["sync_limit"].as_u64(), Some(80));
+
+    let event = daemon
+        .event_queue
+        .lock()
+        .expect("event_queue mutex poisoned")
+        .iter()
+        .rev()
+        .find(|event| event.event_type == "peer_sync")
+        .cloned()
+        .expect("peer sync event");
+    assert_eq!(event.payload["transfer_limit"].as_u64(), Some(80));
+    assert_eq!(event.payload["sync_limit"].as_u64(), Some(80));
+    assert_eq!(event.payload["propagation"]["transfer_limit"].as_u64(), Some(80));
 
     let peers = daemon
         .handle_rpc(RpcRequest { id: 62, method: "list_peers".to_string(), params: None })
@@ -2730,7 +2745,21 @@ fn postponed_peer_sync_reports_request_transfer_limit() {
     assert_eq!(result["postpone_reason"].as_str(), Some("backoff"));
     assert_eq!(result["propagation"]["transfer_limit"].as_u64(), Some(80));
     assert_eq!(result["propagation"]["sync_limit"].as_u64(), Some(80));
-    assert_eq!(result["transfer_limit"], JsonValue::Null);
+    assert_eq!(result["transfer_limit"].as_u64(), Some(80));
+    assert_eq!(result["sync_limit"].as_u64(), Some(80));
+
+    let event = daemon
+        .event_queue
+        .lock()
+        .expect("event_queue mutex poisoned")
+        .iter()
+        .rev()
+        .find(|event| event.event_type == "peer_sync")
+        .cloned()
+        .expect("postponed peer sync event");
+    assert_eq!(event.payload["transfer_limit"].as_u64(), Some(80));
+    assert_eq!(event.payload["sync_limit"].as_u64(), Some(80));
+    assert_eq!(event.payload["propagation"]["transfer_limit"].as_u64(), Some(80));
 }
 
 #[test]
