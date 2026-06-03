@@ -3501,6 +3501,64 @@ fn peer_sync_offer_response_only_transfers_wanted_messages_like_python() {
 }
 
 #[test]
+fn list_peers_top_level_message_counters_match_python_sync_accounting() {
+    let daemon = RpcDaemon::test_instance();
+    let wanted = PropagationEntryRecord {
+        transient_id: "af".repeat(32),
+        destination: "12".repeat(16),
+        payload_hex: "12".repeat(24),
+        received_at: 1_700_000_609,
+        size_bytes: 24,
+        stamp_value: None,
+    };
+    let already_known = PropagationEntryRecord {
+        transient_id: "b0".repeat(32),
+        destination: "12".repeat(16),
+        payload_hex: "13".repeat(30),
+        received_at: 1_700_000_610,
+        size_bytes: 30,
+        stamp_value: None,
+    };
+    for entry in [&wanted, &already_known] {
+        daemon.store.upsert_propagation_entry(entry).expect("store propagation entry");
+        daemon
+            .store
+            .mark_peer_unhandled_propagation("peer-top-level-counters", entry.transient_id.as_str())
+            .expect("mark unhandled");
+    }
+
+    daemon
+        .handle_rpc(rpc_request(
+            55,
+            "peer_sync",
+            json!({
+                "peer": "peer-top-level-counters",
+                "wanted_ids": [wanted.transient_id.as_str()],
+            }),
+        ))
+        .expect("peer sync");
+
+    let peers = daemon
+        .handle_rpc(RpcRequest { id: 56, method: "list_peers".to_string(), params: None })
+        .expect("list peers")
+        .result
+        .expect("list peers result");
+    let row = peers["peers"]
+        .as_array()
+        .expect("peer rows")
+        .iter()
+        .find(|row| row["peer"].as_str() == Some("peer-top-level-counters"))
+        .expect("peer row");
+
+    assert_eq!(row["messages"]["offered"].as_u64(), Some(2));
+    assert_eq!(row["messages"]["outgoing"].as_u64(), Some(1));
+    assert_eq!(row["offered"].as_u64(), Some(2));
+    assert_eq!(row["outgoing"].as_u64(), Some(1));
+    assert_eq!(row["incoming"].as_u64(), Some(0));
+    assert_eq!(row["acceptance_rate"].as_f64(), Some(0.5));
+}
+
+#[test]
 fn peer_sync_drops_stale_unhandled_propagation_marks() {
     let daemon = RpcDaemon::test_instance();
     daemon

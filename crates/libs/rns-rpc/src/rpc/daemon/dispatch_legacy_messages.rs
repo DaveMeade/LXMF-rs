@@ -331,6 +331,9 @@ impl RpcDaemon {
                             "handled_ids": handled_ids.clone(),
                             "unhandled_ids": unhandled_ids.clone(),
                         });
+                        row["offered"] = json!(offered);
+                        row["outgoing"] = json!(outgoing);
+                        row["incoming"] = json!(incoming);
                         row["handled_ids"] = json!(handled_ids);
                         row["unhandled_ids"] = json!(unhandled_ids);
                         row["acceptance_rate"] = json!(acceptance_rate);
