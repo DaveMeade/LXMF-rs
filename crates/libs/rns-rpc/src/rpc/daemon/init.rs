@@ -969,28 +969,40 @@ impl RpcDaemon {
         &self,
         static_peers: &[String],
     ) -> Result<(), std::io::Error> {
-        if static_peers.is_empty() {
-            return Ok(());
-        }
-
-        let mut activated_peers = Vec::new();
-        let mut guard = self.peers.lock().expect("peers mutex poisoned");
+        let mut configured_static_peers = Vec::new();
         for peer in static_peers {
             let peer = peer.trim();
-            if peer.is_empty() {
-                continue;
+            if !peer.is_empty()
+                && !configured_static_peers
+                    .iter()
+                    .any(|existing: &String| existing.eq_ignore_ascii_case(peer))
+            {
+                configured_static_peers.push(peer.to_string());
             }
-            activated_peers.push(peer.to_string());
+        }
 
+        let mut guard = self.peers.lock().expect("peers mutex poisoned");
+        for existing in guard.values_mut() {
+            let is_configured_static = configured_static_peers
+                .iter()
+                .any(|peer| peer.eq_ignore_ascii_case(existing.peer.as_str()));
+            if is_configured_static {
+                existing.peer_type = Some("static".to_string());
+            } else if existing.peer_type.as_deref() == Some("static") {
+                existing.peer_type = Some("manual".to_string());
+            }
+        }
+
+        for peer in &configured_static_peers {
             if let Some(existing) = guard.get_mut(peer) {
                 existing.peer_type = Some("static".to_string());
                 continue;
             }
 
             guard.insert(
-                peer.to_string(),
+                peer.clone(),
                 PeerRecord {
-                    peer: peer.to_string(),
+                    peer: peer.clone(),
                     last_seen: 0,
                     capabilities: Vec::new(),
                     name: None,
@@ -1021,7 +1033,7 @@ impl RpcDaemon {
         self.update_daemon_status_snapshot(|snapshot| {
             snapshot.peer_count = peer_count;
         });
-        for peer in activated_peers {
+        for peer in configured_static_peers {
             self.queue_existing_propagation_for_peer(peer.as_str())?;
         }
         Ok(())

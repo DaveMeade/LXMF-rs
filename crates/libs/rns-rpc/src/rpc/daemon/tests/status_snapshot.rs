@@ -5872,7 +5872,7 @@ fn list_peers_static_type_tracks_current_static_peer_config() {
         .iter()
         .find(|row| row["peer"].as_str() == Some("peer-old"))
         .expect("old peer row");
-    assert_eq!(old["peer_type"].as_str(), Some("static"));
+    assert_eq!(old["peer_type"].as_str(), Some("manual"));
     assert_eq!(old["type"].as_str(), Some("discovered"));
 }
 
