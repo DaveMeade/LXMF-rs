@@ -2,6 +2,7 @@ use super::remote_control_download::propagation_download_request;
 use super::*;
 use reticulum_daemon::lxmf_bridge::rmpv_to_json;
 use rns_rpc::RemoteControlBridge;
+use sha2::{Digest, Sha256};
 
 use super::remote_fetch::{rmpv_binary_array, LocalPropagationImportOutcome};
 use super::remote_request::remote_control_request;
@@ -219,8 +220,10 @@ impl RemoteControlBridge for TransportBridge {
         let mut imported_count = 0usize;
         let mut duplicate_count = 0usize;
         let mut rejected_count = 0usize;
+        let mut import_outcomes = Vec::with_capacity(payloads.len());
         for payload in &payloads {
-            match self.accept_local_propagated_payload(daemon.clone(), payload.clone())? {
+            let outcome = self.accept_local_propagated_payload(daemon.clone(), payload.clone())?;
+            match outcome {
                 LocalPropagationImportOutcome::Imported => {
                     imported_count = imported_count.saturating_add(1);
                 }
@@ -231,6 +234,22 @@ impl RemoteControlBridge for TransportBridge {
                     rejected_count = rejected_count.saturating_add(1);
                 }
             }
+            import_outcomes.push((payload.as_slice(), outcome));
+        }
+        let ack_payload = propagation_remote_fetch_ack_payload(import_outcomes.as_slice());
+        if ack_payload
+            .as_array()
+            .and_then(|entries| entries.get(1))
+            .and_then(rmpv::Value::as_array)
+            .is_some_and(|haves| !haves.is_empty())
+        {
+            let _ = self.run_remote_control_raw(
+                remote,
+                identity_private_key_hex,
+                timeout_secs,
+                "/get",
+                ack_payload,
+            )?;
         }
 
         Ok(propagation_remote_fetch_summary(
@@ -347,6 +366,22 @@ fn propagation_remote_fetch_summary(
     })
 }
 
+fn propagation_remote_fetch_ack_payload(
+    payload_outcomes: &[(&[u8], LocalPropagationImportOutcome)],
+) -> rmpv::Value {
+    let haves = payload_outcomes
+        .iter()
+        .filter_map(|(payload, outcome)| {
+            matches!(
+                outcome,
+                LocalPropagationImportOutcome::Imported | LocalPropagationImportOutcome::Duplicate
+            )
+            .then(|| rmpv::Value::Binary(Sha256::digest(payload).to_vec()))
+        })
+        .collect();
+    rmpv::Value::Array(vec![rmpv::Value::Nil, rmpv::Value::Array(haves)])
+}
+
 fn response_to_json(response: &rmpv::Value) -> Result<JsonValue, std::io::Error> {
     if let Some(error) = response_code_error(response) {
         return Err(error);
@@ -388,6 +423,7 @@ fn response_code_error(response: &rmpv::Value) -> Option<std::io::Error> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use sha2::{Digest, Sha256};
 
     #[test]
     fn propagation_remote_fetch_summary_reports_transferred_bytes() {
@@ -404,5 +440,29 @@ mod tests {
             summary["transferred_bytes"].as_u64(),
             Some(payloads.iter().map(Vec::len).sum::<usize>() as u64)
         );
+    }
+
+    #[test]
+    fn propagation_remote_fetch_ack_payload_reports_imported_and_duplicate_haves() {
+        let imported_payload = b"imported remote fetch payload".to_vec();
+        let duplicate_payload = b"duplicate remote fetch payload".to_vec();
+        let rejected_payload = b"rejected remote fetch payload".to_vec();
+
+        let ack = propagation_remote_fetch_ack_payload(&[
+            (&imported_payload, LocalPropagationImportOutcome::Imported),
+            (&duplicate_payload, LocalPropagationImportOutcome::Duplicate),
+            (&rejected_payload, LocalPropagationImportOutcome::Rejected),
+        ]);
+
+        let rmpv::Value::Array(entries) = ack else {
+            panic!("expected /get acknowledgement array");
+        };
+        assert!(entries.first().is_some_and(rmpv::Value::is_nil));
+        let Some(rmpv::Value::Array(haves)) = entries.get(1) else {
+            panic!("expected haves array");
+        };
+        assert_eq!(haves.len(), 2);
+        assert_eq!(haves[0], rmpv::Value::Binary(Sha256::digest(imported_payload).to_vec()));
+        assert_eq!(haves[1], rmpv::Value::Binary(Sha256::digest(duplicate_payload).to_vec()));
     }
 }
