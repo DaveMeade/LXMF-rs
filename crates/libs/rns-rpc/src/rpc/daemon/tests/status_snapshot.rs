@@ -3474,6 +3474,9 @@ fn peer_sync_offer_response_only_transfers_wanted_messages_like_python() {
     assert_eq!(result["messages"]["offered"].as_u64(), Some(2));
     assert_eq!(result["messages"]["outgoing"].as_u64(), Some(1));
     assert_eq!(result["messages"]["unhandled"].as_u64(), Some(0));
+    assert_eq!(result["offered"].as_u64(), Some(2));
+    assert_eq!(result["outgoing"].as_u64(), Some(1));
+    assert_eq!(result["incoming"].as_u64(), Some(0));
     assert_eq!(result["acceptance_rate"].as_f64(), Some(0.5));
     assert_eq!(
         result["propagation"]["messages"].as_array().expect("transferred messages").len(),
@@ -3498,6 +3501,21 @@ fn peer_sync_offer_response_only_transfers_wanted_messages_like_python() {
             .expect("pending propagation")
             .is_empty()
     );
+
+    let event = daemon
+        .event_queue
+        .lock()
+        .expect("event_queue mutex poisoned")
+        .iter()
+        .rev()
+        .find(|event| event.event_type == "peer_sync")
+        .cloned()
+        .expect("peer sync event");
+    assert_eq!(event.payload["messages"]["offered"].as_u64(), Some(2));
+    assert_eq!(event.payload["messages"]["outgoing"].as_u64(), Some(1));
+    assert_eq!(event.payload["offered"].as_u64(), Some(2));
+    assert_eq!(event.payload["outgoing"].as_u64(), Some(1));
+    assert_eq!(event.payload["incoming"].as_u64(), Some(0));
 }
 
 #[test]
