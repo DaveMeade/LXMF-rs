@@ -830,8 +830,17 @@ impl RpcDaemon {
                                 encode_hex(hasher.finalize())
                             })
                     });
-                let ingested_count =
-                    usize::from(!payload_hex.is_empty() && !transient_id.is_empty());
+                let already_known = if !payload_hex.is_empty() && !transient_id.is_empty() {
+                    self.store
+                        .get_propagation_entry(transient_id.as_str())
+                        .map_err(std::io::Error::other)?
+                        .is_some()
+                } else {
+                    false
+                };
+                let ingested_count = usize::from(
+                    !payload_hex.is_empty() && !transient_id.is_empty() && !already_known,
+                );
 
                 if let Some(payload_hex) =
                     normalized_payload.map(|(_transient_id, payload_hex)| payload_hex)

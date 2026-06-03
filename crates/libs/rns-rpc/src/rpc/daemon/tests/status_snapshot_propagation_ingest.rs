@@ -475,6 +475,42 @@ fn propagation_ingest_without_payload_does_not_increment_counts_or_store_payload
     assert!(err.to_string().contains("transient_id not found"));
 }
 
+#[test]
+fn duplicate_propagation_ingest_does_not_double_count_received() {
+    use sha2::{Digest, Sha256};
+
+    let daemon = RpcDaemon::test_instance();
+    let payload = b"duplicate-local-propagation-ingest";
+    let payload_hex = hex::encode(payload);
+    let transient_id = hex::encode(Sha256::digest(payload));
+
+    let mut second = JsonValue::Null;
+    for request_id in [78, 79] {
+        second = daemon
+            .handle_rpc(rpc_request(
+                request_id,
+                "propagation_ingest",
+                json!({
+                    "transient_id": transient_id,
+                    "payload_hex": payload_hex,
+                }),
+            ))
+            .expect("propagation ingest")
+            .result
+            .expect("propagation ingest result");
+    }
+    assert_eq!(second["ingested_count"].as_u64(), Some(0));
+
+    let status = daemon
+        .handle_rpc(RpcRequest { id: 80, method: "propagation_status".to_string(), params: None })
+        .expect("propagation status")
+        .result
+        .expect("propagation status result");
+    assert_eq!(status["propagation"]["client_propagation_messages_received"].as_u64(), Some(1));
+    assert_eq!(status["propagation"]["total_ingested"].as_u64(), Some(1));
+    assert_eq!(status["propagation"]["last_ingest_count"].as_u64(), Some(0));
+}
+
 fn stamped_propagation_payload(lxm_data: &[u8], target_cost: u32) -> Vec<u8> {
     use hkdf::Hkdf;
     use sha2::{Digest, Sha256};
