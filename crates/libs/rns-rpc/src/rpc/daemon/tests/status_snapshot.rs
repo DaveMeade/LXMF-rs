@@ -198,6 +198,62 @@ fn propagation_enable_normalizes_static_peer_config_for_status_and_type() {
 }
 
 #[test]
+fn propagation_enable_partial_update_preserves_static_peer_config_and_type() {
+    let daemon = RpcDaemon::test_instance();
+    daemon
+        .handle_rpc(rpc_request(
+            27,
+            "propagation_enable",
+            json!({
+                "enabled": true,
+                "static_peers": ["peer-static-preserved"],
+            }),
+        ))
+        .expect("enable static peer");
+
+    let updated = daemon
+        .handle_rpc(rpc_request(
+            28,
+            "propagation_enable",
+            json!({
+                "enabled": true,
+                "from_static_only": true,
+                "max_peers": 1,
+            }),
+        ))
+        .expect("partial propagation update")
+        .result
+        .expect("partial update result");
+    assert_eq!(
+        updated["propagation"]["static_peers"].as_array().expect("static peers"),
+        &[json!("peer-static-preserved")]
+    );
+    assert_eq!(updated["propagation"]["from_static_only"].as_bool(), Some(true));
+
+    let peers = daemon
+        .handle_rpc(RpcRequest { id: 29, method: "list_peers".to_string(), params: None })
+        .expect("list peers")
+        .result
+        .expect("list peers result");
+    let row = peers["peers"]
+        .as_array()
+        .expect("peer rows")
+        .iter()
+        .find(|row| row["peer"].as_str() == Some("peer-static-preserved"))
+        .expect("static peer row");
+    assert_eq!(row["peer_type"].as_str(), Some("static"));
+    assert_eq!(row["type"].as_str(), Some("static"));
+
+    let blocked = daemon
+        .handle_rpc(rpc_request(30, "peer_sync", json!({ "peer": "peer-non-static" })))
+        .expect_err("from_static_only should reject new non-static peers");
+    assert!(
+        blocked.to_string().contains("from_static_only"),
+        "unexpected rejection error: {blocked}"
+    );
+}
+
+#[test]
 fn propagation_enable_queues_existing_entries_for_static_peers() {
     let daemon = RpcDaemon::test_instance();
     let entry = PropagationEntryRecord {

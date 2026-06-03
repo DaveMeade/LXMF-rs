@@ -672,7 +672,7 @@ impl RpcDaemon {
                 let parsed: PropagationEnableParams = serde_json::from_value(params)
                     .map_err(|err| std::io::Error::new(std::io::ErrorKind::InvalidInput, err))?;
 
-                let mut static_peers_to_activate = Vec::new();
+                let mut static_peers_to_activate = None;
                 let state = {
                     let mut guard =
                         self.propagation_state.lock().expect("propagation mutex poisoned");
@@ -708,7 +708,7 @@ impl RpcDaemon {
                     }
                     if let Some(static_peers) = parsed.static_peers {
                         let static_peers = Self::normalize_static_peers(&static_peers);
-                        static_peers_to_activate = static_peers.clone();
+                        static_peers_to_activate = Some(static_peers.clone());
                         guard.static_peers = static_peers;
                     }
                     if let Some(max_peers) = parsed.max_peers {
@@ -728,7 +728,9 @@ impl RpcDaemon {
                 self.update_daemon_status_snapshot(|snapshot| {
                     snapshot.propagation = state.clone();
                 });
-                self.activate_static_peers(&static_peers_to_activate)?;
+                if let Some(static_peers_to_activate) = static_peers_to_activate {
+                    self.activate_static_peers(&static_peers_to_activate)?;
+                }
                 Ok(RpcResponse {
                     id: request.id,
                     result: Some(json!({ "propagation": state })),
