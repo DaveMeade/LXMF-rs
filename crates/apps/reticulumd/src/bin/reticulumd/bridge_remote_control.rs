@@ -190,7 +190,7 @@ impl RemoteControlBridge for TransportBridge {
         )?;
         let transient_ids = rmpv_binary_array(&available)?;
         if transient_ids.is_empty() {
-            return Ok(propagation_remote_fetch_summary(0, &[], 0));
+            return Ok(propagation_remote_fetch_summary(0, &[], 0, 0, 0));
         }
 
         let fetched = self.run_remote_control_raw(
@@ -217,15 +217,29 @@ impl RemoteControlBridge for TransportBridge {
             .ok_or_else(|| std::io::Error::other("daemon unavailable"))?;
 
         let mut imported_count = 0usize;
+        let mut duplicate_count = 0usize;
+        let mut rejected_count = 0usize;
         for payload in &payloads {
-            if self.accept_local_propagated_payload(daemon.clone(), payload.clone())?
-                == LocalPropagationImportOutcome::Imported
-            {
-                imported_count = imported_count.saturating_add(1);
+            match self.accept_local_propagated_payload(daemon.clone(), payload.clone())? {
+                LocalPropagationImportOutcome::Imported => {
+                    imported_count = imported_count.saturating_add(1);
+                }
+                LocalPropagationImportOutcome::Duplicate => {
+                    duplicate_count = duplicate_count.saturating_add(1);
+                }
+                LocalPropagationImportOutcome::Rejected => {
+                    rejected_count = rejected_count.saturating_add(1);
+                }
             }
         }
 
-        Ok(propagation_remote_fetch_summary(transient_ids.len(), &payloads, imported_count))
+        Ok(propagation_remote_fetch_summary(
+            transient_ids.len(),
+            &payloads,
+            imported_count,
+            duplicate_count,
+            rejected_count,
+        ))
     }
 
     fn propagation_remote_download(
@@ -319,12 +333,16 @@ fn propagation_remote_fetch_summary(
     available_count: usize,
     payloads: &[Vec<u8>],
     imported_count: usize,
+    duplicate_count: usize,
+    rejected_count: usize,
 ) -> JsonValue {
     let transferred_bytes = payloads.iter().map(Vec::len).sum::<usize>();
     json!({
         "available_count": available_count,
         "fetched_count": payloads.len(),
         "imported_count": imported_count,
+        "duplicate_count": duplicate_count,
+        "rejected_count": rejected_count,
         "transferred_bytes": transferred_bytes,
     })
 }
@@ -375,11 +393,13 @@ mod tests {
     fn propagation_remote_fetch_summary_reports_transferred_bytes() {
         let payloads = vec![b"first".to_vec(), b"second-payload".to_vec()];
 
-        let summary = propagation_remote_fetch_summary(7, &payloads, 1);
+        let summary = propagation_remote_fetch_summary(7, &payloads, 1, 2, 3);
 
         assert_eq!(summary["available_count"].as_u64(), Some(7));
         assert_eq!(summary["fetched_count"].as_u64(), Some(2));
         assert_eq!(summary["imported_count"].as_u64(), Some(1));
+        assert_eq!(summary["duplicate_count"].as_u64(), Some(2));
+        assert_eq!(summary["rejected_count"].as_u64(), Some(3));
         assert_eq!(
             summary["transferred_bytes"].as_u64(),
             Some(payloads.iter().map(Vec::len).sum::<usize>() as u64)
