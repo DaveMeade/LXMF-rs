@@ -253,7 +253,7 @@ impl RpcDaemon {
         let active_peers = self.active_peer_ids();
         for transient_id in imported_ids {
             self.store
-                .mark_peer_handled_propagation(source_peer, transient_id.as_str())
+                .mark_peer_received_propagation(source_peer, transient_id.as_str())
                 .map_err(std::io::Error::other)?;
             for peer in &active_peers {
                 if peer == source_peer {

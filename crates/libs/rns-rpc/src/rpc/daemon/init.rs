@@ -559,7 +559,7 @@ impl RpcDaemon {
             self.store.peer_propagation_message_stats(peer).map_err(std::io::Error::other)?;
         Ok((
             stats.outgoing.saturating_add(propagation.outgoing),
-            stats.incoming,
+            stats.incoming.saturating_add(propagation.incoming),
             stats.offered.saturating_add(propagation.offered),
             stats.unhandled.saturating_add(propagation.unhandled),
             propagation.offered_bytes,
