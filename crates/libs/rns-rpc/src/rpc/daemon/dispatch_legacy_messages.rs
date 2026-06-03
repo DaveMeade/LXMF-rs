@@ -565,6 +565,8 @@ impl RpcDaemon {
                     .and_then(|record| record.peer_type.clone());
                 let peer_type = if self.is_static_peer(peer_id) {
                     Some("static".to_string())
+                } else if existing_peer_type.as_deref() == Some("unpeered") {
+                    Some("manual".to_string())
                 } else {
                     existing_peer_type.or(Some("manual".to_string()))
                 };

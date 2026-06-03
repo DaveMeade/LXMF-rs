@@ -8288,6 +8288,48 @@ fn peer_unpeer_snapshot_count_ignores_unpeered_records() {
 }
 
 #[test]
+fn peer_sync_reactivates_persisted_unpeered_record() {
+    let daemon = RpcDaemon::test_instance();
+    {
+        let mut guard = daemon.peers.lock().expect("peers mutex poisoned");
+        guard.insert(
+            "peer-rejoin".to_string(),
+            daemon.transient_peer_record(
+                "peer-rejoin".to_string(),
+                1_700_000_901,
+                Vec::new(),
+                None,
+                None,
+                Some("unpeered".to_string()),
+            ),
+        );
+    }
+
+    let result = daemon
+        .handle_rpc(rpc_request(90, "peer_sync", json!({ "peer": "peer-rejoin" })))
+        .expect("peer sync")
+        .result
+        .expect("peer sync result");
+    assert_eq!(result["peer_type"].as_str(), Some("manual"));
+
+    let status = daemon
+        .handle_rpc(RpcRequest { id: 91, method: "daemon_status_ex".to_string(), params: None })
+        .expect("daemon status")
+        .result
+        .expect("daemon status result");
+    assert_eq!(status["peer_count"].as_u64(), Some(1));
+
+    let peers = daemon
+        .handle_rpc(RpcRequest { id: 92, method: "list_peers".to_string(), params: None })
+        .expect("list peers")
+        .result
+        .expect("list peers result");
+    let row = peers["peers"].as_array().and_then(|rows| rows.first()).expect("peer row");
+    assert_eq!(row["peer"].as_str(), Some("peer-rejoin"));
+    assert_eq!(row["peer_type"].as_str(), Some("manual"));
+}
+
+#[test]
 fn peer_unpeer_clears_persisted_propagation_queue_marks() {
     let daemon = RpcDaemon::test_instance();
     daemon
