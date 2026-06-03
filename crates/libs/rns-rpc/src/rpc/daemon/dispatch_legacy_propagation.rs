@@ -521,45 +521,43 @@ impl RpcDaemon {
         transfer_limit_bytes: Option<usize>,
     ) -> Vec<Vec<u8>> {
         let destination_hex = hex::encode(destination);
-        let wanted_hex = wanted.iter().map(hex::encode).collect::<Vec<_>>();
-        let mut messages = self
-            .store
-            .fetch_propagation_payloads_for_destination(
-                destination_hex.as_str(),
-                &wanted_hex,
-                transfer_limit_bytes,
-            )
-            .unwrap_or_default();
-        if !messages.is_empty() {
-            let state = {
-                let mut guard = self.propagation_state.lock().expect("propagation mutex poisoned");
-                guard.client_propagation_messages_served =
-                    guard.client_propagation_messages_served.saturating_add(messages.len());
-                guard.clone()
-            };
-            self.update_daemon_status_snapshot(|snapshot| {
-                snapshot.propagation = state;
-            });
-            return messages;
-        }
-
-        let guard = self.propagation_payloads.lock().expect("propagation payload mutex poisoned");
         let per_message_overhead = 16usize;
         let mut cumulative_size = 24usize;
+        let mut messages = Vec::new();
         for transient_id in wanted {
             if transient_id.len() != 32 {
                 continue;
             }
             let transient_hex = hex::encode(transient_id);
-            let Some(payload_hex) = guard.get(transient_hex.as_str()) else {
-                continue;
+            let payload = match self
+                .store
+                .get_propagation_entry(transient_hex.as_str())
+                .ok()
+                .flatten()
+                .filter(|entry| entry.destination == destination_hex)
+                .and_then(|entry| hex::decode(entry.payload_hex.as_str()).ok())
+            {
+                Some(payload) => payload,
+                None => {
+                    let payload_hex = {
+                        let guard = self
+                            .propagation_payloads
+                            .lock()
+                            .expect("propagation payload mutex poisoned");
+                        let Some(payload_hex) = guard.get(transient_hex.as_str()) else {
+                            continue;
+                        };
+                        payload_hex.clone()
+                    };
+                    let Ok(payload) = hex::decode(payload_hex) else {
+                        continue;
+                    };
+                    if !propagation_payload_matches_destination(payload.as_slice(), destination) {
+                        continue;
+                    }
+                    payload
+                }
             };
-            let Ok(payload) = hex::decode(payload_hex) else {
-                continue;
-            };
-            if !propagation_payload_matches_destination(payload.as_slice(), destination) {
-                continue;
-            }
             let stored_size = payload.len().saturating_add(PROPAGATION_STAMP_SIZE);
             let next_size = cumulative_size.saturating_add(stored_size + per_message_overhead);
             if transfer_limit_bytes.is_some_and(|limit| next_size > limit) {
@@ -568,7 +566,6 @@ impl RpcDaemon {
             cumulative_size = next_size;
             messages.push(payload);
         }
-        drop(guard);
 
         if !messages.is_empty() {
             let state = {

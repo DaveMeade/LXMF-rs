@@ -370,6 +370,51 @@ fn propagation_fetch_transfer_limit_accounts_for_stripped_stamp_bytes() {
 }
 
 #[test]
+fn propagation_destination_fetch_combines_store_and_memory_payloads() {
+    use sha2::{Digest, Sha256};
+
+    let daemon = RpcDaemon::test_instance();
+    let destination = [0x78_u8; 16];
+    let mut stored_payload = destination.to_vec();
+    stored_payload.extend_from_slice(b" stored propagation lxm");
+    let mut cached_payload = destination.to_vec();
+    cached_payload.extend_from_slice(b" cached propagation lxm");
+    let stored_transient_id = Sha256::digest(&stored_payload).to_vec();
+    let cached_transient_id = Sha256::digest(&cached_payload).to_vec();
+    let cached_transient_hex = hex::encode(&cached_transient_id);
+
+    daemon
+        .ingest_propagation_payload_bytes_with_aliases(
+            stored_payload.as_slice(),
+            hex::encode(&stored_transient_id).as_str(),
+            &[],
+        )
+        .expect("ingest stored payload");
+    daemon
+        .ingest_propagation_payload_bytes_with_aliases(
+            cached_payload.as_slice(),
+            cached_transient_hex.as_str(),
+            &[],
+        )
+        .expect("ingest cached payload");
+    daemon
+        .store
+        .purge_propagation_entries_for_destination(
+            hex::encode(destination).as_str(),
+            std::slice::from_ref(&cached_transient_hex),
+        )
+        .expect("remove cached payload from persistent store");
+
+    let fetched = daemon.fetch_propagation_payloads_for_destination(
+        &destination,
+        &[stored_transient_id, cached_transient_id],
+        None,
+    );
+
+    assert_eq!(fetched, vec![stored_payload, cached_payload]);
+}
+
+#[test]
 fn propagation_ingest_rejects_mismatched_transient_id() {
     let daemon = RpcDaemon::test_instance();
     let err = daemon
