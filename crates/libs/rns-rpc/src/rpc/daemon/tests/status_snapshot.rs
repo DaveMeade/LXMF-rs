@@ -6456,6 +6456,57 @@ fn duplicate_propagation_remote_fetch_queues_known_payload_without_double_counti
 }
 
 #[test]
+fn propagation_remote_fetch_reopens_transfer_limited_peer_queue_mark() {
+    let payload = b"remote-fetch-retry-transfer-limited-payload";
+    let payload_hex = hex::encode(payload);
+    let transient_id = hex::encode(Sha256::digest(payload));
+    let daemon = RpcDaemon::test_instance();
+    daemon
+        .handle_rpc(rpc_request(72, "peer_sync", json!({ "peer": "peer-fetch-retry-limit" })))
+        .expect("seed relay peer");
+    daemon
+        .store
+        .upsert_propagation_entry(&PropagationEntryRecord {
+            transient_id: transient_id.clone(),
+            destination: "23".repeat(16),
+            payload_hex: payload_hex.clone(),
+            received_at: 1_700_000_701,
+            size_bytes: payload.len() as u64,
+            stamp_value: None,
+        })
+        .expect("seed known propagation entry");
+    daemon
+        .store
+        .mark_peer_transfer_limited_propagation("peer-fetch-retry-limit", transient_id.as_str())
+        .expect("mark transfer limited");
+    daemon.set_remote_control_bridge(Arc::new(TestRemoteControlBridge {
+        result: Ok(json!({
+            "available_count": 1,
+            "fetched_count": 1,
+            "messages": [{
+                "transient_id": transient_id,
+                "payload_hex": payload_hex,
+            }],
+        })),
+    }));
+
+    let result = daemon
+        .handle_rpc(rpc_request(73, "propagation_remote_fetch", json!({ "remote": "remote-node" })))
+        .expect("remote fetch")
+        .result
+        .expect("remote fetch result");
+    assert_eq!(result["result"]["imported_count"].as_u64(), Some(0));
+    assert_eq!(result["result"]["imported_ids"], json!([]));
+
+    let pending = daemon
+        .store
+        .list_peer_unhandled_propagation("peer-fetch-retry-limit")
+        .expect("pending relay entries");
+    assert_eq!(pending.len(), 1);
+    assert_eq!(pending[0].transient_id, transient_id);
+}
+
+#[test]
 fn propagation_remote_fetch_updates_lifecycle_status() {
     let payload = b"remote-fetch-lifecycle-payload";
     let payload_hex = hex::encode(payload);

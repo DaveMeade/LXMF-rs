@@ -855,9 +855,13 @@ impl MessagesStore {
     ) -> rusqlite::Result<()> {
         self.with_write_conn(|conn| {
             conn.execute(
-                "INSERT OR IGNORE INTO propagation_peer_entries
+                "INSERT INTO propagation_peer_entries
                     (peer, transient_id, state, updated_at)
-                 VALUES (?1, ?2, 'unhandled', ?3)",
+                 VALUES (?1, ?2, 'unhandled', ?3)
+                 ON CONFLICT(peer, transient_id) DO UPDATE SET
+                    state = 'unhandled',
+                    updated_at = excluded.updated_at
+                 WHERE propagation_peer_entries.state = 'transfer_limited'",
                 params![peer, normalize_hex_key(transient_id), now_unix_secs()],
             )?;
             Ok(())
@@ -2346,6 +2350,54 @@ mod tests {
         assert_eq!(pending, vec![transfer_limited]);
         let handled_ids =
             store.list_peer_handled_propagation_ids("peer-reopen").expect("handled ids");
+        assert_eq!(handled_ids, vec![handled.transient_id]);
+    }
+
+    #[test]
+    fn mark_peer_unhandled_reopens_transfer_limited_marks_only() {
+        let store = MessagesStore::in_memory().expect("in-memory store");
+        let transfer_limited = PropagationEntryRecord {
+            transient_id: "b1".repeat(32),
+            destination: "11".repeat(16),
+            payload_hex: "11".repeat(8),
+            received_at: 100,
+            size_bytes: 8,
+            stamp_value: None,
+        };
+        let handled = PropagationEntryRecord {
+            transient_id: "b2".repeat(32),
+            destination: "22".repeat(16),
+            payload_hex: "22".repeat(8),
+            received_at: 101,
+            size_bytes: 8,
+            stamp_value: None,
+        };
+        store.upsert_propagation_entry(&transfer_limited).expect("transfer-limited entry");
+        store.upsert_propagation_entry(&handled).expect("handled entry");
+        store
+            .mark_peer_transfer_limited_propagation(
+                "peer-direct-reopen",
+                transfer_limited.transient_id.as_str(),
+            )
+            .expect("mark transfer limited");
+        store
+            .mark_peer_handled_propagation("peer-direct-reopen", handled.transient_id.as_str())
+            .expect("mark handled");
+
+        store
+            .mark_peer_unhandled_propagation(
+                "peer-direct-reopen",
+                transfer_limited.transient_id.as_str(),
+            )
+            .expect("reopen transfer limited");
+        store
+            .mark_peer_unhandled_propagation("peer-direct-reopen", handled.transient_id.as_str())
+            .expect("ignore handled");
+
+        let pending = store.list_peer_unhandled_propagation("peer-direct-reopen").expect("pending");
+        assert_eq!(pending, vec![transfer_limited]);
+        let handled_ids =
+            store.list_peer_handled_propagation_ids("peer-direct-reopen").expect("handled ids");
         assert_eq!(handled_ids, vec![handled.transient_id]);
     }
 
