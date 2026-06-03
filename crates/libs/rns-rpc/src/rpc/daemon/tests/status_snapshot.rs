@@ -5895,6 +5895,9 @@ fn propagation_remote_sync_updates_peer_runtime_state() {
     assert_eq!(remote_sync["peer_sync"]["name_source"].as_str(), Some("test"));
     assert_eq!(remote_sync["peer_sync"]["tx_bytes"].as_u64(), Some(payload.len() as u64));
     assert_eq!(remote_sync["peer_sync"]["messages"]["incoming"].as_u64(), Some(1));
+    assert_eq!(remote_sync["peer_sync"]["offered"].as_u64(), Some(0));
+    assert_eq!(remote_sync["peer_sync"]["outgoing"].as_u64(), Some(0));
+    assert_eq!(remote_sync["peer_sync"]["incoming"].as_u64(), Some(1));
     assert_eq!(
         remote_sync["peer_sync"]["sync_transfer_rate"].as_f64(),
         Some(payload.len() as f64)
@@ -5978,6 +5981,9 @@ fn propagation_remote_sync_updates_peer_runtime_state() {
     assert_eq!(event.payload["messages"]["outgoing"].as_u64(), Some(0));
     assert_eq!(event.payload["messages"]["incoming"].as_u64(), Some(1));
     assert_eq!(event.payload["messages"]["offered"].as_u64(), Some(0));
+    assert_eq!(event.payload["offered"].as_u64(), Some(0));
+    assert_eq!(event.payload["outgoing"].as_u64(), Some(0));
+    assert_eq!(event.payload["incoming"].as_u64(), Some(1));
     assert_eq!(event.payload["messages"]["unhandled"].as_u64(), Some(0));
     assert_eq!(
         event.payload["messages"]["offered_bytes"].as_u64(),
