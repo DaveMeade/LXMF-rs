@@ -7605,6 +7605,32 @@ fn peer_unpeer_reports_cleared_propagation_queue_accounting() {
         .store
         .mark_peer_unhandled_propagation("peer-unpeer-accounting", unhandled.transient_id.as_str())
         .expect("mark unhandled");
+    daemon
+        .accept_inbound(MessageRecord {
+            id: "peer-unpeer-accounting-in".to_string(),
+            source: "peer-unpeer-accounting".to_string(),
+            destination: "local".to_string(),
+            title: "title".to_string(),
+            content: "body".to_string(),
+            timestamp: 1_700_000_703,
+            direction: "in".to_string(),
+            fields: None,
+            receipt_status: None,
+        })
+        .expect("store inbound message");
+    daemon
+        .accept_inbound(MessageRecord {
+            id: "peer-unpeer-accounting-out".to_string(),
+            source: "local".to_string(),
+            destination: "peer-unpeer-accounting".to_string(),
+            title: "title".to_string(),
+            content: "body".to_string(),
+            timestamp: 1_700_000_704,
+            direction: "out".to_string(),
+            fields: None,
+            receipt_status: None,
+        })
+        .expect("store outbound message");
 
     let result = daemon
         .handle_rpc(rpc_request(
@@ -7618,15 +7644,15 @@ fn peer_unpeer_reports_cleared_propagation_queue_accounting() {
     assert_eq!(result["peer"].as_str(), Some("peer-unpeer-accounting"));
     assert_eq!(result["propagation_cleared"].as_u64(), Some(2));
     assert_eq!(result["propagation_cleared_bytes"].as_u64(), Some(36));
-    assert_eq!(result["messages"]["offered"].as_u64(), Some(2));
-    assert_eq!(result["messages"]["outgoing"].as_u64(), Some(0));
-    assert_eq!(result["messages"]["incoming"].as_u64(), Some(0));
-    assert_eq!(result["messages"]["unhandled"].as_u64(), Some(1));
+    assert_eq!(result["messages"]["offered"].as_u64(), Some(3));
+    assert_eq!(result["messages"]["outgoing"].as_u64(), Some(1));
+    assert_eq!(result["messages"]["incoming"].as_u64(), Some(1));
+    assert_eq!(result["messages"]["unhandled"].as_u64(), Some(2));
     assert_eq!(result["messages"]["offered_bytes"].as_u64(), Some(36));
     assert_eq!(result["messages"]["unhandled_bytes"].as_u64(), Some(24));
-    assert_eq!(result["offered"].as_u64(), Some(2));
-    assert_eq!(result["outgoing"].as_u64(), Some(0));
-    assert_eq!(result["incoming"].as_u64(), Some(0));
+    assert_eq!(result["offered"].as_u64(), Some(3));
+    assert_eq!(result["outgoing"].as_u64(), Some(1));
+    assert_eq!(result["incoming"].as_u64(), Some(1));
     assert_eq!(
         result["messages"]["handled_ids"].as_array().expect("result handled ids"),
         &[json!(handled.transient_id.as_str())]
@@ -7647,15 +7673,15 @@ fn peer_unpeer_reports_cleared_propagation_queue_accounting() {
         .expect("peer unpeer event");
     assert_eq!(event.payload["propagation_cleared"].as_u64(), Some(2));
     assert_eq!(event.payload["propagation_cleared_bytes"].as_u64(), Some(36));
-    assert_eq!(event.payload["messages"]["offered"].as_u64(), Some(2));
-    assert_eq!(event.payload["messages"]["outgoing"].as_u64(), Some(0));
-    assert_eq!(event.payload["messages"]["incoming"].as_u64(), Some(0));
-    assert_eq!(event.payload["messages"]["unhandled"].as_u64(), Some(1));
+    assert_eq!(event.payload["messages"]["offered"].as_u64(), Some(3));
+    assert_eq!(event.payload["messages"]["outgoing"].as_u64(), Some(1));
+    assert_eq!(event.payload["messages"]["incoming"].as_u64(), Some(1));
+    assert_eq!(event.payload["messages"]["unhandled"].as_u64(), Some(2));
     assert_eq!(event.payload["messages"]["offered_bytes"].as_u64(), Some(36));
     assert_eq!(event.payload["messages"]["unhandled_bytes"].as_u64(), Some(24));
-    assert_eq!(event.payload["offered"].as_u64(), Some(2));
-    assert_eq!(event.payload["outgoing"].as_u64(), Some(0));
-    assert_eq!(event.payload["incoming"].as_u64(), Some(0));
+    assert_eq!(event.payload["offered"].as_u64(), Some(3));
+    assert_eq!(event.payload["outgoing"].as_u64(), Some(1));
+    assert_eq!(event.payload["incoming"].as_u64(), Some(1));
     assert_eq!(
         event.payload["messages"]["handled_ids"].as_array().expect("event handled ids"),
         &[json!(handled.transient_id.as_str())]

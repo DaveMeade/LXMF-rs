@@ -1512,6 +1512,8 @@ impl RpcDaemon {
                 )?;
                 let cleanup = self.unpeer_local_state(parsed.peer.as_str())?;
                 let offered = cleanup.messages["offered"].as_u64().unwrap_or(0);
+                let outgoing = cleanup.messages["outgoing"].as_u64().unwrap_or(0);
+                let incoming = cleanup.messages["incoming"].as_u64().unwrap_or(0);
                 self.publish_event(RpcEvent {
                     event_type: "peer_unpeer".into(),
                     payload: json!({
@@ -1521,8 +1523,8 @@ impl RpcDaemon {
                         "propagation_cleared": cleanup.propagation_cleared,
                         "propagation_cleared_bytes": cleanup.propagation_cleared_bytes,
                         "offered": offered,
-                        "outgoing": 0,
-                        "incoming": 0,
+                        "outgoing": outgoing,
+                        "incoming": incoming,
                         "messages": cleanup.messages.clone(),
                         "result": result.clone(),
                     }),
@@ -1536,8 +1538,8 @@ impl RpcDaemon {
                         "propagation_cleared": cleanup.propagation_cleared,
                         "propagation_cleared_bytes": cleanup.propagation_cleared_bytes,
                         "offered": offered,
-                        "outgoing": 0,
-                        "incoming": 0,
+                        "outgoing": outgoing,
+                        "incoming": incoming,
                         "messages": cleanup.messages,
                         "result": result,
                     })),

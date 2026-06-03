@@ -950,6 +950,8 @@ impl RpcDaemon {
 
                 let cleanup = self.unpeer_local_state(peer_id)?;
                 let offered = cleanup.messages["offered"].as_u64().unwrap_or(0);
+                let outgoing = cleanup.messages["outgoing"].as_u64().unwrap_or(0);
+                let incoming = cleanup.messages["incoming"].as_u64().unwrap_or(0);
                 let event = RpcEvent {
                     event_type: "peer_unpeer".into(),
                     payload: json!({
@@ -958,8 +960,8 @@ impl RpcDaemon {
                         "propagation_cleared": cleanup.propagation_cleared,
                         "propagation_cleared_bytes": cleanup.propagation_cleared_bytes,
                         "offered": offered,
-                        "outgoing": 0,
-                        "incoming": 0,
+                        "outgoing": outgoing,
+                        "incoming": incoming,
                         "messages": cleanup.messages.clone(),
                     }),
                 };
@@ -972,8 +974,8 @@ impl RpcDaemon {
                         "propagation_cleared": cleanup.propagation_cleared,
                         "propagation_cleared_bytes": cleanup.propagation_cleared_bytes,
                         "offered": offered,
-                        "outgoing": 0,
-                        "incoming": 0,
+                        "outgoing": outgoing,
+                        "incoming": incoming,
                         "messages": cleanup.messages,
                     })),
                     error: None,
@@ -1458,6 +1460,8 @@ impl RpcDaemon {
     ) -> Result<LocalUnpeerCleanup, std::io::Error> {
         let propagation_stats =
             self.store.peer_propagation_message_stats(peer_id).map_err(std::io::Error::other)?;
+        let (outgoing, incoming, offered, unhandled, offered_bytes, unhandled_bytes) =
+            self.peer_message_stats(peer_id)?;
         let handled_ids =
             self.store.list_peer_handled_propagation_ids(peer_id).map_err(std::io::Error::other)?;
         let unhandled_ids = self
@@ -1466,12 +1470,12 @@ impl RpcDaemon {
             .map_err(std::io::Error::other)?;
         self.store.clear_peer_propagation_marks(peer_id).map_err(std::io::Error::other)?;
         let messages = json!({
-            "offered": propagation_stats.offered,
-            "outgoing": 0,
-            "incoming": 0,
-            "unhandled": propagation_stats.unhandled,
-            "offered_bytes": propagation_stats.offered_bytes,
-            "unhandled_bytes": propagation_stats.unhandled_bytes,
+            "offered": offered,
+            "outgoing": outgoing,
+            "incoming": incoming,
+            "unhandled": unhandled,
+            "offered_bytes": offered_bytes,
+            "unhandled_bytes": unhandled_bytes,
             "handled_ids": handled_ids,
             "unhandled_ids": unhandled_ids,
         });
