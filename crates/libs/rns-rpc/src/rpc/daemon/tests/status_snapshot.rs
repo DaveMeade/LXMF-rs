@@ -7057,6 +7057,32 @@ fn propagation_remote_unpeer_clears_local_peer_and_queue_state() {
         .store
         .mark_peer_unhandled_propagation("peer-remote-unpeer", entry.transient_id.as_str())
         .expect("mark unhandled");
+    daemon
+        .accept_inbound(MessageRecord {
+            id: "peer-remote-unpeer-in".to_string(),
+            source: "peer-remote-unpeer".to_string(),
+            destination: "local".to_string(),
+            title: "title".to_string(),
+            content: "body".to_string(),
+            timestamp: 1_700_000_802,
+            direction: "in".to_string(),
+            fields: None,
+            receipt_status: None,
+        })
+        .expect("store inbound message");
+    daemon
+        .accept_inbound(MessageRecord {
+            id: "peer-remote-unpeer-out".to_string(),
+            source: "local".to_string(),
+            destination: "peer-remote-unpeer".to_string(),
+            title: "title".to_string(),
+            content: "body".to_string(),
+            timestamp: 1_700_000_803,
+            direction: "out".to_string(),
+            fields: None,
+            receipt_status: None,
+        })
+        .expect("store outbound message");
 
     let result = daemon
         .handle_rpc(rpc_request(
@@ -7073,8 +7099,14 @@ fn propagation_remote_unpeer_clears_local_peer_and_queue_state() {
     assert_eq!(result["removed"].as_bool(), Some(true));
     assert_eq!(result["propagation_cleared"].as_u64(), Some(1));
     assert_eq!(result["propagation_cleared_bytes"].as_u64(), Some(24));
-    assert_eq!(result["messages"]["unhandled"].as_u64(), Some(1));
+    assert_eq!(result["messages"]["offered"].as_u64(), Some(2));
+    assert_eq!(result["messages"]["outgoing"].as_u64(), Some(1));
+    assert_eq!(result["messages"]["incoming"].as_u64(), Some(1));
+    assert_eq!(result["messages"]["unhandled"].as_u64(), Some(2));
     assert_eq!(result["messages"]["unhandled_bytes"].as_u64(), Some(24));
+    assert_eq!(result["offered"].as_u64(), Some(2));
+    assert_eq!(result["outgoing"].as_u64(), Some(1));
+    assert_eq!(result["incoming"].as_u64(), Some(1));
 
     let peers = daemon
         .handle_rpc(RpcRequest { id: 78, method: "list_peers".to_string(), params: None })
@@ -7101,6 +7133,32 @@ fn propagation_remote_unpeer_publishes_peer_removed_event() {
         .handle_rpc(rpc_request(79, "peer_sync", json!({ "peer": "peer-remote-unpeer-event" })))
         .expect("peer sync");
     daemon.event_queue.lock().expect("event_queue mutex poisoned").clear();
+    daemon
+        .accept_inbound(MessageRecord {
+            id: "peer-remote-unpeer-event-in".to_string(),
+            source: "peer-remote-unpeer-event".to_string(),
+            destination: "local".to_string(),
+            title: "title".to_string(),
+            content: "body".to_string(),
+            timestamp: 1_700_000_804,
+            direction: "in".to_string(),
+            fields: None,
+            receipt_status: None,
+        })
+        .expect("store inbound message");
+    daemon
+        .accept_inbound(MessageRecord {
+            id: "peer-remote-unpeer-event-out".to_string(),
+            source: "local".to_string(),
+            destination: "peer-remote-unpeer-event".to_string(),
+            title: "title".to_string(),
+            content: "body".to_string(),
+            timestamp: 1_700_000_805,
+            direction: "out".to_string(),
+            fields: None,
+            receipt_status: None,
+        })
+        .expect("store outbound message");
 
     daemon
         .handle_rpc(rpc_request(
@@ -7126,7 +7184,13 @@ fn propagation_remote_unpeer_publishes_peer_removed_event() {
     assert_eq!(event.payload["remote"].as_str(), Some("remote-node"));
     assert_eq!(event.payload["removed"].as_bool(), Some(true));
     assert_eq!(event.payload["propagation_cleared"].as_u64(), Some(0));
-    assert_eq!(event.payload["messages"]["unhandled"].as_u64(), Some(0));
+    assert_eq!(event.payload["messages"]["offered"].as_u64(), Some(1));
+    assert_eq!(event.payload["messages"]["outgoing"].as_u64(), Some(1));
+    assert_eq!(event.payload["messages"]["incoming"].as_u64(), Some(1));
+    assert_eq!(event.payload["messages"]["unhandled"].as_u64(), Some(1));
+    assert_eq!(event.payload["offered"].as_u64(), Some(1));
+    assert_eq!(event.payload["outgoing"].as_u64(), Some(1));
+    assert_eq!(event.payload["incoming"].as_u64(), Some(1));
 }
 
 #[test]

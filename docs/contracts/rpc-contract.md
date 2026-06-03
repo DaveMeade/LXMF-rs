@@ -133,7 +133,11 @@ All methods below are required for full CLI feature coverage.
   Python LXMF peer response indicating the peer already has those messages:
   they become handled but are not transferred.
 - `peer_unpeer`
-: Params keys: `peer`
+: Params keys: `peer`. Result and `peer_unpeer` event include `removed`,
+  `propagation_cleared`, `propagation_cleared_bytes`, top-level aggregate
+  peer counters `offered`, `outgoing`, `incoming`, and `messages` with
+  `offered`, `outgoing`, `incoming`, `unhandled`, byte counts, and handled /
+  unhandled propagation IDs.
 - `clear_peers` (no params)
 - `list_interfaces` (no params)
 - `set_interfaces`
@@ -192,6 +196,8 @@ The following contract is mandatory in v1:
   `acknowledge_sync_completion`: clears progress, resets completed states to
   idle, and preserves failure states unless `reset_state` is true.
 - `propagation_remote_unpeer`
+: Mirrors local `peer_unpeer` cleanup accounting for the local peer state after
+  the remote unpeer call succeeds, and includes the remote bridge `result`.
 : Params keys: `remote`, `peer` (optional: `identity_private_key_hex`, `timeout_secs`).
 
 ### Stamp / tickets
