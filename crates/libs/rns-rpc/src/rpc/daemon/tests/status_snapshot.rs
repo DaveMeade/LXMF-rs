@@ -1629,6 +1629,16 @@ fn peering_cost_policy_blocks_and_breaks_autopeers() {
         ))
         .expect("enable propagation");
 
+    let entry = PropagationEntryRecord {
+        transient_id: "ee".repeat(32),
+        destination: "12".repeat(16),
+        payload_hex: "12".repeat(24),
+        received_at: 1_700_000_299,
+        size_bytes: 24,
+        stamp_value: None,
+    };
+    daemon.store.upsert_propagation_entry(&entry).expect("store propagation entry");
+
     daemon
         .accept_announce_with_metadata(
             "peer-auto".to_string(),
@@ -1651,6 +1661,13 @@ fn peering_cost_policy_blocks_and_breaks_autopeers() {
             None,
         )
         .expect("accept initial announce");
+    assert_eq!(
+        daemon
+            .store
+            .list_peer_unhandled_propagation("peer-auto")
+            .expect("queued autopeer propagation"),
+        vec![entry.clone()]
+    );
 
     daemon
         .accept_announce_with_metadata(
@@ -1681,6 +1698,14 @@ fn peering_cost_policy_blocks_and_breaks_autopeers() {
         .result
         .expect("list peers result");
     assert_eq!(peers["peers"].as_array().map(|rows| rows.len()), Some(0));
+    assert!(
+        daemon
+            .store
+            .list_peer_unhandled_propagation("peer-auto")
+            .expect("autopeer propagation marks after break")
+            .is_empty(),
+        "breaking an autopeer should clear stale propagation queue marks"
+    );
 }
 
 #[test]
