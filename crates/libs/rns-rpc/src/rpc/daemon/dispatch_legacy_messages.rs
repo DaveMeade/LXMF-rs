@@ -949,6 +949,7 @@ impl RpcDaemon {
                 }
 
                 let cleanup = self.unpeer_local_state(peer_id)?;
+                let offered = cleanup.messages["offered"].as_u64().unwrap_or(0);
                 let event = RpcEvent {
                     event_type: "peer_unpeer".into(),
                     payload: json!({
@@ -956,6 +957,9 @@ impl RpcDaemon {
                         "removed": cleanup.removed,
                         "propagation_cleared": cleanup.propagation_cleared,
                         "propagation_cleared_bytes": cleanup.propagation_cleared_bytes,
+                        "offered": offered,
+                        "outgoing": 0,
+                        "incoming": 0,
                         "messages": cleanup.messages.clone(),
                     }),
                 };
@@ -967,6 +971,9 @@ impl RpcDaemon {
                         "removed": cleanup.removed,
                         "propagation_cleared": cleanup.propagation_cleared,
                         "propagation_cleared_bytes": cleanup.propagation_cleared_bytes,
+                        "offered": offered,
+                        "outgoing": 0,
+                        "incoming": 0,
                         "messages": cleanup.messages,
                     })),
                     error: None,
