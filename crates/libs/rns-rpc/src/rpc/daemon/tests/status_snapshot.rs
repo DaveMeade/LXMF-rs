@@ -4190,6 +4190,46 @@ fn peer_sync_applies_request_transfer_limit_without_persisting_it() {
 }
 
 #[test]
+fn peer_sync_accepts_string_transfer_limit_like_python() {
+    let daemon = RpcDaemon::test_instance();
+    daemon
+        .handle_rpc(rpc_request(60, "peer_sync", json!({ "peer": "peer-string-limit" })))
+        .expect("initial peer sync");
+
+    let oversized = PropagationEntryRecord {
+        transient_id: "d6".repeat(32),
+        destination: "16".repeat(16),
+        payload_hex: "16".repeat(100),
+        received_at: 1_700_000_615,
+        size_bytes: 100,
+        stamp_value: None,
+    };
+    daemon.store.upsert_propagation_entry(&oversized).expect("store oversized entry");
+    daemon
+        .store
+        .mark_peer_unhandled_propagation("peer-string-limit", oversized.transient_id.as_str())
+        .expect("mark unhandled");
+
+    let result = daemon
+        .handle_rpc(rpc_request(
+            61,
+            "peer_sync",
+            json!({
+                "peer": "peer-string-limit",
+                "transfer_limit_kb": "0.08",
+            }),
+        ))
+        .expect("peer sync")
+        .result
+        .expect("peer sync result");
+
+    assert_eq!(result["propagation"]["handled"].as_u64(), Some(0));
+    assert_eq!(result["propagation"]["transfer_limited"].as_u64(), Some(1));
+    assert_eq!(result["propagation"]["transfer_limit"].as_u64(), Some(80));
+    assert_eq!(result["transfer_limit"].as_u64(), Some(80));
+}
+
+#[test]
 fn peer_sync_request_transfer_limit_does_not_loosen_peer_limit() {
     let daemon = RpcDaemon::test_instance();
     daemon

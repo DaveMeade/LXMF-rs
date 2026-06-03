@@ -68,7 +68,7 @@ struct ReloadConfigParams {
 #[derive(Debug, Deserialize)]
 struct PeerOpParams {
     peer: String,
-    #[serde(default)]
+    #[serde(default, deserialize_with = "deserialize_python_transfer_limit_kb")]
     transfer_limit_kb: Option<f64>,
     #[serde(default)]
     wanted_ids: Option<Vec<String>>,
@@ -189,7 +189,7 @@ struct PropagationRemoteStatusParams {
     identity_private_key_hex: Option<String>,
     #[serde(default)]
     timeout_secs: Option<f64>,
-    #[serde(default)]
+    #[serde(default, deserialize_with = "deserialize_python_transfer_limit_kb")]
     transfer_limit_kb: Option<f64>,
 }
 
@@ -201,7 +201,7 @@ struct PropagationRemotePeerParams {
     identity_private_key_hex: Option<String>,
     #[serde(default)]
     timeout_secs: Option<f64>,
-    #[serde(default)]
+    #[serde(default, deserialize_with = "deserialize_python_transfer_limit_kb")]
     transfer_limit_kb: Option<f64>,
 }
 
@@ -220,7 +220,7 @@ struct PropagationRemoteFetchParams {
     identity_private_key_hex: Option<String>,
     #[serde(default)]
     timeout_secs: Option<f64>,
-    #[serde(default)]
+    #[serde(default, deserialize_with = "deserialize_python_transfer_limit_kb")]
     transfer_limit_kb: Option<f64>,
 }
 
@@ -235,4 +235,34 @@ struct OutboundLxmQueryParams {
     message_id: Option<String>,
     #[serde(default)]
     lxm_hash: Option<String>,
+}
+
+fn deserialize_python_transfer_limit_kb<'de, D>(deserializer: D) -> Result<Option<f64>, D::Error>
+where
+    D: serde::Deserializer<'de>,
+{
+    let Some(value) = Option::<JsonValue>::deserialize(deserializer)? else {
+        return Ok(None);
+    };
+    let Some(limit) = transfer_limit_kb_from_json_value(&value) else {
+        return Err(serde::de::Error::custom("invalid transfer_limit_kb"));
+    };
+    Ok(limit)
+}
+
+fn transfer_limit_kb_from_json_value(value: &JsonValue) -> Option<Option<f64>> {
+    let limit = match value {
+        JsonValue::Null => return Some(None),
+        JsonValue::Number(value) => value.as_f64(),
+        JsonValue::String(value) => value.trim().parse::<f64>().ok(),
+        JsonValue::Bool(value) => Some(f64::from(*value as u8)),
+        _ => None,
+    }?;
+    if limit.is_nan() {
+        None
+    } else if limit.is_infinite() && limit.is_sign_positive() {
+        Some(None)
+    } else {
+        Some(Some(limit.max(0.0)))
+    }
 }
