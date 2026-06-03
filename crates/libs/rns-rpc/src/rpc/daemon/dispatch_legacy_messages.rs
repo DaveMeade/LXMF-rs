@@ -45,6 +45,7 @@ impl RpcDaemon {
         };
         let (outgoing, incoming, offered, unhandled, offered_bytes, unhandled_bytes) =
             self.peer_message_stats(record.peer.as_str()).unwrap_or((0, 0, 0, 0, 0, 0));
+        let acceptance_rate = peer_acceptance_rate_for_reporting(acceptance_rate, offered, alive);
         let handled_ids =
             self.store.list_peer_handled_propagation_ids(record.peer.as_str()).unwrap_or_default();
         let unhandled_ids = self
@@ -290,6 +291,11 @@ impl RpcDaemon {
                             .unwrap_or((0, 0, 0, 0, 0, 0));
                         let peering_key =
                             peer_peering_key_value(&peer, self.identity_hash.as_str());
+                        let acceptance_rate = peer_acceptance_rate_for_reporting(
+                            peer.acceptance_rate,
+                            offered,
+                            peer.alive,
+                        );
                         let handled_ids = self
                             .store
                             .list_peer_handled_propagation_ids(peer.peer.as_str())
@@ -325,6 +331,7 @@ impl RpcDaemon {
                         });
                         row["handled_ids"] = json!(handled_ids);
                         row["unhandled_ids"] = json!(unhandled_ids);
+                        row["acceptance_rate"] = json!(acceptance_rate);
                         row["peering_key"] = peering_key.map_or(JsonValue::Null, JsonValue::from);
                         row["last_heard"] =
                             row.get("last_seen").cloned().unwrap_or(JsonValue::Null);
@@ -807,6 +814,8 @@ impl RpcDaemon {
                 };
                 let (outgoing, incoming, offered, unhandled, offered_bytes, unhandled_bytes) =
                     self.peer_message_stats(record.peer.as_str()).unwrap_or((0, 0, 0, 0, 0, 0));
+                let acceptance_rate =
+                    peer_acceptance_rate_for_reporting(acceptance_rate, offered, alive);
                 let handled_ids = self
                     .store
                     .list_peer_handled_propagation_ids(record.peer.as_str())
@@ -1496,6 +1505,18 @@ pub(super) fn peer_peering_key_value(peer: &PeerRecord, local_identity_hash: &st
     material.extend_from_slice(remote_hash.as_slice());
     material.extend_from_slice(local_hash.as_slice());
     generate_peering_key_value(material.as_slice(), peering_cost)
+}
+
+pub(super) fn peer_acceptance_rate_for_reporting(
+    cached_rate: f64,
+    offered: u64,
+    alive: bool,
+) -> f64 {
+    if offered == 0 && !alive {
+        0.0
+    } else {
+        cached_rate.clamp(0.0, 1.0)
+    }
 }
 
 fn peer_stamp_policy_known(peer: &PeerRecord) -> bool {

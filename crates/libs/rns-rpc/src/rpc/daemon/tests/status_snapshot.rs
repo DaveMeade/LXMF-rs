@@ -2689,6 +2689,31 @@ fn new_peer_acceptance_rate_matches_python_zero_offer_default() {
 }
 
 #[test]
+fn list_peers_reports_zero_acceptance_rate_when_no_offers_like_python() {
+    let daemon = RpcDaemon::test_instance();
+    daemon
+        .handle_rpc(rpc_request(52, "peer_sync", json!({ "peer": "peer-derived-rate" })))
+        .expect("peer sync");
+    {
+        let mut peers = daemon.peers.lock().expect("peers mutex poisoned");
+        let peer = peers.get_mut("peer-derived-rate").expect("peer record");
+        peer.acceptance_rate = 0.9;
+    }
+
+    let peers = daemon
+        .handle_rpc(RpcRequest { id: 53, method: "list_peers".to_string(), params: None })
+        .expect("list peers")
+        .result
+        .expect("list peers result");
+    let row = peers["peers"].as_array().and_then(|rows| rows.first()).expect("peer row");
+    assert_eq!(row["peer"].as_str(), Some("peer-derived-rate"));
+    assert_eq!(row["messages"]["outgoing"].as_u64(), Some(0));
+    assert_eq!(row["messages"]["offered"].as_u64(), Some(0));
+    assert_eq!(row["messages"]["unhandled"].as_u64(), Some(0));
+    assert_eq!(row["acceptance_rate"].as_f64(), Some(0.0));
+}
+
+#[test]
 fn peer_sync_without_offers_preserves_failure_backoff() {
     let daemon = RpcDaemon::test_instance();
     daemon

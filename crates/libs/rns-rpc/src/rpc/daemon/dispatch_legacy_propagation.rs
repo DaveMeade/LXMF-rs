@@ -35,6 +35,11 @@ impl RpcDaemon {
             &peer,
             self.identity_hash.as_str(),
         );
+        let acceptance_rate = super::dispatch_legacy_messages::peer_acceptance_rate_for_reporting(
+            peer.acceptance_rate,
+            offered,
+            peer.alive,
+        );
         let peer_status_type =
             if self.is_static_peer(peer.peer.as_str()) { "static" } else { "discovered" };
         let messages = json!({
@@ -78,7 +83,7 @@ impl RpcDaemon {
                 "seen_count": peer.seen_count,
                 "rx_bytes": peer.rx_bytes,
                 "tx_bytes": peer.tx_bytes,
-                "acceptance_rate": peer.acceptance_rate,
+                "acceptance_rate": acceptance_rate,
                 "last_sync_attempt": peer.last_sync_attempt,
                 "next_sync_attempt": peer.next_sync_attempt,
                 "sync_backoff": peer.sync_backoff,
@@ -1177,6 +1182,12 @@ impl RpcDaemon {
                                     &peer,
                                     self.identity_hash.as_str(),
                                 );
+                            let acceptance_rate =
+                                super::dispatch_legacy_messages::peer_acceptance_rate_for_reporting(
+                                    peer.acceptance_rate,
+                                    offered,
+                                    peer.alive,
+                                );
                             let messages = json!({
                                 "offered": offered,
                                 "outgoing": outgoing,
@@ -1223,7 +1234,7 @@ impl RpcDaemon {
                                 "seen_count": peer.seen_count,
                                 "rx_bytes": peer.rx_bytes,
                                 "tx_bytes": peer.tx_bytes,
-                                "acceptance_rate": peer.acceptance_rate,
+                                "acceptance_rate": acceptance_rate,
                                 "last_sync_attempt": peer.last_sync_attempt,
                                 "next_sync_attempt": peer.next_sync_attempt,
                                 "sync_backoff": peer.sync_backoff,
