@@ -378,6 +378,17 @@ fn parse_propagation_timebase_from_app_data_hex(app_data_hex: Option<&str>) -> O
     entries.get(1).and_then(parse_fuzzy_i64)
 }
 
+fn parse_propagation_enabled_from_app_data_hex(app_data_hex: Option<&str>) -> Option<bool> {
+    let raw_hex = app_data_hex.map(str::trim).filter(|value| !value.is_empty())?;
+    let app_data = hex::decode(raw_hex).ok()?;
+    let value = rmp_serde::from_slice::<MsgPackValue>(&app_data).ok()?;
+    let entries = value.as_array()?;
+    if entries.len() < 6 {
+        return None;
+    }
+    entries.get(2).map(parse_bool_capability_flag)
+}
+
 fn parse_peer_name_from_app_data_hex(app_data_hex: Option<&str>) -> Option<(String, &'static str)> {
     let raw_hex = app_data_hex.map(str::trim).filter(|value| !value.is_empty())?;
     let app_data = hex::decode(raw_hex).ok()?;

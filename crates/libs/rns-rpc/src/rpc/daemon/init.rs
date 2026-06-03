@@ -785,6 +785,10 @@ impl RpcDaemon {
         let peering_cost = peering_cost.flatten();
         let (propagation_transfer_limit, propagation_sync_limit) =
             parse_propagation_limits_from_app_data_hex(app_data_hex.as_deref());
+        let propagation_enabled =
+            parse_propagation_enabled_from_app_data_hex(app_data_hex.as_deref());
+        let peering_timebase =
+            parse_propagation_timebase_from_app_data_hex(app_data_hex.as_deref());
         let propagation_peer_state = PeerPropagationState {
             transfer_limit: propagation_transfer_limit,
             sync_limit: propagation_sync_limit,
@@ -792,15 +796,23 @@ impl RpcDaemon {
             stamp_cost_flexibility,
             peering_cost,
             network_distance: hops,
-            peering_timebase: parse_propagation_timebase_from_app_data_hex(app_data_hex.as_deref()),
+            peering_timebase,
         };
         let is_static = self.is_static_peer(peer.as_str());
         let remote_peering_cost_allowed = self.remote_peering_cost_allowed(peering_cost);
         if !is_static && !remote_peering_cost_allowed {
             self.remove_autopeered_peer_if_stale_or_expensive(peer.as_str(), timestamp)?;
         }
-        let should_peer =
-            is_static || (remote_peering_cost_allowed && self.should_autopeer_peer(hops));
+        if !is_static && propagation_enabled == Some(false) {
+            self.remove_autopeered_peer_if_propagation_disabled(
+                peer.as_str(),
+                peering_timebase.unwrap_or(timestamp),
+            )?;
+        }
+        let should_peer = is_static
+            || (propagation_enabled != Some(false)
+                && remote_peering_cost_allowed
+                && self.should_autopeer_peer(hops));
         let peer_type = if is_static {
             Some("static".to_string())
         } else if should_peer {
@@ -1368,6 +1380,38 @@ impl RpcDaemon {
             };
             self.update_daemon_status_snapshot(|snapshot| {
                 snapshot.propagation = state;
+            });
+        }
+        Ok(())
+    }
+
+    pub(super) fn remove_autopeered_peer_if_propagation_disabled(
+        &self,
+        peer: &str,
+        peering_timebase: i64,
+    ) -> Result<(), std::io::Error> {
+        let should_remove = {
+            let guard = self.peers.lock().expect("peers mutex poisoned");
+            guard.get(peer).is_some_and(|existing| {
+                existing.peer_type.as_deref() == Some("auto")
+                    && peering_timebase >= existing.peering_timebase
+            })
+        };
+        if !should_remove {
+            return Ok(());
+        }
+        let cleanup = self.unpeer_local_state(peer)?;
+        if cleanup.removed {
+            self.publish_event(RpcEvent {
+                event_type: "peer_unpeer".into(),
+                payload: json!({
+                    "peer": peer,
+                    "removed": true,
+                    "reason": "propagation_disabled",
+                    "propagation_cleared": cleanup.propagation_cleared,
+                    "propagation_cleared_bytes": cleanup.propagation_cleared_bytes,
+                    "messages": cleanup.messages,
+                }),
             });
         }
         Ok(())
