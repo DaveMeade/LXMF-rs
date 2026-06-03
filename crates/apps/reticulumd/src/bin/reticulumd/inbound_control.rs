@@ -751,6 +751,48 @@ mod tests {
     }
 
     #[test]
+    fn python_status_reports_propagation_policy_and_ingest_counters() {
+        let daemon = RpcDaemon::test_instance();
+        daemon
+            .handle_rpc(RpcRequest {
+                id: 1,
+                method: "propagation_enable".to_string(),
+                params: Some(json!({
+                    "enabled": true,
+                    "autopeer": false,
+                    "autopeer_maxdepth": 2,
+                })),
+            })
+            .expect("enable propagation");
+        daemon
+            .handle_rpc(RpcRequest {
+                id: 2,
+                method: "propagation_ingest".to_string(),
+                params: Some(json!({ "payload_hex": "2a".repeat(24) })),
+            })
+            .expect("ingest propagation");
+
+        let status = status::compose_python_status(
+            &daemon,
+            &PropagationControlContext {
+                enabled: true,
+                local_identity_hash: [0u8; 16],
+                propagation_destination_hash_hex: Some("propagation".to_string()),
+                control_destination_hash_hex: Some("control".to_string()),
+                delivery_destination: None,
+                allowed_control_identities: Vec::new(),
+            },
+        );
+
+        assert_eq!(status["autopeer"].as_bool(), Some(false));
+        assert_eq!(status["autopeer_maxdepth"].as_u64(), Some(2));
+        assert_eq!(status["total_ingested"].as_u64(), Some(1));
+        assert_eq!(status["last_ingest_count"].as_u64(), Some(1));
+        assert_eq!(status["messages_received"].as_u64(), Some(0));
+        assert_eq!(status["max_messages"].as_u64(), Some(0));
+    }
+
+    #[test]
     fn python_status_preserves_unknown_peer_propagation_policy_as_null() {
         let peer = "peer-unknown-policy".to_string();
         let daemon = RpcDaemon::test_instance();
