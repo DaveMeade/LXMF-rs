@@ -261,6 +261,16 @@ impl RpcDaemon {
         Ok(())
     }
 
+    fn queue_remote_imports_for_active_peers(
+        &self,
+        imported_ids: &[String],
+    ) -> Result<(), std::io::Error> {
+        for transient_id in imported_ids {
+            self.queue_propagation_entry_for_active_peers(transient_id.as_str())?;
+        }
+        Ok(())
+    }
+
     pub fn note_client_propagation_messages_received(&self, ingested_count: usize) {
         let state = {
             let mut guard = self.propagation_state.lock().expect("propagation mutex poisoned");
@@ -1279,6 +1289,9 @@ impl RpcDaemon {
                                 json!(imported.transferred_bytes),
                             );
                         }
+                        self.queue_remote_imports_for_active_peers(
+                            imported.accepted_ids.as_slice(),
+                        )?;
                         self.update_propagation_sync_state(|state| {
                             state.sync_state = PR_COMPLETE;
                             state.state_name = "completed".to_string();
@@ -1396,6 +1409,7 @@ impl RpcDaemon {
                     result
                         .insert("transferred_bytes".to_string(), json!(imported.transferred_bytes));
                 }
+                self.queue_remote_imports_for_active_peers(imported.accepted_ids.as_slice())?;
                 self.update_propagation_sync_state(|state| {
                     state.sync_state = PR_COMPLETE;
                     state.state_name = "completed".to_string();

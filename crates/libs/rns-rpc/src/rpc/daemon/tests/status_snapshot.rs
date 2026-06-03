@@ -4702,6 +4702,9 @@ fn propagation_remote_fetch_imports_payloads_into_local_store() {
     let payload_hex = hex::encode(payload);
     let transient_id = hex::encode(Sha256::digest(payload));
     let daemon = RpcDaemon::test_instance();
+    daemon
+        .handle_rpc(rpc_request(72, "peer_sync", json!({ "peer": "peer-fetch-relay" })))
+        .expect("seed relay peer");
     daemon.set_remote_control_bridge(Arc::new(TestRemoteControlBridge {
         result: Ok(json!({
             "available_count": 1,
@@ -4751,6 +4754,13 @@ fn propagation_remote_fetch_imports_payloads_into_local_store() {
         .result
         .expect("local fetch result");
     assert_eq!(fetched["payload_hex"].as_str(), Some(payload_hex.as_str()));
+
+    let relay_pending = daemon
+        .store
+        .list_peer_unhandled_propagation("peer-fetch-relay")
+        .expect("relay pending");
+    assert_eq!(relay_pending.len(), 1);
+    assert_eq!(relay_pending[0].transient_id, transient_id);
 }
 
 #[test]
@@ -4921,6 +4931,9 @@ fn propagation_remote_download_imports_payloads_into_local_store() {
     let payload_hex = hex::encode(payload);
     let transient_id = hex::encode(Sha256::digest(payload));
     let daemon = RpcDaemon::test_instance();
+    daemon
+        .handle_rpc(rpc_request(75, "peer_sync", json!({ "peer": "peer-download-relay" })))
+        .expect("seed relay peer");
     daemon.set_remote_control_bridge(Arc::new(TestRemoteControlBridge {
         result: Ok(json!({
             "downloaded_count": 1,
@@ -4966,6 +4979,13 @@ fn propagation_remote_download_imports_payloads_into_local_store() {
         .result
         .expect("local fetch result");
     assert_eq!(fetched["payload_hex"].as_str(), Some(payload_hex.as_str()));
+
+    let relay_pending = daemon
+        .store
+        .list_peer_unhandled_propagation("peer-download-relay")
+        .expect("relay pending");
+    assert_eq!(relay_pending.len(), 1);
+    assert_eq!(relay_pending[0].transient_id, transient_id);
 }
 
 #[test]
