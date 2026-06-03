@@ -623,7 +623,10 @@ impl RpcDaemon {
                     .store
                     .list_peer_unhandled_propagation(peer_id)
                     .map_err(std::io::Error::other)?;
-                if pending_propagation.iter().any(|entry| entry.stamp_value.is_some()) {
+                let peer_policy_required = !pending_propagation.is_empty()
+                    && (pending_propagation.iter().any(|entry| entry.stamp_value.is_some())
+                        || peer_stamp_policy_partially_known(&record));
+                if peer_policy_required {
                     if !peer_stamp_policy_known(&record) {
                         return Ok(self.postponed_peer_sync_response(
                             request.id,
@@ -1480,6 +1483,12 @@ fn peer_stamp_policy_known(peer: &PeerRecord) -> bool {
     peer.propagation_stamp_cost.is_some()
         && peer.propagation_stamp_cost_flexibility.is_some()
         && peer.peering_cost.is_some()
+}
+
+fn peer_stamp_policy_partially_known(peer: &PeerRecord) -> bool {
+    peer.propagation_stamp_cost.is_some()
+        || peer.propagation_stamp_cost_flexibility.is_some()
+        || peer.peering_cost.is_some()
 }
 
 fn peer_minimum_accepted_stamp_value(peer: &PeerRecord) -> Option<u32> {
