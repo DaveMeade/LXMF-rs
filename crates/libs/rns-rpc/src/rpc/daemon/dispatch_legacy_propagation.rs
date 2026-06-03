@@ -1505,21 +1505,28 @@ impl RpcDaemon {
                     .expect("remote control bridge mutex poisoned")
                     .clone()
                     .ok_or_else(|| std::io::Error::other("remote control bridge unavailable"))?;
+                let peer_id = parsed.peer.trim();
+                if peer_id.is_empty() {
+                    return Err(std::io::Error::new(
+                        std::io::ErrorKind::InvalidInput,
+                        "peer is required",
+                    ));
+                }
                 let timeout_secs = parsed.timeout_secs.unwrap_or(5.0).max(0.1);
                 let result = bridge.propagation_remote_unpeer(
                     parsed.remote.as_str(),
-                    parsed.peer.as_str(),
+                    peer_id,
                     parsed.identity_private_key_hex.as_deref(),
                     timeout_secs,
                 )?;
-                let cleanup = self.unpeer_local_state(parsed.peer.as_str())?;
+                let cleanup = self.unpeer_local_state(peer_id)?;
                 let offered = cleanup.messages["offered"].as_u64().unwrap_or(0);
                 let outgoing = cleanup.messages["outgoing"].as_u64().unwrap_or(0);
                 let incoming = cleanup.messages["incoming"].as_u64().unwrap_or(0);
                 self.publish_event(RpcEvent {
                     event_type: "peer_unpeer".into(),
                     payload: json!({
-                        "peer": parsed.peer.as_str(),
+                        "peer": peer_id,
                         "remote": parsed.remote.as_str(),
                         "removed": cleanup.removed,
                         "propagation_cleared": cleanup.propagation_cleared,
@@ -1535,7 +1542,7 @@ impl RpcDaemon {
                     id: request.id,
                     result: Some(json!({
                         "remote": parsed.remote,
-                        "peer": parsed.peer,
+                        "peer": peer_id,
                         "removed": cleanup.removed,
                         "propagation_cleared": cleanup.propagation_cleared,
                         "propagation_cleared_bytes": cleanup.propagation_cleared_bytes,
