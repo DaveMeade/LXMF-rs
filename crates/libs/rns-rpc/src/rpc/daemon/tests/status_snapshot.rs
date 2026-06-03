@@ -1263,6 +1263,59 @@ fn announce_received_parses_propagation_peer_limits_from_python_app_data() {
 }
 
 #[test]
+fn announce_received_uses_python_propagation_node_timebase_for_peer_state() {
+    let daemon = RpcDaemon::test_instance();
+    daemon
+        .handle_rpc(rpc_request(
+            49,
+            "propagation_enable",
+            json!({
+                "enabled": true,
+                "autopeer": true,
+            }),
+        ))
+        .expect("enable propagation");
+    let app_data = rmp_serde::to_vec_named(&MsgPackValue::Array(vec![
+        MsgPackValue::Boolean(false),
+        MsgPackValue::from(1_700_000_021i64),
+        MsgPackValue::Boolean(true),
+        MsgPackValue::from(333),
+        MsgPackValue::from(999),
+        MsgPackValue::Array(vec![
+            MsgPackValue::from(8),
+            MsgPackValue::from(2),
+            MsgPackValue::from(5),
+        ]),
+        MsgPackValue::Map(Vec::new()),
+    ]))
+    .expect("encode propagation app data");
+
+    let announce = daemon
+        .handle_rpc(rpc_request(
+            50,
+            "announce_received",
+            json!({
+                "peer": "peer-pn-timebase",
+                "timestamp": 1_700_000_099i64,
+                "app_data_hex": hex::encode(app_data),
+                "aspect": "lxmf.propagation",
+                "hops": 1,
+            }),
+        ))
+        .expect("announce received");
+    assert!(announce.error.is_none());
+
+    let peers = daemon
+        .handle_rpc(RpcRequest { id: 51, method: "list_peers".to_string(), params: None })
+        .expect("list peers")
+        .result
+        .expect("list peers result");
+    let row = peers["peers"].as_array().and_then(|rows| rows.first()).expect("peer row");
+    assert_eq!(row["last_heard"].as_i64(), Some(1_700_000_099));
+    assert_eq!(row["peering_timebase"].as_i64(), Some(1_700_000_021));
+}
+
+#[test]
 fn announce_received_parses_propagation_peer_name_from_python_metadata() {
     let daemon = RpcDaemon::test_instance();
     daemon

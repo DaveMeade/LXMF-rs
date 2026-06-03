@@ -10,6 +10,7 @@ pub(super) struct PeerPropagationState {
     pub(super) stamp_cost_flexibility: Option<u32>,
     pub(super) peering_cost: Option<u32>,
     pub(super) network_distance: Option<u32>,
+    pub(super) peering_timebase: Option<i64>,
 }
 
 impl RpcDaemon {
@@ -791,6 +792,7 @@ impl RpcDaemon {
             stamp_cost_flexibility,
             peering_cost,
             network_distance: hops,
+            peering_timebase: parse_propagation_timebase_from_app_data_hex(app_data_hex.as_deref()),
         };
         let is_static = self.is_static_peer(peer.as_str());
         let remote_peering_cost_allowed = self.remote_peering_cost_allowed(peering_cost);
@@ -1283,14 +1285,15 @@ impl RpcDaemon {
         let Some(existing) = guard.get_mut(peer) else {
             return;
         };
-        if timestamp < existing.peering_timebase {
+        let peering_timebase = state.peering_timebase.unwrap_or(timestamp);
+        if peering_timebase < existing.peering_timebase {
             return;
         }
 
         existing.alive = true;
         existing.sync_backoff = 0;
         existing.next_sync_attempt = 0;
-        existing.peering_timebase = timestamp;
+        existing.peering_timebase = peering_timebase;
         existing.propagation_transfer_limit = state.transfer_limit;
         existing.propagation_sync_limit = state.sync_limit.or(state.transfer_limit);
         existing.propagation_stamp_cost = state.stamp_cost;
