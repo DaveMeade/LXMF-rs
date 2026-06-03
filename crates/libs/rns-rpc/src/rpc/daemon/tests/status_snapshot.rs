@@ -6921,6 +6921,62 @@ fn propagation_remote_fetch_imports_payloads_into_local_store() {
 }
 
 #[test]
+fn propagation_remote_fetch_marks_source_received_and_queues_other_peers() {
+    let payload = b"remote-fetch-source-peer-payload";
+    let payload_hex = hex::encode(payload);
+    let transient_id = hex::encode(Sha256::digest(payload));
+    let source_peer = "remote-fetch-source";
+    let relay_peer = "peer-fetch-source-relay";
+    let daemon = RpcDaemon::test_instance();
+    daemon
+        .handle_rpc(rpc_request(72, "peer_sync", json!({ "peer": source_peer })))
+        .expect("seed source peer");
+    daemon
+        .handle_rpc(rpc_request(73, "peer_sync", json!({ "peer": relay_peer })))
+        .expect("seed relay peer");
+    daemon.set_remote_control_bridge(Arc::new(TestRemoteControlBridge {
+        result: Ok(json!({
+            "available_count": 1,
+            "fetched_count": 1,
+            "messages": [{
+                "transient_id": transient_id,
+                "payload_hex": payload_hex,
+            }],
+        })),
+    }));
+
+    daemon
+        .handle_rpc(rpc_request(
+            74,
+            "propagation_remote_fetch",
+            json!({ "remote": source_peer }),
+        ))
+        .expect("remote fetch from source peer");
+
+    assert!(
+        daemon
+            .store
+            .list_peer_unhandled_propagation(source_peer)
+            .expect("source unhandled")
+            .is_empty(),
+        "remote source should not be offered the payload it supplied"
+    );
+    assert_eq!(
+        daemon
+            .store
+            .list_peer_handled_propagation_ids(source_peer)
+            .expect("source handled ids"),
+        vec![transient_id.clone()]
+    );
+    let relay_pending = daemon
+        .store
+        .list_peer_unhandled_propagation(relay_peer)
+        .expect("relay pending");
+    assert_eq!(relay_pending.len(), 1);
+    assert_eq!(relay_pending[0].transient_id, transient_id);
+}
+
+#[test]
 fn propagation_remote_fetch_trims_remote_before_bridge_and_response() {
     let daemon = RpcDaemon::test_instance();
     daemon.set_remote_control_bridge(Arc::new(TestRemoteControlBridge {
@@ -7311,6 +7367,61 @@ fn propagation_remote_download_imports_payloads_into_local_store() {
     let relay_pending = daemon
         .store
         .list_peer_unhandled_propagation("peer-download-relay")
+        .expect("relay pending");
+    assert_eq!(relay_pending.len(), 1);
+    assert_eq!(relay_pending[0].transient_id, transient_id);
+}
+
+#[test]
+fn propagation_remote_download_marks_source_received_and_queues_other_peers() {
+    let payload = b"remote-download-source-peer-payload";
+    let payload_hex = hex::encode(payload);
+    let transient_id = hex::encode(Sha256::digest(payload));
+    let source_peer = "remote-download-source";
+    let relay_peer = "peer-download-source-relay";
+    let daemon = RpcDaemon::test_instance();
+    daemon
+        .handle_rpc(rpc_request(78, "peer_sync", json!({ "peer": source_peer })))
+        .expect("seed source peer");
+    daemon
+        .handle_rpc(rpc_request(79, "peer_sync", json!({ "peer": relay_peer })))
+        .expect("seed relay peer");
+    daemon.set_remote_control_bridge(Arc::new(TestRemoteControlBridge {
+        result: Ok(json!({
+            "downloaded_count": 1,
+            "messages": [{
+                "transient_id": transient_id,
+                "payload_hex": payload_hex,
+            }],
+        })),
+    }));
+
+    daemon
+        .handle_rpc(rpc_request(
+            80,
+            "propagation_remote_download",
+            json!({ "remote": source_peer }),
+        ))
+        .expect("remote download from source peer");
+
+    assert!(
+        daemon
+            .store
+            .list_peer_unhandled_propagation(source_peer)
+            .expect("source unhandled")
+            .is_empty(),
+        "remote source should not be offered the payload it supplied"
+    );
+    assert_eq!(
+        daemon
+            .store
+            .list_peer_handled_propagation_ids(source_peer)
+            .expect("source handled ids"),
+        vec![transient_id.clone()]
+    );
+    let relay_pending = daemon
+        .store
+        .list_peer_unhandled_propagation(relay_peer)
         .expect("relay pending");
     assert_eq!(relay_pending.len(), 1);
     assert_eq!(relay_pending[0].transient_id, transient_id);

@@ -276,12 +276,28 @@ impl RpcDaemon {
         Ok(())
     }
 
-    fn queue_remote_imports_for_active_peers(
+    fn queue_remote_imports_from_source_for_active_peers(
         &self,
+        source_peer: &str,
         imported_ids: &[String],
     ) -> Result<(), std::io::Error> {
+        if imported_ids.is_empty() {
+            return Ok(());
+        }
+
+        let active_peers = self.active_peer_ids();
         for transient_id in imported_ids {
-            self.queue_propagation_entry_for_active_peers(transient_id.as_str())?;
+            for peer in &active_peers {
+                if peer == source_peer {
+                    self.store
+                        .mark_peer_received_propagation(peer.as_str(), transient_id.as_str())
+                        .map_err(std::io::Error::other)?;
+                } else {
+                    self.store
+                        .mark_peer_unhandled_propagation(peer.as_str(), transient_id.as_str())
+                        .map_err(std::io::Error::other)?;
+                }
+            }
         }
         Ok(())
     }
@@ -1461,7 +1477,8 @@ impl RpcDaemon {
                                 json!(imported.transferred_bytes),
                             );
                         }
-                        self.queue_remote_imports_for_active_peers(
+                        self.queue_remote_imports_from_source_for_active_peers(
+                            remote_id.as_str(),
                             imported.accepted_ids.as_slice(),
                         )?;
                         self.update_propagation_sync_state(|state| {
@@ -1589,7 +1606,10 @@ impl RpcDaemon {
                     result
                         .insert("transferred_bytes".to_string(), json!(imported.transferred_bytes));
                 }
-                self.queue_remote_imports_for_active_peers(imported.accepted_ids.as_slice())?;
+                self.queue_remote_imports_from_source_for_active_peers(
+                    remote_id.as_str(),
+                    imported.accepted_ids.as_slice(),
+                )?;
                 self.update_propagation_sync_state(|state| {
                     state.sync_state = PR_COMPLETE;
                     state.state_name = "completed".to_string();
