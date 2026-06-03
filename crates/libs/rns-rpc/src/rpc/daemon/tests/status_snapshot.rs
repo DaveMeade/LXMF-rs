@@ -3868,6 +3868,11 @@ struct TransferLimitResultRemoteControlBridge {
     expected_sync_transfer_limit_kb: Option<f64>,
 }
 
+struct FailingTransferLimitRemoteControlBridge {
+    kind: std::io::ErrorKind,
+    expected_sync_transfer_limit_kb: Option<f64>,
+}
+
 impl RemoteControlBridge for TestRemoteControlBridge {
     fn propagation_remote_status(
         &self,
@@ -3998,6 +4003,59 @@ impl RemoteControlBridge for TransferLimitResultRemoteControlBridge {
         result["peer"] = json!(peer);
         result["unpeered"] = json!(true);
         Ok(result)
+    }
+}
+
+impl RemoteControlBridge for FailingTransferLimitRemoteControlBridge {
+    fn propagation_remote_status(
+        &self,
+        _remote: &str,
+        _identity_private_key_hex: Option<&str>,
+        _timeout_secs: f64,
+    ) -> Result<JsonValue, std::io::Error> {
+        Ok(json!({"status": "ok"}))
+    }
+
+    fn propagation_remote_sync(
+        &self,
+        _remote: &str,
+        _peer: &str,
+        _identity_private_key_hex: Option<&str>,
+        _timeout_secs: f64,
+        transfer_limit_kb: Option<f64>,
+    ) -> Result<JsonValue, std::io::Error> {
+        assert_eq!(transfer_limit_kb, self.expected_sync_transfer_limit_kb);
+        Err(std::io::Error::new(self.kind, "remote sync failed"))
+    }
+
+    fn propagation_remote_download(
+        &self,
+        _remote: &str,
+        _identity_private_key_hex: Option<&str>,
+        _timeout_secs: f64,
+        _transfer_limit_kb: Option<f64>,
+    ) -> Result<JsonValue, std::io::Error> {
+        Err(std::io::Error::new(self.kind, "remote download failed"))
+    }
+
+    fn propagation_remote_fetch(
+        &self,
+        _remote: &str,
+        _identity_private_key_hex: Option<&str>,
+        _timeout_secs: f64,
+        _transfer_limit_kb: Option<f64>,
+    ) -> Result<JsonValue, std::io::Error> {
+        Err(std::io::Error::new(self.kind, "remote fetch failed"))
+    }
+
+    fn propagation_remote_unpeer(
+        &self,
+        _remote: &str,
+        _peer: &str,
+        _identity_private_key_hex: Option<&str>,
+        _timeout_secs: f64,
+    ) -> Result<JsonValue, std::io::Error> {
+        Err(std::io::Error::new(self.kind, "remote unpeer failed"))
     }
 }
 
@@ -4959,6 +5017,62 @@ fn failed_propagation_remote_sync_updates_peer_backoff() {
     );
     assert_eq!(event.payload["propagation"]["remote_sync"].as_bool(), Some(true));
     assert_eq!(event.payload["propagation"]["synced"].as_bool(), Some(false));
+    assert_eq!(
+        event.payload["propagation"]["error"].as_str(),
+        Some("remote sync failed")
+    );
+}
+
+#[test]
+fn failed_propagation_remote_sync_reports_effective_limits() {
+    let daemon = RpcDaemon::test_instance();
+    daemon.set_remote_control_bridge(Arc::new(FailingTransferLimitRemoteControlBridge {
+        kind: std::io::ErrorKind::TimedOut,
+        expected_sync_transfer_limit_kb: Some(42.5),
+    }));
+    daemon
+        .handle_rpc(rpc_request(75, "peer_sync", json!({ "peer": "peer-remote-sync-limit-fail" })))
+        .expect("initial peer sync");
+    {
+        let mut peers = daemon.peers.lock().expect("peers mutex poisoned");
+        let peer = peers.get_mut("peer-remote-sync-limit-fail").expect("peer record");
+        peer.propagation_transfer_limit = Some(100_000);
+        peer.propagation_sync_limit = None;
+    }
+    daemon.event_queue.lock().expect("event_queue mutex poisoned").clear();
+
+    let err = daemon
+        .handle_rpc(rpc_request(
+            76,
+            "propagation_remote_sync",
+            json!({
+                "remote": "remote-node",
+                "peer": "peer-remote-sync-limit-fail",
+                "transfer_limit_kb": 42.5,
+            }),
+        ))
+        .expect_err("remote sync failure should be returned");
+    assert_eq!(err.kind(), std::io::ErrorKind::TimedOut);
+
+    let event = daemon
+        .event_queue
+        .lock()
+        .expect("event_queue mutex poisoned")
+        .iter()
+        .rev()
+        .find(|event| event.event_type == "peer_sync")
+        .cloned()
+        .expect("failed remote peer sync event");
+    assert_eq!(event.payload["peer"].as_str(), Some("peer-remote-sync-limit-fail"));
+    assert_eq!(event.payload["remote"].as_str(), Some("remote-node"));
+    assert_eq!(event.payload["remote_sync"].as_bool(), Some(true));
+    assert_eq!(event.payload["synced"].as_bool(), Some(false));
+    assert_eq!(event.payload["propagation_transfer_limit"].as_u64(), Some(100_000));
+    assert!(event.payload["propagation_sync_limit"].is_null());
+    assert_eq!(event.payload["transfer_limit"].as_u64(), Some(42_500));
+    assert_eq!(event.payload["sync_limit"].as_u64(), Some(42_500));
+    assert_eq!(event.payload["propagation"]["transfer_limit"].as_u64(), Some(42_500));
+    assert_eq!(event.payload["propagation"]["sync_limit"].as_u64(), Some(42_500));
     assert_eq!(
         event.payload["propagation"]["error"].as_str(),
         Some("remote sync failed")

@@ -12,7 +12,14 @@ struct RemotePropagationImportSummary {
 }
 
 impl RpcDaemon {
-    fn publish_failed_remote_peer_sync_event(&self, peer_id: &str, remote: &str, error: &str) {
+    fn publish_failed_remote_peer_sync_event(
+        &self,
+        peer_id: &str,
+        remote: &str,
+        error: &str,
+        transfer_limit: Option<u64>,
+        sync_limit: Option<u64>,
+    ) {
         let Some(peer) = self.peers.lock().expect("peers mutex poisoned").get(peer_id).cloned()
         else {
             return;
@@ -44,6 +51,8 @@ impl RpcDaemon {
             "synced": false,
             "error": error,
             "peering_key": peering_key,
+            "transfer_limit": transfer_limit,
+            "sync_limit": sync_limit,
         });
         self.publish_event(RpcEvent {
             event_type: "peer_sync".into(),
@@ -79,8 +88,8 @@ impl RpcDaemon {
                 "propagation_stamp_cost": peer.propagation_stamp_cost,
                 "propagation_stamp_cost_flexibility": peer.propagation_stamp_cost_flexibility,
                 "peering_key": peering_key,
-                "transfer_limit": peer.propagation_transfer_limit,
-                "sync_limit": peer.propagation_sync_limit,
+                "transfer_limit": transfer_limit,
+                "sync_limit": sync_limit,
                 "target_stamp_cost": peer.propagation_stamp_cost,
                 "stamp_cost_flexibility": peer.propagation_stamp_cost_flexibility,
                 "messages": messages,
@@ -971,6 +980,13 @@ impl RpcDaemon {
                 };
                 let transfer_limit =
                     transfer_limit_kb.map(|limit| (limit.max(0.0) * 1000.0) as u64);
+                let sync_limit = self
+                    .peers
+                    .lock()
+                    .expect("peers mutex poisoned")
+                    .get(parsed.peer.as_str())
+                    .and_then(|peer| peer.propagation_sync_limit.map(u64::from))
+                    .or(transfer_limit);
                 self.update_propagation_sync_state(|state| {
                     state.sync_state = PR_REQUEST_SENT;
                     state.state_name = "syncing".to_string();
@@ -1003,6 +1019,8 @@ impl RpcDaemon {
                                     parsed.peer.as_str(),
                                     parsed.remote.as_str(),
                                     err.to_string().as_str(),
+                                    transfer_limit,
+                                    sync_limit,
                                 );
                                 return Err(err);
                             }
@@ -1084,7 +1102,7 @@ impl RpcDaemon {
                                 "transferred_bytes": imported.transferred_bytes,
                                 "peering_key": peering_key,
                                 "transfer_limit": transfer_limit,
-                                "sync_limit": peer.propagation_sync_limit,
+                                "sync_limit": sync_limit,
                             });
                             let peer_status_type = if self.is_static_peer(peer.peer.as_str()) {
                                 "static"
@@ -1124,7 +1142,7 @@ impl RpcDaemon {
                                 "propagation_stamp_cost_flexibility": peer.propagation_stamp_cost_flexibility,
                                 "peering_key": peering_key,
                                 "transfer_limit": transfer_limit,
-                                "sync_limit": peer.propagation_sync_limit,
+                                "sync_limit": sync_limit,
                                 "target_stamp_cost": peer.propagation_stamp_cost,
                                 "stamp_cost_flexibility": peer.propagation_stamp_cost_flexibility,
                                 "messages": messages,
@@ -1151,6 +1169,8 @@ impl RpcDaemon {
                             parsed.peer.as_str(),
                             parsed.remote.as_str(),
                             err.to_string().as_str(),
+                            transfer_limit,
+                            sync_limit,
                         );
                         return Err(err);
                     }
