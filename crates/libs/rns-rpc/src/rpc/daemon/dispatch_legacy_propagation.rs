@@ -1120,19 +1120,54 @@ impl RpcDaemon {
                     ));
                 }
                 let peer_id = parsed.peer.trim().to_string();
+                if peer_id.is_empty() {
+                    return Err(std::io::Error::new(
+                        std::io::ErrorKind::InvalidInput,
+                        "peer is required",
+                    ));
+                }
                 let timestamp = now_i64();
-                let record = self.ensure_peer_for_sync(peer_id.as_str(), timestamp)?;
                 let timeout_secs = parsed.timeout_secs.unwrap_or(5.0).max(0.1);
+                let existing_record = {
+                    self.peers.lock().expect("peers mutex poisoned").get(peer_id.as_str()).cloned()
+                };
+                if let Some(record) = existing_record {
+                    let peer_transfer_limit_kb =
+                        record.propagation_transfer_limit.map(|limit| f64::from(limit) / 1000.0);
+                    let request_transfer_limit_kb =
+                        parsed.transfer_limit_kb.map(|limit| limit.max(0.0));
+                    let transfer_limit_kb = effective_transfer_limit_kb(
+                        peer_transfer_limit_kb,
+                        request_transfer_limit_kb,
+                    );
+                    let transfer_limit =
+                        transfer_limit_kb.map(|limit| (limit.max(0.0) * 1000.0) as u64);
+                    let sync_limit =
+                        record.propagation_sync_limit.map(u64::from).or(transfer_limit);
+                    if record.next_sync_attempt > 0 && timestamp < record.next_sync_attempt {
+                        return Ok(self.postponed_peer_sync_response(
+                            request.id,
+                            &record,
+                            timestamp,
+                            "backoff",
+                            transfer_limit.map(|limit| limit as usize),
+                            sync_limit.map(|limit| limit as usize),
+                        ));
+                    }
+                }
+                let bridge = self
+                    .remote_control_bridge
+                    .lock()
+                    .expect("remote control bridge mutex poisoned")
+                    .clone()
+                    .ok_or_else(|| std::io::Error::other("remote control bridge unavailable"))?;
+                let record = self.ensure_peer_for_sync(peer_id.as_str(), timestamp)?;
                 let peer_transfer_limit_kb =
                     record.propagation_transfer_limit.map(|limit| f64::from(limit) / 1000.0);
                 let request_transfer_limit_kb =
                     parsed.transfer_limit_kb.map(|limit| limit.max(0.0));
-                let transfer_limit_kb = match (peer_transfer_limit_kb, request_transfer_limit_kb) {
-                    (Some(peer_limit), Some(request_limit)) => Some(peer_limit.min(request_limit)),
-                    (Some(peer_limit), None) => Some(peer_limit),
-                    (None, Some(request_limit)) => Some(request_limit),
-                    (None, None) => None,
-                };
+                let transfer_limit_kb =
+                    effective_transfer_limit_kb(peer_transfer_limit_kb, request_transfer_limit_kb);
                 let transfer_limit =
                     transfer_limit_kb.map(|limit| (limit.max(0.0) * 1000.0) as u64);
                 let sync_limit = record.propagation_sync_limit.map(u64::from).or(transfer_limit);
@@ -1146,12 +1181,6 @@ impl RpcDaemon {
                         sync_limit.map(|limit| limit as usize),
                     ));
                 }
-                let bridge = self
-                    .remote_control_bridge
-                    .lock()
-                    .expect("remote control bridge mutex poisoned")
-                    .clone()
-                    .ok_or_else(|| std::io::Error::other("remote control bridge unavailable"))?;
                 self.update_propagation_sync_state(|state| {
                     state.sync_state = PR_REQUEST_SENT;
                     state.state_name = "syncing".to_string();
@@ -1671,6 +1700,18 @@ fn propagation_sync_state_name(state: u32) -> &'static str {
         0xf3 => "no_identity",
         0xf4 => "no_access",
         _ => "unknown",
+    }
+}
+
+fn effective_transfer_limit_kb(
+    peer_transfer_limit_kb: Option<f64>,
+    request_transfer_limit_kb: Option<f64>,
+) -> Option<f64> {
+    match (peer_transfer_limit_kb, request_transfer_limit_kb) {
+        (Some(peer_limit), Some(request_limit)) => Some(peer_limit.min(request_limit)),
+        (Some(peer_limit), None) => Some(peer_limit),
+        (None, Some(request_limit)) => Some(request_limit),
+        (None, None) => None,
     }
 }
 

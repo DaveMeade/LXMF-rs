@@ -6334,6 +6334,46 @@ fn propagation_remote_sync_backoff_does_not_require_bridge() {
 }
 
 #[test]
+fn propagation_remote_sync_missing_bridge_does_not_create_peer() {
+    let daemon = RpcDaemon::test_instance();
+
+    let err = daemon
+        .handle_rpc(rpc_request(
+            95,
+            "propagation_remote_sync",
+            json!({
+                "remote": "remote-without-bridge",
+                "peer": "peer-no-bridge",
+            }),
+        ))
+        .expect_err("missing bridge should reject remote sync");
+    assert_eq!(err.kind(), std::io::ErrorKind::Other);
+    assert_eq!(err.to_string(), "remote control bridge unavailable");
+
+    let peers = daemon
+        .handle_rpc(RpcRequest { id: 96, method: "list_peers".to_string(), params: None })
+        .expect("list peers")
+        .result
+        .expect("list peers result");
+    assert!(
+        peers["peers"]
+            .as_array()
+            .expect("peer rows")
+            .iter()
+            .all(|row| row["peer"].as_str() != Some("peer-no-bridge")),
+        "missing remote bridge should not create local peer state"
+    );
+
+    let status = daemon
+        .handle_rpc(RpcRequest { id: 97, method: "propagation_status".to_string(), params: None })
+        .expect("propagation status")
+        .result
+        .expect("propagation status result");
+    assert_eq!(status["propagation"]["sync_state"].as_u64(), Some(0x00));
+    assert_eq!(status["propagation"]["last_sync_started"], JsonValue::Null);
+}
+
+#[test]
 fn propagation_remote_unpeer_rejects_blank_peer_before_bridge_call() {
     let daemon = RpcDaemon::test_instance();
     let sync_calls = Arc::new(std::sync::atomic::AtomicUsize::new(0));
