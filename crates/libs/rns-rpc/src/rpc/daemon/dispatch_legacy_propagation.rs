@@ -1432,6 +1432,7 @@ impl RpcDaemon {
                     .expect("remote control bridge mutex poisoned")
                     .clone()
                     .ok_or_else(|| std::io::Error::other("remote control bridge unavailable"))?;
+                let remote_id = parsed.remote.trim().to_string();
                 let timeout_secs = parsed.timeout_secs.unwrap_or(8.0).max(0.1);
                 self.update_propagation_sync_state(|state| {
                     state.sync_state = PR_REQUEST_SENT;
@@ -1442,7 +1443,7 @@ impl RpcDaemon {
                     state.last_sync_error = None;
                 });
                 let mut result = match bridge.propagation_remote_fetch(
-                    parsed.remote.as_str(),
+                    remote_id.as_str(),
                     parsed.identity_private_key_hex.as_deref(),
                     timeout_secs,
                     parsed.transfer_limit_kb,
@@ -1489,7 +1490,7 @@ impl RpcDaemon {
                 Ok(RpcResponse {
                     id: request.id,
                     result: Some(json!({
-                        "remote": parsed.remote,
+                        "remote": remote_id,
                         "propagation": propagation,
                         "result": result,
                     })),

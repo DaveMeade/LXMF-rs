@@ -5504,12 +5504,18 @@ impl RemoteControlBridge for TestRemoteControlBridge {
 
     fn propagation_remote_fetch(
         &self,
-        _remote: &str,
+        remote: &str,
         _identity_private_key_hex: Option<&str>,
         _timeout_secs: f64,
         _transfer_limit_kb: Option<f64>,
     ) -> Result<JsonValue, std::io::Error> {
-        self.result.clone().map_err(|kind| std::io::Error::new(kind, "remote fetch failed"))
+        self.result
+            .clone()
+            .map(|mut result| {
+                result["remote"] = json!(remote);
+                result
+            })
+            .map_err(|kind| std::io::Error::new(kind, "remote fetch failed"))
     }
 }
 
@@ -6598,6 +6604,33 @@ fn propagation_remote_fetch_imports_payloads_into_local_store() {
         .expect("relay pending");
     assert_eq!(relay_pending.len(), 1);
     assert_eq!(relay_pending[0].transient_id, transient_id);
+}
+
+#[test]
+fn propagation_remote_fetch_trims_remote_before_bridge_and_response() {
+    let daemon = RpcDaemon::test_instance();
+    daemon.set_remote_control_bridge(Arc::new(TestRemoteControlBridge {
+        result: Ok(json!({
+            "available_count": 0,
+            "fetched_count": 0,
+            "messages": [],
+        })),
+    }));
+
+    let result = daemon
+        .handle_rpc(rpc_request(
+            76,
+            "propagation_remote_fetch",
+            json!({
+                "remote": "  remote-fetch-trimmed  ",
+            }),
+        ))
+        .expect("remote fetch with padded remote")
+        .result
+        .expect("remote fetch result");
+
+    assert_eq!(result["remote"].as_str(), Some("remote-fetch-trimmed"));
+    assert_eq!(result["result"]["remote"].as_str(), Some("remote-fetch-trimmed"));
 }
 
 #[test]
