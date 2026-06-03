@@ -9,6 +9,7 @@ pub(super) struct PeerPropagationState {
     pub(super) stamp_cost: Option<u32>,
     pub(super) stamp_cost_flexibility: Option<u32>,
     pub(super) peering_cost: Option<u32>,
+    pub(super) network_distance: Option<u32>,
 }
 
 impl RpcDaemon {
@@ -789,6 +790,7 @@ impl RpcDaemon {
             stamp_cost,
             stamp_cost_flexibility,
             peering_cost,
+            network_distance: hops,
         };
         let is_static = self.is_static_peer(peer.as_str());
         let remote_peering_cost_allowed = self.remote_peering_cost_allowed(peering_cost);
@@ -1189,6 +1191,41 @@ impl RpcDaemon {
         Ok(())
     }
 
+    pub(super) fn enforce_autopeer_maxdepth_policy(&self) -> Result<(), std::io::Error> {
+        let propagation =
+            self.propagation_state.lock().expect("propagation mutex poisoned").clone();
+        if !propagation.autopeer || propagation.from_static_only {
+            return Ok(());
+        }
+        let max_depth = propagation.autopeer_maxdepth.max(1);
+        let peers_to_remove = {
+            let guard = self.peers.lock().expect("peers mutex poisoned");
+            guard
+                .values()
+                .filter(|record| record.peer_type.as_deref() == Some("auto"))
+                .filter(|record| record.network_distance > max_depth)
+                .map(|record| record.peer.clone())
+                .collect::<Vec<_>>()
+        };
+        for peer in peers_to_remove {
+            let cleanup = self.unpeer_local_state(peer.as_str())?;
+            if cleanup.removed {
+                self.publish_event(RpcEvent {
+                    event_type: "peer_unpeer".into(),
+                    payload: json!({
+                        "peer": peer,
+                        "removed": true,
+                        "reason": "autopeer_maxdepth",
+                        "propagation_cleared": cleanup.propagation_cleared,
+                        "propagation_cleared_bytes": cleanup.propagation_cleared_bytes,
+                        "messages": cleanup.messages,
+                    }),
+                });
+            }
+        }
+        Ok(())
+    }
+
     pub(super) fn ensure_peer_admission_allowed(
         &self,
         peer: &str,
@@ -1259,6 +1296,9 @@ impl RpcDaemon {
         existing.propagation_stamp_cost = state.stamp_cost;
         existing.propagation_stamp_cost_flexibility = state.stamp_cost_flexibility;
         existing.peering_cost = state.peering_cost;
+        if let Some(network_distance) = state.network_distance {
+            existing.network_distance = network_distance.max(1);
+        }
     }
 
     pub(super) fn remove_autopeered_peer_if_stale_or_expensive(

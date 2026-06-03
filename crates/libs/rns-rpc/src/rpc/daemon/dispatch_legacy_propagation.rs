@@ -732,6 +732,7 @@ impl RpcDaemon {
                     self.activate_static_peers(&static_peers_to_activate)?;
                 }
                 self.enforce_autopeer_enabled_policy()?;
+                self.enforce_autopeer_maxdepth_policy()?;
                 self.enforce_static_only_peer_policy()?;
                 state = self.propagation_state.lock().expect("propagation mutex poisoned").clone();
                 let selected_node_rejected = {
