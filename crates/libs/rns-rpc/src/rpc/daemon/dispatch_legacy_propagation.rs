@@ -356,13 +356,23 @@ impl RpcDaemon {
         } else {
             Some(normalize_propagation_payload_bytes(payload, target_cost)?)
         };
+        let transient_id = normalize_propagation_transient_key(transient_id);
+        let already_known = if normalized.is_some() && !transient_id.is_empty() {
+            self.store
+                .get_propagation_entry(transient_id.as_str())
+                .map_err(std::io::Error::other)?
+                .is_some()
+        } else {
+            false
+        };
+        let has_payload = normalized.is_some();
         if let Some((_canonical_transient_id, payload)) = normalized {
             let payload_hex = hex::encode(payload);
-            self.store_propagation_payload_hex(transient_id, payload_hex.as_str())?;
-            self.queue_propagation_entry_for_active_peers(transient_id)?;
+            self.store_propagation_payload_hex(transient_id.as_str(), payload_hex.as_str())?;
+            self.queue_propagation_entry_for_active_peers(transient_id.as_str())?;
             let mut guard =
                 self.propagation_payloads.lock().expect("propagation payload mutex poisoned");
-            guard.insert(normalize_propagation_transient_key(transient_id), payload_hex.clone());
+            guard.insert(transient_id.clone(), payload_hex.clone());
             for alias in aliases {
                 self.store_propagation_payload_hex(alias, payload_hex.as_str())?;
                 guard.insert(normalize_propagation_transient_key(alias), payload_hex.clone());
@@ -371,7 +381,8 @@ impl RpcDaemon {
 
         let state = {
             let mut guard = self.propagation_state.lock().expect("propagation mutex poisoned");
-            let ingested_count = usize::from(!transient_id.is_empty());
+            let ingested_count =
+                usize::from(has_payload && !transient_id.is_empty() && !already_known);
             guard.last_ingest_count = ingested_count;
             guard.total_ingested += ingested_count;
             guard.client_propagation_messages_received =
@@ -382,7 +393,7 @@ impl RpcDaemon {
             snapshot.propagation = state;
         });
 
-        Ok(normalize_propagation_transient_key(transient_id))
+        Ok(transient_id)
     }
 
     pub fn ingest_propagation_payload_hex(
@@ -427,6 +438,15 @@ impl RpcDaemon {
                 })
             });
 
+        let already_known = if normalized_payload.is_some() && !transient_id.is_empty() {
+            self.store
+                .get_propagation_entry(transient_id.as_str())
+                .map_err(std::io::Error::other)?
+                .is_some()
+        } else {
+            false
+        };
+
         if let Some((_canonical_transient_id, payload_hex)) = normalized_payload {
             self.store_propagation_payload_hex(transient_id.as_str(), payload_hex.as_str())?;
             self.queue_propagation_entry_for_active_peers(transient_id.as_str())?;
@@ -437,7 +457,7 @@ impl RpcDaemon {
         }
 
         self.note_client_propagation_messages_received(usize::from(
-            !payload_hex.is_empty() && !transient_id.is_empty(),
+            !payload_hex.is_empty() && !transient_id.is_empty() && !already_known,
         ));
 
         Ok(transient_id)

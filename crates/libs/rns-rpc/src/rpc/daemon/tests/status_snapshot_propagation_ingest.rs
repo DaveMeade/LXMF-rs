@@ -339,6 +339,59 @@ fn propagation_alias_ingest_stores_python_served_unstamped_payload() {
 }
 
 #[test]
+fn duplicate_alias_ingest_does_not_double_count_received() {
+    use sha2::{Digest, Sha256};
+
+    let daemon = RpcDaemon::test_instance();
+    let lxm_data = b"duplicate-alias-ingest-payload".to_vec();
+    let transient_data = stamped_propagation_payload(&lxm_data, 1);
+    let canonical_transient_id = hex::encode(Sha256::digest(&lxm_data));
+
+    for _ in 0..2 {
+        daemon
+            .ingest_propagation_payload_bytes_with_aliases(
+                transient_data.as_slice(),
+                canonical_transient_id.as_str(),
+                &[],
+            )
+            .expect("alias ingest stamped propagation payload");
+    }
+
+    let status = daemon
+        .handle_rpc(RpcRequest { id: 81, method: "propagation_status".to_string(), params: None })
+        .expect("propagation status")
+        .result
+        .expect("propagation status result");
+    assert_eq!(status["propagation"]["client_propagation_messages_received"].as_u64(), Some(1));
+    assert_eq!(status["propagation"]["total_ingested"].as_u64(), Some(1));
+    assert_eq!(status["propagation"]["last_ingest_count"].as_u64(), Some(0));
+}
+
+#[test]
+fn duplicate_byte_ingest_does_not_double_count_received() {
+    use sha2::{Digest, Sha256};
+
+    let daemon = RpcDaemon::test_instance();
+    let payload = b"duplicate-byte-ingest-payload";
+    let transient_id = hex::encode(Sha256::digest(payload));
+
+    for _ in 0..2 {
+        daemon
+            .ingest_propagation_payload_bytes(payload, Some(transient_id.as_str()))
+            .expect("byte ingest propagation payload");
+    }
+
+    let status = daemon
+        .handle_rpc(RpcRequest { id: 82, method: "propagation_status".to_string(), params: None })
+        .expect("propagation status")
+        .result
+        .expect("propagation status result");
+    assert_eq!(status["propagation"]["client_propagation_messages_received"].as_u64(), Some(1));
+    assert_eq!(status["propagation"]["total_ingested"].as_u64(), Some(1));
+    assert_eq!(status["propagation"]["last_ingest_count"].as_u64(), Some(0));
+}
+
+#[test]
 fn propagation_fetch_transfer_limit_accounts_for_stripped_stamp_bytes() {
     use sha2::{Digest, Sha256};
 
