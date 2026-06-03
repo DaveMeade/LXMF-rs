@@ -196,9 +196,10 @@ impl RpcDaemon {
                 )?;
                 let record =
                     self.peers.lock().expect("peers mutex poisoned").get(peer.as_str()).cloned();
+                let peer = record.map(|record| self.enriched_peer_status_row(record));
                 Ok(RpcResponse {
                     id: request.id,
-                    result: Some(json!({ "peer": record })),
+                    result: Some(json!({ "peer": peer })),
                     error: None,
                 })
             }

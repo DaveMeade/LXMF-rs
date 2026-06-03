@@ -2,6 +2,56 @@ use super::init::LXMF_PEER_SYNC_BACKOFF_STEP_SECS;
 use super::*;
 
 impl RpcDaemon {
+    pub(super) fn enriched_peer_status_row(&self, peer: PeerRecord) -> JsonValue {
+        let (outgoing, incoming, offered, unhandled, offered_bytes, unhandled_bytes) =
+            self.peer_message_stats(peer.peer.as_str()).unwrap_or((0, 0, 0, 0, 0, 0));
+        let peering_key = peer_peering_key_value(&peer, self.identity_hash.as_str());
+        let acceptance_rate =
+            peer_acceptance_rate_for_reporting(peer.acceptance_rate, outgoing, offered, peer.alive);
+        let handled_ids =
+            self.store.list_peer_handled_propagation_ids(peer.peer.as_str()).unwrap_or_default();
+        let unhandled_ids =
+            self.store.list_peer_unhandled_propagation_ids(peer.peer.as_str()).unwrap_or_default();
+        let is_static_peer = self.is_static_peer(peer.peer.as_str());
+        let mut row = serde_json::to_value(peer).unwrap_or_else(|_| json!({}));
+        row["type"] =
+            JsonValue::String(if is_static_peer { "static" } else { "discovered" }.to_string());
+        row["state"] = JsonValue::from(0);
+        row["sync_strategy"] = JsonValue::from(2);
+        row["ler"] = JsonValue::from(0);
+        row["str"] = row
+            .get("sync_transfer_rate")
+            .and_then(JsonValue::as_f64)
+            .map(|value| JsonValue::from(value as u64))
+            .unwrap_or_else(|| JsonValue::from(0));
+        row["messages"] = json!({
+            "offered": offered,
+            "outgoing": outgoing,
+            "incoming": incoming,
+            "unhandled": unhandled,
+            "offered_bytes": offered_bytes,
+            "unhandled_bytes": unhandled_bytes,
+            "handled_ids": handled_ids.clone(),
+            "unhandled_ids": unhandled_ids.clone(),
+        });
+        row["offered"] = json!(offered);
+        row["outgoing"] = json!(outgoing);
+        row["incoming"] = json!(incoming);
+        row["handled_ids"] = json!(handled_ids);
+        row["unhandled_ids"] = json!(unhandled_ids);
+        row["acceptance_rate"] = json!(acceptance_rate);
+        row["peering_key"] = peering_key.map_or(JsonValue::Null, JsonValue::from);
+        row["last_heard"] = row.get("last_seen").cloned().unwrap_or(JsonValue::Null);
+        row["transfer_limit"] =
+            row.get("propagation_transfer_limit").cloned().unwrap_or(JsonValue::Null);
+        row["sync_limit"] = row.get("propagation_sync_limit").cloned().unwrap_or(JsonValue::Null);
+        row["target_stamp_cost"] =
+            row.get("propagation_stamp_cost").cloned().unwrap_or(JsonValue::Null);
+        row["stamp_cost_flexibility"] =
+            row.get("propagation_stamp_cost_flexibility").cloned().unwrap_or(JsonValue::Null);
+        row
+    }
+
     fn postponed_peer_sync_response(
         &self,
         request_id: u64,
@@ -277,89 +327,9 @@ impl RpcDaemon {
                 peers.sort_by(|a, b| {
                     b.last_seen.cmp(&a.last_seen).then_with(|| a.peer.cmp(&b.peer))
                 });
-                let static_peers = self
-                    .propagation_state
-                    .lock()
-                    .expect("propagation mutex poisoned")
-                    .static_peers
-                    .clone();
                 let peers = peers
                     .into_iter()
-                    .map(|peer| {
-                        let (
-                            outgoing,
-                            incoming,
-                            offered,
-                            unhandled,
-                            offered_bytes,
-                            unhandled_bytes,
-                        ) = self
-                            .peer_message_stats(peer.peer.as_str())
-                            .unwrap_or((0, 0, 0, 0, 0, 0));
-                        let peering_key =
-                            peer_peering_key_value(&peer, self.identity_hash.as_str());
-                        let acceptance_rate = peer_acceptance_rate_for_reporting(
-                            peer.acceptance_rate,
-                            outgoing,
-                            offered,
-                            peer.alive,
-                        );
-                        let handled_ids = self
-                            .store
-                            .list_peer_handled_propagation_ids(peer.peer.as_str())
-                            .unwrap_or_default();
-                        let unhandled_ids = self
-                            .store
-                            .list_peer_unhandled_propagation_ids(peer.peer.as_str())
-                            .unwrap_or_default();
-                        let is_static_peer = static_peers.iter().any(|static_peer| {
-                            static_peer.eq_ignore_ascii_case(peer.peer.as_str())
-                        });
-                        let mut row = serde_json::to_value(peer).unwrap_or_else(|_| json!({}));
-                        row["type"] = JsonValue::String(
-                            if is_static_peer { "static" } else { "discovered" }.to_string(),
-                        );
-                        row["state"] = JsonValue::from(0);
-                        row["sync_strategy"] = JsonValue::from(2);
-                        row["ler"] = JsonValue::from(0);
-                        row["str"] = row
-                            .get("sync_transfer_rate")
-                            .and_then(JsonValue::as_f64)
-                            .map(|value| JsonValue::from(value as u64))
-                            .unwrap_or_else(|| JsonValue::from(0));
-                        row["messages"] = json!({
-                            "offered": offered,
-                            "outgoing": outgoing,
-                            "incoming": incoming,
-                            "unhandled": unhandled,
-                            "offered_bytes": offered_bytes,
-                            "unhandled_bytes": unhandled_bytes,
-                            "handled_ids": handled_ids.clone(),
-                            "unhandled_ids": unhandled_ids.clone(),
-                        });
-                        row["offered"] = json!(offered);
-                        row["outgoing"] = json!(outgoing);
-                        row["incoming"] = json!(incoming);
-                        row["handled_ids"] = json!(handled_ids);
-                        row["unhandled_ids"] = json!(unhandled_ids);
-                        row["acceptance_rate"] = json!(acceptance_rate);
-                        row["peering_key"] = peering_key.map_or(JsonValue::Null, JsonValue::from);
-                        row["last_heard"] =
-                            row.get("last_seen").cloned().unwrap_or(JsonValue::Null);
-                        row["transfer_limit"] = row
-                            .get("propagation_transfer_limit")
-                            .cloned()
-                            .unwrap_or(JsonValue::Null);
-                        row["sync_limit"] =
-                            row.get("propagation_sync_limit").cloned().unwrap_or(JsonValue::Null);
-                        row["target_stamp_cost"] =
-                            row.get("propagation_stamp_cost").cloned().unwrap_or(JsonValue::Null);
-                        row["stamp_cost_flexibility"] = row
-                            .get("propagation_stamp_cost_flexibility")
-                            .cloned()
-                            .unwrap_or(JsonValue::Null);
-                        row
-                    })
+                    .map(|peer| self.enriched_peer_status_row(peer))
                     .collect::<Vec<_>>();
                 Ok(RpcResponse {
                     id: request.id,

@@ -2750,6 +2750,50 @@ fn list_peers_preserves_python_peer_message_counters() {
 }
 
 #[test]
+fn announce_received_returns_enriched_peer_accounting_like_list_peers() {
+    let daemon = RpcDaemon::test_instance();
+    let peer: PeerRecord = serde_json::from_value(json!({
+        "peer": "peer-announce-accounting",
+        "last_seen": 1_700_001_100,
+        "offered": 7,
+        "outgoing": 5,
+        "incoming": 3,
+        "acceptance_rate": 0.9,
+    }))
+    .expect("deserialize python counter peer");
+    daemon
+        .peers
+        .lock()
+        .expect("peers mutex poisoned")
+        .insert(peer.peer.clone(), peer);
+
+    let response = daemon
+        .handle_rpc(rpc_request(
+            55,
+            "announce_received",
+            json!({
+                "peer": "peer-announce-accounting",
+                "timestamp": 1_700_001_200,
+                "name": "Announced Accounting Peer",
+                "name_source": "test",
+            }),
+        ))
+        .expect("announce received")
+        .result
+        .expect("announce result");
+    let peer = &response["peer"];
+
+    assert_eq!(peer["peer"].as_str(), Some("peer-announce-accounting"));
+    assert_eq!(peer["messages"]["offered"].as_u64(), Some(7));
+    assert_eq!(peer["messages"]["outgoing"].as_u64(), Some(5));
+    assert_eq!(peer["messages"]["incoming"].as_u64(), Some(3));
+    assert_eq!(peer["offered"].as_u64(), Some(7));
+    assert_eq!(peer["outgoing"].as_u64(), Some(5));
+    assert_eq!(peer["incoming"].as_u64(), Some(3));
+    assert_eq!(peer["acceptance_rate"].as_f64(), Some(5.0 / 7.0));
+}
+
+#[test]
 fn peer_sync_without_offers_preserves_failure_backoff() {
     let daemon = RpcDaemon::test_instance();
     daemon
