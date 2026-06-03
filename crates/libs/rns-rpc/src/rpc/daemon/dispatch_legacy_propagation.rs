@@ -1035,16 +1035,17 @@ impl RpcDaemon {
                     .expect("remote control bridge mutex poisoned")
                     .clone()
                     .ok_or_else(|| std::io::Error::other("remote control bridge unavailable"))?;
+                let remote_id = parsed.remote.trim().to_string();
                 let timeout_secs = parsed.timeout_secs.unwrap_or(5.0).max(0.1);
                 let result = bridge.propagation_remote_status(
-                    parsed.remote.as_str(),
+                    remote_id.as_str(),
                     parsed.identity_private_key_hex.as_deref(),
                     timeout_secs,
                 )?;
                 Ok(RpcResponse {
                     id: request.id,
                     result: Some(json!({
-                        "remote": parsed.remote,
+                        "remote": remote_id,
                         "status": result,
                     })),
                     error: None,

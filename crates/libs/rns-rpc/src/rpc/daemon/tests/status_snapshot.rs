@@ -5425,6 +5425,29 @@ fn high_cost_announce_does_not_remove_manual_peer() {
 
 include!("status_snapshot_propagation_ingest.rs");
 
+#[test]
+fn propagation_remote_status_trims_remote_before_bridge_and_response() {
+    let daemon = RpcDaemon::test_instance();
+    daemon.set_remote_control_bridge(Arc::new(TestRemoteControlBridge {
+        result: Ok(json!({})),
+    }));
+
+    let result = daemon
+        .handle_rpc(rpc_request(
+            71,
+            "propagation_remote_status",
+            json!({
+                "remote": "  remote-status-trimmed  ",
+            }),
+        ))
+        .expect("remote status with padded remote")
+        .result
+        .expect("remote status result");
+
+    assert_eq!(result["remote"].as_str(), Some("remote-status-trimmed"));
+    assert_eq!(result["status"]["remote"].as_str(), Some("remote-status-trimmed"));
+}
+
 struct TestRemoteControlBridge {
     result: Result<JsonValue, std::io::ErrorKind>,
 }
@@ -5447,11 +5470,14 @@ struct CountingRemoteControlBridge {
 impl RemoteControlBridge for TestRemoteControlBridge {
     fn propagation_remote_status(
         &self,
-        _remote: &str,
+        remote: &str,
         _identity_private_key_hex: Option<&str>,
         _timeout_secs: f64,
     ) -> Result<JsonValue, std::io::Error> {
-        Ok(json!({"status": "ok"}))
+        Ok(json!({
+            "remote": remote,
+            "status": "ok",
+        }))
     }
 
     fn propagation_remote_sync(
