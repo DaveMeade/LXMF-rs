@@ -36,6 +36,8 @@ impl RpcDaemon {
             &peer,
             self.identity_hash.as_str(),
         );
+        let peering_key_status =
+            super::dispatch_legacy_messages::peer_peering_key_status(&peer, peering_key);
         let acceptance_rate = super::dispatch_legacy_messages::peer_acceptance_rate_for_reporting(
             peer.acceptance_rate,
             outgoing,
@@ -59,6 +61,7 @@ impl RpcDaemon {
             "synced": false,
             "error": error,
             "peering_key": peering_key,
+            "peering_key_status": peering_key_status,
             "transfer_limit": transfer_limit,
             "sync_limit": sync_limit,
         });
@@ -96,6 +99,7 @@ impl RpcDaemon {
                 "propagation_stamp_cost": peer.propagation_stamp_cost,
                 "propagation_stamp_cost_flexibility": peer.propagation_stamp_cost_flexibility,
                 "peering_key": peering_key,
+                "peering_key_status": peering_key_status,
                 "transfer_limit": transfer_limit,
                 "sync_limit": sync_limit,
                 "target_stamp_cost": peer.propagation_stamp_cost,
@@ -1302,6 +1306,11 @@ impl RpcDaemon {
                                     &peer,
                                     self.identity_hash.as_str(),
                                 );
+                            let peering_key_status =
+                                super::dispatch_legacy_messages::peer_peering_key_status(
+                                    &peer,
+                                    peering_key,
+                                );
                             let acceptance_rate =
                                 super::dispatch_legacy_messages::peer_acceptance_rate_for_reporting(
                                     peer.acceptance_rate,
@@ -1327,6 +1336,7 @@ impl RpcDaemon {
                                 "imported_ids": imported.imported_ids,
                                 "transferred_bytes": imported.transferred_bytes,
                                 "peering_key": peering_key,
+                                "peering_key_status": peering_key_status,
                                 "transfer_limit": transfer_limit,
                                 "sync_limit": sync_limit,
                             });
@@ -1367,6 +1377,7 @@ impl RpcDaemon {
                                 "propagation_stamp_cost": peer.propagation_stamp_cost,
                                 "propagation_stamp_cost_flexibility": peer.propagation_stamp_cost_flexibility,
                                 "peering_key": peering_key,
+                                "peering_key_status": peering_key_status,
                                 "transfer_limit": transfer_limit,
                                 "sync_limit": sync_limit,
                                 "target_stamp_cost": peer.propagation_stamp_cost,

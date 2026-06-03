@@ -88,7 +88,8 @@ names are `lxmf-wire` and `reticulum-rs-rpc`.
 - Peer parity is incomplete. Peer records, configured static peers, events,
   runtime counters, acceptance-rate/backoff fields, Python-style message
   accounting, per-peer propagation transfer/sync limits, propagation stamp
-  policy, and peering-key status values are exposed, but the active workspace
+  policy, peering-key values, and explicit peering-key readiness status values
+  are exposed, but the active workspace
   does not yet match Python `LXMPeer` queueing, transfer, and peering behavior.
 - Paper-command baseline is implemented for bridge-backed `reticulumd`: SDK
   paper encode/decode uses canonical `lxmf-wire` paper URI helpers and tests
@@ -142,6 +143,7 @@ Recent focused evidence:
 - `cargo test -p reticulum-rs-rpc --lib announce_received_parses_propagation_peer_name_from_python_metadata -- --nocapture`
 - `cargo test -p reticulum-rs-rpc --lib new_peer_acceptance_rate_matches_python_zero_offer_default -- --nocapture`
 - `cargo test -p reticulum-rs-rpc --lib list_peers_exposes_peering_key_value_when_cost_is_known -- --nocapture`
+- `cargo test -p reticulum-rs-rpc --lib list_peers_exposes_peering_key_status_values -- --nocapture`
 - `cargo test -p reticulum-rs-rpc --lib autopeered_announce_records_propagation_peer_state -- --nocapture`
 - `cargo test -p reticulumd --bin reticulumd python_status_exposes_peer_peering_key_value -- --nocapture`
 - `cargo test -p reticulumd --bin reticulumd python_status_prefers_peer_propagation_stamp_policy -- --nocapture`

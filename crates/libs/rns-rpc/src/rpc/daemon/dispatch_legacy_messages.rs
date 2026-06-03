@@ -6,6 +6,7 @@ impl RpcDaemon {
         let (outgoing, incoming, offered, unhandled, offered_bytes, unhandled_bytes) =
             self.peer_message_stats(peer.peer.as_str()).unwrap_or((0, 0, 0, 0, 0, 0));
         let peering_key = peer_peering_key_value(&peer, self.identity_hash.as_str());
+        let peering_key_status = peer_peering_key_status(&peer, peering_key);
         let acceptance_rate =
             peer_acceptance_rate_for_reporting(peer.acceptance_rate, outgoing, offered, peer.alive);
         let handled_ids =
@@ -41,6 +42,7 @@ impl RpcDaemon {
         row["unhandled_ids"] = json!(unhandled_ids);
         row["acceptance_rate"] = json!(acceptance_rate);
         row["peering_key"] = peering_key.map_or(JsonValue::Null, JsonValue::from);
+        row["peering_key_status"] = json!(peering_key_status);
         row["last_heard"] = row.get("last_seen").cloned().unwrap_or(JsonValue::Null);
         row["transfer_limit"] =
             row.get("propagation_transfer_limit").cloned().unwrap_or(JsonValue::Null);
@@ -139,8 +141,10 @@ impl RpcDaemon {
         let peer_status_type =
             if self.is_static_peer(record.peer.as_str()) { "static" } else { "discovered" };
         let peering_key = peer_peering_key_value(record, self.identity_hash.as_str());
+        let peering_key_status = peer_peering_key_status(record, peering_key);
         let mut propagation_sync = propagation_sync;
         propagation_sync["peering_key"] = peering_key.map_or(JsonValue::Null, JsonValue::from);
+        propagation_sync["peering_key_status"] = json!(peering_key_status);
         let event = RpcEvent {
             event_type: "peer_sync".into(),
             payload: json!({
@@ -175,6 +179,7 @@ impl RpcDaemon {
                 "propagation_stamp_cost": record.propagation_stamp_cost,
                 "propagation_stamp_cost_flexibility": record.propagation_stamp_cost_flexibility,
                 "peering_key": peering_key,
+                "peering_key_status": peering_key_status,
                 "transfer_limit": transfer_limit_bytes,
                 "sync_limit": sync_limit_bytes,
                 "target_stamp_cost": record.propagation_stamp_cost,
@@ -221,6 +226,7 @@ impl RpcDaemon {
                 "propagation_stamp_cost": record.propagation_stamp_cost,
                 "propagation_stamp_cost_flexibility": record.propagation_stamp_cost_flexibility,
                 "peering_key": peering_key,
+                "peering_key_status": peering_key_status,
                 "transfer_limit": transfer_limit_bytes,
                 "sync_limit": sync_limit_bytes,
                 "target_stamp_cost": record.propagation_stamp_cost,
@@ -837,11 +843,13 @@ impl RpcDaemon {
                 let peer_status_type =
                     if self.is_static_peer(record.peer.as_str()) { "static" } else { "discovered" };
                 let peering_key = peer_peering_key_value(&record, self.identity_hash.as_str());
+                let peering_key_status = peer_peering_key_status(&record, peering_key);
                 if let Some(propagation) = propagation_sync.as_object_mut() {
                     propagation.insert(
                         "peering_key".to_string(),
                         peering_key.map_or(JsonValue::Null, JsonValue::from),
                     );
+                    propagation.insert("peering_key_status".to_string(), json!(peering_key_status));
                 }
                 let event = RpcEvent {
                     event_type: "peer_sync".into(),
@@ -875,6 +883,7 @@ impl RpcDaemon {
                         "propagation_stamp_cost": record.propagation_stamp_cost,
                         "propagation_stamp_cost_flexibility": record.propagation_stamp_cost_flexibility,
                         "peering_key": peering_key,
+                        "peering_key_status": peering_key_status,
                         "transfer_limit": transfer_limit_bytes,
                         "sync_limit": sync_limit_bytes,
                         "target_stamp_cost": record.propagation_stamp_cost,
@@ -919,6 +928,7 @@ impl RpcDaemon {
                         "propagation_stamp_cost": record.propagation_stamp_cost,
                         "propagation_stamp_cost_flexibility": record.propagation_stamp_cost_flexibility,
                         "peering_key": peering_key,
+                        "peering_key_status": peering_key_status,
                         "transfer_limit": transfer_limit_bytes,
                         "sync_limit": sync_limit_bytes,
                         "target_stamp_cost": record.propagation_stamp_cost,
@@ -1523,6 +1533,14 @@ pub(super) fn peer_peering_key_value(peer: &PeerRecord, local_identity_hash: &st
     material.extend_from_slice(remote_hash.as_slice());
     material.extend_from_slice(local_hash.as_slice());
     generate_peering_key_value(material.as_slice(), peering_cost)
+}
+
+pub(super) fn peer_peering_key_status(peer: &PeerRecord, peering_key: Option<u32>) -> &'static str {
+    match (peer.peering_cost, peering_key) {
+        (None, _) => "unconfigured",
+        (Some(_), Some(_)) => "ready",
+        (Some(_), None) => "not_ready",
+    }
 }
 
 pub(super) fn peer_acceptance_rate_for_reporting(

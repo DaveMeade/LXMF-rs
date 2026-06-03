@@ -5191,6 +5191,78 @@ fn list_peers_exposes_peering_key_value_when_cost_is_known() {
 }
 
 #[test]
+fn list_peers_exposes_peering_key_status_values() {
+    let store = MessagesStore::in_memory().expect("store");
+    let daemon = RpcDaemon::with_store(store, hex::encode([2u8; 16]));
+    let ready_peer = hex::encode([3u8; 16]);
+
+    daemon
+        .handle_rpc(rpc_request(55, "peer_sync", json!({ "peer": "peer-unconfigured-key" })))
+        .expect("create unconfigured peer");
+    {
+        let mut peers = daemon.peers.lock().expect("peers mutex poisoned");
+        let peer = peers.get_mut("peer-unconfigured-key").expect("peer record");
+        peer.peering_cost = None;
+    }
+    daemon
+        .accept_announce_with_metadata(
+            ready_peer.clone(),
+            1_700_000_610,
+            None,
+            None,
+            None,
+            Some(vec!["propagation".to_string()]),
+            None,
+            None,
+            None,
+            Some(1),
+            Some(Some(1)),
+            Some(Some(1)),
+            None,
+            Some(1),
+            None,
+            None,
+            None,
+            None,
+        )
+        .expect("accept ready propagation peer announce");
+    daemon
+        .handle_rpc(rpc_request(56, "peer_sync", json!({ "peer": "peer-not-ready-key" })))
+        .expect("create not-ready peer");
+    {
+        let mut peers = daemon.peers.lock().expect("peers mutex poisoned");
+        let peer = peers.get_mut("peer-not-ready-key").expect("peer record");
+        peer.peering_cost = Some(1);
+    }
+
+    let peers = daemon
+        .handle_rpc(RpcRequest { id: 57, method: "list_peers".to_string(), params: None })
+        .expect("list peers")
+        .result
+        .expect("list peers result");
+    let rows = peers["peers"].as_array().expect("peer rows");
+    let unconfigured = rows
+        .iter()
+        .find(|row| row["peer"].as_str() == Some("peer-unconfigured-key"))
+        .expect("unconfigured peer row");
+    let ready = rows
+        .iter()
+        .find(|row| row["peer"].as_str() == Some(ready_peer.as_str()))
+        .expect("ready peer row");
+    let not_ready = rows
+        .iter()
+        .find(|row| row["peer"].as_str() == Some("peer-not-ready-key"))
+        .expect("not-ready peer row");
+
+    assert_eq!(unconfigured["peering_key"], JsonValue::Null);
+    assert_eq!(unconfigured["peering_key_status"].as_str(), Some("unconfigured"));
+    assert!(ready["peering_key"].as_u64().is_some_and(|value| value >= 1));
+    assert_eq!(ready["peering_key_status"].as_str(), Some("ready"));
+    assert_eq!(not_ready["peering_key"], JsonValue::Null);
+    assert_eq!(not_ready["peering_key_status"].as_str(), Some("not_ready"));
+}
+
+#[test]
 fn peer_sync_result_and_event_expose_peering_key_value_when_cost_is_known() {
     let store = MessagesStore::in_memory().expect("store");
     let daemon = RpcDaemon::with_store(store, hex::encode([2u8; 16]));
