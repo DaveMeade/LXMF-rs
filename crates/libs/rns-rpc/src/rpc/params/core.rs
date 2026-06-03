@@ -41,6 +41,8 @@ struct AnnounceReceivedParams {
     peering_cost: Option<u32>,
     #[serde(default)]
     aspect: Option<String>,
+    #[serde(default)]
+    is_path_response: bool,
 }
 
 #[derive(Debug, Deserialize)]

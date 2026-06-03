@@ -781,6 +781,98 @@ impl RpcDaemon {
         source_identity: Option<String>,
         source_node: Option<String>,
     ) -> Result<(), std::io::Error> {
+        self.accept_announce_with_metadata_inner(
+            peer,
+            timestamp,
+            name,
+            name_source,
+            app_data_hex,
+            capabilities,
+            rssi,
+            snr,
+            q,
+            stamp_cost,
+            stamp_cost_flexibility,
+            peering_cost,
+            aspect,
+            hops,
+            interface,
+            source_private_key,
+            source_identity,
+            source_node,
+            false,
+        )
+    }
+
+    #[allow(clippy::too_many_arguments)]
+    pub(super) fn accept_announce_with_metadata_for_path_response(
+        &self,
+        peer: String,
+        timestamp: i64,
+        name: Option<String>,
+        name_source: Option<String>,
+        app_data_hex: Option<String>,
+        capabilities: Option<Vec<String>>,
+        rssi: Option<f64>,
+        snr: Option<f64>,
+        q: Option<f64>,
+        stamp_cost: Option<u32>,
+        stamp_cost_flexibility: Option<Option<u32>>,
+        peering_cost: Option<Option<u32>>,
+        aspect: Option<String>,
+        hops: Option<u32>,
+        interface: Option<String>,
+        source_private_key: Option<String>,
+        source_identity: Option<String>,
+        source_node: Option<String>,
+        is_path_response: bool,
+    ) -> Result<(), std::io::Error> {
+        self.accept_announce_with_metadata_inner(
+            peer,
+            timestamp,
+            name,
+            name_source,
+            app_data_hex,
+            capabilities,
+            rssi,
+            snr,
+            q,
+            stamp_cost,
+            stamp_cost_flexibility,
+            peering_cost,
+            aspect,
+            hops,
+            interface,
+            source_private_key,
+            source_identity,
+            source_node,
+            is_path_response,
+        )
+    }
+
+    #[allow(clippy::too_many_arguments)]
+    fn accept_announce_with_metadata_inner(
+        &self,
+        peer: String,
+        timestamp: i64,
+        name: Option<String>,
+        name_source: Option<String>,
+        app_data_hex: Option<String>,
+        capabilities: Option<Vec<String>>,
+        rssi: Option<f64>,
+        snr: Option<f64>,
+        q: Option<f64>,
+        stamp_cost: Option<u32>,
+        stamp_cost_flexibility: Option<Option<u32>>,
+        peering_cost: Option<Option<u32>>,
+        aspect: Option<String>,
+        hops: Option<u32>,
+        interface: Option<String>,
+        source_private_key: Option<String>,
+        source_identity: Option<String>,
+        source_node: Option<String>,
+        is_path_response: bool,
+    ) -> Result<(), std::io::Error> {
         let stamp_cost_flexibility = stamp_cost_flexibility.flatten();
         let peering_cost = peering_cost.flatten();
         let (propagation_transfer_limit, propagation_sync_limit) =
@@ -809,8 +901,17 @@ impl RpcDaemon {
                 peering_timebase.unwrap_or(timestamp),
             )?;
         }
-        let should_peer = is_static
-            || (propagation_enabled != Some(false)
+        let static_peer_last_seen = self
+            .peers
+            .lock()
+            .expect("peers mutex poisoned")
+            .get(peer.as_str())
+            .map(|record| record.last_seen)
+            .unwrap_or_default();
+        let static_path_response_refresh_allowed = !is_path_response || static_peer_last_seen == 0;
+        let should_peer = (is_static && static_path_response_refresh_allowed)
+            || (!is_static
+                && propagation_enabled != Some(false)
                 && remote_peering_cost_allowed
                 && self.should_autopeer_peer(hops));
         let peer_type = if is_static {

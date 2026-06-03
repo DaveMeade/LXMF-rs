@@ -173,7 +173,7 @@ impl RpcDaemon {
                 } else {
                     (parsed.name, parsed.name_source)
                 };
-                self.accept_announce_with_metadata(
+                self.accept_announce_with_metadata_for_path_response(
                     parsed.peer,
                     timestamp,
                     name,
@@ -192,6 +192,7 @@ impl RpcDaemon {
                     None,
                     None,
                     None,
+                    parsed.is_path_response,
                 )?;
                 let record =
                     self.peers.lock().expect("peers mutex poisoned").get(peer.as_str()).cloned();
