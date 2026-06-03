@@ -406,6 +406,119 @@ fn propagation_enable_unpeers_removed_static_peers_when_static_only() {
 }
 
 #[test]
+fn propagation_enable_static_only_unpeers_existing_non_static_peers() {
+    let daemon = RpcDaemon::test_instance();
+    daemon
+        .handle_rpc(rpc_request(
+            42,
+            "propagation_enable",
+            json!({
+                "enabled": true,
+                "autopeer": true,
+                "autopeer_maxdepth": 2,
+            }),
+        ))
+        .expect("enable autopeering");
+
+    let entry = PropagationEntryRecord {
+        transient_id: "b0".repeat(32),
+        destination: "13".repeat(16),
+        payload_hex: "13".repeat(24),
+        received_at: 1_700_000_106,
+        size_bytes: 24,
+        stamp_value: None,
+    };
+    daemon.store.upsert_propagation_entry(&entry).expect("store propagation entry");
+    daemon
+        .accept_announce_with_metadata(
+            "peer-auto-static-only".to_string(),
+            1_700_000_107,
+            Some("Auto Peer".to_string()),
+            Some("announce".to_string()),
+            None,
+            Some(vec!["propagation".to_string()]),
+            None,
+            None,
+            None,
+            Some(3),
+            Some(Some(1)),
+            Some(Some(4)),
+            None,
+            Some(1),
+            None,
+            None,
+            None,
+            None,
+        )
+        .expect("accept autopeer announce");
+    daemon
+        .handle_rpc(rpc_request(
+            43,
+            "set_outbound_propagation_node",
+            json!({ "peer": "peer-auto-static-only" }),
+        ))
+        .expect("select autopeer");
+    daemon.event_queue.lock().expect("event_queue mutex poisoned").clear();
+
+    daemon
+        .handle_rpc(rpc_request(
+            44,
+            "propagation_enable",
+            json!({
+                "enabled": true,
+                "from_static_only": true,
+                "static_peers": ["peer-static-allowed"],
+            }),
+        ))
+        .expect("enable static-only policy");
+
+    let peers = daemon
+        .handle_rpc(RpcRequest { id: 45, method: "list_peers".to_string(), params: None })
+        .expect("list peers")
+        .result
+        .expect("list peers result");
+    let rows = peers["peers"].as_array().expect("peer rows");
+    assert!(rows.iter().all(|row| row["peer"].as_str() != Some("peer-auto-static-only")));
+    assert!(rows.iter().any(|row| {
+        row["peer"].as_str() == Some("peer-static-allowed")
+            && row["peer_type"].as_str() == Some("static")
+    }));
+
+    assert!(
+        daemon
+            .store
+            .list_peer_unhandled_propagation("peer-auto-static-only")
+            .expect("autopeer marks after static-only")
+            .is_empty(),
+        "static-only policy should clear non-static peer queue marks"
+    );
+    let event = daemon
+        .event_queue
+        .lock()
+        .expect("event_queue mutex poisoned")
+        .iter()
+        .rev()
+        .find(|event| event.event_type == "peer_unpeer")
+        .cloned()
+        .expect("static-only non-static peer removal event");
+    assert_eq!(event.payload["peer"].as_str(), Some("peer-auto-static-only"));
+    assert_eq!(event.payload["removed"].as_bool(), Some(true));
+    assert_eq!(event.payload["reason"].as_str(), Some("static_only_policy"));
+    assert_eq!(event.payload["propagation_cleared"].as_u64(), Some(1));
+
+    let selected = daemon
+        .handle_rpc(RpcRequest {
+            id: 46,
+            method: "get_outbound_propagation_node".to_string(),
+            params: None,
+        })
+        .expect("get selected propagation node")
+        .result
+        .expect("selected propagation node result");
+    assert_eq!(selected["peer"], JsonValue::Null);
+}
+
+#[test]
 fn propagation_enable_queues_existing_entries_for_static_peers() {
     let daemon = RpcDaemon::test_instance();
     let entry = PropagationEntryRecord {

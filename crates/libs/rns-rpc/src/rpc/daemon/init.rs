@@ -1118,6 +1118,45 @@ impl RpcDaemon {
         Ok(())
     }
 
+    pub(super) fn enforce_static_only_peer_policy(&self) -> Result<(), std::io::Error> {
+        let propagation =
+            self.propagation_state.lock().expect("propagation mutex poisoned").clone();
+        if !propagation.from_static_only {
+            return Ok(());
+        }
+        let peers_to_remove = {
+            let guard = self.peers.lock().expect("peers mutex poisoned");
+            guard
+                .values()
+                .filter(|record| record.peer_type.as_deref() != Some("unpeered"))
+                .filter(|record| {
+                    !propagation
+                        .static_peers
+                        .iter()
+                        .any(|peer| peer.eq_ignore_ascii_case(record.peer.as_str()))
+                })
+                .map(|record| record.peer.clone())
+                .collect::<Vec<_>>()
+        };
+        for peer in peers_to_remove {
+            let cleanup = self.unpeer_local_state(peer.as_str())?;
+            if cleanup.removed {
+                self.publish_event(RpcEvent {
+                    event_type: "peer_unpeer".into(),
+                    payload: json!({
+                        "peer": peer,
+                        "removed": true,
+                        "reason": "static_only_policy",
+                        "propagation_cleared": cleanup.propagation_cleared,
+                        "propagation_cleared_bytes": cleanup.propagation_cleared_bytes,
+                        "messages": cleanup.messages,
+                    }),
+                });
+            }
+        }
+        Ok(())
+    }
+
     pub(super) fn ensure_peer_admission_allowed(
         &self,
         peer: &str,
