@@ -8,6 +8,7 @@ const PR_FAILED: u32 = 0xfe;
 struct RemotePropagationImportSummary {
     imported_count: usize,
     imported_ids: Vec<String>,
+    accepted_ids: Vec<String>,
     transferred_bytes: usize,
 }
 
@@ -145,12 +146,14 @@ impl RpcDaemon {
             return Ok(RemotePropagationImportSummary {
                 imported_count: 0,
                 imported_ids: Vec::new(),
+                accepted_ids: Vec::new(),
                 transferred_bytes: 0,
             });
         };
 
         let mut imported_count = 0usize;
         let mut imported_ids = Vec::new();
+        let mut accepted_ids = Vec::new();
         let mut transferred_bytes = 0usize;
         for message in messages {
             let Some(payload_hex) = message.get("payload_hex").and_then(JsonValue::as_str) else {
@@ -215,6 +218,7 @@ impl RpcDaemon {
                 .lock()
                 .expect("propagation payload mutex poisoned")
                 .insert(transient_id.clone(), record.payload_hex);
+            accepted_ids.push(transient_id.clone());
             if !already_known {
                 imported_count = imported_count.saturating_add(1);
                 imported_ids.push(transient_id);
@@ -223,7 +227,12 @@ impl RpcDaemon {
         if !messages.is_empty() {
             self.note_client_propagation_messages_received(imported_count);
         }
-        Ok(RemotePropagationImportSummary { imported_count, imported_ids, transferred_bytes })
+        Ok(RemotePropagationImportSummary {
+            imported_count,
+            imported_ids,
+            accepted_ids,
+            transferred_bytes,
+        })
     }
 
     fn queue_remote_sync_imports_for_peers(
@@ -1064,7 +1073,7 @@ impl RpcDaemon {
                         }
                         self.queue_remote_sync_imports_for_peers(
                             parsed.peer.as_str(),
-                            imported.imported_ids.as_slice(),
+                            imported.accepted_ids.as_slice(),
                         )?;
                         self.update_propagation_sync_state(|state| {
                             state.sync_state = PR_COMPLETE;

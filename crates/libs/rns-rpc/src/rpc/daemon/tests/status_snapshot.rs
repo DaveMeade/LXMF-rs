@@ -4669,6 +4669,19 @@ fn duplicate_propagation_remote_sync_import_does_not_double_count_received() {
     }
     assert_eq!(second["result"]["imported_count"].as_u64(), Some(0));
     assert_eq!(second["result"]["imported_ids"], json!([]));
+    assert_eq!(
+        second["peer_sync"]["messages"]["handled_ids"]
+            .as_array()
+            .expect("source handled ids"),
+        &[json!(transient_id.as_str())]
+    );
+    assert_eq!(
+        daemon
+            .store
+            .list_peer_handled_propagation_ids("peer-a")
+            .expect("source handled ids"),
+        vec![transient_id]
+    );
 
     let status = daemon
         .handle_rpc(RpcRequest { id: 75, method: "propagation_status".to_string(), params: None })
