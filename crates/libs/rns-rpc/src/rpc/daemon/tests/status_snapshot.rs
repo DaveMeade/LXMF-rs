@@ -867,6 +867,66 @@ fn autopeer_disabled_keeps_announced_peer_unpeered() {
 }
 
 #[test]
+fn announce_received_honors_hops_for_autopeer_maxdepth() {
+    let daemon = RpcDaemon::test_instance();
+    daemon
+        .handle_rpc(rpc_request(
+            42,
+            "propagation_enable",
+            json!({
+                "enabled": true,
+                "autopeer": true,
+                "autopeer_maxdepth": 2,
+            }),
+        ))
+        .expect("enable autopeer");
+
+    let announce = daemon
+        .handle_rpc(rpc_request(
+            43,
+            "announce_received",
+            json!({
+                "peer": "peer-too-deep-rpc",
+                "timestamp": 1_700_000_109i64,
+                "capabilities": ["propagation"],
+                "aspect": "lxmf.propagation",
+                "hops": 3,
+                "interface": "if-auto",
+                "source_private_key": "source-private",
+                "source_identity": "source-identity",
+                "source_node": "source-node",
+            }),
+        ))
+        .expect("announce received")
+        .result
+        .expect("announce result");
+    assert_eq!(announce["peer"], JsonValue::Null);
+
+    let peers = daemon
+        .handle_rpc(RpcRequest { id: 44, method: "list_peers".to_string(), params: None })
+        .expect("list peers")
+        .result
+        .expect("list peers result");
+    assert_eq!(peers["peers"].as_array().map(Vec::len), Some(0));
+
+    let event = daemon
+        .event_queue
+        .lock()
+        .expect("event_queue mutex poisoned")
+        .iter()
+        .rev()
+        .find(|event| event.event_type == "announce_received")
+        .cloned()
+        .expect("announce event");
+    assert_eq!(event.payload["peer"].as_str(), Some("peer-too-deep-rpc"));
+    assert_eq!(event.payload["hops"].as_u64(), Some(3));
+    assert_eq!(event.payload["interface"].as_str(), Some("if-auto"));
+    assert_eq!(event.payload["source_private_key"].as_str(), Some("source-private"));
+    assert_eq!(event.payload["source_identity"].as_str(), Some("source-identity"));
+    assert_eq!(event.payload["source_node"].as_str(), Some("source-node"));
+}
+
+#[test]
 fn propagation_enable_autopeer_false_unpeers_existing_autopeers() {
     let daemon = RpcDaemon::test_instance();
     daemon

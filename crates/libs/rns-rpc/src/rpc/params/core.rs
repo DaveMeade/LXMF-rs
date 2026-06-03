@@ -42,6 +42,16 @@ struct AnnounceReceivedParams {
     #[serde(default)]
     aspect: Option<String>,
     #[serde(default)]
+    hops: Option<u32>,
+    #[serde(default)]
+    interface: Option<String>,
+    #[serde(default)]
+    source_private_key: Option<String>,
+    #[serde(default)]
+    source_identity: Option<String>,
+    #[serde(default)]
+    source_node: Option<String>,
+    #[serde(default)]
     is_path_response: bool,
 }
 
