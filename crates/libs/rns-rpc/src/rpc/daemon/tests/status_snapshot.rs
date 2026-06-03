@@ -4014,6 +4014,10 @@ struct FailingTransferLimitRemoteControlBridge {
     expected_sync_transfer_limit_kb: Option<f64>,
 }
 
+struct CountingRemoteControlBridge {
+    sync_calls: Arc<std::sync::atomic::AtomicUsize>,
+}
+
 impl RemoteControlBridge for TestRemoteControlBridge {
     fn propagation_remote_status(
         &self,
@@ -4080,6 +4084,74 @@ impl RemoteControlBridge for TestRemoteControlBridge {
         _transfer_limit_kb: Option<f64>,
     ) -> Result<JsonValue, std::io::Error> {
         self.result.clone().map_err(|kind| std::io::Error::new(kind, "remote fetch failed"))
+    }
+}
+
+impl RemoteControlBridge for CountingRemoteControlBridge {
+    fn propagation_remote_status(
+        &self,
+        _remote: &str,
+        _identity_private_key_hex: Option<&str>,
+        _timeout_secs: f64,
+    ) -> Result<JsonValue, std::io::Error> {
+        Ok(json!({"status": "ok"}))
+    }
+
+    fn propagation_remote_sync(
+        &self,
+        remote: &str,
+        peer: &str,
+        _identity_private_key_hex: Option<&str>,
+        _timeout_secs: f64,
+        _transfer_limit_kb: Option<f64>,
+    ) -> Result<JsonValue, std::io::Error> {
+        self.sync_calls.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
+        Ok(json!({
+            "remote": remote,
+            "peer": peer,
+            "synced": true,
+        }))
+    }
+
+    fn propagation_remote_download(
+        &self,
+        remote: &str,
+        _identity_private_key_hex: Option<&str>,
+        _timeout_secs: f64,
+        _transfer_limit_kb: Option<f64>,
+    ) -> Result<JsonValue, std::io::Error> {
+        Ok(json!({
+            "remote": remote,
+            "downloaded_count": 0,
+            "messages": [],
+        }))
+    }
+
+    fn propagation_remote_fetch(
+        &self,
+        remote: &str,
+        _identity_private_key_hex: Option<&str>,
+        _timeout_secs: f64,
+        _transfer_limit_kb: Option<f64>,
+    ) -> Result<JsonValue, std::io::Error> {
+        Ok(json!({
+            "remote": remote,
+            "messages": [],
+        }))
+    }
+
+    fn propagation_remote_unpeer(
+        &self,
+        remote: &str,
+        peer: &str,
+        _identity_private_key_hex: Option<&str>,
+        _timeout_secs: f64,
+    ) -> Result<JsonValue, std::io::Error> {
+        Ok(json!({
+            "remote": remote,
+            "peer": peer,
+            "unpeered": true,
+        }))
     }
 }
 
@@ -4422,6 +4494,69 @@ fn rejected_selected_propagation_node_does_not_update_selection() {
     assert!(
         nodes["nodes"].as_array().expect("propagation nodes").is_empty(),
         "rejected selected node should not be listed"
+    );
+}
+
+#[test]
+fn rejected_propagation_remote_sync_does_not_call_bridge_or_update_lifecycle() {
+    let daemon = RpcDaemon::test_instance();
+    daemon
+        .handle_rpc(rpc_request(
+            80,
+            "propagation_enable",
+            json!({
+                "enabled": true,
+                "max_peers": 1,
+            }),
+        ))
+        .expect("enable propagation");
+    daemon
+        .handle_rpc(rpc_request(81, "peer_sync", json!({ "peer": "peer-capacity-a" })))
+        .expect("fill peer capacity");
+    let sync_calls = Arc::new(std::sync::atomic::AtomicUsize::new(0));
+    daemon.set_remote_control_bridge(Arc::new(CountingRemoteControlBridge {
+        sync_calls: Arc::clone(&sync_calls),
+    }));
+
+    let rejected = daemon
+        .handle_rpc(rpc_request(
+            82,
+            "propagation_remote_sync",
+            json!({
+                "remote": "remote-capacity",
+                "peer": "peer-capacity-b",
+            }),
+        ))
+        .expect_err("remote sync should respect peer admission");
+    assert!(
+        rejected.to_string().contains("max_peers=1"),
+        "unexpected rejection error: {rejected}"
+    );
+    assert_eq!(sync_calls.load(std::sync::atomic::Ordering::SeqCst), 0);
+
+    let status = daemon
+        .handle_rpc(RpcRequest { id: 83, method: "propagation_status".to_string(), params: None })
+        .expect("propagation status")
+        .result
+        .expect("propagation status result");
+    let propagation = &status["propagation"];
+    assert_eq!(propagation["sync_state"].as_u64(), Some(0x00));
+    assert_ne!(propagation["state_name"].as_str(), Some("syncing"));
+    assert_ne!(propagation["state_name"].as_str(), Some("failed"));
+    assert_eq!(propagation["last_sync_started"], JsonValue::Null);
+
+    let peers = daemon
+        .handle_rpc(RpcRequest { id: 84, method: "list_peers".to_string(), params: None })
+        .expect("list peers")
+        .result
+        .expect("list peers result");
+    assert!(
+        peers["peers"]
+            .as_array()
+            .expect("peer rows")
+            .iter()
+            .all(|row| row["peer"].as_str() != Some("peer-capacity-b")),
+        "rejected remote sync peer should not be listed"
     );
 }
 

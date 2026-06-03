@@ -1011,6 +1011,7 @@ impl RpcDaemon {
                     .expect("remote control bridge mutex poisoned")
                     .clone()
                     .ok_or_else(|| std::io::Error::other("remote control bridge unavailable"))?;
+                self.ensure_peer_for_sync(parsed.peer.as_str(), now_i64())?;
                 let timeout_secs = parsed.timeout_secs.unwrap_or(5.0).max(0.1);
                 let peer_transfer_limit_kb = self
                     .peers
@@ -1063,7 +1064,6 @@ impl RpcDaemon {
                                     state.sync_progress = 0.0;
                                     state.last_sync_error = Some(err.to_string());
                                 });
-                                self.ensure_peer_for_sync(parsed.peer.as_str(), now_i64())?;
                                 self.record_outbound_peer_activity(parsed.peer.as_str(), 0, false);
                                 self.publish_failed_remote_peer_sync_event(
                                     parsed.peer.as_str(),
@@ -1097,7 +1097,6 @@ impl RpcDaemon {
                             state.last_sync_completed = Some(now_i64());
                             state.last_sync_error = None;
                         });
-                        self.ensure_peer_for_sync(parsed.peer.as_str(), now_i64())?;
                         self.record_outbound_peer_activity(
                             parsed.peer.as_str(),
                             imported.transferred_bytes,
@@ -1217,7 +1216,6 @@ impl RpcDaemon {
                             state.sync_progress = 0.0;
                             state.last_sync_error = Some(err.to_string());
                         });
-                        self.ensure_peer_for_sync(parsed.peer.as_str(), now_i64())?;
                         self.record_outbound_peer_activity(parsed.peer.as_str(), 0, false);
                         self.publish_failed_remote_peer_sync_event(
                             parsed.peer.as_str(),
