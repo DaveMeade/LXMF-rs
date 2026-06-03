@@ -1062,13 +1062,14 @@ impl RpcDaemon {
                     .expect("remote control bridge mutex poisoned")
                     .clone()
                     .ok_or_else(|| std::io::Error::other("remote control bridge unavailable"))?;
-                self.ensure_peer_for_sync(parsed.peer.as_str(), now_i64())?;
+                let peer_id = parsed.peer.trim().to_string();
+                self.ensure_peer_for_sync(peer_id.as_str(), now_i64())?;
                 let timeout_secs = parsed.timeout_secs.unwrap_or(5.0).max(0.1);
                 let peer_transfer_limit_kb = self
                     .peers
                     .lock()
                     .expect("peers mutex poisoned")
-                    .get(parsed.peer.as_str())
+                    .get(peer_id.as_str())
                     .and_then(|peer| {
                         peer.propagation_transfer_limit.map(|limit| f64::from(limit) / 1000.0)
                     });
@@ -1086,7 +1087,7 @@ impl RpcDaemon {
                     .peers
                     .lock()
                     .expect("peers mutex poisoned")
-                    .get(parsed.peer.as_str())
+                    .get(peer_id.as_str())
                     .and_then(|peer| peer.propagation_sync_limit.map(u64::from))
                     .or(transfer_limit);
                 self.update_propagation_sync_state(|state| {
@@ -1100,7 +1101,7 @@ impl RpcDaemon {
                 let mut peer_sync_result = JsonValue::Null;
                 let result = match bridge.propagation_remote_sync(
                     parsed.remote.as_str(),
-                    parsed.peer.as_str(),
+                    peer_id.as_str(),
                     parsed.identity_private_key_hex.as_deref(),
                     timeout_secs,
                     transfer_limit_kb,
@@ -1115,9 +1116,9 @@ impl RpcDaemon {
                                     state.sync_progress = 0.0;
                                     state.last_sync_error = Some(err.to_string());
                                 });
-                                self.record_outbound_peer_activity(parsed.peer.as_str(), 0, false);
+                                self.record_outbound_peer_activity(peer_id.as_str(), 0, false);
                                 self.publish_failed_remote_peer_sync_event(
-                                    parsed.peer.as_str(),
+                                    peer_id.as_str(),
                                     parsed.remote.as_str(),
                                     err.to_string().as_str(),
                                     transfer_limit,
@@ -1138,7 +1139,7 @@ impl RpcDaemon {
                             );
                         }
                         self.queue_remote_sync_imports_for_peers(
-                            parsed.peer.as_str(),
+                            peer_id.as_str(),
                             imported.accepted_ids.as_slice(),
                         )?;
                         self.update_propagation_sync_state(|state| {
@@ -1149,12 +1150,12 @@ impl RpcDaemon {
                             state.last_sync_error = None;
                         });
                         self.record_outbound_peer_activity(
-                            parsed.peer.as_str(),
+                            peer_id.as_str(),
                             imported.transferred_bytes,
                             true,
                         );
                         if let Ok(mut peers) = self.peers.lock() {
-                            if let Some(peer) = peers.get_mut(parsed.peer.as_str()) {
+                            if let Some(peer) = peers.get_mut(peer_id.as_str()) {
                                 peer.sync_transfer_rate = imported.transferred_bytes as f64;
                             }
                         }
@@ -1162,7 +1163,7 @@ impl RpcDaemon {
                             .peers
                             .lock()
                             .expect("peers mutex poisoned")
-                            .get(parsed.peer.as_str())
+                            .get(peer_id.as_str())
                             .cloned();
                         if let Some(peer) = peer {
                             let (
@@ -1277,9 +1278,9 @@ impl RpcDaemon {
                             state.sync_progress = 0.0;
                             state.last_sync_error = Some(err.to_string());
                         });
-                        self.record_outbound_peer_activity(parsed.peer.as_str(), 0, false);
+                        self.record_outbound_peer_activity(peer_id.as_str(), 0, false);
                         self.publish_failed_remote_peer_sync_event(
-                            parsed.peer.as_str(),
+                            peer_id.as_str(),
                             parsed.remote.as_str(),
                             err.to_string().as_str(),
                             transfer_limit,
@@ -1294,7 +1295,7 @@ impl RpcDaemon {
                     id: request.id,
                     result: Some(json!({
                         "remote": parsed.remote,
-                        "peer": parsed.peer,
+                        "peer": peer_id,
                         "propagation": propagation,
                         "peer_sync": peer_sync_result,
                         "result": result,

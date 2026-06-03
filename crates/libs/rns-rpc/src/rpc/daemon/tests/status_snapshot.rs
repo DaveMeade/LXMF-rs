@@ -6025,6 +6025,42 @@ fn propagation_remote_sync_rejects_blank_peer_before_bridge_call() {
 }
 
 #[test]
+fn propagation_remote_sync_trims_peer_before_bridge_and_response() {
+    let daemon = RpcDaemon::test_instance();
+    daemon.set_remote_control_bridge(Arc::new(TestRemoteControlBridge {
+        result: Ok(json!({"synced": true})),
+    }));
+
+    let result = daemon
+        .handle_rpc(rpc_request(
+            87,
+            "propagation_remote_sync",
+            json!({
+                "remote": "remote-trim-peer",
+                "peer": "  peer-trimmed  ",
+            }),
+        ))
+        .expect("remote sync with padded peer")
+        .result
+        .expect("remote sync result");
+
+    assert_eq!(result["peer"].as_str(), Some("peer-trimmed"));
+    assert_eq!(result["result"]["peer"].as_str(), Some("peer-trimmed"));
+    assert_eq!(result["peer_sync"]["peer"].as_str(), Some("peer-trimmed"));
+
+    let peers = daemon
+        .handle_rpc(RpcRequest { id: 88, method: "list_peers".to_string(), params: None })
+        .expect("list peers")
+        .result
+        .expect("list peers result");
+    let rows = peers["peers"].as_array().expect("peer rows");
+    assert!(rows.iter().any(|row| row["peer"].as_str() == Some("peer-trimmed")));
+    assert!(rows
+        .iter()
+        .all(|row| row["peer"].as_str() != Some("  peer-trimmed  ")));
+}
+
+#[test]
 fn propagation_remote_unpeer_rejects_blank_peer_before_bridge_call() {
     let daemon = RpcDaemon::test_instance();
     let sync_calls = Arc::new(std::sync::atomic::AtomicUsize::new(0));
