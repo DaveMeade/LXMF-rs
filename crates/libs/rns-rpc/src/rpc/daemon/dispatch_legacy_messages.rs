@@ -687,12 +687,20 @@ impl RpcDaemon {
                         .unwrap_or(std::cmp::Ordering::Equal)
                         .then_with(|| left.transient_id.cmp(&right.transient_id))
                 });
+                let wanted_ids = parsed.wanted_ids.as_ref().map(|ids| {
+                    ids.iter()
+                        .map(|id| id.trim().to_string())
+                        .collect::<std::collections::HashSet<_>>()
+                });
                 let mut cumulative_size = 24usize;
                 let mut propagation_handled = 0usize;
+                let mut propagation_transferred = 0usize;
                 let mut propagation_skipped = 0usize;
                 let mut propagation_bytes = 0u64;
+                let mut propagation_offered_bytes = 0u64;
                 let mut propagation_remaining_bytes = 0u64;
                 let mut propagation_handled_ids = Vec::new();
+                let mut propagation_transferred_ids = Vec::new();
                 let mut propagation_skipped_ids = Vec::new();
                 let mut propagation_transfer_limited = 0usize;
                 let mut propagation_transfer_limited_bytes = 0u64;
@@ -721,35 +729,49 @@ impl RpcDaemon {
                         propagation_skipped_ids.push(entry.transient_id);
                         continue;
                     }
-                    let propagation_message = json!({
-                        "transient_id": entry.transient_id,
-                        "destination": entry.destination,
-                        "payload_hex": entry.payload_hex,
-                        "received_at": entry.received_at,
-                        "size_bytes": entry.size_bytes,
-                        "stamp_value": entry.stamp_value,
-                    });
-                    let transient_id = entry.transient_id;
-                    self.store
-                        .mark_peer_transferred_propagation(peer_id, transient_id.as_str())
-                        .map_err(std::io::Error::other)?;
+                    let transient_id = entry.transient_id.clone();
                     cumulative_size = next_size;
                     propagation_handled = propagation_handled.saturating_add(1);
-                    propagation_bytes = propagation_bytes.saturating_add(entry.size_bytes);
+                    propagation_offered_bytes =
+                        propagation_offered_bytes.saturating_add(entry.size_bytes);
+                    let wanted =
+                        wanted_ids.as_ref().is_none_or(|ids| ids.contains(transient_id.as_str()));
+                    if wanted {
+                        let propagation_message = json!({
+                            "transient_id": entry.transient_id,
+                            "destination": entry.destination,
+                            "payload_hex": entry.payload_hex,
+                            "received_at": entry.received_at,
+                            "size_bytes": entry.size_bytes,
+                            "stamp_value": entry.stamp_value,
+                        });
+                        self.store
+                            .mark_peer_transferred_propagation(peer_id, transient_id.as_str())
+                            .map_err(std::io::Error::other)?;
+                        propagation_transferred = propagation_transferred.saturating_add(1);
+                        propagation_bytes = propagation_bytes.saturating_add(entry.size_bytes);
+                        propagation_transferred_ids.push(transient_id.clone());
+                        propagation_messages.push(propagation_message);
+                    } else {
+                        self.store
+                            .mark_peer_handled_propagation(peer_id, transient_id.as_str())
+                            .map_err(std::io::Error::other)?;
+                    }
                     propagation_handled_ids.push(transient_id);
-                    propagation_messages.push(propagation_message);
                 }
                 let mut propagation_sync = json!({
                     "synced": true,
                     "postponed": false,
                     "handled": propagation_handled,
+                    "transferred": propagation_transferred,
                     "skipped": propagation_skipped,
                     "offered": propagation_handled,
                     "bytes": propagation_bytes,
-                    "offered_bytes": propagation_bytes,
+                    "offered_bytes": propagation_offered_bytes,
                     "remaining": propagation_skipped,
                     "remaining_bytes": propagation_remaining_bytes,
                     "handled_ids": propagation_handled_ids,
+                    "transferred_ids": propagation_transferred_ids,
                     "skipped_ids": propagation_skipped_ids,
                     "transfer_limited": propagation_transfer_limited,
                     "transfer_limited_bytes": propagation_transfer_limited_bytes,
@@ -779,7 +801,7 @@ impl RpcDaemon {
                         existing.tx_bytes = existing.tx_bytes.saturating_add(propagation_bytes);
                         existing.sync_transfer_rate = propagation_bytes as f64;
                         if propagation_offered > 0 {
-                            existing.acceptance_rate = (propagation_handled as f64
+                            existing.acceptance_rate = (propagation_transferred as f64
                                 / propagation_offered as f64)
                                 .clamp(0.0, 1.0);
                         }

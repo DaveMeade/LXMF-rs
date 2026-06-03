@@ -128,7 +128,10 @@ All methods below are required for full CLI feature coverage.
 ### Peers and interfaces
 - `list_peers` (no params)
 - `peer_sync`
-: Params keys: `peer`
+: Params keys: `peer` (optional: `transfer_limit_kb`, `wanted_ids`). When
+  `wanted_ids` is supplied, offered IDs outside that list are treated like a
+  Python LXMF peer response indicating the peer already has those messages:
+  they become handled but are not transferred.
 - `peer_unpeer`
 : Params keys: `peer`
 - `clear_peers` (no params)

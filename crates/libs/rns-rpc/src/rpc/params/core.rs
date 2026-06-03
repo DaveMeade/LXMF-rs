@@ -70,6 +70,8 @@ struct PeerOpParams {
     peer: String,
     #[serde(default)]
     transfer_limit_kb: Option<f64>,
+    #[serde(default)]
+    wanted_ids: Option<Vec<String>>,
 }
 
 #[derive(Debug, Deserialize)]

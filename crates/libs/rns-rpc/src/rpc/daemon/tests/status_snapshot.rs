@@ -3429,6 +3429,78 @@ fn peer_sync_queues_existing_entries_for_new_manual_peer() {
 }
 
 #[test]
+fn peer_sync_offer_response_only_transfers_wanted_messages_like_python() {
+    let daemon = RpcDaemon::test_instance();
+    let wanted = PropagationEntryRecord {
+        transient_id: "ad".repeat(32),
+        destination: "12".repeat(16),
+        payload_hex: "12".repeat(24),
+        received_at: 1_700_000_607,
+        size_bytes: 24,
+        stamp_value: None,
+    };
+    let already_known = PropagationEntryRecord {
+        transient_id: "ae".repeat(32),
+        destination: "12".repeat(16),
+        payload_hex: "13".repeat(30),
+        received_at: 1_700_000_608,
+        size_bytes: 30,
+        stamp_value: None,
+    };
+    for entry in [&wanted, &already_known] {
+        daemon.store.upsert_propagation_entry(entry).expect("store propagation entry");
+        daemon
+            .store
+            .mark_peer_unhandled_propagation("peer-offer-response", entry.transient_id.as_str())
+            .expect("mark unhandled");
+    }
+
+    let result = daemon
+        .handle_rpc(rpc_request(
+            55,
+            "peer_sync",
+            json!({
+                "peer": "peer-offer-response",
+                "wanted_ids": [wanted.transient_id.as_str()],
+            }),
+        ))
+        .expect("peer sync")
+        .result
+        .expect("peer sync result");
+
+    assert_eq!(result["propagation"]["offered"].as_u64(), Some(2));
+    assert_eq!(result["propagation"]["handled"].as_u64(), Some(2));
+    assert_eq!(result["propagation"]["transferred"].as_u64(), Some(1));
+    assert_eq!(result["messages"]["offered"].as_u64(), Some(2));
+    assert_eq!(result["messages"]["outgoing"].as_u64(), Some(1));
+    assert_eq!(result["messages"]["unhandled"].as_u64(), Some(0));
+    assert_eq!(result["acceptance_rate"].as_f64(), Some(0.5));
+    assert_eq!(
+        result["propagation"]["messages"].as_array().expect("transferred messages").len(),
+        1
+    );
+    assert_eq!(
+        result["propagation"]["messages"][0]["transient_id"].as_str(),
+        Some(wanted.transient_id.as_str())
+    );
+
+    assert_eq!(
+        daemon
+            .store
+            .list_peer_handled_propagation_ids("peer-offer-response")
+            .expect("handled ids"),
+        vec![wanted.transient_id, already_known.transient_id]
+    );
+    assert!(
+        daemon
+            .store
+            .list_peer_unhandled_propagation("peer-offer-response")
+            .expect("pending propagation")
+            .is_empty()
+    );
+}
+
+#[test]
 fn peer_sync_drops_stale_unhandled_propagation_marks() {
     let daemon = RpcDaemon::test_instance();
     daemon
