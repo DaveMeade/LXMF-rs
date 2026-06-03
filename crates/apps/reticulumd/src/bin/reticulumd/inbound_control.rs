@@ -629,6 +629,52 @@ mod tests {
     }
 
     #[test]
+    fn python_status_reports_peer_message_counters_at_top_level() {
+        let peer = "peer-top-level-status-counters".to_string();
+        let daemon = RpcDaemon::test_instance();
+        daemon
+            .handle_rpc(RpcRequest {
+                id: 1,
+                method: "peer_sync".to_string(),
+                params: Some(json!({ "peer": peer })),
+            })
+            .expect("peer sync");
+        let payload_id = "8c".repeat(32);
+        daemon
+            .ingest_propagation_payload_bytes_with_aliases(
+                b"top-level status counter payload",
+                payload_id.as_str(),
+                &[],
+            )
+            .expect("store propagation payload");
+        daemon.record_propagation_offer_peer(peer.as_str()).expect("record offered peer");
+
+        let status = status::compose_python_status(
+            &daemon,
+            &PropagationControlContext {
+                enabled: true,
+                local_identity_hash: [0u8; 16],
+                propagation_destination_hash_hex: Some("propagation".to_string()),
+                control_destination_hash_hex: Some("control".to_string()),
+                delivery_destination: None,
+                allowed_control_identities: Vec::new(),
+            },
+        );
+
+        let peer_status = &status["peers"][peer.as_str()];
+        assert_eq!(peer_status["messages"]["offered"].as_u64(), Some(1));
+        assert_eq!(peer_status["messages"]["unhandled"].as_u64(), Some(1));
+        assert_eq!(peer_status["messages"]["offered_bytes"].as_u64(), Some(32));
+        assert_eq!(peer_status["messages"]["unhandled_bytes"].as_u64(), Some(32));
+        assert_eq!(peer_status["offered"].as_u64(), Some(1));
+        assert_eq!(peer_status["outgoing"].as_u64(), Some(0));
+        assert_eq!(peer_status["incoming"].as_u64(), Some(0));
+        assert_eq!(peer_status["unhandled"].as_u64(), Some(1));
+        assert_eq!(peer_status["offered_bytes"].as_u64(), Some(32));
+        assert_eq!(peer_status["unhandled_bytes"].as_u64(), Some(32));
+    }
+
+    #[test]
     fn python_status_preserves_unknown_peer_propagation_policy_as_null() {
         let peer = "peer-unknown-policy".to_string();
         let daemon = RpcDaemon::test_instance();

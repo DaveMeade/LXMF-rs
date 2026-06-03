@@ -92,6 +92,12 @@ pub(super) fn compose_python_status(
                             "rx_bytes": row.get("rx_bytes").and_then(Value::as_u64).unwrap_or(0),
                             "tx_bytes": row.get("tx_bytes").and_then(Value::as_u64).unwrap_or(0),
                             "acceptance_rate": row.get("acceptance_rate").and_then(Value::as_f64).unwrap_or(0.0),
+                            "offered": offered,
+                            "outgoing": outgoing,
+                            "incoming": incoming,
+                            "unhandled": unhandled,
+                            "offered_bytes": offered_bytes,
+                            "unhandled_bytes": unhandled_bytes,
                             "handled_ids": handled_ids.clone(),
                             "unhandled_ids": unhandled_ids.clone(),
                             "messages": {
