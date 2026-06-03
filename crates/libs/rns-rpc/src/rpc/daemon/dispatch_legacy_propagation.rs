@@ -980,6 +980,7 @@ impl RpcDaemon {
                                     state.sync_progress = 0.0;
                                     state.last_sync_error = Some(err.to_string());
                                 });
+                                self.ensure_peer_for_sync(parsed.peer.as_str(), now_i64())?;
                                 self.record_outbound_peer_activity(parsed.peer.as_str(), 0, false);
                                 self.publish_failed_remote_peer_sync_event(
                                     parsed.peer.as_str(),
@@ -1125,6 +1126,7 @@ impl RpcDaemon {
                             state.sync_progress = 0.0;
                             state.last_sync_error = Some(err.to_string());
                         });
+                        self.ensure_peer_for_sync(parsed.peer.as_str(), now_i64())?;
                         self.record_outbound_peer_activity(parsed.peer.as_str(), 0, false);
                         self.publish_failed_remote_peer_sync_event(
                             parsed.peer.as_str(),

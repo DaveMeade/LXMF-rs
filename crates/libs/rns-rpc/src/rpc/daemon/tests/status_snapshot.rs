@@ -4543,6 +4543,40 @@ fn failed_propagation_remote_sync_updates_lifecycle_error() {
     assert!(propagation["last_sync_started"].as_i64().is_some());
     assert!(propagation["last_sync_completed"].is_null());
     assert_eq!(propagation["last_sync_error"].as_str(), Some("remote sync failed"));
+
+    let peers = daemon
+        .handle_rpc(RpcRequest { id: 76, method: "list_peers".to_string(), params: None })
+        .expect("list peers")
+        .result
+        .expect("list peers result");
+    let row = peers["peers"]
+        .as_array()
+        .expect("peer rows")
+        .iter()
+        .find(|row| row["peer"].as_str() == Some("peer-a"))
+        .expect("peer row");
+    assert_eq!(row["peer_type"].as_str(), Some("manual"));
+    assert_eq!(row["alive"].as_bool(), Some(false));
+    assert_eq!(row["sync_backoff"].as_u64(), Some(12 * 60));
+    let last_sync_attempt = row["last_sync_attempt"].as_i64().expect("last sync attempt");
+    assert!(last_sync_attempt > 0);
+    assert_eq!(row["next_sync_attempt"].as_i64(), Some(last_sync_attempt + 12 * 60));
+
+    let event = daemon
+        .event_queue
+        .lock()
+        .expect("event_queue mutex poisoned")
+        .iter()
+        .rev()
+        .find(|event| event.event_type == "peer_sync")
+        .cloned()
+        .expect("failed remote peer sync event");
+    assert_eq!(event.payload["peer"].as_str(), Some("peer-a"));
+    assert_eq!(event.payload["remote"].as_str(), Some("remote-node"));
+    assert_eq!(event.payload["remote_sync"].as_bool(), Some(true));
+    assert_eq!(event.payload["synced"].as_bool(), Some(false));
+    assert_eq!(event.payload["alive"].as_bool(), Some(false));
+    assert_eq!(event.payload["sync_backoff"].as_u64(), Some(12 * 60));
 }
 
 #[test]
