@@ -613,6 +613,11 @@ impl RpcDaemon {
         purged
     }
 
+    pub fn record_propagation_offer_peer(&self, peer: &str) -> Result<(), std::io::Error> {
+        let record = self.ensure_peer_for_sync(peer, now_i64())?;
+        self.queue_existing_propagation_for_peer(record.peer.as_str())
+    }
+
     pub(super) fn handle_rpc_legacy_propagation(
         &self,
         request: RpcRequest,

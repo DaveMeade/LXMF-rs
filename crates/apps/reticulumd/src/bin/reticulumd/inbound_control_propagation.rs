@@ -105,6 +105,7 @@ pub(super) fn handle_offer_request(
     if validate_peering_key(peering_id.as_slice(), peering_key, peering_cost).is_none() {
         return ControlResponse::Code(error_invalid_key);
     }
+    let _ = daemon.record_propagation_offer_peer(hex::encode(remote_propagation_hash).as_str());
 
     let mut wanted = Vec::new();
     for transient_id in transient_ids {
@@ -261,6 +262,78 @@ mod tests {
             panic!("expected partial wanted-id list");
         };
         assert_eq!(wanted, vec![rmpv::Value::Binary(missing.to_vec())]);
+    }
+
+    #[test]
+    fn offer_request_records_authenticated_peer_for_status_and_queueing() {
+        let daemon = RpcDaemon::test_instance();
+        daemon
+            .handle_rpc(RpcRequest {
+                id: 10,
+                method: "propagation_enable".to_string(),
+                params: Some(json!({
+                    "enabled": true,
+                    "peering_cost": 1,
+                })),
+            })
+            .expect("enable propagation");
+        let existing_payload = b"queued propagation payload";
+        let existing_transient_id = hex::encode(sha2::Sha256::digest(existing_payload));
+        daemon
+            .ingest_propagation_payload_bytes_with_aliases(
+                existing_payload,
+                existing_transient_id.as_str(),
+                &[],
+            )
+            .expect("store existing payload");
+        let local_identity_hash = [0x11; 16];
+        let remote_private =
+            rns_transport::identity::PrivateIdentity::new_from_rand(rand_core::OsRng);
+        let remote_identity = *remote_private.as_identity();
+        let remote_propagation_hash =
+            hex::encode(propagation_destination_hash_for_identity(&remote_identity));
+        let mut peering_id = Vec::with_capacity(32);
+        peering_id.extend_from_slice(local_identity_hash.as_slice());
+        peering_id.extend_from_slice(remote_identity.address_hash.as_slice());
+        let peering_key = generate_peering_key(peering_id.as_slice(), 1).expect("peering key");
+        let control = PropagationControlContext {
+            enabled: true,
+            local_identity_hash,
+            propagation_destination_hash_hex: Some("propagation".to_string()),
+            control_destination_hash_hex: Some("control".to_string()),
+            delivery_destination: None,
+            allowed_control_identities: Vec::new(),
+        };
+
+        let response = handle_offer_request(
+            &daemon,
+            &control,
+            &remote_identity,
+            Some(rmpv::Value::Array(vec![
+                rmpv::Value::Binary(peering_key),
+                rmpv::Value::Array(Vec::new()),
+            ])),
+            0xF1,
+            0xF3,
+            0xF4,
+        );
+
+        assert!(matches!(response, ControlResponse::Bool(false)));
+        let peers = daemon
+            .handle_rpc(RpcRequest { id: 11, method: "list_peers".to_string(), params: None })
+            .expect("list peers")
+            .result
+            .expect("list peers result");
+        let row = peers["peers"]
+            .as_array()
+            .expect("peer rows")
+            .iter()
+            .find(|row| row["peer"].as_str() == Some(remote_propagation_hash.as_str()))
+            .expect("authenticated offer peer row");
+        assert_eq!(row["peer_type"].as_str(), Some("manual"));
+        assert_eq!(row["type"].as_str(), Some("discovered"));
+        assert_eq!(row["messages"]["unhandled"].as_u64(), Some(1));
+        assert_eq!(row["messages"]["unhandled_ids"], json!([existing_transient_id]));
     }
 
     #[test]
