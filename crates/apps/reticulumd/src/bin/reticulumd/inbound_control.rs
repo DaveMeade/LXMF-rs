@@ -710,6 +710,47 @@ mod tests {
     }
 
     #[test]
+    fn python_status_reports_propagation_node_runtime_state() {
+        let daemon = RpcDaemon::test_instance();
+        daemon
+            .handle_rpc(RpcRequest {
+                id: 1,
+                method: "propagation_enable".to_string(),
+                params: Some(json!({
+                    "enabled": true,
+                    "static_peers": ["peer-selected-node"],
+                })),
+            })
+            .expect("enable propagation");
+        daemon
+            .handle_rpc(RpcRequest {
+                id: 2,
+                method: "set_outbound_propagation_node".to_string(),
+                params: Some(json!({ "peer": "peer-selected-node" })),
+            })
+            .expect("set selected node");
+
+        let status = status::compose_python_status(
+            &daemon,
+            &PropagationControlContext {
+                enabled: true,
+                local_identity_hash: [0u8; 16],
+                propagation_destination_hash_hex: Some("propagation".to_string()),
+                control_destination_hash_hex: Some("control".to_string()),
+                delivery_destination: None,
+                allowed_control_identities: Vec::new(),
+            },
+        );
+
+        assert_eq!(status["selected_node"].as_str(), Some("peer-selected-node"));
+        assert_eq!(status["sync_state"].as_u64(), Some(0));
+        assert_eq!(status["sync_progress"].as_f64(), Some(0.0));
+        assert_eq!(status["last_sync_started"], Value::Null);
+        assert_eq!(status["last_sync_completed"], Value::Null);
+        assert_eq!(status["last_sync_error"], Value::Null);
+    }
+
+    #[test]
     fn python_status_preserves_unknown_peer_propagation_policy_as_null() {
         let peer = "peer-unknown-policy".to_string();
         let daemon = RpcDaemon::test_instance();

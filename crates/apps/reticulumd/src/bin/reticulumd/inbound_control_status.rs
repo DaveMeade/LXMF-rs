@@ -142,6 +142,13 @@ pub(super) fn compose_python_status(
         "max_peering_cost": propagation.get("remote_peering_cost_max").and_then(Value::as_u64).unwrap_or(26),
         "autopeer_maxdepth": propagation.get("autopeer_maxdepth").and_then(Value::as_u64).unwrap_or(6),
         "from_static_only": propagation.get("from_static_only").and_then(Value::as_bool).unwrap_or(false),
+        "selected_node": propagation.get("selected_node").cloned().unwrap_or(Value::Null),
+        "sync_state": propagation.get("sync_state").and_then(Value::as_u64).unwrap_or(0),
+        "state_name": propagation.get("state_name").cloned().unwrap_or(Value::Null),
+        "sync_progress": propagation.get("sync_progress").and_then(Value::as_f64).unwrap_or(0.0),
+        "last_sync_started": propagation.get("last_sync_started").cloned().unwrap_or(Value::Null),
+        "last_sync_completed": propagation.get("last_sync_completed").cloned().unwrap_or(Value::Null),
+        "last_sync_error": propagation.get("last_sync_error").cloned().unwrap_or(Value::Null),
         "messagestore": {
             "count": message_count,
             "bytes": message_bytes,
