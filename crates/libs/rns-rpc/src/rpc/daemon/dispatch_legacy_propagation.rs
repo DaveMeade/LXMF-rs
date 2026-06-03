@@ -969,6 +969,8 @@ impl RpcDaemon {
                     (None, Some(request_limit)) => Some(request_limit),
                     (None, None) => None,
                 };
+                let transfer_limit =
+                    transfer_limit_kb.map(|limit| (limit.max(0.0) * 1000.0) as u64);
                 self.update_propagation_sync_state(|state| {
                     state.sync_state = PR_REQUEST_SENT;
                     state.state_name = "syncing".to_string();
@@ -1081,6 +1083,8 @@ impl RpcDaemon {
                                 "imported_ids": imported.imported_ids,
                                 "transferred_bytes": imported.transferred_bytes,
                                 "peering_key": peering_key,
+                                "transfer_limit": transfer_limit,
+                                "sync_limit": peer.propagation_sync_limit,
                             });
                             let peer_status_type = if self.is_static_peer(peer.peer.as_str()) {
                                 "static"
@@ -1119,7 +1123,7 @@ impl RpcDaemon {
                                 "propagation_stamp_cost": peer.propagation_stamp_cost,
                                 "propagation_stamp_cost_flexibility": peer.propagation_stamp_cost_flexibility,
                                 "peering_key": peering_key,
-                                "transfer_limit": peer.propagation_transfer_limit,
+                                "transfer_limit": transfer_limit,
                                 "sync_limit": peer.propagation_sync_limit,
                                 "target_stamp_cost": peer.propagation_stamp_cost,
                                 "stamp_cost_flexibility": peer.propagation_stamp_cost_flexibility,

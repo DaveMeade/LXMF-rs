@@ -3863,6 +3863,11 @@ struct TestRemoteControlBridge {
     result: Result<JsonValue, std::io::ErrorKind>,
 }
 
+struct TransferLimitResultRemoteControlBridge {
+    result: JsonValue,
+    expected_sync_transfer_limit_kb: Option<f64>,
+}
+
 impl RemoteControlBridge for TestRemoteControlBridge {
     fn propagation_remote_status(
         &self,
@@ -3929,6 +3934,70 @@ impl RemoteControlBridge for TestRemoteControlBridge {
         _transfer_limit_kb: Option<f64>,
     ) -> Result<JsonValue, std::io::Error> {
         self.result.clone().map_err(|kind| std::io::Error::new(kind, "remote fetch failed"))
+    }
+}
+
+impl RemoteControlBridge for TransferLimitResultRemoteControlBridge {
+    fn propagation_remote_status(
+        &self,
+        _remote: &str,
+        _identity_private_key_hex: Option<&str>,
+        _timeout_secs: f64,
+    ) -> Result<JsonValue, std::io::Error> {
+        Ok(json!({"status": "ok"}))
+    }
+
+    fn propagation_remote_sync(
+        &self,
+        remote: &str,
+        peer: &str,
+        _identity_private_key_hex: Option<&str>,
+        _timeout_secs: f64,
+        transfer_limit_kb: Option<f64>,
+    ) -> Result<JsonValue, std::io::Error> {
+        assert_eq!(transfer_limit_kb, self.expected_sync_transfer_limit_kb);
+        let mut result = self.result.clone();
+        result["remote"] = json!(remote);
+        result["peer"] = json!(peer);
+        Ok(result)
+    }
+
+    fn propagation_remote_download(
+        &self,
+        remote: &str,
+        _identity_private_key_hex: Option<&str>,
+        _timeout_secs: f64,
+        _transfer_limit_kb: Option<f64>,
+    ) -> Result<JsonValue, std::io::Error> {
+        let mut result = self.result.clone();
+        result["remote"] = json!(remote);
+        Ok(result)
+    }
+
+    fn propagation_remote_fetch(
+        &self,
+        remote: &str,
+        _identity_private_key_hex: Option<&str>,
+        _timeout_secs: f64,
+        _transfer_limit_kb: Option<f64>,
+    ) -> Result<JsonValue, std::io::Error> {
+        let mut result = self.result.clone();
+        result["remote"] = json!(remote);
+        Ok(result)
+    }
+
+    fn propagation_remote_unpeer(
+        &self,
+        remote: &str,
+        peer: &str,
+        _identity_private_key_hex: Option<&str>,
+        _timeout_secs: f64,
+    ) -> Result<JsonValue, std::io::Error> {
+        let mut result = self.result.clone();
+        result["remote"] = json!(remote);
+        result["peer"] = json!(peer);
+        result["unpeered"] = json!(true);
+        Ok(result)
     }
 }
 
@@ -4099,14 +4168,15 @@ fn propagation_remote_sync_updates_peer_runtime_state() {
     let peer_id = hex::encode([3u8; 16]);
     let daemon =
         RpcDaemon::with_store(MessagesStore::in_memory().expect("store"), hex::encode([2u8; 16]));
-    daemon.set_remote_control_bridge(Arc::new(TestRemoteControlBridge {
-        result: Ok(json!({
+    daemon.set_remote_control_bridge(Arc::new(TransferLimitResultRemoteControlBridge {
+        expected_sync_transfer_limit_kb: Some(42.5),
+        result: json!({
             "synced": true,
             "messages": [{
                 "transient_id": transient_id,
                 "payload_hex": payload_hex,
             }],
-        })),
+        }),
     }));
     daemon
         .handle_rpc(rpc_request(73, "peer_sync", json!({ "peer": peer_id })))
@@ -4121,6 +4191,7 @@ fn propagation_remote_sync_updates_peer_runtime_state() {
         peer.sync_backoff = 12 * 60;
         peer.next_sync_attempt = 1_700_010_000;
         peer.acceptance_rate = 0.25;
+        peer.propagation_transfer_limit = Some(100_000);
         peer.propagation_sync_limit = Some(84_000);
         peer.propagation_stamp_cost = Some(8);
         peer.propagation_stamp_cost_flexibility = Some(2);
@@ -4134,6 +4205,7 @@ fn propagation_remote_sync_updates_peer_runtime_state() {
             json!({
                 "remote": "remote-node",
                 "peer": peer_id,
+                "transfer_limit_kb": 42.5,
             }),
         ))
         .expect("remote sync")
@@ -4156,6 +4228,12 @@ fn propagation_remote_sync_updates_peer_runtime_state() {
         remote_sync["peer_sync"]["propagation"]["peering_key"].as_u64(),
         Some(response_peering_key)
     );
+    assert_eq!(remote_sync["peer_sync"]["propagation_transfer_limit"].as_u64(), Some(100_000));
+    assert_eq!(remote_sync["peer_sync"]["propagation_sync_limit"].as_u64(), Some(84_000));
+    assert_eq!(remote_sync["peer_sync"]["transfer_limit"].as_u64(), Some(42_500));
+    assert_eq!(remote_sync["peer_sync"]["sync_limit"].as_u64(), Some(84_000));
+    assert_eq!(remote_sync["peer_sync"]["propagation"]["transfer_limit"].as_u64(), Some(42_500));
+    assert_eq!(remote_sync["peer_sync"]["propagation"]["sync_limit"].as_u64(), Some(84_000));
 
     let peers = daemon
         .handle_rpc(RpcRequest { id: 75, method: "list_peers".to_string(), params: None })
@@ -4198,20 +4276,22 @@ fn propagation_remote_sync_updates_peer_runtime_state() {
     assert_eq!(event.payload["ler"].as_u64(), Some(0));
     assert_eq!(event.payload["network_distance"].as_u64(), Some(1));
     assert_eq!(event.payload["alive"].as_bool(), Some(true));
-    assert!(event.payload["propagation_transfer_limit"].is_null());
+    assert_eq!(event.payload["propagation_transfer_limit"].as_u64(), Some(100_000));
     assert_eq!(event.payload["propagation_sync_limit"].as_u64(), Some(84_000));
     assert_eq!(event.payload["propagation_stamp_cost"].as_u64(), Some(8));
     assert_eq!(
         event.payload["propagation_stamp_cost_flexibility"].as_u64(),
         Some(2)
     );
-    assert!(event.payload["transfer_limit"].is_null());
+    assert_eq!(event.payload["transfer_limit"].as_u64(), Some(42_500));
     assert_eq!(event.payload["sync_limit"].as_u64(), Some(84_000));
     assert_eq!(event.payload["target_stamp_cost"].as_u64(), Some(8));
     assert_eq!(event.payload["stamp_cost_flexibility"].as_u64(), Some(2));
     let peering_key = event.payload["peering_key"].as_u64().expect("peering key");
     assert!(peering_key >= 1);
     assert_eq!(event.payload["propagation"]["peering_key"].as_u64(), Some(peering_key));
+    assert_eq!(event.payload["propagation"]["transfer_limit"].as_u64(), Some(42_500));
+    assert_eq!(event.payload["propagation"]["sync_limit"].as_u64(), Some(84_000));
     assert_eq!(event.payload["sync_backoff"].as_u64(), Some(0));
     assert_eq!(event.payload["next_sync_attempt"].as_i64(), Some(0));
     assert_eq!(event.payload["tx_bytes"].as_u64(), Some(payload.len() as u64));
