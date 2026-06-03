@@ -668,7 +668,7 @@ impl RpcDaemon {
                 });
                 let wanted_ids = parsed.wanted_ids.as_ref().map(|ids| {
                     ids.iter()
-                        .map(|id| id.trim().to_string())
+                        .map(|id| id.trim().to_ascii_lowercase())
                         .collect::<std::collections::HashSet<_>>()
                 });
                 let mut cumulative_size = 24usize;

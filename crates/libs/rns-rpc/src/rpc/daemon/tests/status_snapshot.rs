@@ -3563,6 +3563,47 @@ fn peer_sync_offer_response_only_transfers_wanted_messages_like_python() {
 }
 
 #[test]
+fn peer_sync_matches_wanted_ids_by_canonical_transient_id() {
+    let daemon = RpcDaemon::test_instance();
+    let wanted = PropagationEntryRecord {
+        transient_id: "a1".repeat(32),
+        destination: "12".repeat(16),
+        payload_hex: "12".repeat(24),
+        received_at: 1_700_000_607,
+        size_bytes: 24,
+        stamp_value: None,
+    };
+    daemon.store.upsert_propagation_entry(&wanted).expect("store propagation entry");
+    daemon
+        .store
+        .mark_peer_unhandled_propagation("peer-canonical-wanted", wanted.transient_id.as_str())
+        .expect("mark unhandled");
+
+    let result = daemon
+        .handle_rpc(rpc_request(
+            55,
+            "peer_sync",
+            json!({
+                "peer": "peer-canonical-wanted",
+                "wanted_ids": [format!("  {}  ", wanted.transient_id.to_ascii_uppercase())],
+            }),
+        ))
+        .expect("peer sync")
+        .result
+        .expect("peer sync result");
+
+    assert_eq!(result["propagation"]["offered"].as_u64(), Some(1));
+    assert_eq!(result["propagation"]["transferred"].as_u64(), Some(1));
+    assert_eq!(
+        result["propagation"]["transferred_ids"]
+            .as_array()
+            .expect("transferred ids"),
+        &[json!(wanted.transient_id.as_str())]
+    );
+    assert_eq!(result["messages"]["outgoing"].as_u64(), Some(1));
+}
+
+#[test]
 fn list_peers_top_level_message_counters_match_python_sync_accounting() {
     let daemon = RpcDaemon::test_instance();
     let wanted = PropagationEntryRecord {
