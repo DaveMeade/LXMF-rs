@@ -1157,6 +1157,38 @@ impl RpcDaemon {
         Ok(())
     }
 
+    pub(super) fn enforce_autopeer_enabled_policy(&self) -> Result<(), std::io::Error> {
+        let autopeer = self.propagation_state.lock().expect("propagation mutex poisoned").autopeer;
+        if autopeer {
+            return Ok(());
+        }
+        let peers_to_remove = {
+            let guard = self.peers.lock().expect("peers mutex poisoned");
+            guard
+                .values()
+                .filter(|record| record.peer_type.as_deref() == Some("auto"))
+                .map(|record| record.peer.clone())
+                .collect::<Vec<_>>()
+        };
+        for peer in peers_to_remove {
+            let cleanup = self.unpeer_local_state(peer.as_str())?;
+            if cleanup.removed {
+                self.publish_event(RpcEvent {
+                    event_type: "peer_unpeer".into(),
+                    payload: json!({
+                        "peer": peer,
+                        "removed": true,
+                        "reason": "autopeer_disabled",
+                        "propagation_cleared": cleanup.propagation_cleared,
+                        "propagation_cleared_bytes": cleanup.propagation_cleared_bytes,
+                        "messages": cleanup.messages,
+                    }),
+                });
+            }
+        }
+        Ok(())
+    }
+
     pub(super) fn ensure_peer_admission_allowed(
         &self,
         peer: &str,
