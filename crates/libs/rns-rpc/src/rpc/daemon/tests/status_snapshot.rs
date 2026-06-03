@@ -4371,6 +4371,61 @@ fn selected_propagation_node_queues_existing_entries_for_peer_sync() {
 }
 
 #[test]
+fn rejected_selected_propagation_node_does_not_update_selection() {
+    let daemon = RpcDaemon::test_instance();
+    daemon
+        .handle_rpc(rpc_request(
+            75,
+            "propagation_enable",
+            json!({
+                "enabled": true,
+                "max_peers": 1,
+            }),
+        ))
+        .expect("enable propagation");
+    daemon
+        .handle_rpc(rpc_request(76, "peer_sync", json!({ "peer": "peer-capacity-a" })))
+        .expect("fill peer capacity");
+
+    let rejected = daemon
+        .handle_rpc(rpc_request(
+            77,
+            "set_outbound_propagation_node",
+            json!({ "peer": "peer-capacity-b" }),
+        ))
+        .expect_err("selected node should respect peer admission");
+    assert!(
+        rejected.to_string().contains("max_peers=1"),
+        "unexpected rejection error: {rejected}"
+    );
+
+    let selected = daemon
+        .handle_rpc(RpcRequest {
+            id: 78,
+            method: "get_outbound_propagation_node".to_string(),
+            params: None,
+        })
+        .expect("get selected propagation node")
+        .result
+        .expect("selected propagation node result");
+    assert_eq!(selected["peer"], JsonValue::Null);
+
+    let nodes = daemon
+        .handle_rpc(RpcRequest {
+            id: 79,
+            method: "list_propagation_nodes".to_string(),
+            params: None,
+        })
+        .expect("list propagation nodes")
+        .result
+        .expect("list propagation nodes result");
+    assert!(
+        nodes["nodes"].as_array().expect("propagation nodes").is_empty(),
+        "rejected selected node should not be listed"
+    );
+}
+
+#[test]
 fn propagation_remote_sync_updates_lifecycle_status() {
     let daemon = RpcDaemon::test_instance();
     daemon.set_remote_control_bridge(Arc::new(TestRemoteControlBridge {
