@@ -1460,6 +1460,25 @@ impl RpcDaemon {
             });
             removed
         };
+        let mut cleared_selected_node = false;
+        {
+            let mut guard =
+                self.outbound_propagation_node.lock().expect("propagation node mutex poisoned");
+            if guard.as_deref() == Some(peer_id) {
+                *guard = None;
+                cleared_selected_node = true;
+            }
+        }
+        if cleared_selected_node {
+            let state = {
+                let mut guard = self.propagation_state.lock().expect("propagation mutex poisoned");
+                guard.selected_node = None;
+                guard.clone()
+            };
+            self.update_daemon_status_snapshot(|snapshot| {
+                snapshot.propagation = state;
+            });
+        }
         Ok(LocalUnpeerCleanup {
             removed,
             propagation_cleared: propagation_stats.offered as usize,
