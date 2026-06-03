@@ -147,6 +147,7 @@ Recent focused evidence:
 - `cargo test -p reticulum-rs-rpc --lib autopeered_announce_records_propagation_peer_state -- --nocapture`
 - `cargo test -p reticulumd --bin reticulumd python_status_exposes_peer_peering_key_value -- --nocapture`
 - `cargo test -p reticulumd --bin reticulumd python_status_exposes_peer_peering_key_status -- --nocapture`
+- `cargo test -p reticulumd --bin reticulumd peer_sync_command_reports_peering_key_status -- --nocapture`
 - `cargo test -p reticulumd --bin reticulumd python_status_prefers_peer_propagation_stamp_policy -- --nocapture`
 - `cargo test -p reticulumd --bin reticulumd python_status_reports_elapsed_uptime_not_epoch_time -- --nocapture`
 - `cargo test -p reticulumd --bin reticulumd python_status_uses_configured_node_transfer_limits -- --nocapture`

@@ -87,6 +87,7 @@ fn peer_exists(daemon: &RpcDaemon, peer_hex: &str) -> bool {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use rns_rpc::MessagesStore;
 
     const ERROR_INVALID_DATA: u8 = 0xF4;
     const ERROR_NOT_FOUND: u8 = 0xFD;
@@ -220,6 +221,54 @@ mod tests {
         assert_eq!(result["propagation"]["transferred"].as_u64(), Some(1));
         assert_eq!(result["propagation"]["transferred_ids"], json!([transient_id]));
         assert_eq!(result["propagation"]["messages"].as_array().map(Vec::len), Some(1));
+    }
+
+    #[test]
+    fn peer_sync_command_reports_peering_key_status() {
+        let peer_bytes = [0xC8; 16];
+        let peer_hex = hex::encode(peer_bytes);
+        let daemon = RpcDaemon::with_store(
+            MessagesStore::in_memory().expect("store"),
+            hex::encode([2u8; 16]),
+        );
+        daemon
+            .accept_announce_with_metadata(
+                peer_hex.clone(),
+                1_700_000_611,
+                None,
+                None,
+                None,
+                Some(vec!["propagation".to_string()]),
+                None,
+                None,
+                None,
+                Some(1),
+                Some(Some(1)),
+                Some(Some(1)),
+                None,
+                Some(1),
+                None,
+                None,
+                None,
+                None,
+            )
+            .expect("accept propagation peer announce");
+
+        let response = handle_peer_command(
+            &daemon,
+            control_path_hash("/pn/peer/sync"),
+            Some(rmpv::Value::Binary(peer_bytes.to_vec())),
+            ERROR_INVALID_DATA,
+            ERROR_NOT_FOUND,
+        )
+        .expect("peer sync command response");
+
+        let ControlResponse::Value(result) = response else {
+            panic!("expected peer sync result value");
+        };
+        assert_eq!(result["peer"].as_str(), Some(peer_hex.as_str()));
+        assert_eq!(result["peering_key_status"].as_str(), Some("ready"));
+        assert_eq!(result["propagation"]["peering_key_status"].as_str(), Some("ready"));
     }
 
     #[test]
