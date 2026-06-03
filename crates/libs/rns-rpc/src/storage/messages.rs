@@ -866,14 +866,28 @@ impl MessagesStore {
 
     pub fn mark_all_propagation_unhandled_for_peer(&self, peer: &str) -> rusqlite::Result<usize> {
         self.with_write_conn(|conn| {
-            let affected = conn.execute(
+            let tx = conn.unchecked_transaction()?;
+            let inserted = tx.execute(
                 "INSERT OR IGNORE INTO propagation_peer_entries
                     (peer, transient_id, state, updated_at)
                  SELECT ?1, transient_id, 'unhandled', ?2
                  FROM propagation_entries",
                 params![peer, now_unix_secs()],
             )?;
-            Ok(affected)
+            let reopened = tx.execute(
+                "UPDATE propagation_peer_entries
+                 SET state = 'unhandled', updated_at = ?2
+                 WHERE peer = ?1
+                   AND state = 'transfer_limited'
+                   AND EXISTS (
+                       SELECT 1
+                       FROM propagation_entries e
+                       WHERE e.transient_id = propagation_peer_entries.transient_id
+                   )",
+                params![peer, now_unix_secs()],
+            )?;
+            tx.commit()?;
+            Ok(inserted.saturating_add(reopened))
         })
     }
 
@@ -2293,6 +2307,46 @@ mod tests {
         let handled =
             store.list_peer_handled_propagation_ids("peer-a").expect("list peer handled ids");
         assert_eq!(handled, vec![first.transient_id]);
+    }
+
+    #[test]
+    fn queue_existing_propagation_reopens_transfer_limited_marks_only() {
+        let store = MessagesStore::in_memory().expect("in-memory store");
+        let transfer_limited = PropagationEntryRecord {
+            transient_id: "a1".repeat(32),
+            destination: "11".repeat(16),
+            payload_hex: "11".repeat(8),
+            received_at: 100,
+            size_bytes: 8,
+            stamp_value: None,
+        };
+        let handled = PropagationEntryRecord {
+            transient_id: "a2".repeat(32),
+            destination: "22".repeat(16),
+            payload_hex: "22".repeat(8),
+            received_at: 101,
+            size_bytes: 8,
+            stamp_value: None,
+        };
+        store.upsert_propagation_entry(&transfer_limited).expect("transfer-limited entry");
+        store.upsert_propagation_entry(&handled).expect("handled entry");
+        store
+            .mark_peer_transfer_limited_propagation(
+                "peer-reopen",
+                transfer_limited.transient_id.as_str(),
+            )
+            .expect("mark transfer limited");
+        store
+            .mark_peer_handled_propagation("peer-reopen", handled.transient_id.as_str())
+            .expect("mark handled");
+
+        store.mark_all_propagation_unhandled_for_peer("peer-reopen").expect("queue existing");
+
+        let pending = store.list_peer_unhandled_propagation("peer-reopen").expect("pending");
+        assert_eq!(pending, vec![transfer_limited]);
+        let handled_ids =
+            store.list_peer_handled_propagation_ids("peer-reopen").expect("handled ids");
+        assert_eq!(handled_ids, vec![handled.transient_id]);
     }
 
     #[test]

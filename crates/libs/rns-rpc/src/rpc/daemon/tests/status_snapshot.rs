@@ -4019,6 +4019,70 @@ fn peer_sync_marks_entries_above_transfer_limit_handled_like_python() {
 }
 
 #[test]
+fn peer_sync_retries_transfer_limited_entries_when_limit_increases() {
+    let daemon = RpcDaemon::test_instance();
+    daemon
+        .handle_rpc(rpc_request(60, "peer_sync", json!({ "peer": "peer-transfer-retry" })))
+        .expect("initial peer sync");
+    {
+        let mut peers = daemon.peers.lock().expect("peers mutex poisoned");
+        let peer = peers.get_mut("peer-transfer-retry").expect("peer record");
+        peer.propagation_transfer_limit = Some(80);
+        peer.propagation_sync_limit = Some(1_000);
+    }
+
+    let oversized = PropagationEntryRecord {
+        transient_id: "c4".repeat(32),
+        destination: "16".repeat(16),
+        payload_hex: "16".repeat(100),
+        received_at: 1_700_000_613,
+        size_bytes: 100,
+        stamp_value: None,
+    };
+    let oversized_id = oversized.transient_id.clone();
+    daemon.store.upsert_propagation_entry(&oversized).expect("store oversized entry");
+    daemon
+        .store
+        .mark_peer_unhandled_propagation("peer-transfer-retry", oversized.transient_id.as_str())
+        .expect("mark unhandled");
+
+    let limited = daemon
+        .handle_rpc(rpc_request(61, "peer_sync", json!({ "peer": "peer-transfer-retry" })))
+        .expect("limited peer sync")
+        .result
+        .expect("limited peer sync result");
+    assert_eq!(limited["propagation"]["transfer_limited"].as_u64(), Some(1));
+    assert_eq!(limited["messages"]["offered"].as_u64(), Some(1));
+
+    {
+        let mut peers = daemon.peers.lock().expect("peers mutex poisoned");
+        let peer = peers.get_mut("peer-transfer-retry").expect("peer record");
+        peer.propagation_transfer_limit = Some(200);
+        peer.propagation_sync_limit = Some(1_000);
+    }
+
+    let retried = daemon
+        .handle_rpc(rpc_request(62, "peer_sync", json!({ "peer": "peer-transfer-retry" })))
+        .expect("retried peer sync")
+        .result
+        .expect("retried peer sync result");
+    assert_eq!(retried["propagation"]["handled"].as_u64(), Some(1));
+    assert_eq!(retried["propagation"]["transferred"].as_u64(), Some(1));
+    assert_eq!(retried["propagation"]["transfer_limited"].as_u64(), Some(0));
+    assert_eq!(
+        retried["propagation"]["transferred_ids"]
+            .as_array()
+            .expect("transferred ids"),
+        &[json!(oversized_id.as_str())]
+    );
+    assert_eq!(
+        retried["propagation"]["messages"][0]["transient_id"].as_str(),
+        Some(oversized_id.as_str())
+    );
+    assert_eq!(retried["messages"]["outgoing"].as_u64(), Some(1));
+}
+
+#[test]
 fn peer_sync_applies_request_transfer_limit_without_persisting_it() {
     let daemon = RpcDaemon::test_instance();
     daemon
