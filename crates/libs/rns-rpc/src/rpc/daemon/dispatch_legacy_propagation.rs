@@ -1317,13 +1317,19 @@ impl RpcDaemon {
                 })?;
                 let parsed: PropagationRemoteStatusParams = serde_json::from_value(params)
                     .map_err(|err| std::io::Error::new(std::io::ErrorKind::InvalidInput, err))?;
+                let remote_id = parsed.remote.trim().to_string();
+                if remote_id.is_empty() {
+                    return Err(std::io::Error::new(
+                        std::io::ErrorKind::InvalidInput,
+                        "remote is required",
+                    ));
+                }
                 let bridge = self
                     .remote_control_bridge
                     .lock()
                     .expect("remote control bridge mutex poisoned")
                     .clone()
                     .ok_or_else(|| std::io::Error::other("remote control bridge unavailable"))?;
-                let remote_id = parsed.remote.trim().to_string();
                 let timeout_secs = parsed.timeout_secs.unwrap_or(5.0).max(0.1);
                 self.update_propagation_sync_state(|state| {
                     state.sync_state = PR_REQUEST_SENT;

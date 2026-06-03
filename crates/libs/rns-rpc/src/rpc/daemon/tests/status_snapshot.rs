@@ -5454,6 +5454,7 @@ fn propagation_remote_status_rejects_blank_remote_before_bridge_call() {
     let status_calls = Arc::new(std::sync::atomic::AtomicUsize::new(0));
     daemon.set_remote_control_bridge(Arc::new(CountingRemoteControlBridge {
         status_calls: Arc::clone(&status_calls),
+        download_calls: Arc::new(std::sync::atomic::AtomicUsize::new(0)),
         sync_calls: Arc::new(std::sync::atomic::AtomicUsize::new(0)),
         unpeer_calls: Arc::new(std::sync::atomic::AtomicUsize::new(0)),
     }));
@@ -5490,6 +5491,7 @@ struct FailingTransferLimitRemoteControlBridge {
 
 struct CountingRemoteControlBridge {
     status_calls: Arc<std::sync::atomic::AtomicUsize>,
+    download_calls: Arc<std::sync::atomic::AtomicUsize>,
     sync_calls: Arc<std::sync::atomic::AtomicUsize>,
     unpeer_calls: Arc<std::sync::atomic::AtomicUsize>,
 }
@@ -5606,6 +5608,7 @@ impl RemoteControlBridge for CountingRemoteControlBridge {
         _timeout_secs: f64,
         _transfer_limit_kb: Option<f64>,
     ) -> Result<JsonValue, std::io::Error> {
+        self.download_calls.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
         Ok(json!({
             "remote": remote,
             "downloaded_count": 0,
@@ -6003,6 +6006,7 @@ fn rejected_propagation_remote_sync_does_not_call_bridge_or_update_lifecycle() {
     let sync_calls = Arc::new(std::sync::atomic::AtomicUsize::new(0));
     daemon.set_remote_control_bridge(Arc::new(CountingRemoteControlBridge {
         status_calls: Arc::new(std::sync::atomic::AtomicUsize::new(0)),
+        download_calls: Arc::new(std::sync::atomic::AtomicUsize::new(0)),
         sync_calls: Arc::clone(&sync_calls),
         unpeer_calls: Arc::new(std::sync::atomic::AtomicUsize::new(0)),
     }));
@@ -6055,6 +6059,7 @@ fn propagation_remote_sync_rejects_blank_peer_before_bridge_call() {
     let sync_calls = Arc::new(std::sync::atomic::AtomicUsize::new(0));
     daemon.set_remote_control_bridge(Arc::new(CountingRemoteControlBridge {
         status_calls: Arc::new(std::sync::atomic::AtomicUsize::new(0)),
+        download_calls: Arc::new(std::sync::atomic::AtomicUsize::new(0)),
         sync_calls: Arc::clone(&sync_calls),
         unpeer_calls: Arc::new(std::sync::atomic::AtomicUsize::new(0)),
     }));
@@ -6154,6 +6159,7 @@ fn propagation_remote_unpeer_rejects_blank_peer_before_bridge_call() {
     let unpeer_calls = Arc::new(std::sync::atomic::AtomicUsize::new(0));
     daemon.set_remote_control_bridge(Arc::new(CountingRemoteControlBridge {
         status_calls: Arc::new(std::sync::atomic::AtomicUsize::new(0)),
+        download_calls: Arc::new(std::sync::atomic::AtomicUsize::new(0)),
         sync_calls,
         unpeer_calls: Arc::clone(&unpeer_calls),
     }));
@@ -7053,6 +7059,33 @@ fn propagation_remote_download_trims_remote_before_bridge_and_response() {
 
     assert_eq!(result["remote"].as_str(), Some("remote-download-trimmed"));
     assert_eq!(result["result"]["remote"].as_str(), Some("remote-download-trimmed"));
+}
+
+#[test]
+fn propagation_remote_download_rejects_blank_remote_before_bridge_call() {
+    let daemon = RpcDaemon::test_instance();
+    let download_calls = Arc::new(std::sync::atomic::AtomicUsize::new(0));
+    daemon.set_remote_control_bridge(Arc::new(CountingRemoteControlBridge {
+        status_calls: Arc::new(std::sync::atomic::AtomicUsize::new(0)),
+        download_calls: Arc::clone(&download_calls),
+        sync_calls: Arc::new(std::sync::atomic::AtomicUsize::new(0)),
+        unpeer_calls: Arc::new(std::sync::atomic::AtomicUsize::new(0)),
+    }));
+
+    let rejected = daemon
+        .handle_rpc(rpc_request(
+            80,
+            "propagation_remote_download",
+            json!({
+                "remote": "   ",
+            }),
+        ))
+        .expect_err("blank remote download node should be rejected");
+    assert!(
+        rejected.to_string().contains("remote is required"),
+        "unexpected rejection error: {rejected}"
+    );
+    assert_eq!(download_calls.load(std::sync::atomic::Ordering::SeqCst), 0);
 }
 
 #[test]
