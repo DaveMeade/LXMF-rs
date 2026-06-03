@@ -163,6 +163,41 @@ fn propagation_enable_activates_static_peers_like_python() {
 }
 
 #[test]
+fn propagation_enable_normalizes_static_peer_config_for_status_and_type() {
+    let daemon = RpcDaemon::test_instance();
+    let result = daemon
+        .handle_rpc(rpc_request(
+            25,
+            "propagation_enable",
+            json!({
+                "enabled": true,
+                "static_peers": ["  peer-static-normalized  ", "peer-static-normalized", ""],
+            }),
+        ))
+        .expect("enable propagation")
+        .result
+        .expect("enable result");
+    assert_eq!(
+        result["propagation"]["static_peers"].as_array().expect("static peers"),
+        &[json!("peer-static-normalized")]
+    );
+
+    let peers = daemon
+        .handle_rpc(RpcRequest { id: 26, method: "list_peers".to_string(), params: None })
+        .expect("list peers")
+        .result
+        .expect("list peers result");
+    let row = peers["peers"]
+        .as_array()
+        .expect("peer rows")
+        .iter()
+        .find(|row| row["peer"].as_str() == Some("peer-static-normalized"))
+        .expect("normalized static peer row");
+    assert_eq!(row["peer_type"].as_str(), Some("static"));
+    assert_eq!(row["type"].as_str(), Some("static"));
+}
+
+#[test]
 fn propagation_enable_queues_existing_entries_for_static_peers() {
     let daemon = RpcDaemon::test_instance();
     let entry = PropagationEntryRecord {

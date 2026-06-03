@@ -707,6 +707,7 @@ impl RpcDaemon {
                         guard.autopeer_maxdepth = autopeer_maxdepth;
                     }
                     if let Some(static_peers) = parsed.static_peers {
+                        let static_peers = Self::normalize_static_peers(&static_peers);
                         static_peers_to_activate = static_peers.clone();
                         guard.static_peers = static_peers;
                     }

@@ -43,6 +43,19 @@ impl RpcDaemon {
             .map_err(std::io::Error::other)
     }
 
+    pub(super) fn normalize_static_peers(static_peers: &[String]) -> Vec<String> {
+        let mut normalized = Vec::new();
+        for peer in static_peers {
+            let peer = peer.trim();
+            if !peer.is_empty()
+                && !normalized.iter().any(|existing: &String| existing.eq_ignore_ascii_case(peer))
+            {
+                normalized.push(peer.to_string());
+            }
+        }
+        normalized
+    }
+
     pub(super) fn next_announce_seq(&self) -> u64 {
         let mut guard = self.announce_next_seq.lock().expect("announce_next_seq mutex poisoned");
         *guard = guard.wrapping_add(1);
@@ -969,18 +982,7 @@ impl RpcDaemon {
         &self,
         static_peers: &[String],
     ) -> Result<(), std::io::Error> {
-        let mut configured_static_peers = Vec::new();
-        for peer in static_peers {
-            let peer = peer.trim();
-            if !peer.is_empty()
-                && !configured_static_peers
-                    .iter()
-                    .any(|existing: &String| existing.eq_ignore_ascii_case(peer))
-            {
-                configured_static_peers.push(peer.to_string());
-            }
-        }
-
+        let configured_static_peers = Self::normalize_static_peers(static_peers);
         let mut guard = self.peers.lock().expect("peers mutex poisoned");
         for existing in guard.values_mut() {
             let is_configured_static = configured_static_peers
