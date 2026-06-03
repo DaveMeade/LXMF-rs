@@ -32,6 +32,11 @@ pub(super) fn handle_message_get_request(
         ));
     }
 
+    let wants = match entries.first() {
+        Some(value) if value.is_nil() => Vec::new(),
+        Some(rmpv::Value::Array(values)) => binary_id_list(values),
+        _ => return ControlResponse::Code(error_invalid_data),
+    };
     let haves = match entries.get(1) {
         Some(value) if value.is_nil() => Vec::new(),
         Some(rmpv::Value::Array(values)) => binary_id_list(values),
@@ -41,11 +46,6 @@ pub(super) fn handle_message_get_request(
         daemon.purge_propagation_payloads_for_destination(&remote_delivery_hash, &haves);
     }
 
-    let wants = match entries.first() {
-        Some(value) if value.is_nil() => Vec::new(),
-        Some(rmpv::Value::Array(values)) => binary_id_list(values),
-        _ => return ControlResponse::Code(error_invalid_data),
-    };
     if wants.is_empty() {
         return ControlResponse::Rmpv(rmpv::Value::Array(Vec::new()));
     }
@@ -614,6 +614,42 @@ mod tests {
         };
         assert_eq!(messages, vec![rmpv::Value::Binary(wanted_payload)]);
         assert!(!daemon.has_propagation_payload(hex::encode(have).as_str()));
+    }
+
+    #[test]
+    fn message_get_rejects_invalid_wants_without_purging_haves() {
+        let daemon = RpcDaemon::test_instance();
+        let remote_private =
+            rns_transport::identity::PrivateIdentity::new_from_rand(rand_core::OsRng);
+        let remote_identity = *remote_private.as_identity();
+        let remote_delivery_hash = delivery_destination_hash_for_identity(&remote_identity);
+        let have = [0x5C; 32];
+        let mut have_payload = remote_delivery_hash.to_vec();
+        have_payload.extend_from_slice(b" already have propagation lxm");
+        daemon
+            .ingest_propagation_payload_bytes_with_aliases(
+                have_payload.as_slice(),
+                hex::encode(have).as_str(),
+                &[],
+            )
+            .expect("store have payload");
+
+        let response = handle_message_get_request(
+            &daemon,
+            &remote_identity,
+            Some(rmpv::Value::Array(vec![
+                rmpv::Value::Integer(7.into()),
+                rmpv::Value::Array(vec![rmpv::Value::Binary(have.to_vec())]),
+            ])),
+            0xF1,
+            0xF4,
+        );
+
+        assert!(matches!(response, ControlResponse::Code(0xF4)));
+        assert!(
+            daemon.has_propagation_payload(hex::encode(have).as_str()),
+            "invalid request data must not purge haves before the request is accepted"
+        );
     }
 
     #[test]
