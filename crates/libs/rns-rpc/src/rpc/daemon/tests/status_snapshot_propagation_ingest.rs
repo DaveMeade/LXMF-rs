@@ -28,7 +28,7 @@ fn propagation_counters_track_ingest_and_unpeered_attempts() {
     assert_eq!(propagation["unpeered_propagation_incoming"].as_u64(), Some(1));
     assert_eq!(propagation["unpeered_propagation_rx_bytes"].as_u64(), Some(42));
 
-    daemon
+    let fetched = daemon
         .handle_rpc(rpc_request(
             62,
             "propagation_fetch",
@@ -36,7 +36,11 @@ fn propagation_counters_track_ingest_and_unpeered_attempts() {
                 "transient_id": hex::encode(Sha256::digest(payload)),
             }),
         ))
-        .expect("propagation fetch");
+        .expect("propagation fetch")
+        .result
+        .expect("propagation fetch result");
+    assert_eq!(fetched["transferred_bytes"].as_u64(), Some(payload.len() as u64));
+    assert_eq!(fetched["payload_bytes"].as_u64(), Some(payload.len() as u64));
     let result = daemon
         .handle_rpc(RpcRequest { id: 63, method: "propagation_status".to_string(), params: None })
         .expect("propagation status")

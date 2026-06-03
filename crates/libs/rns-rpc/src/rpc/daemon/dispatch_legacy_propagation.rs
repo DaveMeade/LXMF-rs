@@ -894,6 +894,8 @@ impl RpcDaemon {
                     .ok_or_else(|| {
                         std::io::Error::new(std::io::ErrorKind::NotFound, "transient_id not found")
                     })?;
+                let payload_bytes =
+                    hex::decode(payload.as_str()).map(|bytes| bytes.len()).unwrap_or(0);
                 {
                     let mut guard =
                         self.propagation_state.lock().expect("propagation mutex poisoned");
@@ -911,6 +913,8 @@ impl RpcDaemon {
                     result: Some(json!({
                         "transient_id": normalized_transient_id,
                         "payload_hex": payload,
+                        "payload_bytes": payload_bytes,
+                        "transferred_bytes": payload_bytes,
                     })),
                     error: None,
                 })
