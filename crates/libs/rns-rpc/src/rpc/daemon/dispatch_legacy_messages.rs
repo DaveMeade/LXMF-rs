@@ -555,6 +555,7 @@ impl RpcDaemon {
                         "peer is required",
                     ));
                 }
+                let wanted_ids = canonical_peer_sync_wanted_ids(parsed.wanted_ids.as_ref())?;
 
                 let timestamp = now_i64();
                 let existing_peer_type = self
@@ -667,11 +668,6 @@ impl RpcDaemon {
                         .partial_cmp(&right_weight)
                         .unwrap_or(std::cmp::Ordering::Equal)
                         .then_with(|| left.transient_id.cmp(&right.transient_id))
-                });
-                let wanted_ids = parsed.wanted_ids.as_ref().map(|ids| {
-                    ids.iter()
-                        .map(|id| id.trim().to_ascii_lowercase())
-                        .collect::<std::collections::HashSet<_>>()
                 });
                 let mut cumulative_size = 24usize;
                 let mut propagation_handled = 0usize;
@@ -1560,6 +1556,26 @@ fn peer_minimum_accepted_stamp_value(peer: &PeerRecord) -> Option<u32> {
     let cost = peer.propagation_stamp_cost?;
     let flexibility = peer.propagation_stamp_cost_flexibility?;
     Some(cost.saturating_sub(flexibility))
+}
+
+fn canonical_peer_sync_wanted_ids(
+    wanted_ids: Option<&Vec<String>>,
+) -> Result<Option<std::collections::HashSet<String>>, std::io::Error> {
+    let Some(wanted_ids) = wanted_ids else {
+        return Ok(None);
+    };
+    let mut canonical = std::collections::HashSet::with_capacity(wanted_ids.len());
+    for wanted_id in wanted_ids {
+        let wanted_id = wanted_id.trim();
+        if wanted_id.len() != 64 || !wanted_id.as_bytes().iter().all(u8::is_ascii_hexdigit) {
+            return Err(std::io::Error::new(
+                std::io::ErrorKind::InvalidInput,
+                "wanted_ids must contain 32-byte transient ids",
+            ));
+        }
+        canonical.insert(wanted_id.to_ascii_lowercase());
+    }
+    Ok(Some(canonical))
 }
 
 fn propagation_peer_sync_weight(entry: &PropagationEntryRecord, now: i64) -> f64 {

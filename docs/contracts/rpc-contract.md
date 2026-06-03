@@ -131,7 +131,9 @@ All methods below are required for full CLI feature coverage.
 : Params keys: `peer` (optional: `transfer_limit_kb`, `wanted_ids`). When
   `wanted_ids` is supplied, offered IDs outside that list are treated like a
   Python LXMF peer response indicating the peer already has those messages:
-  they become handled but are not transferred.
+  they become handled but are not transferred. Each supplied wanted ID must be
+  a 32-byte transient ID encoded as 64 hex characters; malformed wanted IDs are
+  rejected before peer queue state is mutated.
 - `peer_unpeer`
 : Params keys: `peer`. Result and `peer_unpeer` event include `removed`,
   `propagation_cleared`, `propagation_cleared_bytes`, top-level aggregate

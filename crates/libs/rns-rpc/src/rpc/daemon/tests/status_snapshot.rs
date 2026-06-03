@@ -3604,6 +3604,51 @@ fn peer_sync_matches_wanted_ids_by_canonical_transient_id() {
 }
 
 #[test]
+fn peer_sync_rejects_malformed_wanted_ids_without_mutating_queue() {
+    let daemon = RpcDaemon::test_instance();
+    let pending = PropagationEntryRecord {
+        transient_id: "a3".repeat(32),
+        destination: "12".repeat(16),
+        payload_hex: "12".repeat(24),
+        received_at: 1_700_000_607,
+        size_bytes: 24,
+        stamp_value: None,
+    };
+    daemon.store.upsert_propagation_entry(&pending).expect("store propagation entry");
+    daemon
+        .store
+        .mark_peer_unhandled_propagation("peer-invalid-wanted", pending.transient_id.as_str())
+        .expect("mark unhandled");
+
+    let error = daemon
+        .handle_rpc(rpc_request(
+            55,
+            "peer_sync",
+            json!({
+                "peer": "peer-invalid-wanted",
+                "wanted_ids": ["not-a-transient-id"],
+            }),
+        ))
+        .expect_err("malformed wanted ids should be rejected");
+    assert_eq!(error.kind(), std::io::ErrorKind::InvalidInput);
+
+    assert!(
+        daemon
+            .store
+            .list_peer_handled_propagation_ids("peer-invalid-wanted")
+            .expect("handled ids")
+            .is_empty()
+    );
+    assert_eq!(
+        daemon
+            .store
+            .list_peer_unhandled_propagation("peer-invalid-wanted")
+            .expect("pending propagation"),
+        vec![pending]
+    );
+}
+
+#[test]
 fn list_peers_top_level_message_counters_match_python_sync_accounting() {
     let daemon = RpcDaemon::test_instance();
     let wanted = PropagationEntryRecord {
