@@ -4764,6 +4764,69 @@ fn propagation_remote_fetch_imports_payloads_into_local_store() {
 }
 
 #[test]
+fn duplicate_propagation_remote_fetch_queues_known_payload_without_double_counting() {
+    let payload = b"duplicate-remote-fetch-propagation-payload";
+    let payload_hex = hex::encode(payload);
+    let transient_id = hex::encode(Sha256::digest(payload));
+    let daemon = RpcDaemon::test_instance();
+    daemon
+        .handle_rpc(rpc_request(72, "peer_sync", json!({ "peer": "peer-fetch-known" })))
+        .expect("seed relay peer");
+    daemon.set_remote_control_bridge(Arc::new(TestRemoteControlBridge {
+        result: Ok(json!({
+            "available_count": 1,
+            "fetched_count": 1,
+            "messages": [{
+                "transient_id": transient_id,
+                "payload_hex": payload_hex,
+            }],
+        })),
+    }));
+
+    daemon
+        .handle_rpc(rpc_request(
+            73,
+            "propagation_remote_fetch",
+            json!({ "remote": "remote-node" }),
+        ))
+        .expect("initial remote fetch");
+    daemon
+        .store
+        .clear_peer_propagation_marks("peer-fetch-known")
+        .expect("clear peer marks");
+    let second = daemon
+        .handle_rpc(rpc_request(
+            74,
+            "propagation_remote_fetch",
+            json!({ "remote": "remote-node" }),
+        ))
+        .expect("duplicate remote fetch")
+        .result
+        .expect("duplicate remote fetch result");
+    assert_eq!(second["result"]["imported_count"].as_u64(), Some(0));
+    assert_eq!(second["result"]["imported_ids"], json!([]));
+
+    let relay_pending = daemon
+        .store
+        .list_peer_unhandled_propagation("peer-fetch-known")
+        .expect("relay pending");
+    assert_eq!(relay_pending.len(), 1);
+    assert_eq!(relay_pending[0].transient_id, transient_id);
+
+    let status = daemon
+        .handle_rpc(RpcRequest { id: 75, method: "propagation_status".to_string(), params: None })
+        .expect("propagation status")
+        .result
+        .expect("propagation status result");
+    assert_eq!(
+        status["propagation"]["client_propagation_messages_received"].as_u64(),
+        Some(1)
+    );
+    assert_eq!(status["propagation"]["total_ingested"].as_u64(), Some(1));
+    assert_eq!(status["propagation"]["last_ingest_count"].as_u64(), Some(0));
+}
+
+#[test]
 fn propagation_remote_fetch_updates_lifecycle_status() {
     let payload = b"remote-fetch-lifecycle-payload";
     let payload_hex = hex::encode(payload);
@@ -4986,6 +5049,68 @@ fn propagation_remote_download_imports_payloads_into_local_store() {
         .expect("relay pending");
     assert_eq!(relay_pending.len(), 1);
     assert_eq!(relay_pending[0].transient_id, transient_id);
+}
+
+#[test]
+fn duplicate_propagation_remote_download_queues_known_payload_without_double_counting() {
+    let payload = b"duplicate-remote-download-propagation-payload";
+    let payload_hex = hex::encode(payload);
+    let transient_id = hex::encode(Sha256::digest(payload));
+    let daemon = RpcDaemon::test_instance();
+    daemon
+        .handle_rpc(rpc_request(75, "peer_sync", json!({ "peer": "peer-download-known" })))
+        .expect("seed relay peer");
+    daemon.set_remote_control_bridge(Arc::new(TestRemoteControlBridge {
+        result: Ok(json!({
+            "downloaded_count": 1,
+            "messages": [{
+                "transient_id": transient_id,
+                "payload_hex": payload_hex,
+            }],
+        })),
+    }));
+
+    daemon
+        .handle_rpc(rpc_request(
+            76,
+            "propagation_remote_download",
+            json!({ "remote": "remote-node" }),
+        ))
+        .expect("initial remote download");
+    daemon
+        .store
+        .clear_peer_propagation_marks("peer-download-known")
+        .expect("clear peer marks");
+    let second = daemon
+        .handle_rpc(rpc_request(
+            77,
+            "propagation_remote_download",
+            json!({ "remote": "remote-node" }),
+        ))
+        .expect("duplicate remote download")
+        .result
+        .expect("duplicate remote download result");
+    assert_eq!(second["result"]["imported_count"].as_u64(), Some(0));
+    assert_eq!(second["result"]["imported_ids"], json!([]));
+
+    let relay_pending = daemon
+        .store
+        .list_peer_unhandled_propagation("peer-download-known")
+        .expect("relay pending");
+    assert_eq!(relay_pending.len(), 1);
+    assert_eq!(relay_pending[0].transient_id, transient_id);
+
+    let status = daemon
+        .handle_rpc(RpcRequest { id: 78, method: "propagation_status".to_string(), params: None })
+        .expect("propagation status")
+        .result
+        .expect("propagation status result");
+    assert_eq!(
+        status["propagation"]["client_propagation_messages_received"].as_u64(),
+        Some(1)
+    );
+    assert_eq!(status["propagation"]["total_ingested"].as_u64(), Some(1));
+    assert_eq!(status["propagation"]["last_ingest_count"].as_u64(), Some(0));
 }
 
 #[test]
