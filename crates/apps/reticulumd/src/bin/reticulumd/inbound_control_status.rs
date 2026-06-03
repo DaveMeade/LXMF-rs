@@ -67,13 +67,35 @@ pub(super) fn compose_python_status(
                     let handled_ids = row.get("handled_ids").cloned().unwrap_or_else(|| json!([]));
                     let unhandled_ids =
                         row.get("unhandled_ids").cloned().unwrap_or_else(|| json!([]));
+                    let internal_peer_type =
+                        row.get("peer_type").cloned().unwrap_or(Value::Null);
+                    let name_source = row.get("name_source").cloned().unwrap_or(Value::Null);
+                    let first_seen = row.get("first_seen").and_then(Value::as_i64).unwrap_or(0);
+                    let seen_count = row.get("seen_count").and_then(Value::as_u64).unwrap_or(0);
+                    let sync_strategy =
+                        row.get("sync_strategy").and_then(Value::as_u64).unwrap_or(2);
+                    let messages = json!({
+                        "offered": offered,
+                        "outgoing": outgoing,
+                        "incoming": incoming,
+                        "unhandled": unhandled,
+                        "offered_bytes": offered_bytes,
+                        "unhandled_bytes": unhandled_bytes,
+                        "handled_ids": handled_ids.clone(),
+                        "unhandled_ids": unhandled_ids.clone()
+                    });
                     Some((
                         peer,
                         json!({
                             "type": peer_type,
+                            "peer_type": internal_peer_type,
                             "state": 0,
+                            "sync_strategy": sync_strategy,
                             "alive": row.get("alive").and_then(Value::as_bool).unwrap_or(true),
                             "name": row.get("name").cloned().unwrap_or(Value::Null),
+                            "name_source": name_source,
+                            "first_seen": first_seen,
+                            "seen_count": seen_count,
                             "last_heard": row.get("last_seen").and_then(Value::as_i64).unwrap_or(0),
                             "next_sync_attempt": row.get("next_sync_attempt").and_then(Value::as_i64).unwrap_or(0),
                             "last_sync_attempt": row.get("last_sync_attempt").and_then(Value::as_i64).unwrap_or(0),
@@ -100,16 +122,7 @@ pub(super) fn compose_python_status(
                             "unhandled_bytes": unhandled_bytes,
                             "handled_ids": handled_ids.clone(),
                             "unhandled_ids": unhandled_ids.clone(),
-                            "messages": {
-                                "offered": offered,
-                                "outgoing": outgoing,
-                                "incoming": incoming,
-                                "unhandled": unhandled,
-                                "offered_bytes": offered_bytes,
-                                "unhandled_bytes": unhandled_bytes,
-                                "handled_ids": handled_ids,
-                                "unhandled_ids": unhandled_ids
-                            }
+                            "messages": messages
                         }),
                     ))
                 })

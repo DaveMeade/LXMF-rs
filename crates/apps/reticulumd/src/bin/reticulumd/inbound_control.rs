@@ -675,6 +675,41 @@ mod tests {
     }
 
     #[test]
+    fn python_status_reports_peer_record_metadata() {
+        let peer = "peer-record-metadata".to_string();
+        let daemon = RpcDaemon::test_instance();
+        let sync = daemon
+            .handle_rpc(RpcRequest {
+                id: 1,
+                method: "peer_sync".to_string(),
+                params: Some(json!({ "peer": peer })),
+            })
+            .expect("peer sync")
+            .result
+            .expect("peer sync result");
+        let first_seen = sync["first_seen"].as_i64().expect("first_seen");
+        assert!(first_seen > 0);
+
+        let status = status::compose_python_status(
+            &daemon,
+            &PropagationControlContext {
+                enabled: true,
+                local_identity_hash: [0u8; 16],
+                propagation_destination_hash_hex: Some("propagation".to_string()),
+                control_destination_hash_hex: Some("control".to_string()),
+                delivery_destination: None,
+                allowed_control_identities: Vec::new(),
+            },
+        );
+
+        let peer_status = &status["peers"][peer.as_str()];
+        assert_eq!(peer_status["peer_type"].as_str(), Some("manual"));
+        assert_eq!(peer_status["first_seen"].as_i64(), Some(first_seen));
+        assert_eq!(peer_status["seen_count"].as_u64(), Some(1));
+        assert_eq!(peer_status["sync_strategy"].as_u64(), Some(2));
+    }
+
+    #[test]
     fn python_status_preserves_unknown_peer_propagation_policy_as_null() {
         let peer = "peer-unknown-policy".to_string();
         let daemon = RpcDaemon::test_instance();
