@@ -64,6 +64,9 @@ pub(super) fn compose_python_status(
                         .unwrap_or(Value::Null);
                     let sync_transfer_rate =
                         row.get("sync_transfer_rate").and_then(Value::as_f64).unwrap_or(0.0);
+                    let handled_ids = row.get("handled_ids").cloned().unwrap_or_else(|| json!([]));
+                    let unhandled_ids =
+                        row.get("unhandled_ids").cloned().unwrap_or_else(|| json!([]));
                     Some((
                         peer,
                         json!({
@@ -89,13 +92,17 @@ pub(super) fn compose_python_status(
                             "rx_bytes": row.get("rx_bytes").and_then(Value::as_u64).unwrap_or(0),
                             "tx_bytes": row.get("tx_bytes").and_then(Value::as_u64).unwrap_or(0),
                             "acceptance_rate": row.get("acceptance_rate").and_then(Value::as_f64).unwrap_or(0.0),
+                            "handled_ids": handled_ids.clone(),
+                            "unhandled_ids": unhandled_ids.clone(),
                             "messages": {
                                 "offered": offered,
                                 "outgoing": outgoing,
                                 "incoming": incoming,
                                 "unhandled": unhandled,
                                 "offered_bytes": offered_bytes,
-                                "unhandled_bytes": unhandled_bytes
+                                "unhandled_bytes": unhandled_bytes,
+                                "handled_ids": handled_ids,
+                                "unhandled_ids": unhandled_ids
                             }
                         }),
                     ))
