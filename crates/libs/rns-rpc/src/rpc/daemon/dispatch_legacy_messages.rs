@@ -1467,6 +1467,8 @@ impl RpcDaemon {
         self.store.clear_peer_propagation_marks(peer_id).map_err(std::io::Error::other)?;
         let messages = json!({
             "offered": propagation_stats.offered,
+            "outgoing": 0,
+            "incoming": 0,
             "unhandled": propagation_stats.unhandled,
             "offered_bytes": propagation_stats.offered_bytes,
             "unhandled_bytes": propagation_stats.unhandled_bytes,
