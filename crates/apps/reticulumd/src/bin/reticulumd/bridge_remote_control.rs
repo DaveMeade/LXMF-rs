@@ -415,6 +415,7 @@ fn response_code_error(response: &rmpv::Value) -> Option<std::io::Error> {
             0xF4 => (std::io::ErrorKind::InvalidInput, "propagation node rejected the request"),
             0xF6 => (std::io::ErrorKind::WouldBlock, "propagation peer throttled"),
             0xFD => (std::io::ErrorKind::NotFound, "propagation peer not found"),
+            0xFE => (std::io::ErrorKind::TimedOut, "propagation peer timed out"),
             _ => (std::io::ErrorKind::InvalidData, "unexpected propagation control response"),
         };
         return Some(std::io::Error::new(kind, message));
@@ -460,6 +461,15 @@ mod tests {
 
         assert_eq!(err.kind(), std::io::ErrorKind::PermissionDenied);
         assert_eq!(err.to_string(), "propagation peer invalid peering key");
+    }
+
+    #[test]
+    fn propagation_control_response_code_maps_timeout_like_python() {
+        let err = response_code_error(&rmpv::Value::from(0xFE_u64))
+            .expect("timeout response should map to error");
+
+        assert_eq!(err.kind(), std::io::ErrorKind::TimedOut);
+        assert_eq!(err.to_string(), "propagation peer timed out");
     }
 
     #[test]

@@ -9680,6 +9680,77 @@ fn invalid_data_propagation_remote_sync_preserves_peer_without_backoff() {
 }
 
 #[test]
+fn timeout_propagation_remote_sync_preserves_peer_without_backoff() {
+    let daemon = RpcDaemon::test_instance();
+    daemon.set_remote_control_bridge(Arc::new(RemoteSyncErrorBridge {
+        kind: std::io::ErrorKind::TimedOut,
+        message: "propagation peer timed out",
+    }));
+    daemon
+        .handle_rpc(rpc_request(90, "peer_sync", json!({ "peer": "peer-timeout" })))
+        .expect("initial peer sync");
+    {
+        let mut peers = daemon.peers.lock().expect("peers mutex poisoned");
+        let peer = peers.get_mut("peer-timeout").expect("peer record");
+        peer.alive = true;
+        peer.sync_backoff = 0;
+        peer.next_sync_attempt = 0;
+        peer.acceptance_rate = 0.5;
+    }
+    daemon.event_queue.lock().expect("event_queue mutex poisoned").clear();
+
+    let err = daemon
+        .handle_rpc(rpc_request(
+            91,
+            "propagation_remote_sync",
+            json!({
+                "remote": "remote-node",
+                "peer": "peer-timeout",
+            }),
+        ))
+        .expect_err("timeout remote sync should return the bridge error");
+    assert_eq!(err.kind(), std::io::ErrorKind::TimedOut);
+    assert_eq!(err.to_string(), "propagation peer timed out");
+
+    let peers = daemon
+        .handle_rpc(RpcRequest { id: 92, method: "list_peers".to_string(), params: None })
+        .expect("list peers")
+        .result
+        .expect("list peers result");
+    let row = peers["peers"]
+        .as_array()
+        .expect("peer rows")
+        .iter()
+        .find(|row| row["peer"].as_str() == Some("peer-timeout"))
+        .expect("peer should remain available for another offer");
+    assert_eq!(row["alive"].as_bool(), Some(true));
+    assert_eq!(row["sync_backoff"].as_u64(), Some(0));
+    assert_eq!(row["next_sync_attempt"].as_i64(), Some(0));
+    assert_eq!(row["acceptance_rate"].as_f64(), Some(0.5));
+    assert!(row["last_sync_attempt"].as_i64().expect("last sync attempt") > 0);
+
+    let events = daemon.event_queue.lock().expect("event_queue mutex poisoned");
+    assert!(
+        events.iter().all(|event| event.event_type != "peer_unpeer"),
+        "timeout response should not break peering"
+    );
+    let event = events
+        .iter()
+        .rev()
+        .find(|event| event.event_type == "peer_sync")
+        .expect("timeout peer sync event");
+    assert_eq!(event.payload["peer"].as_str(), Some("peer-timeout"));
+    assert_eq!(event.payload["remote"].as_str(), Some("remote-node"));
+    assert_eq!(event.payload["alive"].as_bool(), Some(true));
+    assert_eq!(event.payload["sync_backoff"].as_u64(), Some(0));
+    assert_eq!(event.payload["next_sync_attempt"].as_i64(), Some(0));
+    assert_eq!(
+        event.payload["propagation"]["error"].as_str(),
+        Some("propagation peer timed out")
+    );
+}
+
+#[test]
 fn failed_propagation_remote_sync_reports_effective_limits() {
     let daemon = RpcDaemon::test_instance();
     daemon.set_remote_control_bridge(Arc::new(FailingTransferLimitRemoteControlBridge {
