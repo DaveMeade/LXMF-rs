@@ -74,6 +74,7 @@ pub(super) fn handle_message_get_request(
 pub(super) fn handle_offer_request(
     daemon: &RpcDaemon,
     control: &PropagationControlContext,
+    link_id: &AddressHash,
     remote_identity: &Identity,
     data: Option<rmpv::Value>,
     error_no_access: u8,
@@ -116,6 +117,9 @@ pub(super) fn handle_offer_request(
     peering_id.extend_from_slice(remote_identity.address_hash.as_slice());
     if validate_peering_key(peering_id.as_slice(), peering_key, peering_cost).is_none() {
         return ControlResponse::Code(error_invalid_key);
+    }
+    if let Ok(mut guard) = control.validated_peer_links.lock() {
+        guard.insert(*link_id);
     }
 
     let mut wanted = Vec::new();
@@ -216,6 +220,16 @@ fn named_destination_hash_for_identity(identity: &Identity, aspect: &str) -> [u8
 mod tests {
     use super::*;
     use reticulum_daemon::lxmf_stamps::generate_peering_key;
+    use std::collections::HashSet;
+    use std::sync::{Arc, Mutex};
+
+    fn test_validated_peer_links() -> Arc<Mutex<HashSet<AddressHash>>> {
+        Arc::new(Mutex::new(HashSet::new()))
+    }
+
+    fn test_link_id() -> AddressHash {
+        AddressHash::new([0xA6; 16])
+    }
 
     #[test]
     fn offer_request_returns_only_missing_transient_ids_after_peering_key_validation() {
@@ -255,11 +269,14 @@ mod tests {
             control_destination_hash_hex: Some("control".to_string()),
             delivery_destination: None,
             allowed_control_identities: Vec::new(),
+            validated_peer_links: test_validated_peer_links(),
         };
 
+        let link_id = test_link_id();
         let response = handle_offer_request(
             &daemon,
             &control,
+            &link_id,
             &remote_identity,
             Some(rmpv::Value::Array(vec![
                 rmpv::Value::Binary(peering_key),
@@ -278,6 +295,11 @@ mod tests {
             panic!("expected partial wanted-id list");
         };
         assert_eq!(wanted, vec![rmpv::Value::Binary(missing.to_vec())]);
+        assert!(control
+            .validated_peer_links
+            .lock()
+            .expect("validated peer links")
+            .contains(&link_id));
     }
 
     #[test]
@@ -319,11 +341,13 @@ mod tests {
             control_destination_hash_hex: Some("control".to_string()),
             delivery_destination: None,
             allowed_control_identities: Vec::new(),
+            validated_peer_links: test_validated_peer_links(),
         };
 
         let response = handle_offer_request(
             &daemon,
             &control,
+            &test_link_id(),
             &remote_identity,
             Some(rmpv::Value::Array(vec![
                 rmpv::Value::Binary(peering_key),
@@ -392,11 +416,13 @@ mod tests {
             control_destination_hash_hex: Some("control".to_string()),
             delivery_destination: None,
             allowed_control_identities: Vec::new(),
+            validated_peer_links: test_validated_peer_links(),
         };
 
         let response = handle_offer_request(
             &daemon,
             &control,
+            &test_link_id(),
             &remote_identity,
             Some(rmpv::Value::Array(vec![
                 rmpv::Value::Binary(peering_key),
@@ -460,11 +486,13 @@ mod tests {
             control_destination_hash_hex: Some("control".to_string()),
             delivery_destination: None,
             allowed_control_identities: Vec::new(),
+            validated_peer_links: test_validated_peer_links(),
         };
 
         let response = handle_offer_request(
             &daemon,
             &control,
+            &test_link_id(),
             &remote_identity,
             Some(rmpv::Value::Array(vec![
                 rmpv::Value::Binary(peering_key),
@@ -509,11 +537,13 @@ mod tests {
             control_destination_hash_hex: Some("control".to_string()),
             delivery_destination: None,
             allowed_control_identities: Vec::new(),
+            validated_peer_links: test_validated_peer_links(),
         };
 
         let response = handle_offer_request(
             &daemon,
             &control,
+            &test_link_id(),
             &remote_identity,
             Some(rmpv::Value::Array(vec![
                 rmpv::Value::Binary(peering_key),
@@ -581,11 +611,13 @@ mod tests {
             control_destination_hash_hex: Some("control".to_string()),
             delivery_destination: None,
             allowed_control_identities: Vec::new(),
+            validated_peer_links: test_validated_peer_links(),
         };
 
         let response = handle_offer_request(
             &daemon,
             &control,
+            &test_link_id(),
             &remote_identity,
             Some(rmpv::Value::Array(vec![
                 rmpv::Value::Binary(peering_key),
@@ -643,11 +675,13 @@ mod tests {
             control_destination_hash_hex: Some("control".to_string()),
             delivery_destination: None,
             allowed_control_identities: Vec::new(),
+            validated_peer_links: test_validated_peer_links(),
         };
 
         let response = handle_offer_request(
             &daemon,
             &control,
+            &test_link_id(),
             &remote_identity,
             Some(rmpv::Value::Array(vec![
                 rmpv::Value::Binary(peering_key),
@@ -694,11 +728,13 @@ mod tests {
             control_destination_hash_hex: Some("control".to_string()),
             delivery_destination: None,
             allowed_control_identities: Vec::new(),
+            validated_peer_links: test_validated_peer_links(),
         };
 
         let response = handle_offer_request(
             &daemon,
             &control,
+            &test_link_id(),
             &remote_identity,
             Some(rmpv::Value::Array(vec![
                 rmpv::Value::Binary(peering_key),
@@ -738,11 +774,13 @@ mod tests {
             control_destination_hash_hex: Some("control".to_string()),
             delivery_destination: None,
             allowed_control_identities: Vec::new(),
+            validated_peer_links: test_validated_peer_links(),
         };
 
         let response = handle_offer_request(
             &daemon,
             &control,
+            &test_link_id(),
             &remote_identity,
             Some(rmpv::Value::Nil),
             0xF1,

@@ -21,7 +21,7 @@ pub(super) async fn ingest_propagation_envelope(
     payload: &[u8],
     delivery_destination: Option<&Arc<tokio::sync::Mutex<SingleInputDestination>>>,
 ) -> Result<usize, std::io::Error> {
-    ingest_propagation_envelope_from_peer(daemon, payload, delivery_destination, None).await
+    ingest_propagation_envelope_from_peer(daemon, payload, delivery_destination, None, false).await
 }
 
 pub(super) async fn ingest_propagation_envelope_from_peer(
@@ -29,6 +29,7 @@ pub(super) async fn ingest_propagation_envelope_from_peer(
     payload: &[u8],
     delivery_destination: Option<&Arc<tokio::sync::Mutex<SingleInputDestination>>>,
     remote_propagation_peer: Option<&str>,
+    peer_link_validated: bool,
 ) -> Result<usize, std::io::Error> {
     let (_timestamp, messages): (f64, Vec<Vec<u8>>) =
         rmp_serde::from_slice(payload).map_err(|err| {
@@ -37,6 +38,12 @@ pub(super) async fn ingest_propagation_envelope_from_peer(
                 format!("invalid propagation envelope: {err}"),
             )
         })?;
+    if remote_propagation_peer.is_some() && !peer_link_validated && messages.len() > 1 {
+        return Err(std::io::Error::new(
+            std::io::ErrorKind::PermissionDenied,
+            "received multiple propagation messages without valid peering key",
+        ));
+    }
     let accepted_stamp_cost = daemon.propagation_min_accepted_stamp_cost();
     for message in messages.iter() {
         let transient_id = match daemon

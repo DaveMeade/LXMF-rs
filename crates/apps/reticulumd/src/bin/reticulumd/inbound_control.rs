@@ -23,8 +23,13 @@ pub(super) fn spawn_control_worker(
             let Ok(event) = rx.recv().await else {
                 break;
             };
-            let LinkEvent::Data(payload) = event.event else {
-                continue;
+            let payload = match event.event {
+                LinkEvent::Closed => {
+                    clear_validated_peer_link(&control, &event.id);
+                    continue;
+                }
+                LinkEvent::Data(payload) => payload,
+                _ => continue,
             };
             let destination_hex = hex::encode(event.address_hash.as_slice());
             let is_control_request =
@@ -71,6 +76,7 @@ pub(super) fn spawn_control_worker(
                     let response = handle_control_request(
                         daemon.as_ref(),
                         &control,
+                        &event.id,
                         payload.as_slice(),
                         remote_identity.as_ref(),
                         is_propagation_request,
@@ -97,6 +103,12 @@ pub(super) fn spawn_control_worker(
     });
 }
 
+fn clear_validated_peer_link(control: &PropagationControlContext, link_id: &AddressHash) {
+    if let Ok(mut guard) = control.validated_peer_links.lock() {
+        guard.remove(link_id);
+    }
+}
+
 fn parse_link_identify_payload(payload: &[u8], link_id: &AddressHash) -> Option<Identity> {
     if payload.len() < 32 + 32 + 64 {
         return None;
@@ -113,6 +125,7 @@ fn parse_link_identify_payload(payload: &[u8], link_id: &AddressHash) -> Option<
 fn handle_control_request(
     daemon: &RpcDaemon,
     control: &PropagationControlContext,
+    link_id: &AddressHash,
     payload: &[u8],
     remote_identity: Option<&Identity>,
     propagation_destination: bool,
@@ -143,6 +156,7 @@ fn handle_control_request(
             return propagation_commands::handle_offer_request(
                 daemon,
                 control,
+                link_id,
                 remote_identity,
                 data,
                 ERROR_NO_ACCESS,
@@ -221,6 +235,15 @@ mod tests {
     use reticulum_daemon::lxmf_stamps::generate_peering_key;
     use rns_rpc::MessagesStore;
     use serde_json::json;
+    use std::collections::HashSet;
+
+    fn test_validated_peer_links() -> Arc<Mutex<HashSet<AddressHash>>> {
+        Arc::new(Mutex::new(HashSet::new()))
+    }
+
+    fn test_link_id() -> AddressHash {
+        AddressHash::new([0xA5; 16])
+    }
 
     fn test_control_context() -> PropagationControlContext {
         PropagationControlContext {
@@ -230,6 +253,7 @@ mod tests {
             control_destination_hash_hex: Some("control".to_string()),
             delivery_destination: None,
             allowed_control_identities: Vec::new(),
+            validated_peer_links: test_validated_peer_links(),
         }
     }
 
@@ -243,6 +267,21 @@ mod tests {
     }
 
     #[test]
+    fn closed_link_clears_validated_peer_link_like_python() {
+        let control = test_control_context();
+        let link_id = test_link_id();
+        control.validated_peer_links.lock().expect("validated peer links").insert(link_id);
+
+        clear_validated_peer_link(&control, &link_id);
+
+        assert!(!control
+            .validated_peer_links
+            .lock()
+            .expect("validated peer links")
+            .contains(&link_id));
+    }
+
+    #[test]
     fn stats_request_returns_nil_when_propagation_node_is_disabled() {
         let daemon = RpcDaemon::test_instance();
         let remote_private =
@@ -252,6 +291,7 @@ mod tests {
         let response = handle_control_request(
             &daemon,
             &test_control_context(),
+            &test_link_id(),
             control_request("/pn/get/stats", rmpv::Value::Nil).as_slice(),
             Some(&remote_identity),
             false,
@@ -277,6 +317,7 @@ mod tests {
         let response = handle_control_request(
             &daemon,
             &test_control_context(),
+            &test_link_id(),
             control_request("/pn/get/stats", rmpv::Value::Nil).as_slice(),
             Some(&remote_identity),
             false,
@@ -308,6 +349,7 @@ mod tests {
         let response = handle_control_request(
             &daemon,
             &control,
+            &test_link_id(),
             control_request("/pn/get/stats", rmpv::Value::Nil).as_slice(),
             Some(&remote_identity),
             false,
@@ -344,10 +386,12 @@ mod tests {
             control_destination_hash_hex: Some("control".to_string()),
             delivery_destination: None,
             allowed_control_identities: vec!["not-the-remote".to_string()],
+            validated_peer_links: test_validated_peer_links(),
         };
         let response = handle_control_request(
             &daemon,
             &control,
+            &test_link_id(),
             control_request(
                 "/offer",
                 rmpv::Value::Array(vec![
@@ -398,6 +442,7 @@ mod tests {
                 control_destination_hash_hex: Some("control".to_string()),
                 delivery_destination: None,
                 allowed_control_identities: Vec::new(),
+                validated_peer_links: test_validated_peer_links(),
             },
         );
 
@@ -417,6 +462,7 @@ mod tests {
                 control_destination_hash_hex: Some("control".to_string()),
                 delivery_destination: None,
                 allowed_control_identities: Vec::new(),
+                validated_peer_links: test_validated_peer_links(),
             },
         );
 
@@ -451,6 +497,7 @@ mod tests {
                 control_destination_hash_hex: Some("control".to_string()),
                 delivery_destination: None,
                 allowed_control_identities: Vec::new(),
+                validated_peer_links: test_validated_peer_links(),
             },
         );
 
@@ -482,6 +529,7 @@ mod tests {
                 control_destination_hash_hex: Some("control".to_string()),
                 delivery_destination: None,
                 allowed_control_identities: Vec::new(),
+                validated_peer_links: test_validated_peer_links(),
             },
         );
 
@@ -509,6 +557,7 @@ mod tests {
                 control_destination_hash_hex: Some("control".to_string()),
                 delivery_destination: None,
                 allowed_control_identities: Vec::new(),
+                validated_peer_links: test_validated_peer_links(),
             },
         );
 
@@ -555,6 +604,7 @@ mod tests {
                 control_destination_hash_hex: Some("control".to_string()),
                 delivery_destination: None,
                 allowed_control_identities: Vec::new(),
+                validated_peer_links: test_validated_peer_links(),
             },
         );
 
@@ -608,6 +658,7 @@ mod tests {
                 control_destination_hash_hex: Some("control".to_string()),
                 delivery_destination: None,
                 allowed_control_identities: Vec::new(),
+                validated_peer_links: test_validated_peer_links(),
             },
         );
 
@@ -677,6 +728,7 @@ mod tests {
                 control_destination_hash_hex: Some("control".to_string()),
                 delivery_destination: None,
                 allowed_control_identities: Vec::new(),
+                validated_peer_links: test_validated_peer_links(),
             },
         );
 
@@ -718,6 +770,7 @@ mod tests {
                 control_destination_hash_hex: Some("control".to_string()),
                 delivery_destination: None,
                 allowed_control_identities: Vec::new(),
+                validated_peer_links: test_validated_peer_links(),
             },
         );
 
@@ -758,6 +811,7 @@ mod tests {
                 control_destination_hash_hex: Some("control".to_string()),
                 delivery_destination: None,
                 allowed_control_identities: Vec::new(),
+                validated_peer_links: test_validated_peer_links(),
             },
         );
 
@@ -800,6 +854,7 @@ mod tests {
                 control_destination_hash_hex: Some("control".to_string()),
                 delivery_destination: None,
                 allowed_control_identities: Vec::new(),
+                validated_peer_links: test_validated_peer_links(),
             },
         );
 
@@ -846,6 +901,7 @@ mod tests {
                 control_destination_hash_hex: Some("control".to_string()),
                 delivery_destination: None,
                 allowed_control_identities: Vec::new(),
+                validated_peer_links: test_validated_peer_links(),
             },
         );
 
@@ -913,6 +969,7 @@ mod tests {
                 control_destination_hash_hex: Some("control".to_string()),
                 delivery_destination: None,
                 allowed_control_identities: Vec::new(),
+                validated_peer_links: test_validated_peer_links(),
             },
         );
 
@@ -964,6 +1021,7 @@ mod tests {
                 control_destination_hash_hex: Some("control".to_string()),
                 delivery_destination: None,
                 allowed_control_identities: Vec::new(),
+                validated_peer_links: test_validated_peer_links(),
             },
         );
 
@@ -1041,6 +1099,7 @@ mod tests {
                 control_destination_hash_hex: Some("control".to_string()),
                 delivery_destination: None,
                 allowed_control_identities: Vec::new(),
+                validated_peer_links: test_validated_peer_links(),
             },
         );
 
@@ -1121,6 +1180,7 @@ mod tests {
                 control_destination_hash_hex: Some("control".to_string()),
                 delivery_destination: None,
                 allowed_control_identities: Vec::new(),
+                validated_peer_links: test_validated_peer_links(),
             },
         );
 

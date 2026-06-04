@@ -66,12 +66,18 @@ pub(super) fn spawn_inbound_worker(
                                         &event.link_id,
                                     )
                                     .await;
+                                    let peer_link_validated = resource_control
+                                        .validated_peer_links
+                                        .lock()
+                                        .ok()
+                                        .is_some_and(|guard| guard.contains(&event.link_id));
                                     if let Err(error) =
                                         propagation::ingest_propagation_envelope_from_peer(
                                             daemon.as_ref(),
                                             &complete.data,
                                             resource_control.delivery_destination.as_ref(),
                                             remote_peer.as_deref(),
+                                            peer_link_validated,
                                         )
                                         .await
                                     {
@@ -430,12 +436,55 @@ mod tests {
                 .expect("propagation envelope");
         let peer = hex::encode([0x77_u8; 16]);
 
-        let err = ingest_propagation_envelope_from_peer(&daemon, &envelope, None, Some(&peer))
-            .await
-            .expect_err("invalid peer propagation envelope should be rejected");
+        let err =
+            ingest_propagation_envelope_from_peer(&daemon, &envelope, None, Some(&peer), false)
+                .await
+                .expect_err("invalid peer propagation envelope should be rejected");
 
         assert!(err.to_string().contains("invalid propagation stamp"));
         assert!(daemon.propagation_peer_is_throttled(peer.as_str()));
+    }
+
+    #[tokio::test]
+    async fn inbound_peer_propagation_rejects_multi_message_without_validated_link_like_python() {
+        let daemon = RpcDaemon::test_instance();
+        let first = b"unvalidated-peer-first".to_vec();
+        let second = b"unvalidated-peer-second".to_vec();
+        let first_id = hex::encode(Sha256::digest(&first));
+        let second_id = hex::encode(Sha256::digest(&second));
+        let envelope =
+            rmp_serde::to_vec(&(1.0_f64, vec![first, second])).expect("propagation envelope");
+        let peer = hex::encode([0x78_u8; 16]);
+
+        let err =
+            ingest_propagation_envelope_from_peer(&daemon, &envelope, None, Some(&peer), false)
+                .await
+                .expect_err("unvalidated peer resource should reject multi-message transfer");
+
+        assert!(err.to_string().contains("valid peering key"));
+        assert!(!daemon.has_propagation_payload(first_id.as_str()));
+        assert!(!daemon.has_propagation_payload(second_id.as_str()));
+    }
+
+    #[tokio::test]
+    async fn inbound_peer_propagation_accepts_multi_message_with_validated_link_like_python() {
+        let daemon = RpcDaemon::test_instance();
+        let first = b"validated-peer-first".to_vec();
+        let second = b"validated-peer-second".to_vec();
+        let first_id = hex::encode(Sha256::digest(&first));
+        let second_id = hex::encode(Sha256::digest(&second));
+        let envelope =
+            rmp_serde::to_vec(&(1.0_f64, vec![first, second])).expect("propagation envelope");
+        let peer = hex::encode([0x79_u8; 16]);
+
+        let ingested =
+            ingest_propagation_envelope_from_peer(&daemon, &envelope, None, Some(&peer), true)
+                .await
+                .expect("validated peer resource should accept multi-message transfer");
+
+        assert_eq!(ingested, 2);
+        assert!(daemon.has_propagation_payload(first_id.as_str()));
+        assert!(daemon.has_propagation_payload(second_id.as_str()));
     }
 
     #[tokio::test]

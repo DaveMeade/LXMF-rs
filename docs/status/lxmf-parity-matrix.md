@@ -162,6 +162,9 @@ Recent focused evidence:
 - `cargo test -p reticulumd --bin reticulumd propagation_offer_ignores_control_allow_list_like_python -- --nocapture`
 - `cargo test -p reticulumd --bin reticulumd offer_request_does_not_mark_known_offers_received_like_python -- --nocapture`
 - `cargo test -p reticulumd --bin reticulumd message_get_marks_served_wanted_payloads_transferred_for_peer -- --nocapture`
+- `cargo test -p reticulumd --bin reticulumd inbound_peer_propagation_ -- --nocapture`
+- `cargo test -p reticulumd --bin reticulumd offer_request -- --nocapture`
+- `cargo test -p reticulumd --bin reticulumd inbound_worker::control::tests -- --nocapture`
 - `cargo test -p reticulumd --bin reticulumd transport_bridge_regenerates_propagation_app_data_from_daemon_state -- --nocapture`
 - `cargo test -p reticulum-rs-rpc --lib propagation -- --nocapture`
 - `cargo test -p reticulumd --bin reticulumd inbound_propagation_accepts_stamp_within_flexibility_window -- --nocapture`

@@ -151,6 +151,11 @@ gap, even though deeper propagation-router parity remains open.
   before interpreting `wanted_ids`: transfer-limited entries are filtered before
   the peer response, while sync-limited entries that were never offered remain
   queued for a later sync instead of being marked handled.
+- Inbound propagation peer-resource handling now tracks Python's validated
+  peering-link rule: a successful `/offer` peering-key validation marks the
+  link as peer-validated, and peer resource transfers with multiple propagation
+  messages are rejected unless they arrive on such a validated link. Validated
+  link state is cleared when the link closes.
 - Reticulum interface breadth is still narrower than the Python reference, but
   KISS and LoRa/RNode are active implemented areas in the current branch. The
   daemon and transport crates now cover serial KISS
