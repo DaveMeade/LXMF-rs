@@ -23,6 +23,7 @@ impl RpcDaemon {
         error: &str,
         transfer_limit: Option<u64>,
         sync_limit: Option<u64>,
+        postpone_reason: Option<&str>,
     ) {
         let peer = self.peers.lock().expect("peers mutex poisoned").get(peer_id).cloned();
         let Some(peer) = peer else {
@@ -58,7 +59,7 @@ impl RpcDaemon {
             "handled_ids": handled_ids,
             "unhandled_ids": unhandled_ids,
         });
-        let propagation = json!({
+        let mut propagation = json!({
             "remote_sync": true,
             "synced": false,
             "error": error,
@@ -70,52 +71,83 @@ impl RpcDaemon {
             "transfer_limit": transfer_limit,
             "sync_limit": sync_limit,
         });
-        self.publish_event(RpcEvent {
-            event_type: "peer_sync".into(),
-            payload: json!({
-                "peer": peer.peer,
-                "peer_type": peer.peer_type,
-                "type": peer_status_type,
-                "timestamp": now_i64(),
-                "name": peer.name,
-                "name_source": peer.name_source,
-                "remote": remote,
-                "remote_sync": true,
-                "synced": false,
-                "state": 0,
-                "sync_strategy": 2,
-                "ler": 0,
-                "peering_timebase": peer.peering_timebase,
-                "network_distance": peer.network_distance,
-                "alive": peer.alive,
-                "last_heard": peer.last_seen,
-                "first_seen": peer.first_seen,
-                "seen_count": peer.seen_count,
-                "rx_bytes": peer.rx_bytes,
-                "tx_bytes": peer.tx_bytes,
-                "acceptance_rate": acceptance_rate,
-                "last_sync_attempt": peer.last_sync_attempt,
-                "next_sync_attempt": peer.next_sync_attempt,
-                "sync_backoff": peer.sync_backoff,
-                "sync_transfer_rate": peer.sync_transfer_rate,
-                "str": peer.sync_transfer_rate as u64,
-                "propagation_transfer_limit": peer.propagation_transfer_limit,
-                "propagation_sync_limit": peer.propagation_sync_limit,
-                "propagation_stamp_cost": peer.propagation_stamp_cost,
-                "propagation_stamp_cost_flexibility": peer.propagation_stamp_cost_flexibility,
-                "peering_key": peering_key,
-                "peering_key_status": peering_key_status,
-                "transfer_limit": transfer_limit,
-                "sync_limit": sync_limit,
-                "target_stamp_cost": peer.propagation_stamp_cost,
-                "stamp_cost_flexibility": peer.propagation_stamp_cost_flexibility,
-                "offered": offered,
-                "outgoing": outgoing,
-                "incoming": incoming,
-                "messages": messages,
-                "propagation": propagation,
-            }),
+        if let Some(reason) = postpone_reason {
+            propagation["postponed"] = json!(true);
+            propagation["postpone_reason"] = json!(reason);
+        }
+        let mut payload = json!({
+            "peer": peer.peer,
+            "peer_type": peer.peer_type,
+            "type": peer_status_type,
+            "timestamp": now_i64(),
+            "name": peer.name,
+            "name_source": peer.name_source,
+            "remote": remote,
+            "remote_sync": true,
+            "synced": false,
+            "state": 0,
+            "sync_strategy": 2,
+            "ler": 0,
+            "peering_timebase": peer.peering_timebase,
+            "network_distance": peer.network_distance,
+            "alive": peer.alive,
+            "last_heard": peer.last_seen,
+            "first_seen": peer.first_seen,
+            "seen_count": peer.seen_count,
+            "rx_bytes": peer.rx_bytes,
+            "tx_bytes": peer.tx_bytes,
+            "acceptance_rate": acceptance_rate,
+            "last_sync_attempt": peer.last_sync_attempt,
+            "next_sync_attempt": peer.next_sync_attempt,
+            "sync_backoff": peer.sync_backoff,
+            "sync_transfer_rate": peer.sync_transfer_rate,
+            "str": peer.sync_transfer_rate as u64,
+            "propagation_transfer_limit": peer.propagation_transfer_limit,
+            "propagation_sync_limit": peer.propagation_sync_limit,
+            "propagation_stamp_cost": peer.propagation_stamp_cost,
+            "propagation_stamp_cost_flexibility": peer.propagation_stamp_cost_flexibility,
+            "peering_key": peering_key,
+            "peering_key_status": peering_key_status,
+            "transfer_limit": transfer_limit,
+            "sync_limit": sync_limit,
+            "target_stamp_cost": peer.propagation_stamp_cost,
+            "stamp_cost_flexibility": peer.propagation_stamp_cost_flexibility,
+            "offered": offered,
+            "outgoing": outgoing,
+            "incoming": incoming,
+            "messages": messages,
+            "propagation": propagation,
         });
+        if let Some(reason) = postpone_reason {
+            payload["postponed"] = json!(true);
+            payload["postpone_reason"] = json!(reason);
+        }
+        self.publish_event(RpcEvent { event_type: "peer_sync".into(), payload });
+    }
+
+    fn record_throttled_remote_peer_sync(
+        &self,
+        peer_id: &str,
+        remote: &str,
+        error: &str,
+        transfer_limit: Option<u64>,
+        sync_limit: Option<u64>,
+    ) {
+        let timestamp = now_i64();
+        if let Ok(mut peers) = self.peers.lock() {
+            if let Some(peer) = peers.get_mut(peer_id) {
+                peer.last_sync_attempt = timestamp;
+                peer.next_sync_attempt = timestamp.saturating_add(PN_STAMP_THROTTLE_SECS);
+            }
+        }
+        self.publish_failed_remote_peer_sync_event(
+            peer_id,
+            remote,
+            error,
+            transfer_limit,
+            sync_limit,
+            Some("throttled"),
+        );
     }
 
     fn store_propagation_payload_hex(
@@ -1328,6 +1360,7 @@ impl RpcDaemon {
                                     err.to_string().as_str(),
                                     transfer_limit,
                                     sync_limit,
+                                    None,
                                 );
                                 return Err(err);
                             }
@@ -1492,20 +1525,32 @@ impl RpcDaemon {
                         result
                     }
                     Err(err) => {
+                        let error = err.to_string();
                         self.update_propagation_sync_state(|state| {
                             state.sync_state = PR_FAILED;
                             state.state_name = "failed".to_string();
                             state.sync_progress = 0.0;
-                            state.last_sync_error = Some(err.to_string());
+                            state.last_sync_error = Some(error.clone());
                         });
-                        self.record_outbound_peer_activity(peer_id.as_str(), 0, false);
-                        self.publish_failed_remote_peer_sync_event(
-                            peer_id.as_str(),
-                            remote_id.as_str(),
-                            err.to_string().as_str(),
-                            transfer_limit,
-                            sync_limit,
-                        );
+                        if err.kind() == std::io::ErrorKind::WouldBlock {
+                            self.record_throttled_remote_peer_sync(
+                                peer_id.as_str(),
+                                remote_id.as_str(),
+                                error.as_str(),
+                                transfer_limit,
+                                sync_limit,
+                            );
+                        } else {
+                            self.record_outbound_peer_activity(peer_id.as_str(), 0, false);
+                            self.publish_failed_remote_peer_sync_event(
+                                peer_id.as_str(),
+                                remote_id.as_str(),
+                                error.as_str(),
+                                transfer_limit,
+                                sync_limit,
+                                None,
+                            );
+                        }
                         return Err(err);
                     }
                 };

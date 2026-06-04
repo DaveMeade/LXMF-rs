@@ -412,6 +412,7 @@ fn response_code_error(response: &rmpv::Value) -> Option<std::io::Error> {
             0xF0 => (std::io::ErrorKind::PermissionDenied, "propagation node requires identity"),
             0xF1 => (std::io::ErrorKind::PermissionDenied, "propagation node denied access"),
             0xF4 => (std::io::ErrorKind::InvalidInput, "propagation node rejected the request"),
+            0xF6 => (std::io::ErrorKind::WouldBlock, "propagation peer throttled"),
             0xFD => (std::io::ErrorKind::NotFound, "propagation peer not found"),
             _ => (std::io::ErrorKind::InvalidData, "unexpected propagation control response"),
         };
@@ -440,6 +441,15 @@ mod tests {
             summary["transferred_bytes"].as_u64(),
             Some(payloads.iter().map(Vec::len).sum::<usize>() as u64)
         );
+    }
+
+    #[test]
+    fn propagation_control_response_code_maps_throttled_like_python() {
+        let err = response_code_error(&rmpv::Value::from(0xF6_u64))
+            .expect("throttled response should map to error");
+
+        assert_eq!(err.kind(), std::io::ErrorKind::WouldBlock);
+        assert_eq!(err.to_string(), "propagation peer throttled");
     }
 
     #[test]

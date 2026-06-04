@@ -110,6 +110,10 @@ gap, even though deeper propagation-router parity remains open.
   that propagation peer throttled for Python's `PN_STAMP_THROTTLE` window, and
   subsequent `/offer` requests from the peer return `ERROR_THROTTLED` until the
   throttle expires.
+- Remote propagation sync now maps peer `ERROR_THROTTLED` responses to the
+  Python throttle path: the peer's next sync attempt is postponed by
+  `PN_STAMP_THROTTLE` while liveness, acceptance, and generic sync backoff are
+  preserved.
 - Reticulum interface breadth is still narrower than the Python reference, but
   KISS and LoRa/RNode are active implemented areas in the current branch. The
   daemon and transport crates now cover serial KISS
