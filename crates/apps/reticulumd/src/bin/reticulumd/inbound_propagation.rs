@@ -65,11 +65,20 @@ pub(super) async fn ingest_propagation_envelope_from_peer(
             daemon.note_client_propagation_messages_received(1);
             continue;
         }
-        daemon.ingest_propagation_payload_bytes_at_cost(
-            message,
-            Some(transient_id.as_str()),
-            accepted_stamp_cost,
-        )?;
+        if let Some(peer) = remote_propagation_peer {
+            daemon.ingest_peer_propagation_payload_bytes_at_cost(
+                message,
+                Some(transient_id.as_str()),
+                accepted_stamp_cost,
+                peer,
+            )?;
+        } else {
+            daemon.ingest_propagation_payload_bytes_at_cost(
+                message,
+                Some(transient_id.as_str()),
+                accepted_stamp_cost,
+            )?;
+        }
     }
     if let Some(error) = invalid_stamp_error {
         return Err(error);

@@ -484,6 +484,66 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn inbound_peer_propagation_marks_source_handled_and_queues_other_peers_like_python() {
+        let daemon = RpcDaemon::test_instance();
+        daemon
+            .handle_rpc(RpcRequest {
+                id: 46,
+                method: "propagation_enable".to_string(),
+                params: Some(serde_json::json!({
+                    "enabled": true,
+                    "target_cost": 1,
+                    "stamp_cost_flexibility": 0,
+                })),
+            })
+            .expect("enable propagation");
+        let source_peer = hex::encode([0x7B_u8; 16]);
+        let relay_peer = hex::encode([0x7C_u8; 16]);
+        for (id, peer) in [(47, &source_peer), (48, &relay_peer)] {
+            daemon
+                .handle_rpc(RpcRequest {
+                    id,
+                    method: "peer_sync".to_string(),
+                    params: Some(serde_json::json!({ "peer": peer })),
+                })
+                .expect("seed propagation peer");
+        }
+        let lxm_data = [0x53_u8; 113];
+        let transient = stamped_propagation_payload(&lxm_data, 1);
+        let transient_id = hex::encode(Sha256::digest(lxm_data));
+        let envelope =
+            rmp_serde::to_vec(&(1.0_f64, vec![transient])).expect("propagation envelope");
+
+        let ingested = ingest_propagation_envelope_from_peer(
+            &daemon,
+            &envelope,
+            None,
+            Some(&source_peer),
+            true,
+        )
+        .await
+        .expect("ingest peer propagation envelope");
+
+        assert_eq!(ingested, 1);
+        let source_row = peer_row(&daemon, source_peer.as_str(), 49);
+        assert_eq!(
+            source_row["messages"]["handled_ids"].as_array().expect("source handled ids"),
+            &[serde_json::json!(transient_id.as_str())]
+        );
+        assert!(source_row["messages"]["unhandled_ids"]
+            .as_array()
+            .expect("source unhandled ids")
+            .is_empty());
+        assert_eq!(source_row["rx_bytes"].as_u64(), Some(lxm_data.len() as u64));
+        assert_eq!(source_row["messages"]["incoming"].as_u64(), Some(1));
+        let relay_row = peer_row(&daemon, relay_peer.as_str(), 50);
+        assert_eq!(
+            relay_row["messages"]["unhandled_ids"].as_array().expect("relay unhandled ids"),
+            &[serde_json::json!(transient_id.as_str())]
+        );
+    }
+
+    #[tokio::test]
     async fn inbound_peer_propagation_rejects_multi_message_without_validated_link_like_python() {
         let daemon = RpcDaemon::test_instance();
         let first = b"unvalidated-peer-first".to_vec();

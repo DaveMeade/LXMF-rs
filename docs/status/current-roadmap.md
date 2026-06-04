@@ -159,6 +159,10 @@ gap, even though deeper propagation-router parity remains open.
 - Inbound peer propagation resources with mixed valid and invalid propagation
   stamps now follow Python's transfer handling more closely: valid messages are
   ingested before the transfer is rejected and the offending peer is throttled.
+- Inbound peer propagation resources from a known source peer now follow
+  Python's source-peer queueing rule: the source peer is marked received/handled
+  and records inbound bytes, while newly ingested propagation entries are queued
+  only for other active peers.
 - Reticulum interface breadth is still narrower than the Python reference, but
   KISS and LoRa/RNode are active implemented areas in the current branch. The
   daemon and transport crates now cover serial KISS

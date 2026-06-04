@@ -91,7 +91,8 @@ names are `lxmf-wire` and `reticulum-rs-rpc`.
   policy, Python-compatible low-value stamped peer-offer handling,
   strict peering-timebase config refresh, Python-style unreachable-peer
   maintenance culling, mixed invalid-stamp peer resource handling that preserves
-  valid entries before throttling, peering-key values, and explicit peering-key
+  valid entries before throttling, source-peer handled/other-peer queueing for
+  inbound propagation resources, peering-key values, and explicit peering-key
   readiness status values are exposed, but the active workspace
   does not yet match Python `LXMPeer` queueing, transfer, and peering behavior.
 - Paper-command baseline is implemented for bridge-backed `reticulumd`: SDK

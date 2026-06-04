@@ -241,6 +241,26 @@ impl RpcDaemon {
         Ok(())
     }
 
+    fn queue_propagation_entry_from_source_for_active_peers(
+        &self,
+        source_peer: &str,
+        transient_id: &str,
+    ) -> Result<(), std::io::Error> {
+        let source_peer = source_peer.trim().to_ascii_lowercase();
+        for peer in self.active_peer_ids() {
+            if peer == source_peer {
+                self.store
+                    .mark_peer_received_propagation(peer.as_str(), transient_id)
+                    .map_err(std::io::Error::other)?;
+            } else {
+                self.store
+                    .mark_peer_unhandled_propagation(peer.as_str(), transient_id)
+                    .map_err(std::io::Error::other)?;
+            }
+        }
+        Ok(())
+    }
+
     fn import_remote_propagation_payloads(
         &self,
         result: &JsonValue,
@@ -625,6 +645,59 @@ impl RpcDaemon {
     ) -> Result<String, std::io::Error> {
         let payload_hex = hex::encode(payload);
         self.ingest_propagation_payload_hex_at_cost(payload_hex.as_str(), transient_id, stamp_cost)
+    }
+
+    pub fn ingest_peer_propagation_payload_bytes_at_cost(
+        &self,
+        payload: &[u8],
+        transient_id: Option<&str>,
+        stamp_cost: u32,
+        source_peer: &str,
+    ) -> Result<String, std::io::Error> {
+        let source_peer = source_peer.trim().to_ascii_lowercase();
+        if source_peer.is_empty() {
+            return self.ingest_propagation_payload_bytes_at_cost(
+                payload,
+                transient_id,
+                stamp_cost,
+            );
+        }
+        let (canonical_transient_id, normalized_payload) =
+            normalize_propagation_payload_bytes(payload, stamp_cost)?;
+        let canonical_transient_id = hex::encode(canonical_transient_id);
+        if let Some(provided_transient_id) = transient_id {
+            if !provided_transient_id.eq_ignore_ascii_case(canonical_transient_id.as_str()) {
+                return Err(std::io::Error::new(
+                    std::io::ErrorKind::InvalidInput,
+                    "transient_id does not match propagation payload",
+                ));
+            }
+        }
+        let transient_id =
+            transient_id.map(normalize_propagation_transient_key).unwrap_or(canonical_transient_id);
+        let already_known = self
+            .store
+            .get_propagation_entry(transient_id.as_str())
+            .map_err(std::io::Error::other)?
+            .is_some();
+        let payload_hex = hex::encode(normalized_payload);
+        self.store_propagation_payload_hex(transient_id.as_str(), payload_hex.as_str())?;
+        if !already_known {
+            self.queue_propagation_entry_from_source_for_active_peers(
+                source_peer.as_str(),
+                transient_id.as_str(),
+            )?;
+        } else {
+            self.store
+                .mark_peer_received_propagation(source_peer.as_str(), transient_id.as_str())
+                .map_err(std::io::Error::other)?;
+        }
+        self.record_inbound_peer_activity(source_peer.as_str(), normalized_payload.len());
+        self.propagation_payloads
+            .lock()
+            .expect("propagation payload mutex poisoned")
+            .insert(transient_id.clone(), payload_hex);
+        Ok(transient_id)
     }
 
     pub fn has_propagation_payload(&self, transient_id: &str) -> bool {
