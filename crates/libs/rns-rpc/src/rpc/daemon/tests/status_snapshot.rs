@@ -2284,6 +2284,138 @@ fn autopeer_capacity_rejects_peer_but_preserves_announce() {
 }
 
 #[test]
+fn propagation_peer_maintenance_culls_unreachable_non_static_peers_like_python() {
+    let daemon = RpcDaemon::test_instance();
+    daemon
+        .handle_rpc(rpc_request(
+            41,
+            "propagation_enable",
+            json!({
+                "enabled": true,
+                "autopeer": true,
+                "static_peers": ["peer-static-unreachable-retained"],
+            }),
+        ))
+        .expect("enable propagation");
+
+    let stale_entry = PropagationEntryRecord {
+        transient_id: "c9".repeat(32),
+        destination: "12".repeat(16),
+        payload_hex: "12".repeat(24),
+        received_at: 1_700_000_500,
+        size_bytes: 24,
+        stamp_value: None,
+    };
+    let static_entry = PropagationEntryRecord {
+        transient_id: "ca".repeat(32),
+        destination: "13".repeat(16),
+        payload_hex: "13".repeat(24),
+        received_at: 1_700_000_501,
+        size_bytes: 24,
+        stamp_value: None,
+    };
+    daemon.store.upsert_propagation_entry(&stale_entry).expect("store stale entry");
+    daemon.store.upsert_propagation_entry(&static_entry).expect("store static entry");
+    daemon
+        .store
+        .mark_peer_unhandled_propagation(
+            "peer-auto-unreachable-cull",
+            stale_entry.transient_id.as_str(),
+        )
+        .expect("mark stale unhandled");
+    daemon
+        .store
+        .mark_peer_unhandled_propagation(
+            "peer-static-unreachable-retained",
+            static_entry.transient_id.as_str(),
+        )
+        .expect("mark static unhandled");
+    daemon
+        .accept_announce_with_metadata(
+            "peer-auto-unreachable-cull".to_string(),
+            1_700_000_510,
+            Some("Cull Candidate".to_string()),
+            Some("announce".to_string()),
+            None,
+            Some(vec!["propagation".to_string()]),
+            None,
+            None,
+            None,
+            Some(1),
+            Some(Some(0)),
+            Some(Some(1)),
+            None,
+            Some(1),
+            None,
+            None,
+            None,
+            None,
+        )
+        .expect("accept autopeer announce");
+
+    let stale_last_seen = now_i64() - (14 * 24 * 60 * 60) - 1;
+    {
+        let mut peers = daemon.peers.lock().expect("peers mutex poisoned");
+        let stale = peers.get_mut("peer-auto-unreachable-cull").expect("stale peer");
+        stale.last_seen = stale_last_seen;
+        stale.alive = false;
+        let static_peer =
+            peers.get_mut("peer-static-unreachable-retained").expect("static peer");
+        static_peer.last_seen = stale_last_seen;
+        static_peer.alive = false;
+    }
+    daemon.event_queue.lock().expect("event_queue mutex poisoned").clear();
+
+    let result = daemon
+        .handle_rpc(rpc_request(42, "propagation_peer_maintenance", json!({})))
+        .expect("peer maintenance")
+        .result
+        .expect("peer maintenance result");
+
+    assert_eq!(result["culled"].as_u64(), Some(1));
+    assert_eq!(
+        result["culled_peers"].as_array().expect("culled peers"),
+        &[json!("peer-auto-unreachable-cull")]
+    );
+    let peers = daemon
+        .handle_rpc(RpcRequest { id: 43, method: "list_peers".to_string(), params: None })
+        .expect("list peers")
+        .result
+        .expect("list peers result");
+    let rows = peers["peers"].as_array().expect("peer rows");
+    assert!(rows.iter().all(|row| row["peer"].as_str() != Some("peer-auto-unreachable-cull")));
+    assert!(
+        rows.iter()
+            .any(|row| row["peer"].as_str() == Some("peer-static-unreachable-retained"))
+    );
+    assert!(
+        daemon
+            .store
+            .list_peer_unhandled_propagation("peer-auto-unreachable-cull")
+            .expect("stale unhandled marks")
+            .is_empty()
+    );
+    assert_eq!(
+        daemon
+            .store
+            .list_peer_unhandled_propagation("peer-static-unreachable-retained")
+            .expect("static unhandled marks"),
+        vec![static_entry]
+    );
+    let event = daemon
+        .event_queue
+        .lock()
+        .expect("event_queue mutex poisoned")
+        .iter()
+        .rev()
+        .find(|event| event.event_type == "peer_unpeer")
+        .cloned()
+        .expect("peer unpeer event");
+    assert_eq!(event.payload["peer"].as_str(), Some("peer-auto-unreachable-cull"));
+    assert_eq!(event.payload["reason"].as_str(), Some("max_unreachable"));
+}
+
+#[test]
 fn stale_announce_does_not_regress_propagation_peer_state() {
     let daemon = RpcDaemon::test_instance();
     daemon

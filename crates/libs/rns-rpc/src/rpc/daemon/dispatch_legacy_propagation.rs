@@ -769,6 +769,20 @@ impl RpcDaemon {
                     error: None,
                 })
             }
+            "propagation_peer_maintenance" => {
+                let timestamp = now_i64();
+                let culled_peers = self.cull_unreachable_non_static_peers(timestamp)?;
+                Ok(RpcResponse {
+                    id: request.id,
+                    result: Some(json!({
+                        "timestamp": timestamp,
+                        "culled": culled_peers.len(),
+                        "culled_peers": culled_peers,
+                        "max_unreachable_secs": super::init::LXMF_PEER_MAX_UNREACHABLE_SECS,
+                    })),
+                    error: None,
+                })
+            }
             "propagation_enable" => {
                 let params = request.params.ok_or_else(|| {
                     std::io::Error::new(std::io::ErrorKind::InvalidInput, "missing params")

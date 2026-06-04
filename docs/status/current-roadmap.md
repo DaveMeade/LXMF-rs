@@ -101,6 +101,10 @@ gap, even though deeper propagation-router parity remains open.
   ordering: equal-timebase announces are retained in the announce log but no
   longer overwrite the active peer's propagation limits, costs, or peering
   policy fields.
+- Propagation peer maintenance now has an explicit RPC path for Python
+  `sync_peers()`-style unreachable-peer culling: non-static peers unheard for
+  `LXMPeer.MAX_UNREACHABLE` are unpeered and have their propagation queue marks
+  cleared, while configured static peers are retained.
 - Reticulum interface breadth is still narrower than the Python reference, but
   KISS and LoRa/RNode are active implemented areas in the current branch. The
   daemon and transport crates now cover serial KISS

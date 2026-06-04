@@ -2,6 +2,7 @@ use super::dispatch_legacy_messages::LocalUnpeerCleanup;
 use super::*;
 
 pub(super) const LXMF_PEER_SYNC_BACKOFF_STEP_SECS: u32 = 12 * 60;
+pub(super) const LXMF_PEER_MAX_UNREACHABLE_SECS: i64 = 14 * 24 * 60 * 60;
 
 #[derive(Debug, Clone, Copy)]
 pub(super) struct PeerPropagationState {
@@ -1355,6 +1356,45 @@ impl RpcDaemon {
             }
         }
         Ok(())
+    }
+
+    pub(super) fn cull_unreachable_non_static_peers(
+        &self,
+        timestamp: i64,
+    ) -> Result<Vec<String>, std::io::Error> {
+        let static_peers =
+            self.propagation_state.lock().expect("propagation mutex poisoned").static_peers.clone();
+        let mut peers_to_remove = {
+            let guard = self.peers.lock().expect("peers mutex poisoned");
+            guard
+                .values()
+                .filter(|record| record.peer_type.as_deref() != Some("unpeered"))
+                .filter(|record| {
+                    !static_peers.iter().any(|peer| peer.eq_ignore_ascii_case(record.peer.as_str()))
+                })
+                .filter(|record| {
+                    timestamp > record.last_seen.saturating_add(LXMF_PEER_MAX_UNREACHABLE_SECS)
+                })
+                .map(|record| record.peer.clone())
+                .collect::<Vec<_>>()
+        };
+        peers_to_remove.sort();
+        let mut removed = Vec::new();
+        for peer in peers_to_remove {
+            let cleanup = self.unpeer_local_state(peer.as_str())?;
+            if cleanup.removed {
+                self.publish_event(RpcEvent {
+                    event_type: "peer_unpeer".into(),
+                    payload: policy_unpeer_event_payload(
+                        peer.as_str(),
+                        "max_unreachable",
+                        &cleanup,
+                    ),
+                });
+                removed.push(peer);
+            }
+        }
+        Ok(removed)
     }
 
     pub(super) fn ensure_peer_admission_allowed(
