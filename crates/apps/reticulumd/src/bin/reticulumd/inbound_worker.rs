@@ -883,6 +883,103 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn inbound_peer_propagation_local_delivery_counts_source_peer_like_python() {
+        let daemon = RpcDaemon::test_instance();
+        daemon
+            .handle_rpc(RpcRequest {
+                id: 46,
+                method: "propagation_enable".to_string(),
+                params: Some(serde_json::json!({
+                    "enabled": true,
+                    "target_cost": 1,
+                    "stamp_cost_flexibility": 0,
+                })),
+            })
+            .expect("enable propagation");
+        let delivery_private = PrivateIdentity::new_from_rand(OsRng);
+        let source_private = PrivateIdentity::new_from_rand(OsRng);
+        let delivery_destination = Arc::new(TokioMutex::new(SingleInputDestination::new(
+            delivery_private.clone(),
+            DestinationName::new("lxmf", "delivery"),
+        )));
+        let source_destination = SingleInputDestination::new(
+            source_private.clone(),
+            DestinationName::new("lxmf", "delivery"),
+        );
+        let mut destination_hash = [0u8; 16];
+        {
+            let destination = delivery_destination.lock().await;
+            destination_hash.copy_from_slice(destination.desc.address_hash.as_slice());
+        }
+        daemon.set_delivery_destination_hash(Some(hex::encode(destination_hash)));
+        let mut source_hash = [0u8; 16];
+        source_hash.copy_from_slice(source_destination.desc.address_hash.as_slice());
+        let propagation_peer = hex::encode([0x7F_u8; 16]);
+        daemon
+            .handle_rpc(RpcRequest {
+                id: 47,
+                method: "peer_sync".to_string(),
+                params: Some(serde_json::json!({ "peer": propagation_peer })),
+            })
+            .expect("seed propagation peer");
+
+        let wire = build_wire_message_with_options(
+            source_hash,
+            destination_hash,
+            "peer local propagated title",
+            "peer local propagated content",
+            None,
+            &to_core_private_identity(&source_private),
+            None,
+            None,
+            None,
+        )
+        .expect("wire");
+        let (envelope, transient_len) = {
+            let destination = delivery_destination.lock().await;
+            let message = WireMessage::unpack(&wire).expect("wire unpack");
+            let (transient, transient_id) = message
+                .pack_propagation_transient_with_rng(
+                    &to_core_identity(destination.identity.as_identity()),
+                    OsRng,
+                )
+                .expect("propagation transient");
+            let stamp = generate_propagation_stamp(&transient_id, 1).expect("propagation stamp");
+            (
+                WireMessage::pack_propagation_envelope(1.0, &transient, Some(&stamp))
+                    .expect("propagation envelope"),
+                transient.len(),
+            )
+        };
+
+        let ingested = ingest_propagation_envelope_from_peer(
+            &daemon,
+            &envelope,
+            Some(&delivery_destination),
+            Some(&propagation_peer),
+            true,
+        )
+        .await
+        .expect("ingest peer propagation envelope");
+        assert_eq!(ingested, 1);
+
+        let peer = peer_row(&daemon, propagation_peer.as_str(), 48);
+        assert_eq!(peer["messages"]["incoming"].as_u64(), Some(1));
+        assert_eq!(peer["rx_bytes"].as_u64(), Some(transient_len as u64));
+
+        let status = daemon
+            .handle_rpc(RpcRequest {
+                id: 49,
+                method: "propagation_status".to_string(),
+                params: None,
+            })
+            .expect("propagation status")
+            .result
+            .expect("propagation status result");
+        assert_eq!(status["propagation"]["client_propagation_messages_received"].as_u64(), Some(0));
+    }
+
+    #[tokio::test]
     async fn duplicate_local_propagation_payload_does_not_update_peer_activity_like_python() {
         let daemon = RpcDaemon::test_instance();
         daemon

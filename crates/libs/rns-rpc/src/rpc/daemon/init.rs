@@ -588,6 +588,22 @@ impl RpcDaemon {
         }
     }
 
+    pub fn record_inbound_propagation_peer_activity(&self, peer: &str, bytes: usize) -> bool {
+        let peer = peer.trim();
+        if let Ok(mut guard) = self.peers.lock() {
+            if let Some(existing) =
+                guard.get_mut(peer).filter(|record| record.peer_type.as_deref() != Some("unpeered"))
+            {
+                existing.alive = true;
+                existing.last_seen = now_i64();
+                existing.incoming = existing.incoming.saturating_add(1);
+                existing.rx_bytes = existing.rx_bytes.saturating_add(bytes as u64);
+                return true;
+            }
+        }
+        false
+    }
+
     pub fn record_outbound_peer_activity(&self, peer: &str, bytes: usize, delivered: bool) {
         if let Ok(mut guard) = self.peers.lock() {
             if let Some(existing) = guard.get_mut(peer) {

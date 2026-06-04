@@ -61,8 +61,17 @@ pub(super) async fn ingest_propagation_envelope_from_peer(
                 continue;
             }
         };
-        if try_accept_local_propagated_message(daemon, delivery_destination, message).await? {
-            daemon.note_client_propagation_messages_received(1);
+        if try_accept_local_propagated_message(
+            daemon,
+            delivery_destination,
+            message,
+            remote_propagation_peer,
+        )
+        .await?
+        {
+            if remote_propagation_peer.is_none() {
+                daemon.note_client_propagation_messages_received(1);
+            }
             continue;
         }
         if let Some(peer) = remote_propagation_peer {
@@ -90,6 +99,7 @@ async fn try_accept_local_propagated_message(
     daemon: &RpcDaemon,
     delivery_destination: Option<&Arc<tokio::sync::Mutex<SingleInputDestination>>>,
     transient_payload: &[u8],
+    remote_propagation_peer: Option<&str>,
 ) -> Result<bool, std::io::Error> {
     let Some(delivery_destination) = delivery_destination else {
         return Ok(false);
@@ -133,13 +143,25 @@ async fn try_accept_local_propagated_message(
         daemon.propagation_target_cost(),
         daemon.propagation_min_accepted_stamp_cost(),
     );
+    if let Some(peer) = remote_propagation_peer {
+        let propagation_bytes = if daemon.propagation_target_cost() > 0 {
+            transient_payload.len().saturating_sub(32)
+        } else {
+            transient_payload.len()
+        };
+        if !daemon.record_inbound_propagation_peer_activity(peer, propagation_bytes) {
+            daemon.record_unpeered_propagation_attempt(propagation_bytes);
+        }
+    }
     if !inbound_record_allowed_by_delivery_policy(daemon, &record) {
         return Ok(true);
     }
     if daemon.message_exists(record.id.as_str())? {
         return Ok(true);
     }
-    daemon.record_inbound_peer_activity(&record.source, wire.len());
+    if remote_propagation_peer.is_none() {
+        daemon.record_inbound_peer_activity(&record.source, wire.len());
+    }
     daemon.accept_inbound_with_raw(record, &wire)?;
     Ok(true)
 }
