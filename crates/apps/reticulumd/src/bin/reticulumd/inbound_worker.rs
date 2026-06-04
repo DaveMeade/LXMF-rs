@@ -446,6 +446,44 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn inbound_peer_propagation_preserves_valid_messages_when_transfer_has_invalid_stamp_like_python(
+    ) {
+        let daemon = RpcDaemon::test_instance();
+        daemon
+            .handle_rpc(RpcRequest {
+                id: 44,
+                method: "propagation_enable".to_string(),
+                params: Some(serde_json::json!({
+                    "enabled": true,
+                    "target_cost": 1,
+                    "stamp_cost_flexibility": 0,
+                })),
+            })
+            .expect("enable propagation");
+        let valid_lxm_data = [0x52_u8; 113];
+        let valid_transient = stamped_propagation_payload(&valid_lxm_data, 1);
+        let valid_transient_id = hex::encode(Sha256::digest(valid_lxm_data));
+        let invalid_transient = b"unstamped-peer-propagation-payload".to_vec();
+        let invalid_transient_id = hex::encode(Sha256::digest(&invalid_transient));
+        let envelope = rmp_serde::to_vec(&(1.0_f64, vec![invalid_transient, valid_transient]))
+            .expect("propagation envelope");
+        let peer = hex::encode([0x7A_u8; 16]);
+
+        let err =
+            ingest_propagation_envelope_from_peer(&daemon, &envelope, None, Some(&peer), true)
+                .await
+                .expect_err("mixed-stamp peer resource should reject the transfer");
+
+        assert!(err.to_string().contains("invalid propagation stamp"));
+        assert!(daemon.propagation_peer_is_throttled(peer.as_str()));
+        assert!(
+            daemon.has_propagation_payload(valid_transient_id.as_str()),
+            "valid entries in a mixed peer transfer should still be ingested"
+        );
+        assert!(!daemon.has_propagation_payload(invalid_transient_id.as_str()));
+    }
+
+    #[tokio::test]
     async fn inbound_peer_propagation_rejects_multi_message_without_validated_link_like_python() {
         let daemon = RpcDaemon::test_instance();
         let first = b"unvalidated-peer-first".to_vec();

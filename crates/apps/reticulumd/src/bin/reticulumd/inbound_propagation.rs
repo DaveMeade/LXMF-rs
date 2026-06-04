@@ -45,6 +45,7 @@ pub(super) async fn ingest_propagation_envelope_from_peer(
         ));
     }
     let accepted_stamp_cost = daemon.propagation_min_accepted_stamp_cost();
+    let mut invalid_stamp_error = None;
     for message in messages.iter() {
         let transient_id = match daemon
             .canonical_propagation_payload_bytes_at_cost(message, accepted_stamp_cost)
@@ -54,7 +55,10 @@ pub(super) async fn ingest_propagation_envelope_from_peer(
                 if let Some(peer) = remote_propagation_peer {
                     daemon.throttle_propagation_peer_for_invalid_stamp(peer);
                 }
-                return Err(error);
+                if invalid_stamp_error.is_none() {
+                    invalid_stamp_error = Some(error);
+                }
+                continue;
             }
         };
         if try_accept_local_propagated_message(daemon, delivery_destination, message).await? {
@@ -66,6 +70,9 @@ pub(super) async fn ingest_propagation_envelope_from_peer(
             Some(transient_id.as_str()),
             accepted_stamp_cost,
         )?;
+    }
+    if let Some(error) = invalid_stamp_error {
+        return Err(error);
     }
     Ok(messages.len())
 }

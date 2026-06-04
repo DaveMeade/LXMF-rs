@@ -156,6 +156,9 @@ gap, even though deeper propagation-router parity remains open.
   link as peer-validated, and peer resource transfers with multiple propagation
   messages are rejected unless they arrive on such a validated link. Validated
   link state is cleared when the link closes.
+- Inbound peer propagation resources with mixed valid and invalid propagation
+  stamps now follow Python's transfer handling more closely: valid messages are
+  ingested before the transfer is rejected and the offending peer is throttled.
 - Reticulum interface breadth is still narrower than the Python reference, but
   KISS and LoRa/RNode are active implemented areas in the current branch. The
   daemon and transport crates now cover serial KISS

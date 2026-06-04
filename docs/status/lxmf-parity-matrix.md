@@ -90,8 +90,9 @@ names are `lxmf-wire` and `reticulum-rs-rpc`.
   accounting, per-peer propagation transfer/sync limits, propagation stamp
   policy, Python-compatible low-value stamped peer-offer handling,
   strict peering-timebase config refresh, Python-style unreachable-peer
-  maintenance culling, peering-key values, and explicit peering-key readiness
-  status values are exposed, but the active workspace
+  maintenance culling, mixed invalid-stamp peer resource handling that preserves
+  valid entries before throttling, peering-key values, and explicit peering-key
+  readiness status values are exposed, but the active workspace
   does not yet match Python `LXMPeer` queueing, transfer, and peering behavior.
 - Paper-command baseline is implemented for bridge-backed `reticulumd`: SDK
   paper encode/decode uses canonical `lxmf-wire` paper URI helpers and tests
@@ -162,6 +163,7 @@ Recent focused evidence:
 - `cargo test -p reticulumd --bin reticulumd propagation_offer_ignores_control_allow_list_like_python -- --nocapture`
 - `cargo test -p reticulumd --bin reticulumd offer_request_does_not_mark_known_offers_received_like_python -- --nocapture`
 - `cargo test -p reticulumd --bin reticulumd message_get_marks_served_wanted_payloads_transferred_for_peer -- --nocapture`
+- `cargo test -p reticulumd --bin reticulumd inbound_peer_propagation_preserves_valid_messages_when_transfer_has_invalid_stamp_like_python -- --nocapture`
 - `cargo test -p reticulumd --bin reticulumd inbound_peer_propagation_ -- --nocapture`
 - `cargo test -p reticulumd --bin reticulumd offer_request -- --nocapture`
 - `cargo test -p reticulumd --bin reticulumd inbound_worker::control::tests -- --nocapture`
