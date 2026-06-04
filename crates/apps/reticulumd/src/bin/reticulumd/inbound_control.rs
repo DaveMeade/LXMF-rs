@@ -121,6 +121,7 @@ fn handle_control_request(
     const ERROR_NO_ACCESS: u8 = 0xF1;
     const ERROR_INVALID_KEY: u8 = 0xF3;
     const ERROR_INVALID_DATA: u8 = 0xF4;
+    const ERROR_THROTTLED: u8 = 0xF6;
     const ERROR_NOT_FOUND: u8 = 0xFD;
 
     if remote_identity.is_none() {
@@ -147,6 +148,7 @@ fn handle_control_request(
                 ERROR_NO_ACCESS,
                 ERROR_INVALID_KEY,
                 ERROR_INVALID_DATA,
+                ERROR_THROTTLED,
             );
         }
         if path_hash == control_path_hash("/get") {

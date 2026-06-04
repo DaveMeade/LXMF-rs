@@ -21,6 +21,15 @@ pub(super) async fn ingest_propagation_envelope(
     payload: &[u8],
     delivery_destination: Option<&Arc<tokio::sync::Mutex<SingleInputDestination>>>,
 ) -> Result<usize, std::io::Error> {
+    ingest_propagation_envelope_from_peer(daemon, payload, delivery_destination, None).await
+}
+
+pub(super) async fn ingest_propagation_envelope_from_peer(
+    daemon: &RpcDaemon,
+    payload: &[u8],
+    delivery_destination: Option<&Arc<tokio::sync::Mutex<SingleInputDestination>>>,
+    remote_propagation_peer: Option<&str>,
+) -> Result<usize, std::io::Error> {
     let (_timestamp, messages): (f64, Vec<Vec<u8>>) =
         rmp_serde::from_slice(payload).map_err(|err| {
             std::io::Error::new(
@@ -30,8 +39,17 @@ pub(super) async fn ingest_propagation_envelope(
         })?;
     let accepted_stamp_cost = daemon.propagation_min_accepted_stamp_cost();
     for message in messages.iter() {
-        let transient_id =
-            daemon.canonical_propagation_payload_bytes_at_cost(message, accepted_stamp_cost)?;
+        let transient_id = match daemon
+            .canonical_propagation_payload_bytes_at_cost(message, accepted_stamp_cost)
+        {
+            Ok(transient_id) => transient_id,
+            Err(error) => {
+                if let Some(peer) = remote_propagation_peer {
+                    daemon.throttle_propagation_peer_for_invalid_stamp(peer);
+                }
+                return Err(error);
+            }
+        };
         if try_accept_local_propagated_message(daemon, delivery_destination, message).await? {
             daemon.note_client_propagation_messages_received(1);
             continue;

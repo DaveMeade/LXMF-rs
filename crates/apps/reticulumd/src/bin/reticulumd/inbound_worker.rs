@@ -12,7 +12,7 @@ mod routing;
 use reticulum_daemon::receipt_bridge::ReceiptEvent;
 use rns_rpc::{RpcDaemon, RpcRequest};
 use rns_transport::destination::link::{Link, LinkEvent};
-use rns_transport::destination::SingleInputDestination;
+use rns_transport::destination::{DestinationName, SingleInputDestination};
 use rns_transport::hash::{AddressHash, Hash};
 use rns_transport::identity::{DecryptIdentity, Identity};
 use rns_transport::packet::{
@@ -23,6 +23,7 @@ use rns_transport::resource::ResourceEventKind;
 use rns_transport::transport::Transport;
 use routing::InboundLxmfDestination;
 use serde_json::{json, Value};
+use sha2::Digest;
 use std::sync::Arc;
 
 pub(super) fn spawn_inbound_worker(
@@ -60,12 +61,19 @@ pub(super) fn spawn_inbound_worker(
                                     .await;
                                 }
                                 InboundLxmfDestination::Propagation => {
-                                    if let Err(error) = propagation::ingest_propagation_envelope(
-                                        daemon.as_ref(),
-                                        &complete.data,
-                                        resource_control.delivery_destination.as_ref(),
+                                    let remote_peer = remote_propagation_peer_for_link(
+                                        transport.as_ref(),
+                                        &event.link_id,
                                     )
-                                    .await
+                                    .await;
+                                    if let Err(error) =
+                                        propagation::ingest_propagation_envelope_from_peer(
+                                            daemon.as_ref(),
+                                            &complete.data,
+                                            resource_control.delivery_destination.as_ref(),
+                                            remote_peer.as_deref(),
+                                        )
+                                        .await
                                     {
                                         if diagnostics_enabled() {
                                             log::debug!(
@@ -106,6 +114,30 @@ pub(super) fn spawn_inbound_worker(
             }
         }
     });
+}
+
+async fn remote_propagation_peer_for_link(
+    transport: &Transport,
+    link_id: &AddressHash,
+) -> Option<String> {
+    if let Some(link) = transport.find_in_link(link_id).await {
+        let guard = link.lock().await;
+        return Some(propagation_destination_hash_for_identity(guard.peer_identity()));
+    }
+    if let Some(link) = transport.find_out_link(link_id).await {
+        let guard = link.lock().await;
+        return Some(propagation_destination_hash_for_identity(guard.peer_identity()));
+    }
+    None
+}
+
+fn propagation_destination_hash_for_identity(identity: &Identity) -> String {
+    let name = DestinationName::new("lxmf", "propagation");
+    let hash = sha2::Sha256::new()
+        .chain_update(name.as_name_hash_slice())
+        .chain_update(identity.address_hash.as_slice())
+        .finalize();
+    hex::encode(&hash[..16])
 }
 
 fn handle_outbound_resource_completion(
@@ -239,7 +271,7 @@ fn spawn_packet_inbound_worker(
 #[cfg(test)]
 mod tests {
     use super::delivery_events;
-    use super::propagation::ingest_propagation_envelope;
+    use super::propagation::{ingest_propagation_envelope, ingest_propagation_envelope_from_peer};
     use hkdf::Hkdf;
     use lxmf::WireMessage;
     use rand_core::OsRng;
@@ -377,6 +409,33 @@ mod tests {
             .result
             .expect("propagation status result");
         assert_eq!(status["propagation"]["client_propagation_messages_received"].as_u64(), Some(0));
+    }
+
+    #[tokio::test]
+    async fn inbound_propagation_invalid_peer_stamp_throttles_peer_like_python() {
+        let daemon = RpcDaemon::test_instance();
+        daemon
+            .handle_rpc(RpcRequest {
+                id: 4,
+                method: "propagation_enable".to_string(),
+                params: Some(serde_json::json!({
+                    "enabled": true,
+                    "target_cost": 1,
+                    "stamp_cost_flexibility": 0,
+                })),
+            })
+            .expect("enable propagation");
+        let envelope =
+            rmp_serde::to_vec(&(1.0_f64, vec![b"unstamped-peer-propagation-payload".to_vec()]))
+                .expect("propagation envelope");
+        let peer = hex::encode([0x77_u8; 16]);
+
+        let err = ingest_propagation_envelope_from_peer(&daemon, &envelope, None, Some(&peer))
+            .await
+            .expect_err("invalid peer propagation envelope should be rejected");
+
+        assert!(err.to_string().contains("invalid propagation stamp"));
+        assert!(daemon.propagation_peer_is_throttled(peer.as_str()));
     }
 
     #[tokio::test]

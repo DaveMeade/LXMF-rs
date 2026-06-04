@@ -78,8 +78,12 @@ pub(super) fn handle_offer_request(
     error_no_access: u8,
     error_invalid_key: u8,
     error_invalid_data: u8,
+    error_throttled: u8,
 ) -> ControlResponse {
     let remote_propagation_hash = propagation_destination_hash_for_identity(remote_identity);
+    if daemon.propagation_peer_is_throttled(hex::encode(remote_propagation_hash).as_str()) {
+        return ControlResponse::Code(error_throttled);
+    }
     let propagation_state = daemon.current_propagation_state();
     if propagation_state.from_static_only
         && !propagation_state
@@ -266,6 +270,7 @@ mod tests {
             0xF1,
             0xF3,
             0xF4,
+            0xF6,
         );
 
         let ControlResponse::Rmpv(rmpv::Value::Array(wanted)) = response else {
@@ -326,6 +331,7 @@ mod tests {
             0xF1,
             0xF3,
             0xF4,
+            0xF6,
         );
 
         assert!(matches!(response, ControlResponse::Bool(false)));
@@ -400,6 +406,7 @@ mod tests {
             0xF1,
             0xF3,
             0xF4,
+            0xF6,
         );
 
         assert!(matches!(response, ControlResponse::Bool(false)));
@@ -418,6 +425,57 @@ mod tests {
         assert_eq!(row["messages"]["unhandled"].as_u64(), Some(1));
         assert_eq!(row["messages"]["handled_ids"], json!([]));
         assert_eq!(row["messages"]["unhandled_ids"], json!([known_transient_id]));
+    }
+
+    #[test]
+    fn offer_request_rejects_throttled_peer_like_python() {
+        let daemon = RpcDaemon::test_instance();
+        daemon
+            .handle_rpc(RpcRequest {
+                id: 10,
+                method: "propagation_enable".to_string(),
+                params: Some(json!({
+                    "enabled": true,
+                    "peering_cost": 1,
+                })),
+            })
+            .expect("enable propagation");
+        let local_identity_hash = [0x11; 16];
+        let remote_private =
+            rns_transport::identity::PrivateIdentity::new_from_rand(rand_core::OsRng);
+        let remote_identity = *remote_private.as_identity();
+        let remote_propagation_hash =
+            hex::encode(propagation_destination_hash_for_identity(&remote_identity));
+        daemon.throttle_propagation_peer_for_invalid_stamp(remote_propagation_hash.as_str());
+        let offered = [0xBB; 32];
+        let mut peering_id = Vec::with_capacity(32);
+        peering_id.extend_from_slice(local_identity_hash.as_slice());
+        peering_id.extend_from_slice(remote_identity.address_hash.as_slice());
+        let peering_key = generate_peering_key(peering_id.as_slice(), 1).expect("peering key");
+        let control = PropagationControlContext {
+            enabled: true,
+            local_identity_hash,
+            propagation_destination_hash_hex: Some("propagation".to_string()),
+            control_destination_hash_hex: Some("control".to_string()),
+            delivery_destination: None,
+            allowed_control_identities: Vec::new(),
+        };
+
+        let response = handle_offer_request(
+            &daemon,
+            &control,
+            &remote_identity,
+            Some(rmpv::Value::Array(vec![
+                rmpv::Value::Binary(peering_key),
+                rmpv::Value::Array(vec![rmpv::Value::Binary(offered.to_vec())]),
+            ])),
+            0xF1,
+            0xF3,
+            0xF4,
+            0xF6,
+        );
+
+        assert!(matches!(response, ControlResponse::Code(0xF6)));
     }
 
     #[test]
@@ -463,6 +521,7 @@ mod tests {
             0xF1,
             0xF3,
             0xF4,
+            0xF6,
         );
 
         assert!(matches!(response, ControlResponse::Code(0xF4)));
@@ -534,6 +593,7 @@ mod tests {
             0xF1,
             0xF3,
             0xF4,
+            0xF6,
         );
 
         assert!(matches!(response, ControlResponse::Code(0xF1)));
@@ -595,6 +655,7 @@ mod tests {
             0xF1,
             0xF3,
             0xF4,
+            0xF6,
         );
 
         assert!(matches!(response, ControlResponse::Code(0xF1)));
@@ -645,6 +706,7 @@ mod tests {
             0xF1,
             0xF3,
             0xF4,
+            0xF6,
         );
 
         assert!(matches!(response, ControlResponse::Bool(false)));
@@ -685,6 +747,7 @@ mod tests {
             0xF1,
             0xF3,
             0xF4,
+            0xF6,
         );
 
         assert!(matches!(response, ControlResponse::Code(0xF1)));

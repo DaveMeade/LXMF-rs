@@ -491,6 +491,7 @@ pub struct RpcDaemon {
     delivery_policy: Mutex<DeliveryPolicy>,
     propagation_state: Mutex<PropagationState>,
     propagation_payloads: Mutex<HashMap<String, String>>,
+    throttled_propagation_peers: Mutex<HashMap<String, i64>>,
     outbound_propagation_node: Mutex<Option<String>>,
     paper_ingest_seen: Mutex<HashSet<String>>,
     stamp_policy: Mutex<StampPolicy>,

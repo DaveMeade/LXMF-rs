@@ -171,6 +171,7 @@ impl RpcDaemon {
             delivery_policy: Mutex::new(DeliveryPolicy::default()),
             propagation_state: Mutex::new(PropagationState::default()),
             propagation_payloads: Mutex::new(HashMap::new()),
+            throttled_propagation_peers: Mutex::new(HashMap::new()),
             outbound_propagation_node: Mutex::new(None),
             paper_ingest_seen: Mutex::new(HashSet::new()),
             stamp_policy: Mutex::new(StampPolicy::default()),

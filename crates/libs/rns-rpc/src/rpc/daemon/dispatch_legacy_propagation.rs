@@ -1,5 +1,7 @@
 use super::*;
 
+const PN_STAMP_THROTTLE_SECS: i64 = 180;
+
 const PR_REQUEST_SENT: u32 = 0x04;
 const PR_COMPLETE: u32 = 0x07;
 const PR_IDLE: u32 = 0x00;
@@ -366,6 +368,37 @@ impl RpcDaemon {
     pub fn propagation_min_accepted_stamp_cost(&self) -> u32 {
         let state = self.propagation_state.lock().expect("propagation mutex poisoned");
         state.target_cost.saturating_sub(state.stamp_cost_flexibility)
+    }
+
+    pub fn throttle_propagation_peer_for_invalid_stamp(&self, peer: &str) {
+        let peer = peer.trim().to_ascii_lowercase();
+        if peer.is_empty() {
+            return;
+        }
+        self.throttled_propagation_peers
+            .lock()
+            .expect("throttled propagation peers mutex poisoned")
+            .insert(peer, now_i64().saturating_add(PN_STAMP_THROTTLE_SECS));
+    }
+
+    pub fn propagation_peer_is_throttled(&self, peer: &str) -> bool {
+        let peer = peer.trim().to_ascii_lowercase();
+        if peer.is_empty() {
+            return false;
+        }
+        let now = now_i64();
+        let mut guard = self
+            .throttled_propagation_peers
+            .lock()
+            .expect("throttled propagation peers mutex poisoned");
+        match guard.get(peer.as_str()).copied() {
+            Some(deadline) if deadline > now => true,
+            Some(_) => {
+                guard.remove(peer.as_str());
+                false
+            }
+            None => false,
+        }
     }
 
     pub fn ingest_propagation_payload_bytes_with_aliases(

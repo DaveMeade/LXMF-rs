@@ -1,6 +1,6 @@
 # Current Roadmap Status
 
-Last updated: 2026-06-03
+Last updated: 2026-06-04
 
 This document is the current source of truth for repository-wide delivery
 status. Update this file first when parity status, release confidence, or the
@@ -105,6 +105,11 @@ gap, even though deeper propagation-router parity remains open.
   `sync_peers()`-style unreachable-peer culling: non-static peers unheard for
   `LXMPeer.MAX_UNREACHABLE` are unpeered and have their propagation queue marks
   cleared, while configured static peers are retained.
+- Propagation offer handling now follows Python's invalid propagation-stamp
+  throttle: peer resource transfers containing invalid propagation stamps mark
+  that propagation peer throttled for Python's `PN_STAMP_THROTTLE` window, and
+  subsequent `/offer` requests from the peer return `ERROR_THROTTLED` until the
+  throttle expires.
 - Reticulum interface breadth is still narrower than the Python reference, but
   KISS and LoRa/RNode are active implemented areas in the current branch. The
   daemon and transport crates now cover serial KISS
