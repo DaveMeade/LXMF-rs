@@ -3865,6 +3865,74 @@ fn peer_sync_handles_unwanted_oversized_entries_without_transfer_limit() {
 }
 
 #[test]
+fn peer_sync_handles_unwanted_entries_without_sync_limit() {
+    let daemon = RpcDaemon::test_instance();
+    daemon
+        .handle_rpc(rpc_request(52, "peer_sync", json!({ "peer": "peer-unwanted-sync-limit" })))
+        .expect("initial peer sync");
+    {
+        let mut peers = daemon.peers.lock().expect("peers mutex poisoned");
+        let peer = peers.get_mut("peer-unwanted-sync-limit").expect("peer record");
+        peer.propagation_sync_limit = Some(24);
+    }
+    let already_known = PropagationEntryRecord {
+        transient_id: "a5".repeat(32),
+        destination: "12".repeat(16),
+        payload_hex: "12".repeat(100),
+        received_at: 1_700_000_610,
+        size_bytes: 100,
+        stamp_value: None,
+    };
+    daemon.store.upsert_propagation_entry(&already_known).expect("store propagation entry");
+    daemon
+        .store
+        .mark_peer_unhandled_propagation("peer-unwanted-sync-limit", already_known.transient_id.as_str())
+        .expect("mark unhandled");
+
+    let result = daemon
+        .handle_rpc(rpc_request(
+            55,
+            "peer_sync",
+            json!({
+                "peer": "peer-unwanted-sync-limit",
+                "wanted_ids": [],
+            }),
+        ))
+        .expect("peer sync")
+        .result
+        .expect("peer sync result");
+
+    assert_eq!(result["propagation"]["handled"].as_u64(), Some(1));
+    assert_eq!(result["propagation"]["transferred"].as_u64(), Some(0));
+    assert_eq!(result["propagation"]["skipped"].as_u64(), Some(0));
+    assert_eq!(result["propagation"]["remaining_bytes"].as_u64(), Some(0));
+    assert_eq!(
+        result["propagation"]["handled_ids"].as_array().expect("handled ids"),
+        &[json!(already_known.transient_id.as_str())]
+    );
+    assert!(
+        result["propagation"]["skipped_ids"].as_array().expect("skipped ids").is_empty()
+    );
+    assert_eq!(result["messages"]["offered"].as_u64(), Some(1));
+    assert_eq!(result["messages"]["unhandled"].as_u64(), Some(0));
+
+    assert_eq!(
+        daemon
+            .store
+            .list_peer_handled_propagation_ids("peer-unwanted-sync-limit")
+            .expect("handled ids"),
+        vec![already_known.transient_id]
+    );
+    assert!(
+        daemon
+            .store
+            .list_peer_unhandled_propagation("peer-unwanted-sync-limit")
+            .expect("pending propagation")
+            .is_empty()
+    );
+}
+
+#[test]
 fn peer_sync_rejects_malformed_wanted_ids_without_mutating_queue() {
     let daemon = RpcDaemon::test_instance();
     let pending = PropagationEntryRecord {

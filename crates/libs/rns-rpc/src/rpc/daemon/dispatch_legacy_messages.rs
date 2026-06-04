@@ -760,16 +760,18 @@ impl RpcDaemon {
                         propagation_transfer_limited_ids.push(transient_id);
                         continue;
                     }
-                    let next_size = cumulative_size.saturating_add(transfer_size);
-                    if sync_limit_bytes.is_some_and(|limit| next_size >= limit) {
-                        propagation_skipped = propagation_skipped.saturating_add(1);
-                        propagation_remaining_bytes =
-                            propagation_remaining_bytes.saturating_add(entry.size_bytes);
-                        propagation_skipped_ids.push(entry.transient_id);
-                        continue;
+                    if wanted {
+                        let next_size = cumulative_size.saturating_add(transfer_size);
+                        if sync_limit_bytes.is_some_and(|limit| next_size >= limit) {
+                            propagation_skipped = propagation_skipped.saturating_add(1);
+                            propagation_remaining_bytes =
+                                propagation_remaining_bytes.saturating_add(entry.size_bytes);
+                            propagation_skipped_ids.push(entry.transient_id);
+                            continue;
+                        }
+                        cumulative_size = next_size;
                     }
                     let transient_id = entry.transient_id.clone();
-                    cumulative_size = next_size;
                     propagation_handled = propagation_handled.saturating_add(1);
                     propagation_offered_bytes =
                         propagation_offered_bytes.saturating_add(entry.size_bytes);
