@@ -653,7 +653,17 @@ impl RpcDaemon {
                 let mut propagation_rejected = 0usize;
                 let mut propagation_rejected_bytes = 0u64;
                 let mut propagation_rejected_ids = Vec::new();
+                let sync_limit_excludes_all_pending = sync_limit_bytes.is_some_and(|limit| {
+                    !pending_propagation.is_empty()
+                        && pending_propagation.iter().all(|entry| {
+                            let entry_size =
+                                usize::try_from(entry.size_bytes).unwrap_or(usize::MAX);
+                            let transfer_size = entry_size.saturating_add(16);
+                            24usize.saturating_add(transfer_size) >= limit
+                        })
+                });
                 let peer_policy_required = !pending_propagation.is_empty()
+                    && !sync_limit_excludes_all_pending
                     && (pending_propagation.iter().any(|entry| entry.stamp_value.is_some())
                         || peer_stamp_policy_partially_known(&record));
                 if peer_policy_required {

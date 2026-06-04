@@ -3196,6 +3196,60 @@ fn peer_sync_transfer_limits_oversized_stamped_entries_before_peering_key_gate()
 }
 
 #[test]
+fn peer_sync_sync_limits_stamped_entries_before_peering_key_gate() {
+    let daemon = RpcDaemon::test_instance();
+    daemon
+        .handle_rpc(rpc_request(52, "peer_sync", json!({ "peer": "peer-key-sync-limit-first" })))
+        .expect("initial peer sync");
+    {
+        let mut peers = daemon.peers.lock().expect("peers mutex poisoned");
+        let peer = peers.get_mut("peer-key-sync-limit-first").expect("peer record");
+        peer.propagation_sync_limit = Some(24);
+        peer.propagation_stamp_cost = Some(1);
+        peer.propagation_stamp_cost_flexibility = Some(1);
+        peer.peering_cost = Some(1);
+    }
+    let skipped = PropagationEntryRecord {
+        transient_id: "ed".repeat(32),
+        destination: "1d".repeat(16),
+        payload_hex: "1d".repeat(20),
+        received_at: 1_700_000_622,
+        size_bytes: 20,
+        stamp_value: Some(1),
+    };
+    daemon.store.upsert_propagation_entry(&skipped).expect("store entry");
+    daemon
+        .store
+        .mark_peer_unhandled_propagation("peer-key-sync-limit-first", skipped.transient_id.as_str())
+        .expect("mark unhandled");
+
+    let result = daemon
+        .handle_rpc(rpc_request(54, "peer_sync", json!({ "peer": "peer-key-sync-limit-first" })))
+        .expect("sync-limited peer sync")
+        .result
+        .expect("peer sync result");
+    assert_eq!(result["synced"].as_bool(), Some(true));
+    assert_eq!(result["peering_key"], JsonValue::Null);
+    assert_eq!(result["propagation"]["postponed"].as_bool(), Some(false));
+    assert_eq!(result["propagation"]["postpone_reason"], JsonValue::Null);
+    assert_eq!(result["propagation"]["handled"].as_u64(), Some(0));
+    assert_eq!(result["propagation"]["offered"].as_u64(), Some(0));
+    assert_eq!(result["propagation"]["skipped"].as_u64(), Some(1));
+    assert_eq!(result["propagation"]["remaining_bytes"].as_u64(), Some(20));
+    assert_eq!(
+        result["propagation"]["skipped_ids"].as_array().expect("skipped ids"),
+        &[json!(skipped.transient_id.as_str())]
+    );
+
+    let unhandled = daemon
+        .store
+        .list_peer_unhandled_propagation("peer-key-sync-limit-first")
+        .expect("list unhandled");
+    assert_eq!(unhandled.len(), 1);
+    assert_eq!(unhandled[0].transient_id, skipped.transient_id);
+}
+
+#[test]
 fn peer_sync_postpones_unstamped_offers_until_peering_key_is_ready() {
     let daemon = RpcDaemon::test_instance();
     daemon
