@@ -631,7 +631,10 @@ impl RpcDaemon {
                     for entry in pending_propagation {
                         let entry_size = usize::try_from(entry.size_bytes).unwrap_or(usize::MAX);
                         let transfer_size = entry_size.saturating_add(16);
-                        if transfer_size > limit {
+                        let wanted = wanted_ids
+                            .as_ref()
+                            .is_none_or(|ids| ids.contains(entry.transient_id.as_str()));
+                        if wanted && transfer_size > limit {
                             propagation_transfer_limited =
                                 propagation_transfer_limited.saturating_add(1);
                             propagation_transfer_limited_bytes =
@@ -742,7 +745,10 @@ impl RpcDaemon {
                 for entry in pending_propagation {
                     let entry_size = usize::try_from(entry.size_bytes).unwrap_or(usize::MAX);
                     let transfer_size = entry_size.saturating_add(16);
-                    if transfer_limit_bytes.is_some_and(|limit| transfer_size > limit) {
+                    let wanted = wanted_ids
+                        .as_ref()
+                        .is_none_or(|ids| ids.contains(entry.transient_id.as_str()));
+                    if wanted && transfer_limit_bytes.is_some_and(|limit| transfer_size > limit) {
                         propagation_transfer_limited =
                             propagation_transfer_limited.saturating_add(1);
                         propagation_transfer_limited_bytes =
@@ -767,8 +773,6 @@ impl RpcDaemon {
                     propagation_handled = propagation_handled.saturating_add(1);
                     propagation_offered_bytes =
                         propagation_offered_bytes.saturating_add(entry.size_bytes);
-                    let wanted =
-                        wanted_ids.as_ref().is_none_or(|ids| ids.contains(transient_id.as_str()));
                     if wanted {
                         let propagation_message = json!({
                             "transient_id": entry.transient_id,
