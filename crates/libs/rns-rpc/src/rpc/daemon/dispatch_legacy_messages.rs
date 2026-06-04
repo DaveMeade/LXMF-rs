@@ -857,9 +857,15 @@ impl RpcDaemon {
                             || propagation_skipped > 0;
                         let propagation_no_work =
                             !propagation_completed && propagation_pending == 0;
+                        let propagation_no_transfer_offer_response =
+                            wanted_ids.as_ref().is_some_and(std::collections::HashSet::is_empty)
+                                && propagation_transferred == 0
+                                && propagation_handled > 0;
                         let was_alive = existing.alive;
                         existing.last_sync_attempt = timestamp;
-                        existing.alive = if propagation_no_work && existing.sync_backoff == 0 {
+                        existing.alive = if (propagation_no_work && existing.sync_backoff == 0)
+                            || propagation_no_transfer_offer_response
+                        {
                             was_alive
                         } else {
                             propagation_completed || existing.last_sync_attempt < existing.last_seen

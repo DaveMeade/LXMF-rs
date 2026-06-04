@@ -134,6 +134,10 @@ gap, even though deeper propagation-router parity remains open.
 - Remote propagation sync now preserves peers on `ERROR_NOT_FOUND` offer
   responses as explicit peer-response cleanup, without treating that reply as
   a local peering break or generic liveness failure.
+- Local peer sync now preserves existing liveness when a peer explicitly wants
+  none of the offered messages (`wanted_ids: []`), matching Python's
+  no-resource-transfer offer-response path while still marking the offer
+  handled.
 - Empty local peer sync now follows Python's no-unhandled-messages path: a
   clean peer with no pending propagation entries records the attempt but
   preserves liveness and avoids synthetic failure backoff, while existing

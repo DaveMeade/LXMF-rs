@@ -4228,6 +4228,75 @@ fn peer_sync_handles_unwanted_stamped_entries_without_peering_key() {
 }
 
 #[test]
+fn peer_sync_unwanted_offer_response_does_not_revive_unheard_peer_like_python() {
+    let daemon = RpcDaemon::test_instance();
+    daemon
+        .handle_rpc(rpc_request(52, "peer_sync", json!({ "peer": "peer-unwanted-unheard" })))
+        .expect("initial peer sync");
+    {
+        let mut peers = daemon.peers.lock().expect("peers mutex poisoned");
+        let peer = peers.get_mut("peer-unwanted-unheard").expect("peer record");
+        peer.alive = false;
+        peer.last_seen = 0;
+        peer.sync_backoff = 0;
+        peer.next_sync_attempt = 0;
+        peer.acceptance_rate = 0.75;
+    }
+    let already_known = PropagationEntryRecord {
+        transient_id: "a9".repeat(32),
+        destination: "12".repeat(16),
+        payload_hex: "12".repeat(24),
+        received_at: 1_700_000_613,
+        size_bytes: 24,
+        stamp_value: None,
+    };
+    daemon.store.upsert_propagation_entry(&already_known).expect("store propagation entry");
+    daemon
+        .store
+        .mark_peer_unhandled_propagation(
+            "peer-unwanted-unheard",
+            already_known.transient_id.as_str(),
+        )
+        .expect("mark unhandled");
+
+    let result = daemon
+        .handle_rpc(rpc_request(
+            55,
+            "peer_sync",
+            json!({
+                "peer": "peer-unwanted-unheard",
+                "wanted_ids": [],
+            }),
+        ))
+        .expect("peer sync")
+        .result
+        .expect("peer sync result");
+
+    assert_eq!(result["propagation"]["handled"].as_u64(), Some(1));
+    assert_eq!(result["propagation"]["transferred"].as_u64(), Some(0));
+    assert_eq!(result["messages"]["offered"].as_u64(), Some(1));
+    assert_eq!(result["messages"]["outgoing"].as_u64(), Some(0));
+    assert_eq!(result["alive"].as_bool(), Some(false));
+    assert_eq!(result["acceptance_rate"].as_f64(), Some(0.0));
+    assert_eq!(result["sync_backoff"].as_u64(), Some(0));
+    assert_eq!(result["next_sync_attempt"].as_i64(), Some(0));
+
+    let row = daemon
+        .handle_rpc(RpcRequest { id: 56, method: "list_peers".to_string(), params: None })
+        .expect("list peers")
+        .result
+        .expect("list peers result")["peers"]
+        .as_array()
+        .expect("peer rows")
+        .iter()
+        .find(|row| row["peer"].as_str() == Some("peer-unwanted-unheard"))
+        .cloned()
+        .expect("peer row");
+    assert_eq!(row["alive"].as_bool(), Some(false));
+    assert_eq!(row["acceptance_rate"].as_f64(), Some(0.0));
+}
+
+#[test]
 fn peer_sync_handles_unwanted_oversized_entries_without_transfer_limit() {
     let daemon = RpcDaemon::test_instance();
     daemon
