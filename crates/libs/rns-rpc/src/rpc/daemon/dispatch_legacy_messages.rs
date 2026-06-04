@@ -32,8 +32,8 @@ impl RpcDaemon {
             "unhandled": unhandled,
             "offered_bytes": offered_bytes,
             "unhandled_bytes": unhandled_bytes,
-            "handled_ids": handled_ids.clone(),
-            "unhandled_ids": unhandled_ids.clone(),
+            "handled_ids": handled_ids,
+            "unhandled_ids": unhandled_ids,
         });
         row["offered"] = json!(offered);
         row["outgoing"] = json!(outgoing);
@@ -153,7 +153,7 @@ impl RpcDaemon {
             event_type: "peer_sync".into(),
             payload: json!({
                 "peer": &record.peer,
-                "peer_type": peer_type_value.clone(),
+                "peer_type": peer_type_value,
                 "type": peer_status_type,
                 "timestamp": timestamp,
                 "name": &record.name,
@@ -191,7 +191,7 @@ impl RpcDaemon {
                 "offered": offered,
                 "outgoing": outgoing,
                 "incoming": incoming,
-                "messages": messages.clone(),
+                "messages": messages,
                 "propagation": propagation_sync.clone(),
             }),
         };
@@ -681,7 +681,7 @@ impl RpcDaemon {
                         let transfer_size = entry_size.saturating_add(16);
                         let wanted = wanted_ids
                             .as_ref()
-                            .is_none_or(|ids| ids.contains(entry.transient_id.as_str()));
+                            .map_or(true, |ids| ids.contains(entry.transient_id.as_str()));
                         if wanted && transfer_size > limit {
                             propagation_transfer_limited =
                                 propagation_transfer_limited.saturating_add(1);
@@ -771,7 +771,7 @@ impl RpcDaemon {
                     cumulative_size = next_size;
                     let wanted = wanted_ids
                         .as_ref()
-                        .is_none_or(|ids| ids.contains(entry.transient_id.as_str()));
+                        .map_or(true, |ids| ids.contains(entry.transient_id.as_str()));
                     let transient_id = entry.transient_id.clone();
                     propagation_handled = propagation_handled.saturating_add(1);
                     propagation_offered_bytes =
@@ -858,9 +858,19 @@ impl RpcDaemon {
                             wanted_ids.as_ref().is_some_and(std::collections::HashSet::is_empty)
                                 && propagation_transferred == 0
                                 && propagation_handled > 0;
+                        let had_prior_peer_activity = existing.last_sync_attempt > 0
+                            || existing.offered > 0
+                            || existing.outgoing > 0
+                            || existing.incoming > 0
+                            || existing.rx_bytes > 0
+                            || existing.tx_bytes > 0
+                            || existing.sync_transfer_rate > 0.0
+                            || existing.acceptance_rate > 0.0;
                         let was_alive = existing.alive;
                         existing.last_sync_attempt = timestamp;
-                        existing.alive = if (propagation_no_work && existing.sync_backoff == 0)
+                        existing.alive = if (propagation_no_work
+                            && existing.sync_backoff == 0
+                            && had_prior_peer_activity)
                             || propagation_no_transfer_offer_response
                         {
                             was_alive
@@ -950,7 +960,7 @@ impl RpcDaemon {
                     event_type: "peer_sync".into(),
                     payload: json!({
                         "peer": &record.peer,
-                        "peer_type": peer_type_value.clone(),
+                        "peer_type": peer_type_value,
                         "type": peer_status_type,
                         "timestamp": timestamp,
                         "name": &record.name,
@@ -986,7 +996,7 @@ impl RpcDaemon {
                         "offered": offered,
                         "outgoing": outgoing,
                         "incoming": incoming,
-                        "messages": messages.clone(),
+                        "messages": messages,
                         "propagation": propagation_sync.clone(),
                     }),
                 };
@@ -1065,7 +1075,7 @@ impl RpcDaemon {
                         "offered": offered,
                         "outgoing": outgoing,
                         "incoming": incoming,
-                        "messages": cleanup.messages.clone(),
+                        "messages": cleanup.messages,
                     }),
                 };
                 self.publish_event(event);
@@ -1687,7 +1697,7 @@ fn peer_sync_policy_relevance(
     let mut policy_relevant_size = 24usize;
     for entry in pending_propagation
         .iter()
-        .filter(|entry| wanted_ids.is_none_or(|ids| ids.contains(entry.transient_id.as_str())))
+        .filter(|entry| wanted_ids.map_or(true, |ids| ids.contains(entry.transient_id.as_str())))
     {
         let entry_size = usize::try_from(entry.size_bytes).unwrap_or(usize::MAX);
         let transfer_size = entry_size.saturating_add(16);

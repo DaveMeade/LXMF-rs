@@ -70,6 +70,7 @@ pub(super) fn handle_message_get_request(
     ))
 }
 
+#[allow(clippy::too_many_arguments)]
 pub(super) fn handle_offer_request(
     daemon: &RpcDaemon,
     control: &PropagationControlContext,

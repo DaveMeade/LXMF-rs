@@ -371,13 +371,13 @@ fn propagation_remote_fetch_ack_payload(
 ) -> rmpv::Value {
     let haves = payload_outcomes
         .iter()
-        .filter_map(|(payload, outcome)| {
+        .filter(|(_payload, outcome)| {
             matches!(
                 outcome,
                 LocalPropagationImportOutcome::Imported | LocalPropagationImportOutcome::Duplicate
             )
-            .then(|| rmpv::Value::Binary(Sha256::digest(payload).to_vec()))
         })
+        .map(|(payload, _outcome)| rmpv::Value::Binary(Sha256::digest(payload).to_vec()))
         .collect();
     rmpv::Value::Array(vec![rmpv::Value::Nil, rmpv::Value::Array(haves)])
 }
