@@ -553,7 +553,7 @@ fn propagation_enable_queues_existing_entries_for_static_peers() {
         .iter()
         .find(|row| row["peer"].as_str() == Some("peer-static-queue"))
         .expect("peer row");
-    assert_eq!(row["messages"]["offered"].as_u64(), Some(1));
+    assert_eq!(row["messages"]["offered"].as_u64(), Some(0));
     assert_eq!(row["messages"]["unhandled"].as_u64(), Some(1));
     assert_eq!(
         row["messages"]["unhandled_ids"].as_array().expect("message unhandled ids"),
@@ -611,7 +611,7 @@ fn propagation_ingest_queues_new_entries_for_static_peers() {
         .iter()
         .find(|row| row["peer"].as_str() == Some("peer-static-ingest-queue"))
         .expect("peer row");
-    assert_eq!(row["messages"]["offered"].as_u64(), Some(1));
+    assert_eq!(row["messages"]["offered"].as_u64(), Some(0));
     assert_eq!(row["messages"]["unhandled"].as_u64(), Some(1));
     assert_eq!(
         row["messages"]["unhandled_ids"].as_array().expect("message unhandled ids"),
@@ -4957,9 +4957,11 @@ fn peer_sync_reports_propagation_transfer_accounting() {
         .find(|row| row["peer"].as_str() == Some("peer-sync-report"))
         .expect("peer row");
     assert_eq!(row["tx_bytes"].as_u64(), Some(expected_resource_bytes as u64));
+    assert_eq!(row["messages"]["offered"].as_u64(), Some(1));
     assert_eq!(row["messages"]["outgoing"].as_u64(), Some(1));
+    assert_eq!(row["messages"]["unhandled"].as_u64(), Some(1));
     assert_eq!(row["alive"].as_bool(), Some(true));
-    assert_eq!(row["acceptance_rate"].as_f64(), Some(0.5));
+    assert_eq!(row["acceptance_rate"].as_f64(), Some(1.0));
 }
 
 #[test]
@@ -5767,10 +5769,10 @@ fn list_peers_includes_propagation_marks_in_message_counters() {
         .iter()
         .find(|row| row["peer"].as_str() == Some("peer-propagation-stats"))
         .expect("peer row");
-    assert_eq!(row["messages"]["offered"].as_u64(), Some(2));
+    assert_eq!(row["messages"]["offered"].as_u64(), Some(1));
     assert_eq!(row["messages"]["unhandled"].as_u64(), Some(1));
     assert_eq!(row["acceptance_rate"].as_f64(), Some(0.0));
-    assert_eq!(row["messages"]["offered_bytes"].as_u64(), Some(40));
+    assert_eq!(row["messages"]["offered_bytes"].as_u64(), Some(16));
     assert_eq!(row["messages"]["unhandled_bytes"].as_u64(), Some(24));
     assert_eq!(
         row["handled_ids"].as_array().expect("handled ids"),
@@ -9317,7 +9319,7 @@ fn peer_unpeer_clears_persisted_propagation_queue_marks() {
     assert_eq!(unpeer["removed"].as_bool(), Some(true));
     assert_eq!(unpeer["propagation_cleared"].as_u64(), Some(1));
     assert_eq!(unpeer["propagation_cleared_bytes"].as_u64(), Some(24));
-    assert_eq!(unpeer["messages"]["offered"].as_u64(), Some(1));
+    assert_eq!(unpeer["messages"]["offered"].as_u64(), Some(0));
     assert_eq!(unpeer["messages"]["unhandled"].as_u64(), Some(1));
     assert!(
         daemon
@@ -9566,13 +9568,13 @@ fn peer_unpeer_reports_cleared_propagation_queue_accounting() {
     assert_eq!(result["peer"].as_str(), Some("peer-unpeer-accounting"));
     assert_eq!(result["propagation_cleared"].as_u64(), Some(2));
     assert_eq!(result["propagation_cleared_bytes"].as_u64(), Some(36));
-    assert_eq!(result["messages"]["offered"].as_u64(), Some(3));
+    assert_eq!(result["messages"]["offered"].as_u64(), Some(2));
     assert_eq!(result["messages"]["outgoing"].as_u64(), Some(1));
     assert_eq!(result["messages"]["incoming"].as_u64(), Some(1));
     assert_eq!(result["messages"]["unhandled"].as_u64(), Some(2));
-    assert_eq!(result["messages"]["offered_bytes"].as_u64(), Some(36));
+    assert_eq!(result["messages"]["offered_bytes"].as_u64(), Some(12));
     assert_eq!(result["messages"]["unhandled_bytes"].as_u64(), Some(24));
-    assert_eq!(result["offered"].as_u64(), Some(3));
+    assert_eq!(result["offered"].as_u64(), Some(2));
     assert_eq!(result["outgoing"].as_u64(), Some(1));
     assert_eq!(result["incoming"].as_u64(), Some(1));
     assert_eq!(
@@ -9595,13 +9597,13 @@ fn peer_unpeer_reports_cleared_propagation_queue_accounting() {
         .expect("peer unpeer event");
     assert_eq!(event.payload["propagation_cleared"].as_u64(), Some(2));
     assert_eq!(event.payload["propagation_cleared_bytes"].as_u64(), Some(36));
-    assert_eq!(event.payload["messages"]["offered"].as_u64(), Some(3));
+    assert_eq!(event.payload["messages"]["offered"].as_u64(), Some(2));
     assert_eq!(event.payload["messages"]["outgoing"].as_u64(), Some(1));
     assert_eq!(event.payload["messages"]["incoming"].as_u64(), Some(1));
     assert_eq!(event.payload["messages"]["unhandled"].as_u64(), Some(2));
-    assert_eq!(event.payload["messages"]["offered_bytes"].as_u64(), Some(36));
+    assert_eq!(event.payload["messages"]["offered_bytes"].as_u64(), Some(12));
     assert_eq!(event.payload["messages"]["unhandled_bytes"].as_u64(), Some(24));
-    assert_eq!(event.payload["offered"].as_u64(), Some(3));
+    assert_eq!(event.payload["offered"].as_u64(), Some(2));
     assert_eq!(event.payload["outgoing"].as_u64(), Some(1));
     assert_eq!(event.payload["incoming"].as_u64(), Some(1));
     assert_eq!(

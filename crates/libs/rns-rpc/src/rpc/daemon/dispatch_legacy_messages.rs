@@ -1591,8 +1591,13 @@ impl RpcDaemon {
         }
         Ok(LocalUnpeerCleanup {
             removed,
-            propagation_cleared: propagation_stats.offered as usize,
-            propagation_cleared_bytes: propagation_stats.offered_bytes,
+            propagation_cleared: propagation_stats
+                .offered
+                .saturating_add(propagation_stats.unhandled)
+                as usize,
+            propagation_cleared_bytes: propagation_stats
+                .offered_bytes
+                .saturating_add(propagation_stats.unhandled_bytes),
             messages,
         })
     }
