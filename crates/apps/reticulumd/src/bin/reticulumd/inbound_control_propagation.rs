@@ -32,11 +32,6 @@ pub(super) fn handle_message_get_request(
         ));
     }
 
-    let wants = match entries.first() {
-        Some(value) if value.is_nil() => Vec::new(),
-        Some(rmpv::Value::Array(values)) => binary_id_list(values),
-        _ => return ControlResponse::Code(error_invalid_data),
-    };
     let haves = match entries.get(1) {
         Some(value) if value.is_nil() => Vec::new(),
         Some(rmpv::Value::Array(values)) => binary_id_list(values),
@@ -46,6 +41,11 @@ pub(super) fn handle_message_get_request(
         daemon.purge_propagation_payloads_for_destination(&remote_delivery_hash, &haves);
     }
 
+    let wants = match entries.first() {
+        Some(value) if value.is_nil() => Vec::new(),
+        Some(rmpv::Value::Array(values)) => binary_id_list(values),
+        _ => return ControlResponse::Code(error_invalid_data),
+    };
     if wants.is_empty() {
         return ControlResponse::Rmpv(rmpv::Value::Array(Vec::new()));
     }
@@ -962,7 +962,7 @@ mod tests {
     }
 
     #[test]
-    fn message_get_rejects_invalid_wants_without_purging_haves() {
+    fn message_get_purges_haves_before_rejecting_invalid_wants_like_python() {
         let daemon = RpcDaemon::test_instance();
         let remote_private =
             rns_transport::identity::PrivateIdentity::new_from_rand(rand_core::OsRng);
@@ -992,8 +992,8 @@ mod tests {
 
         assert!(matches!(response, ControlResponse::Code(0xF4)));
         assert!(
-            daemon.has_propagation_payload(hex::encode(have).as_str()),
-            "invalid request data must not purge haves before the request is accepted"
+            !daemon.has_propagation_payload(hex::encode(have).as_str()),
+            "Python purges haves before later malformed wants abort the request"
         );
     }
 
