@@ -150,7 +150,7 @@ impl RpcDaemon {
         );
     }
 
-    fn record_identity_required_remote_peer_sync(
+    fn record_retryable_remote_peer_sync_error(
         &self,
         peer_id: &str,
         remote: &str,
@@ -1594,8 +1594,8 @@ impl RpcDaemon {
                                 transfer_limit,
                                 sync_limit,
                             );
-                        } else if is_remote_identity_required_error(&err) {
-                            self.record_identity_required_remote_peer_sync(
+                        } else if is_retryable_remote_peer_sync_error(&err) {
+                            self.record_retryable_remote_peer_sync_error(
                                 peer_id.as_str(),
                                 remote_id.as_str(),
                                 error.as_str(),
@@ -1963,9 +1963,12 @@ fn is_remote_access_denied_error(err: &std::io::Error) -> bool {
         && err.to_string() == "propagation node denied access"
 }
 
-fn is_remote_identity_required_error(err: &std::io::Error) -> bool {
+fn is_retryable_remote_peer_sync_error(err: &std::io::Error) -> bool {
     err.kind() == std::io::ErrorKind::PermissionDenied
-        && err.to_string() == "propagation node requires identity"
+        && matches!(
+            err.to_string().as_str(),
+            "propagation node requires identity" | "propagation peer invalid peering key"
+        )
 }
 
 fn normalize_propagation_transient_key(transient_id: &str) -> String {

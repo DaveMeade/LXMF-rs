@@ -411,6 +411,7 @@ fn response_code_error(response: &rmpv::Value) -> Option<std::io::Error> {
         let (kind, message) = match code as u8 {
             0xF0 => (std::io::ErrorKind::PermissionDenied, "propagation node requires identity"),
             0xF1 => (std::io::ErrorKind::PermissionDenied, "propagation node denied access"),
+            0xF3 => (std::io::ErrorKind::PermissionDenied, "propagation peer invalid peering key"),
             0xF4 => (std::io::ErrorKind::InvalidInput, "propagation node rejected the request"),
             0xF6 => (std::io::ErrorKind::WouldBlock, "propagation peer throttled"),
             0xFD => (std::io::ErrorKind::NotFound, "propagation peer not found"),
@@ -450,6 +451,15 @@ mod tests {
 
         assert_eq!(err.kind(), std::io::ErrorKind::WouldBlock);
         assert_eq!(err.to_string(), "propagation peer throttled");
+    }
+
+    #[test]
+    fn propagation_control_response_code_maps_invalid_peering_key_like_python() {
+        let err = response_code_error(&rmpv::Value::from(0xF3_u64))
+            .expect("invalid key response should map to error");
+
+        assert_eq!(err.kind(), std::io::ErrorKind::PermissionDenied);
+        assert_eq!(err.to_string(), "propagation peer invalid peering key");
     }
 
     #[test]
