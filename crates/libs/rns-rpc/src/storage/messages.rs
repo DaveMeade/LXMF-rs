@@ -855,13 +855,9 @@ impl MessagesStore {
     ) -> rusqlite::Result<()> {
         self.with_write_conn(|conn| {
             conn.execute(
-                "INSERT INTO propagation_peer_entries
+                "INSERT OR IGNORE INTO propagation_peer_entries
                     (peer, transient_id, state, updated_at)
-                 VALUES (?1, ?2, 'unhandled', ?3)
-                 ON CONFLICT(peer, transient_id) DO UPDATE SET
-                    state = 'unhandled',
-                    updated_at = excluded.updated_at
-                 WHERE propagation_peer_entries.state = 'transfer_limited'",
+                 VALUES (?1, ?2, 'unhandled', ?3)",
                 params![peer, normalize_hex_key(transient_id), now_unix_secs()],
             )?;
             Ok(())
@@ -870,28 +866,13 @@ impl MessagesStore {
 
     pub fn mark_all_propagation_unhandled_for_peer(&self, peer: &str) -> rusqlite::Result<usize> {
         self.with_write_conn(|conn| {
-            let tx = conn.unchecked_transaction()?;
-            let inserted = tx.execute(
+            conn.execute(
                 "INSERT OR IGNORE INTO propagation_peer_entries
                     (peer, transient_id, state, updated_at)
                  SELECT ?1, transient_id, 'unhandled', ?2
                  FROM propagation_entries",
                 params![peer, now_unix_secs()],
-            )?;
-            let reopened = tx.execute(
-                "UPDATE propagation_peer_entries
-                 SET state = 'unhandled', updated_at = ?2
-                 WHERE peer = ?1
-                   AND state = 'transfer_limited'
-                   AND EXISTS (
-                       SELECT 1
-                       FROM propagation_entries e
-                       WHERE e.transient_id = propagation_peer_entries.transient_id
-                   )",
-                params![peer, now_unix_secs()],
-            )?;
-            tx.commit()?;
-            Ok(inserted.saturating_add(reopened))
+            )
         })
     }
 
@@ -2318,7 +2299,7 @@ mod tests {
     }
 
     #[test]
-    fn queue_existing_propagation_reopens_transfer_limited_marks_only() {
+    fn queue_existing_propagation_preserves_transfer_limited_marks_like_python() {
         let store = MessagesStore::in_memory().expect("in-memory store");
         let transfer_limited = PropagationEntryRecord {
             transient_id: "a1".repeat(32),
@@ -2351,14 +2332,14 @@ mod tests {
         store.mark_all_propagation_unhandled_for_peer("peer-reopen").expect("queue existing");
 
         let pending = store.list_peer_unhandled_propagation("peer-reopen").expect("pending");
-        assert_eq!(pending, vec![transfer_limited]);
+        assert!(pending.is_empty());
         let handled_ids =
             store.list_peer_handled_propagation_ids("peer-reopen").expect("handled ids");
-        assert_eq!(handled_ids, vec![handled.transient_id]);
+        assert_eq!(handled_ids, vec![transfer_limited.transient_id, handled.transient_id]);
     }
 
     #[test]
-    fn mark_peer_unhandled_reopens_transfer_limited_marks_only() {
+    fn mark_peer_unhandled_preserves_transfer_limited_marks_like_python() {
         let store = MessagesStore::in_memory().expect("in-memory store");
         let transfer_limited = PropagationEntryRecord {
             transient_id: "b1".repeat(32),
@@ -2393,16 +2374,16 @@ mod tests {
                 "peer-direct-reopen",
                 transfer_limited.transient_id.as_str(),
             )
-            .expect("reopen transfer limited");
+            .expect("ignore transfer limited");
         store
             .mark_peer_unhandled_propagation("peer-direct-reopen", handled.transient_id.as_str())
             .expect("ignore handled");
 
         let pending = store.list_peer_unhandled_propagation("peer-direct-reopen").expect("pending");
-        assert_eq!(pending, vec![transfer_limited]);
+        assert!(pending.is_empty());
         let handled_ids =
             store.list_peer_handled_propagation_ids("peer-direct-reopen").expect("handled ids");
-        assert_eq!(handled_ids, vec![handled.transient_id]);
+        assert_eq!(handled_ids, vec![transfer_limited.transient_id, handled.transient_id]);
     }
 
     #[test]

@@ -4873,7 +4873,7 @@ fn peer_sync_marks_entries_above_transfer_limit_handled_like_python() {
 }
 
 #[test]
-fn peer_sync_retries_transfer_limited_entries_when_limit_increases() {
+fn peer_sync_does_not_retry_transfer_limited_entries_when_limit_increases_like_python() {
     let daemon = RpcDaemon::test_instance();
     daemon
         .handle_rpc(rpc_request(60, "peer_sync", json!({ "peer": "peer-transfer-retry" })))
@@ -4927,20 +4927,34 @@ fn peer_sync_retries_transfer_limited_entries_when_limit_increases() {
         .expect("retried peer sync")
         .result
         .expect("retried peer sync result");
-    assert_eq!(retried["propagation"]["handled"].as_u64(), Some(1));
-    assert_eq!(retried["propagation"]["transferred"].as_u64(), Some(1));
+    assert_eq!(retried["propagation"]["handled"].as_u64(), Some(0));
+    assert_eq!(retried["propagation"]["transferred"].as_u64(), Some(0));
     assert_eq!(retried["propagation"]["transfer_limited"].as_u64(), Some(0));
     assert_eq!(
         retried["propagation"]["transferred_ids"]
             .as_array()
             .expect("transferred ids"),
-        &[json!(oversized_id.as_str())]
+        &[] as &[JsonValue]
     );
+    assert!(
+        retried["propagation"]["messages"].as_array().expect("messages").is_empty()
+    );
+    assert_eq!(retried["messages"]["outgoing"].as_u64(), Some(0));
+    assert_eq!(retried["messages"]["unhandled"].as_u64(), Some(0));
     assert_eq!(
-        retried["propagation"]["messages"][0]["transient_id"].as_str(),
-        Some(oversized_id.as_str())
+        daemon
+            .store
+            .list_peer_handled_propagation_ids("peer-transfer-retry")
+            .expect("handled ids"),
+        vec![oversized_id]
     );
-    assert_eq!(retried["messages"]["outgoing"].as_u64(), Some(1));
+    assert!(
+        daemon
+            .store
+            .list_peer_unhandled_propagation("peer-transfer-retry")
+            .expect("pending propagation")
+            .is_empty()
+    );
 }
 
 #[test]
@@ -8251,7 +8265,7 @@ fn duplicate_propagation_remote_fetch_queues_known_payload_without_double_counti
 }
 
 #[test]
-fn propagation_remote_fetch_reopens_transfer_limited_peer_queue_mark() {
+fn propagation_remote_fetch_preserves_transfer_limited_peer_queue_mark_like_python() {
     let payload = b"remote-fetch-retry-transfer-limited-payload";
     let payload_hex = hex::encode(payload);
     let transient_id = hex::encode(Sha256::digest(payload));
@@ -8298,8 +8312,14 @@ fn propagation_remote_fetch_reopens_transfer_limited_peer_queue_mark() {
         .store
         .list_peer_unhandled_propagation("peer-fetch-retry-limit")
         .expect("pending relay entries");
-    assert_eq!(pending.len(), 1);
-    assert_eq!(pending[0].transient_id, transient_id);
+    assert!(pending.is_empty());
+    assert_eq!(
+        daemon
+            .store
+            .list_peer_handled_propagation_ids("peer-fetch-retry-limit")
+            .expect("handled relay ids"),
+        vec![transient_id]
+    );
 }
 
 #[test]
