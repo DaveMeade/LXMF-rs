@@ -118,6 +118,10 @@ gap, even though deeper propagation-router parity remains open.
   break like Python `LXMPeer.offer_response`: the denied peer is unpeered
   locally and its propagation queue marks are cleared instead of being retained
   as a generic failed sync peer.
+- Remote propagation sync now preserves peers on `ERROR_NO_IDENTITY` like
+  Python's identify-and-retry path: the sync attempt is recorded, but peer
+  liveness, acceptance, generic backoff, and immediate retry eligibility are
+  preserved for a follow-up request with identity credentials.
 - Reticulum interface breadth is still narrower than the Python reference, but
   KISS and LoRa/RNode are active implemented areas in the current branch. The
   daemon and transport crates now cover serial KISS

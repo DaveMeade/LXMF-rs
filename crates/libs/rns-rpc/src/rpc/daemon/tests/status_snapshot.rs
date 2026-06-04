@@ -6890,7 +6890,10 @@ struct FailingTransferLimitRemoteControlBridge {
     expected_sync_transfer_limit_kb: Option<f64>,
 }
 
-struct DeniedAccessRemoteSyncBridge;
+struct RemoteSyncErrorBridge {
+    kind: std::io::ErrorKind,
+    message: &'static str,
+}
 
 struct CountingRemoteControlBridge {
     status_calls: Arc<std::sync::atomic::AtomicUsize>,
@@ -7050,7 +7053,7 @@ impl RemoteControlBridge for CountingRemoteControlBridge {
     }
 }
 
-impl RemoteControlBridge for DeniedAccessRemoteSyncBridge {
+impl RemoteControlBridge for RemoteSyncErrorBridge {
     fn propagation_remote_status(
         &self,
         remote: &str,
@@ -7071,10 +7074,7 @@ impl RemoteControlBridge for DeniedAccessRemoteSyncBridge {
         _timeout_secs: f64,
         _transfer_limit_kb: Option<f64>,
     ) -> Result<JsonValue, std::io::Error> {
-        Err(std::io::Error::new(
-            std::io::ErrorKind::PermissionDenied,
-            "propagation node denied access",
-        ))
+        Err(std::io::Error::new(self.kind, self.message))
     }
 
     fn propagation_remote_download(
@@ -9330,7 +9330,10 @@ fn throttled_propagation_remote_sync_uses_python_retry_window_without_breaking_l
 #[test]
 fn denied_access_propagation_remote_sync_breaks_peering_like_python() {
     let daemon = RpcDaemon::test_instance();
-    daemon.set_remote_control_bridge(Arc::new(DeniedAccessRemoteSyncBridge));
+    daemon.set_remote_control_bridge(Arc::new(RemoteSyncErrorBridge {
+        kind: std::io::ErrorKind::PermissionDenied,
+        message: "propagation node denied access",
+    }));
     daemon
         .handle_rpc(rpc_request(78, "peer_sync", json!({ "peer": "peer-remote-denied" })))
         .expect("initial peer sync");
@@ -9399,6 +9402,77 @@ fn denied_access_propagation_remote_sync_breaks_peering_like_python() {
     assert_eq!(event.payload["removed"].as_bool(), Some(true));
     assert_eq!(event.payload["propagation_cleared"].as_u64(), Some(1));
     assert_eq!(event.payload["propagation_cleared_bytes"].as_u64(), Some(24));
+}
+
+#[test]
+fn identity_required_propagation_remote_sync_preserves_peer_for_immediate_retry() {
+    let daemon = RpcDaemon::test_instance();
+    daemon.set_remote_control_bridge(Arc::new(RemoteSyncErrorBridge {
+        kind: std::io::ErrorKind::PermissionDenied,
+        message: "propagation node requires identity",
+    }));
+    daemon
+        .handle_rpc(rpc_request(81, "peer_sync", json!({ "peer": "peer-remote-needs-id" })))
+        .expect("initial peer sync");
+    {
+        let mut peers = daemon.peers.lock().expect("peers mutex poisoned");
+        let peer = peers.get_mut("peer-remote-needs-id").expect("peer record");
+        peer.alive = true;
+        peer.sync_backoff = 0;
+        peer.next_sync_attempt = 0;
+        peer.acceptance_rate = 0.8;
+    }
+    daemon.event_queue.lock().expect("event_queue mutex poisoned").clear();
+
+    let err = daemon
+        .handle_rpc(rpc_request(
+            82,
+            "propagation_remote_sync",
+            json!({
+                "remote": "remote-node",
+                "peer": "peer-remote-needs-id",
+            }),
+        ))
+        .expect_err("identity-required remote sync should still return the bridge error");
+    assert_eq!(err.kind(), std::io::ErrorKind::PermissionDenied);
+    assert_eq!(err.to_string(), "propagation node requires identity");
+
+    let peers = daemon
+        .handle_rpc(RpcRequest { id: 83, method: "list_peers".to_string(), params: None })
+        .expect("list peers")
+        .result
+        .expect("list peers result");
+    let row = peers["peers"]
+        .as_array()
+        .expect("peer rows")
+        .iter()
+        .find(|row| row["peer"].as_str() == Some("peer-remote-needs-id"))
+        .expect("peer should remain available for retry");
+    assert_eq!(row["alive"].as_bool(), Some(true));
+    assert_eq!(row["sync_backoff"].as_u64(), Some(0));
+    assert_eq!(row["next_sync_attempt"].as_i64(), Some(0));
+    assert_eq!(row["acceptance_rate"].as_f64(), Some(0.8));
+    assert!(row["last_sync_attempt"].as_i64().expect("last sync attempt") > 0);
+
+    let events = daemon.event_queue.lock().expect("event_queue mutex poisoned");
+    assert!(
+        events.iter().all(|event| event.event_type != "peer_unpeer"),
+        "identity-required response should not break peering"
+    );
+    let event = events
+        .iter()
+        .rev()
+        .find(|event| event.event_type == "peer_sync")
+        .expect("identity-required peer sync event");
+    assert_eq!(event.payload["peer"].as_str(), Some("peer-remote-needs-id"));
+    assert_eq!(event.payload["remote"].as_str(), Some("remote-node"));
+    assert_eq!(event.payload["alive"].as_bool(), Some(true));
+    assert_eq!(event.payload["sync_backoff"].as_u64(), Some(0));
+    assert_eq!(event.payload["next_sync_attempt"].as_i64(), Some(0));
+    assert_eq!(
+        event.payload["propagation"]["error"].as_str(),
+        Some("propagation node requires identity")
+    );
 }
 
 #[test]

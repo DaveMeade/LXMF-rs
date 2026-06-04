@@ -150,6 +150,31 @@ impl RpcDaemon {
         );
     }
 
+    fn record_identity_required_remote_peer_sync(
+        &self,
+        peer_id: &str,
+        remote: &str,
+        error: &str,
+        transfer_limit: Option<u64>,
+        sync_limit: Option<u64>,
+    ) {
+        let timestamp = now_i64();
+        if let Ok(mut peers) = self.peers.lock() {
+            if let Some(peer) = peers.get_mut(peer_id) {
+                peer.last_sync_attempt = timestamp;
+                peer.next_sync_attempt = 0;
+            }
+        }
+        self.publish_failed_remote_peer_sync_event(
+            peer_id,
+            remote,
+            error,
+            transfer_limit,
+            sync_limit,
+            None,
+        );
+    }
+
     fn break_remote_peer_sync_peering_on_denied_access(
         &self,
         peer_id: &str,
@@ -1569,6 +1594,14 @@ impl RpcDaemon {
                                 transfer_limit,
                                 sync_limit,
                             );
+                        } else if is_remote_identity_required_error(&err) {
+                            self.record_identity_required_remote_peer_sync(
+                                peer_id.as_str(),
+                                remote_id.as_str(),
+                                error.as_str(),
+                                transfer_limit,
+                                sync_limit,
+                            );
                         } else if is_remote_access_denied_error(&err) {
                             self.break_remote_peer_sync_peering_on_denied_access(
                                 peer_id.as_str(),
@@ -1928,6 +1961,11 @@ fn effective_transfer_limit_kb(
 fn is_remote_access_denied_error(err: &std::io::Error) -> bool {
     err.kind() == std::io::ErrorKind::PermissionDenied
         && err.to_string() == "propagation node denied access"
+}
+
+fn is_remote_identity_required_error(err: &std::io::Error) -> bool {
+    err.kind() == std::io::ErrorKind::PermissionDenied
+        && err.to_string() == "propagation node requires identity"
 }
 
 fn normalize_propagation_transient_key(transient_id: &str) -> String {
