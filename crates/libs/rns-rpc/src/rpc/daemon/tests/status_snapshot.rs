@@ -3053,6 +3053,68 @@ fn peer_sync_without_offers_preserves_failure_backoff() {
 }
 
 #[test]
+fn peer_sync_without_offers_preserves_liveness_when_not_backing_off_like_python() {
+    let daemon = RpcDaemon::test_instance();
+    daemon
+        .handle_rpc(rpc_request(52, "peer_sync", json!({ "peer": "peer-empty-alive" })))
+        .expect("initial peer sync");
+    {
+        let mut peers = daemon.peers.lock().expect("peers mutex poisoned");
+        let peer = peers.get_mut("peer-empty-alive").expect("peer record");
+        peer.alive = true;
+        peer.sync_backoff = 0;
+        peer.next_sync_attempt = 0;
+        peer.acceptance_rate = 0.5;
+    }
+    daemon.event_queue.lock().expect("event_queue mutex poisoned").clear();
+
+    let result = daemon
+        .handle_rpc(rpc_request(53, "peer_sync", json!({ "peer": "peer-empty-alive" })))
+        .expect("empty peer sync")
+        .result
+        .expect("peer sync result");
+    assert_eq!(result["propagation"]["offered"].as_u64(), Some(0));
+    assert_eq!(result["propagation"]["transferred"].as_u64(), Some(0));
+    assert_eq!(result["alive"].as_bool(), Some(true));
+    assert_eq!(result["sync_backoff"].as_u64(), Some(0));
+    assert_eq!(result["next_sync_attempt"].as_i64(), Some(0));
+    assert_eq!(result["acceptance_rate"].as_f64(), Some(0.5));
+    let last_sync_attempt = result["last_sync_attempt"].as_i64().expect("last sync attempt");
+    assert!(last_sync_attempt > 0);
+
+    let peers = daemon
+        .handle_rpc(RpcRequest { id: 54, method: "list_peers".to_string(), params: None })
+        .expect("list peers")
+        .result
+        .expect("list peers result");
+    let row = peers["peers"]
+        .as_array()
+        .expect("peer rows")
+        .iter()
+        .find(|row| row["peer"].as_str() == Some("peer-empty-alive"))
+        .expect("peer row");
+    assert_eq!(row["alive"].as_bool(), Some(true));
+    assert_eq!(row["sync_backoff"].as_u64(), Some(0));
+    assert_eq!(row["next_sync_attempt"].as_i64(), Some(0));
+    assert_eq!(row["acceptance_rate"].as_f64(), Some(0.5));
+
+    let event = daemon
+        .event_queue
+        .lock()
+        .expect("event_queue mutex poisoned")
+        .iter()
+        .rev()
+        .find(|event| event.event_type == "peer_sync")
+        .cloned()
+        .expect("empty peer sync event");
+    assert_eq!(event.payload["peer"].as_str(), Some("peer-empty-alive"));
+    assert_eq!(event.payload["alive"].as_bool(), Some(true));
+    assert_eq!(event.payload["sync_backoff"].as_u64(), Some(0));
+    assert_eq!(event.payload["next_sync_attempt"].as_i64(), Some(0));
+    assert_eq!(event.payload["last_sync_attempt"].as_i64(), Some(last_sync_attempt));
+}
+
+#[test]
 fn peer_sync_during_backoff_postpones_skipped_offers() {
     let daemon = RpcDaemon::test_instance();
     daemon

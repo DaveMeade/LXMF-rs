@@ -855,9 +855,15 @@ impl RpcDaemon {
                             || propagation_rejected > 0
                             || propagation_transfer_limited > 0
                             || propagation_skipped > 0;
+                        let propagation_no_work =
+                            !propagation_completed && propagation_pending == 0;
+                        let was_alive = existing.alive;
                         existing.last_sync_attempt = timestamp;
-                        existing.alive = propagation_completed
-                            || existing.last_sync_attempt < existing.last_seen;
+                        existing.alive = if propagation_no_work && existing.sync_backoff == 0 {
+                            was_alive
+                        } else {
+                            propagation_completed || existing.last_sync_attempt < existing.last_seen
+                        };
                         existing.tx_bytes =
                             existing.tx_bytes.saturating_add(propagation_resource_bytes);
                         existing.sync_transfer_rate = propagation_resource_bytes as f64;
