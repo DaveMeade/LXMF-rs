@@ -784,13 +784,13 @@ struct PeerRecordWire {
     #[serde(default)]
     peering_timebase: i64,
     #[serde(default)]
-    propagation_transfer_limit: Option<u32>,
+    propagation_transfer_limit: Option<JsonValue>,
     #[serde(default)]
-    transfer_limit: Option<u32>,
+    transfer_limit: Option<JsonValue>,
     #[serde(default)]
-    propagation_sync_limit: Option<u32>,
+    propagation_sync_limit: Option<JsonValue>,
     #[serde(default)]
-    sync_limit: Option<u32>,
+    sync_limit: Option<JsonValue>,
     #[serde(default)]
     propagation_stamp_cost: Option<u32>,
     #[serde(default)]
@@ -814,6 +814,21 @@ impl<'de> Deserialize<'de> for PeerRecord {
             .or(wire.last_heard)
             .ok_or_else(|| serde::de::Error::missing_field("last_seen"))?;
         let sync_transfer_rate = wire.sync_transfer_rate.or(wire.str).unwrap_or_default();
+        let python_transfer_limit = wire.propagation_transfer_limit.is_some()
+            && wire.transfer_limit.is_none();
+        let transfer_limit = parse_peer_limit_bytes(
+            wire.propagation_transfer_limit.as_ref(),
+            wire.transfer_limit.as_ref(),
+            python_transfer_limit,
+        );
+        let python_sync_limit =
+            wire.propagation_sync_limit.is_some() && wire.sync_limit.is_none();
+        let sync_limit = parse_peer_limit_bytes(
+            wire.propagation_sync_limit.as_ref(),
+            wire.sync_limit.as_ref(),
+            python_sync_limit,
+        )
+        .or_else(|| python_transfer_limit.then_some(transfer_limit).flatten());
         Ok(Self {
             peer: wire.peer,
             last_seen,
@@ -836,8 +851,8 @@ impl<'de> Deserialize<'de> for PeerRecord {
             first_seen: wire.first_seen.unwrap_or(last_seen),
             seen_count: wire.seen_count.unwrap_or_else(|| u64::from(last_seen > 0)),
             peering_timebase: wire.peering_timebase,
-            propagation_transfer_limit: wire.propagation_transfer_limit.or(wire.transfer_limit),
-            propagation_sync_limit: wire.propagation_sync_limit.or(wire.sync_limit),
+            propagation_transfer_limit: transfer_limit,
+            propagation_sync_limit: sync_limit,
             propagation_stamp_cost: wire.propagation_stamp_cost.or(wire.target_stamp_cost),
             propagation_stamp_cost_flexibility: wire
                 .propagation_stamp_cost_flexibility
@@ -845,6 +860,41 @@ impl<'de> Deserialize<'de> for PeerRecord {
             peering_cost: wire.peering_cost,
         })
     }
+}
+
+fn parse_peer_limit_bytes(
+    primary: Option<&JsonValue>,
+    alias: Option<&JsonValue>,
+    primary_is_python_kb: bool,
+) -> Option<u32> {
+    let value = primary.or(alias)?;
+    if primary_is_python_kb && primary.is_some() {
+        parse_json_f64(value).and_then(kilobytes_to_bytes)
+    } else {
+        parse_json_u32(value)
+    }
+}
+
+fn parse_json_u32(value: &JsonValue) -> Option<u32> {
+    if let Some(value) = value.as_u64() {
+        u32::try_from(value).ok()
+    } else if let Some(value) = value.as_i64() {
+        u32::try_from(value.max(0)).ok()
+    } else {
+        parse_json_f64(value).and_then(|value| {
+            let bytes = value.max(0.0).floor();
+            (bytes.is_finite() && bytes <= f64::from(u32::MAX)).then_some(bytes as u32)
+        })
+    }
+}
+
+fn parse_json_f64(value: &JsonValue) -> Option<f64> {
+    value.as_f64().or_else(|| value.as_str()?.trim().parse::<f64>().ok())
+}
+
+fn kilobytes_to_bytes(value: f64) -> Option<u32> {
+    let bytes = (value.max(0.0) * 1000.0).floor();
+    (bytes.is_finite() && bytes <= f64::from(u32::MAX)).then_some(bytes as u32)
 }
 
 fn default_true() -> bool {
@@ -950,6 +1000,30 @@ mod peer_record_serde_tests {
         assert_eq!(value["offered"].as_u64(), Some(7));
         assert_eq!(value["outgoing"].as_u64(), Some(5));
         assert_eq!(value["incoming"].as_u64(), Some(3));
+    }
+
+    #[test]
+    fn peer_record_deserializes_python_serialized_kilobyte_limits_as_runtime_bytes() {
+        let record: PeerRecord = serde_json::from_value(json!({
+            "peer": "peer-python-serialized-limits",
+            "last_seen": 1_700_001_004,
+            "propagation_transfer_limit": 0.08,
+            "propagation_sync_limit": 1,
+        }))
+        .expect("deserialize python serialized peer");
+
+        assert_eq!(record.propagation_transfer_limit, Some(80));
+        assert_eq!(record.propagation_sync_limit, Some(1_000));
+
+        let fallback: PeerRecord = serde_json::from_value(json!({
+            "peer": "peer-python-serialized-limit-fallback",
+            "last_seen": 1_700_001_004,
+            "propagation_transfer_limit": 0.152,
+        }))
+        .expect("deserialize python serialized peer with sync fallback");
+
+        assert_eq!(fallback.propagation_transfer_limit, Some(152));
+        assert_eq!(fallback.propagation_sync_limit, Some(152));
     }
 
     #[test]
