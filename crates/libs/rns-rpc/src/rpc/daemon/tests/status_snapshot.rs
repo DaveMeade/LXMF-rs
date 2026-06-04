@@ -4426,6 +4426,9 @@ fn peer_sync_marks_entries_above_transfer_limit_handled_like_python() {
         let peer = peers.get_mut("peer-transfer-oversize").expect("peer record");
         peer.propagation_transfer_limit = Some(80);
         peer.propagation_sync_limit = Some(1_000);
+        peer.alive = false;
+        peer.sync_backoff = 720;
+        peer.next_sync_attempt = 1_700_000_720;
     }
 
     let oversized = PropagationEntryRecord {
@@ -4465,6 +4468,7 @@ fn peer_sync_marks_entries_above_transfer_limit_handled_like_python() {
         &[json!(oversized_id.as_str())]
     );
     assert_eq!(result["sync_backoff"].as_u64(), Some(0));
+    assert_eq!(result["alive"].as_bool(), Some(true));
     assert!(result["last_sync_attempt"].as_i64().is_some_and(|value| value > 0));
     assert_eq!(result["next_sync_attempt"].as_i64(), Some(0));
 
@@ -4505,6 +4509,7 @@ fn peer_sync_marks_entries_above_transfer_limit_handled_like_python() {
         &[json!(oversized_id.as_str())]
     );
     assert_eq!(event.payload["sync_backoff"].as_u64(), Some(0));
+    assert_eq!(event.payload["alive"].as_bool(), Some(true));
     assert_eq!(event.payload["next_sync_attempt"].as_i64(), Some(0));
 }
 

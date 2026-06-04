@@ -846,8 +846,9 @@ impl RpcDaemon {
                     if let Some(existing) = guard.get_mut(&record.peer) {
                         let propagation_offered = propagation_handled;
                         let propagation_pending = propagation_skipped;
-                        let propagation_completed =
-                            propagation_handled > 0 || propagation_rejected > 0;
+                        let propagation_completed = propagation_handled > 0
+                            || propagation_rejected > 0
+                            || propagation_transfer_limited > 0;
                         existing.last_sync_attempt = timestamp;
                         existing.alive = propagation_completed
                             || existing.last_sync_attempt < existing.last_seen;
