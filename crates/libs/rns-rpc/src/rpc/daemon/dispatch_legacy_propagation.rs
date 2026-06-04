@@ -369,11 +369,13 @@ impl RpcDaemon {
         &self,
         source_peer: &str,
         imported_ids: &[String],
+        transferred_bytes: usize,
     ) -> Result<(), std::io::Error> {
         if imported_ids.is_empty() {
             return Ok(());
         }
 
+        self.record_inbound_peer_activity(source_peer, transferred_bytes);
         let active_peers = self.active_peer_ids();
         for transient_id in imported_ids {
             self.store
@@ -1515,6 +1517,7 @@ impl RpcDaemon {
                         self.queue_remote_sync_imports_for_peers(
                             peer_id.as_str(),
                             imported.accepted_ids.as_slice(),
+                            imported.transferred_bytes,
                         )?;
                         self.update_propagation_sync_state(|state| {
                             state.sync_state = PR_COMPLETE;

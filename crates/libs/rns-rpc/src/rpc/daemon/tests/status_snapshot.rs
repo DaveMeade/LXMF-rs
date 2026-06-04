@@ -8167,6 +8167,7 @@ fn propagation_remote_sync_updates_peer_runtime_state() {
     assert_eq!(remote_sync["peer_sync"]["synced"].as_bool(), Some(true));
     assert_eq!(remote_sync["peer_sync"]["name"].as_str(), Some("Remote Sync State"));
     assert_eq!(remote_sync["peer_sync"]["name_source"].as_str(), Some("test"));
+    assert_eq!(remote_sync["peer_sync"]["rx_bytes"].as_u64(), Some(payload.len() as u64));
     assert_eq!(remote_sync["peer_sync"]["tx_bytes"].as_u64(), Some(payload.len() as u64));
     assert_eq!(remote_sync["peer_sync"]["messages"]["incoming"].as_u64(), Some(1));
     assert_eq!(remote_sync["peer_sync"]["offered"].as_u64(), Some(0));
@@ -8212,6 +8213,7 @@ fn propagation_remote_sync_updates_peer_runtime_state() {
     assert!(row["last_sync_attempt"].as_i64().is_some_and(|value| value > 0));
     assert_eq!(row["sync_backoff"].as_u64(), Some(0));
     assert_eq!(row["next_sync_attempt"].as_i64(), Some(0));
+    assert_eq!(row["rx_bytes"].as_u64(), Some(payload.len() as u64));
     assert_eq!(row["tx_bytes"].as_u64(), Some(payload.len() as u64));
     assert_eq!(row["messages"]["incoming"].as_u64(), Some(1));
     assert_eq!(row["sync_transfer_rate"].as_f64(), Some(payload.len() as f64));
@@ -8264,6 +8266,7 @@ fn propagation_remote_sync_updates_peer_runtime_state() {
     );
     assert_eq!(event.payload["sync_backoff"].as_u64(), Some(0));
     assert_eq!(event.payload["next_sync_attempt"].as_i64(), Some(0));
+    assert_eq!(event.payload["rx_bytes"].as_u64(), Some(payload.len() as u64));
     assert_eq!(event.payload["tx_bytes"].as_u64(), Some(payload.len() as u64));
     assert_eq!(event.payload["sync_transfer_rate"].as_f64(), Some(payload.len() as f64));
     assert_eq!(event.payload["messages"]["outgoing"].as_u64(), Some(0));
@@ -8354,6 +8357,19 @@ fn propagation_remote_sync_marks_source_handled_and_queues_other_peers() {
         .list_peer_unhandled_propagation(source_peer.as_str())
         .expect("source unhandled");
     assert!(source_unhandled.is_empty());
+    let peers = daemon
+        .handle_rpc(RpcRequest { id: 77, method: "list_peers".to_string(), params: None })
+        .expect("list peers")
+        .result
+        .expect("list peers result");
+    let source_row = peers["peers"]
+        .as_array()
+        .expect("peer rows")
+        .iter()
+        .find(|row| row["peer"].as_str() == Some(source_peer.as_str()))
+        .expect("source peer row");
+    assert_eq!(source_row["rx_bytes"].as_u64(), Some(payload.len() as u64));
+    assert_eq!(source_row["alive"].as_bool(), Some(true));
     let relay_unhandled = daemon
         .store
         .list_peer_unhandled_propagation(relay_peer.as_str())
