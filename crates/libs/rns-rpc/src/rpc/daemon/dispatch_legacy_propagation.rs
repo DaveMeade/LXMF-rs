@@ -1964,11 +1964,12 @@ fn is_remote_access_denied_error(err: &std::io::Error) -> bool {
 }
 
 fn is_retryable_remote_peer_sync_error(err: &std::io::Error) -> bool {
-    err.kind() == std::io::ErrorKind::PermissionDenied
-        && matches!(
-            err.to_string().as_str(),
-            "propagation node requires identity" | "propagation peer invalid peering key"
-        )
+    matches!(
+        (err.kind(), err.to_string().as_str()),
+        (std::io::ErrorKind::PermissionDenied, "propagation node requires identity")
+            | (std::io::ErrorKind::PermissionDenied, "propagation peer invalid peering key")
+            | (std::io::ErrorKind::InvalidInput, "propagation node rejected the request")
+    )
 }
 
 fn normalize_propagation_transient_key(transient_id: &str) -> String {

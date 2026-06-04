@@ -125,6 +125,9 @@ gap, even though deeper propagation-router parity remains open.
 - Remote propagation sync now maps peer `ERROR_INVALID_KEY` responses and
   treats invalid peering-key offers as retryable peer-sync errors, preserving
   the peer and propagation queue without applying generic failure backoff.
+- Remote propagation sync now treats peer `ERROR_INVALID_DATA` offer rejections
+  as retryable request failures as well, matching Python's failed offer-response
+  cleanup without penalizing peer liveness or sync backoff.
 - Reticulum interface breadth is still narrower than the Python reference, but
   KISS and LoRa/RNode are active implemented areas in the current branch. The
   daemon and transport crates now cover serial KISS
