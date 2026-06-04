@@ -144,6 +144,9 @@ gap, even though deeper propagation-router parity remains open.
   failure backoff, while existing failure backoff remains intact.
 - Postponed local peer sync now also preserves the previous sync transfer rate
   instead of clearing transfer accounting before any offer/resource path runs.
+- Local peer sync now preserves the previous sync transfer rate when pending
+  offers are only skipped by sync limits or marked transfer-limited, matching
+  Python's resource-completion-only transfer-rate updates.
 - Reticulum interface breadth is still narrower than the Python reference, but
   KISS and LoRa/RNode are active implemented areas in the current branch. The
   daemon and transport crates now cover serial KISS

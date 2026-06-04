@@ -5813,7 +5813,7 @@ fn peer_sync_preserves_transfer_rate_when_no_offers_remain_like_python() {
 }
 
 #[test]
-fn peer_sync_clears_transfer_rate_when_offers_are_skipped() {
+fn peer_sync_preserves_transfer_rate_when_offers_are_skipped_or_transfer_limited() {
     let daemon = RpcDaemon::test_instance();
     daemon
         .handle_rpc(rpc_request(63, "peer_sync", json!({ "peer": "peer-sync-rate-skipped" })))
@@ -5847,6 +5847,8 @@ fn peer_sync_clears_transfer_rate_when_offers_are_skipped() {
             }),
         ))
         .expect("peer sync with transfer");
+    let first_resource_bytes =
+        rmp_serde::to_vec(&(1.0_f64, vec![vec![0x26; 40]])).expect("pack sync resource").len();
 
     {
         let mut peers = daemon.peers.lock().expect("peers mutex poisoned");
@@ -5881,8 +5883,8 @@ fn peer_sync_clears_transfer_rate_when_offers_are_skipped() {
         .expect("peer sync result");
     assert_eq!(result["propagation"]["handled"].as_u64(), Some(0));
     assert_eq!(result["propagation"]["skipped"].as_u64(), Some(1));
-    assert_eq!(result["sync_transfer_rate"].as_f64(), Some(0.0));
-    assert_eq!(result["str"].as_u64(), Some(0));
+    assert_eq!(result["sync_transfer_rate"].as_f64(), Some(first_resource_bytes as f64));
+    assert_eq!(result["str"].as_u64(), Some(first_resource_bytes as u64));
 
     let peers = daemon
         .handle_rpc(RpcRequest { id: 66, method: "list_peers".to_string(), params: None })
@@ -5895,8 +5897,8 @@ fn peer_sync_clears_transfer_rate_when_offers_are_skipped() {
         .iter()
         .find(|row| row["peer"].as_str() == Some("peer-sync-rate-skipped"))
         .expect("peer row");
-    assert_eq!(row["sync_transfer_rate"].as_f64(), Some(0.0));
-    assert_eq!(row["str"].as_u64(), Some(0));
+    assert_eq!(row["sync_transfer_rate"].as_f64(), Some(first_resource_bytes as f64));
+    assert_eq!(row["str"].as_u64(), Some(first_resource_bytes as u64));
 
     {
         let mut peers = daemon.peers.lock().expect("peers mutex poisoned");
@@ -5932,6 +5934,9 @@ fn peer_sync_clears_transfer_rate_when_offers_are_skipped() {
             }),
         ))
         .expect("peer sync with second transfer");
+    let second_resource_bytes = rmp_serde::to_vec(&(1.0_f64, vec![vec![0x27; 40], vec![0x28; 32]]))
+        .expect("pack sync resource")
+        .len();
 
     {
         let mut peers = daemon.peers.lock().expect("peers mutex poisoned");
@@ -5973,8 +5978,8 @@ fn peer_sync_clears_transfer_rate_when_offers_are_skipped() {
         .expect("peer sync result");
     assert_eq!(result["propagation"]["handled"].as_u64(), Some(0));
     assert_eq!(result["propagation"]["transfer_limited"].as_u64(), Some(1));
-    assert_eq!(result["sync_transfer_rate"].as_f64(), Some(0.0));
-    assert_eq!(result["str"].as_u64(), Some(0));
+    assert_eq!(result["sync_transfer_rate"].as_f64(), Some(second_resource_bytes as f64));
+    assert_eq!(result["str"].as_u64(), Some(second_resource_bytes as u64));
 }
 
 #[test]

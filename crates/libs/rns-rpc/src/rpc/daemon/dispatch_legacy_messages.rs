@@ -871,7 +871,7 @@ impl RpcDaemon {
                         };
                         existing.tx_bytes =
                             existing.tx_bytes.saturating_add(propagation_resource_bytes);
-                        if !propagation_no_work && !propagation_no_transfer_offer_response {
+                        if propagation_transferred > 0 {
                             existing.sync_transfer_rate = propagation_resource_bytes as f64;
                         }
                         if propagation_offered > 0 {
