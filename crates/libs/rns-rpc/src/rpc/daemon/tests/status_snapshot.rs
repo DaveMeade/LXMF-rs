@@ -5750,7 +5750,7 @@ fn peer_sync_updates_transfer_rate_from_transferred_bytes() {
 }
 
 #[test]
-fn peer_sync_clears_transfer_rate_when_no_offers_remain() {
+fn peer_sync_preserves_transfer_rate_when_no_offers_remain_like_python() {
     let daemon = RpcDaemon::test_instance();
     daemon
         .handle_rpc(rpc_request(63, "peer_sync", json!({ "peer": "peer-sync-rate-empty" })))
@@ -5775,8 +5775,17 @@ fn peer_sync_clears_transfer_rate_when_no_offers_remain() {
         .mark_peer_unhandled_propagation("peer-sync-rate-empty", entry.transient_id.as_str())
         .expect("mark unhandled");
     daemon
-        .handle_rpc(rpc_request(64, "peer_sync", json!({ "peer": "peer-sync-rate-empty" })))
+        .handle_rpc(rpc_request(
+            64,
+            "peer_sync",
+            json!({
+                "peer": "peer-sync-rate-empty",
+                "transfer_limit_kb": 1.0,
+            }),
+        ))
         .expect("peer sync with transfer");
+    let expected_resource_bytes =
+        rmp_serde::to_vec(&(1.0_f64, vec![vec![0x30; 48]])).expect("pack sync resource").len();
 
     let result = daemon
         .handle_rpc(rpc_request(65, "peer_sync", json!({ "peer": "peer-sync-rate-empty" })))
@@ -5785,8 +5794,8 @@ fn peer_sync_clears_transfer_rate_when_no_offers_remain() {
         .expect("peer sync result");
     assert_eq!(result["propagation"]["offered"].as_u64(), Some(0));
     assert_eq!(result["propagation"]["bytes"].as_u64(), Some(0));
-    assert_eq!(result["sync_transfer_rate"].as_f64(), Some(0.0));
-    assert_eq!(result["str"].as_u64(), Some(0));
+    assert_eq!(result["sync_transfer_rate"].as_f64(), Some(expected_resource_bytes as f64));
+    assert_eq!(result["str"].as_u64(), Some(expected_resource_bytes as u64));
 
     let peers = daemon
         .handle_rpc(RpcRequest { id: 66, method: "list_peers".to_string(), params: None })
@@ -5799,8 +5808,8 @@ fn peer_sync_clears_transfer_rate_when_no_offers_remain() {
         .iter()
         .find(|row| row["peer"].as_str() == Some("peer-sync-rate-empty"))
         .expect("peer row");
-    assert_eq!(row["sync_transfer_rate"].as_f64(), Some(0.0));
-    assert_eq!(row["str"].as_u64(), Some(0));
+    assert_eq!(row["sync_transfer_rate"].as_f64(), Some(expected_resource_bytes as f64));
+    assert_eq!(row["str"].as_u64(), Some(expected_resource_bytes as u64));
 }
 
 #[test]
@@ -6438,8 +6447,8 @@ fn peer_sync_result_and_event_report_transfer_and_stamp_policy() {
     assert_eq!(result["propagation"]["stamp_cost_flexibility"].as_u64(), Some(2));
     assert_eq!(result["target_stamp_cost"].as_u64(), Some(8));
     assert_eq!(result["stamp_cost_flexibility"].as_u64(), Some(2));
-    assert_eq!(result["sync_transfer_rate"].as_f64(), Some(0.0));
-    assert_eq!(result["str"].as_u64(), Some(0));
+    assert_eq!(result["sync_transfer_rate"].as_f64(), Some(12_345.0));
+    assert_eq!(result["str"].as_u64(), Some(12_345));
 
     let event = daemon
         .event_queue
@@ -6483,8 +6492,8 @@ fn peer_sync_result_and_event_report_transfer_and_stamp_policy() {
     );
     assert_eq!(event.payload["target_stamp_cost"].as_u64(), Some(8));
     assert_eq!(event.payload["stamp_cost_flexibility"].as_u64(), Some(2));
-    assert_eq!(event.payload["sync_transfer_rate"].as_f64(), Some(0.0));
-    assert_eq!(event.payload["str"].as_u64(), Some(0));
+    assert_eq!(event.payload["sync_transfer_rate"].as_f64(), Some(12_345.0));
+    assert_eq!(event.payload["str"].as_u64(), Some(12_345));
 }
 
 #[test]

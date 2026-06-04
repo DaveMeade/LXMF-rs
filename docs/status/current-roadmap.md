@@ -140,8 +140,8 @@ gap, even though deeper propagation-router parity remains open.
   handled and preserving the prior sync transfer rate.
 - Empty local peer sync now follows Python's no-unhandled-messages path: a
   clean peer with no pending propagation entries records the attempt but
-  preserves liveness and avoids synthetic failure backoff, while existing
-  failure backoff remains intact.
+  preserves liveness and the previous sync transfer rate, and avoids synthetic
+  failure backoff, while existing failure backoff remains intact.
 - Reticulum interface breadth is still narrower than the Python reference, but
   KISS and LoRa/RNode are active implemented areas in the current branch. The
   daemon and transport crates now cover serial KISS
