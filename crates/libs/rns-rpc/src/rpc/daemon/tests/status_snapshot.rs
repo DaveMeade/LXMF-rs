@@ -3038,6 +3038,60 @@ fn peer_sync_postpones_offers_until_stamp_policy_is_known() {
 }
 
 #[test]
+fn peer_sync_stamp_policy_postpone_preserves_existing_liveness_like_python() {
+    let daemon = RpcDaemon::test_instance();
+    daemon
+        .handle_rpc(rpc_request(52, "peer_sync", json!({ "peer": "peer-policy-live" })))
+        .expect("initial peer sync");
+    {
+        let mut peers = daemon.peers.lock().expect("peers mutex poisoned");
+        let peer = peers.get_mut("peer-policy-live").expect("peer record");
+        peer.alive = true;
+        peer.last_seen = 1;
+        peer.propagation_sync_limit = Some(1_000);
+        peer.propagation_stamp_cost = None;
+        peer.propagation_stamp_cost_flexibility = None;
+        peer.peering_cost = None;
+    }
+    let entry = PropagationEntryRecord {
+        transient_id: "ef".repeat(32),
+        destination: "1f".repeat(16),
+        payload_hex: "1f".repeat(20),
+        received_at: 1_700_000_621,
+        size_bytes: 20,
+        stamp_value: Some(1),
+    };
+    daemon.store.upsert_propagation_entry(&entry).expect("store entry");
+    daemon
+        .store
+        .mark_peer_unhandled_propagation("peer-policy-live", entry.transient_id.as_str())
+        .expect("mark unhandled");
+
+    let result = daemon
+        .handle_rpc(rpc_request(54, "peer_sync", json!({ "peer": "peer-policy-live" })))
+        .expect("policy-gated peer sync")
+        .result
+        .expect("peer sync result");
+
+    assert_eq!(result["postponed"].as_bool(), Some(true));
+    assert_eq!(result["postpone_reason"].as_str(), Some("stamp_policy"));
+    assert_eq!(result["alive"].as_bool(), Some(true));
+
+    let after = daemon
+        .handle_rpc(RpcRequest { id: 55, method: "list_peers".to_string(), params: None })
+        .expect("list peers")
+        .result
+        .expect("list peers result");
+    let row = after["peers"]
+        .as_array()
+        .expect("peer rows")
+        .iter()
+        .find(|row| row["peer"].as_str() == Some("peer-policy-live"))
+        .expect("peer row");
+    assert_eq!(row["alive"].as_bool(), Some(true));
+}
+
+#[test]
 fn peer_sync_postpones_unstamped_offers_when_peer_stamp_policy_is_partial() {
     let daemon = RpcDaemon::test_instance();
     daemon
