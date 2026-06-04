@@ -131,6 +131,9 @@ gap, even though deeper propagation-router parity remains open.
 - Remote propagation sync now maps peer `ERROR_TIMEOUT` responses and preserves
   the peer without generic liveness failure/backoff, matching Python's
   failed offer-response cleanup for explicit peer timeout replies.
+- Remote propagation sync now preserves peers on `ERROR_NOT_FOUND` offer
+  responses as explicit peer-response cleanup, without treating that reply as
+  a local peering break or generic liveness failure.
 - Empty local peer sync now follows Python's no-unhandled-messages path: a
   clean peer with no pending propagation entries records the attempt but
   preserves liveness and avoids synthetic failure backoff, while existing

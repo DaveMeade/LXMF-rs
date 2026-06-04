@@ -9751,6 +9751,77 @@ fn timeout_propagation_remote_sync_preserves_peer_without_backoff() {
 }
 
 #[test]
+fn not_found_propagation_remote_sync_preserves_peer_without_backoff() {
+    let daemon = RpcDaemon::test_instance();
+    daemon.set_remote_control_bridge(Arc::new(RemoteSyncErrorBridge {
+        kind: std::io::ErrorKind::NotFound,
+        message: "propagation peer not found",
+    }));
+    daemon
+        .handle_rpc(rpc_request(93, "peer_sync", json!({ "peer": "peer-not-found" })))
+        .expect("initial peer sync");
+    {
+        let mut peers = daemon.peers.lock().expect("peers mutex poisoned");
+        let peer = peers.get_mut("peer-not-found").expect("peer record");
+        peer.alive = true;
+        peer.sync_backoff = 0;
+        peer.next_sync_attempt = 0;
+        peer.acceptance_rate = 0.4;
+    }
+    daemon.event_queue.lock().expect("event_queue mutex poisoned").clear();
+
+    let err = daemon
+        .handle_rpc(rpc_request(
+            94,
+            "propagation_remote_sync",
+            json!({
+                "remote": "remote-node",
+                "peer": "peer-not-found",
+            }),
+        ))
+        .expect_err("not-found remote sync should return the bridge error");
+    assert_eq!(err.kind(), std::io::ErrorKind::NotFound);
+    assert_eq!(err.to_string(), "propagation peer not found");
+
+    let peers = daemon
+        .handle_rpc(RpcRequest { id: 95, method: "list_peers".to_string(), params: None })
+        .expect("list peers")
+        .result
+        .expect("list peers result");
+    let row = peers["peers"]
+        .as_array()
+        .expect("peer rows")
+        .iter()
+        .find(|row| row["peer"].as_str() == Some("peer-not-found"))
+        .expect("peer should remain available for another offer");
+    assert_eq!(row["alive"].as_bool(), Some(true));
+    assert_eq!(row["sync_backoff"].as_u64(), Some(0));
+    assert_eq!(row["next_sync_attempt"].as_i64(), Some(0));
+    assert_eq!(row["acceptance_rate"].as_f64(), Some(0.4));
+    assert!(row["last_sync_attempt"].as_i64().expect("last sync attempt") > 0);
+
+    let events = daemon.event_queue.lock().expect("event_queue mutex poisoned");
+    assert!(
+        events.iter().all(|event| event.event_type != "peer_unpeer"),
+        "not-found response should not break peering"
+    );
+    let event = events
+        .iter()
+        .rev()
+        .find(|event| event.event_type == "peer_sync")
+        .expect("not-found peer sync event");
+    assert_eq!(event.payload["peer"].as_str(), Some("peer-not-found"));
+    assert_eq!(event.payload["remote"].as_str(), Some("remote-node"));
+    assert_eq!(event.payload["alive"].as_bool(), Some(true));
+    assert_eq!(event.payload["sync_backoff"].as_u64(), Some(0));
+    assert_eq!(event.payload["next_sync_attempt"].as_i64(), Some(0));
+    assert_eq!(
+        event.payload["propagation"]["error"].as_str(),
+        Some("propagation peer not found")
+    );
+}
+
+#[test]
 fn failed_propagation_remote_sync_reports_effective_limits() {
     let daemon = RpcDaemon::test_instance();
     daemon.set_remote_control_bridge(Arc::new(FailingTransferLimitRemoteControlBridge {
