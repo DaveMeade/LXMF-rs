@@ -4116,6 +4116,92 @@ fn list_peers_top_level_message_counters_match_python_sync_accounting() {
 }
 
 #[test]
+fn peer_sync_result_reports_cumulative_acceptance_rate_like_python() {
+    let daemon = RpcDaemon::test_instance();
+    let first = PropagationEntryRecord {
+        transient_id: "b1".repeat(32),
+        destination: "12".repeat(16),
+        payload_hex: "12".repeat(24),
+        received_at: 1_700_000_611,
+        size_bytes: 24,
+        stamp_value: None,
+    };
+    daemon.store.upsert_propagation_entry(&first).expect("store first entry");
+    daemon
+        .store
+        .mark_peer_unhandled_propagation("peer-cumulative-acceptance", first.transient_id.as_str())
+        .expect("mark first unhandled");
+    daemon
+        .handle_rpc(rpc_request(57, "peer_sync", json!({ "peer": "peer-cumulative-acceptance" })))
+        .expect("initial peer sync");
+    daemon.event_queue.lock().expect("event_queue mutex poisoned").clear();
+
+    let wanted = PropagationEntryRecord {
+        transient_id: "b2".repeat(32),
+        destination: "12".repeat(16),
+        payload_hex: "13".repeat(24),
+        received_at: 1_700_000_612,
+        size_bytes: 24,
+        stamp_value: None,
+    };
+    let already_known = PropagationEntryRecord {
+        transient_id: "b3".repeat(32),
+        destination: "12".repeat(16),
+        payload_hex: "14".repeat(24),
+        received_at: 1_700_000_613,
+        size_bytes: 24,
+        stamp_value: None,
+    };
+    for entry in [&wanted, &already_known] {
+        daemon.store.upsert_propagation_entry(entry).expect("store propagation entry");
+        daemon
+            .store
+            .mark_peer_unhandled_propagation(
+                "peer-cumulative-acceptance",
+                entry.transient_id.as_str(),
+            )
+            .expect("mark unhandled");
+    }
+
+    let result = daemon
+        .handle_rpc(rpc_request(
+            58,
+            "peer_sync",
+            json!({
+                "peer": "peer-cumulative-acceptance",
+                "wanted_ids": [wanted.transient_id.as_str()],
+            }),
+        ))
+        .expect("second peer sync")
+        .result
+        .expect("second peer sync result");
+    assert_eq!(result["messages"]["offered"].as_u64(), Some(3));
+    assert_eq!(result["messages"]["outgoing"].as_u64(), Some(2));
+    assert!(
+        result["acceptance_rate"]
+            .as_f64()
+            .is_some_and(|value| (value - (2.0 / 3.0)).abs() < f64::EPSILON)
+    );
+
+    let event = daemon
+        .event_queue
+        .lock()
+        .expect("event_queue mutex poisoned")
+        .iter()
+        .rev()
+        .find(|event| event.event_type == "peer_sync")
+        .cloned()
+        .expect("peer sync event");
+    assert_eq!(event.payload["messages"]["offered"].as_u64(), Some(3));
+    assert_eq!(event.payload["messages"]["outgoing"].as_u64(), Some(2));
+    assert!(
+        event.payload["acceptance_rate"]
+            .as_f64()
+            .is_some_and(|value| (value - (2.0 / 3.0)).abs() < f64::EPSILON)
+    );
+}
+
+#[test]
 fn peer_sync_drops_stale_unhandled_propagation_marks() {
     let daemon = RpcDaemon::test_instance();
     daemon

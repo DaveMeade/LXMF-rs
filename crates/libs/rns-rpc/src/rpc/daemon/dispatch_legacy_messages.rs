@@ -894,6 +894,8 @@ impl RpcDaemon {
                 };
                 let (outgoing, incoming, offered, unhandled, offered_bytes, unhandled_bytes) =
                     self.peer_message_stats(record.peer.as_str()).unwrap_or((0, 0, 0, 0, 0, 0));
+                let acceptance_rate =
+                    peer_acceptance_rate_for_reporting(acceptance_rate, outgoing, offered, alive);
                 let handled_ids = self
                     .store
                     .list_peer_handled_propagation_ids(record.peer.as_str())
