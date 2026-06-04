@@ -705,7 +705,10 @@ impl RpcDaemon {
                         sync_limit_bytes,
                     );
                 let peer_policy_required = remaining_policy_relevant > 0
-                    && (remaining_policy_relevant_has_stamp
+                    && ((wanted_ids.is_none()
+                        && transfer_limit_bytes.is_none()
+                        && sync_limit_bytes.is_none())
+                        || remaining_policy_relevant_has_stamp
                         || peer_stamp_policy_partially_known(&record));
                 if peer_policy_required && !peer_stamp_policy_known(&record) {
                     return Ok(self.postponed_peer_sync_response(

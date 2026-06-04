@@ -561,7 +561,11 @@ fn propagation_enable_queues_existing_entries_for_static_peers() {
     );
 
     let result = daemon
-        .handle_rpc(rpc_request(28, "peer_sync", json!({ "peer": "peer-static-queue" })))
+        .handle_rpc(rpc_request(
+            28,
+            "peer_sync",
+            json!({ "peer": "peer-static-queue", "transfer_limit_kb": 1 }),
+        ))
         .expect("peer sync")
         .result
         .expect("peer sync result");
@@ -3082,6 +3086,46 @@ fn peer_sync_postpones_unstamped_offers_when_peer_stamp_policy_is_partial() {
 }
 
 #[test]
+fn peer_sync_postpones_unstamped_offers_until_stamp_policy_is_known() {
+    let daemon = RpcDaemon::test_instance();
+    daemon
+        .handle_rpc(rpc_request(52, "peer_sync", json!({ "peer": "peer-unknown-stamp-policy" })))
+        .expect("initial peer sync");
+    let entry = PropagationEntryRecord {
+        transient_id: "e9".repeat(32),
+        destination: "19".repeat(16),
+        payload_hex: "19".repeat(20),
+        received_at: 1_700_000_623,
+        size_bytes: 20,
+        stamp_value: None,
+    };
+    daemon.store.upsert_propagation_entry(&entry).expect("store entry");
+    daemon
+        .store
+        .mark_peer_unhandled_propagation("peer-unknown-stamp-policy", entry.transient_id.as_str())
+        .expect("mark unhandled");
+
+    let result = daemon
+        .handle_rpc(rpc_request(54, "peer_sync", json!({ "peer": "peer-unknown-stamp-policy" })))
+        .expect("policy-gated peer sync")
+        .result
+        .expect("peer sync result");
+    assert_eq!(result["synced"].as_bool(), Some(false));
+    assert_eq!(result["postponed"].as_bool(), Some(true));
+    assert_eq!(result["postpone_reason"].as_str(), Some("stamp_policy"));
+    assert_eq!(result["propagation"]["offered"].as_u64(), Some(0));
+    assert_eq!(result["propagation"]["handled"].as_u64(), Some(0));
+    assert_eq!(result["propagation"]["skipped"].as_u64(), Some(0));
+
+    let unhandled = daemon
+        .store
+        .list_peer_unhandled_propagation("peer-unknown-stamp-policy")
+        .expect("list unhandled");
+    assert_eq!(unhandled.len(), 1);
+    assert_eq!(unhandled[0].transient_id, entry.transient_id);
+}
+
+#[test]
 fn peer_sync_postpones_stamped_offers_until_peering_key_is_ready() {
     let daemon = RpcDaemon::test_instance();
     daemon
@@ -3553,7 +3597,11 @@ fn peer_sync_marks_unhandled_propagation_entries_handled() {
         .expect("mark propagation unhandled");
 
     daemon
-        .handle_rpc(rpc_request(55, "peer_sync", json!({ "peer": "peer-propagation-sync" })))
+        .handle_rpc(rpc_request(
+            55,
+            "peer_sync",
+            json!({ "peer": "peer-propagation-sync", "transfer_limit_kb": 1 }),
+        ))
         .expect("peer sync");
 
     assert!(
@@ -3586,7 +3634,11 @@ fn peer_sync_queues_existing_entries_for_new_manual_peer() {
     daemon.store.upsert_propagation_entry(&entry).expect("store propagation entry");
 
     let result = daemon
-        .handle_rpc(rpc_request(55, "peer_sync", json!({ "peer": "peer-manual-queue" })))
+        .handle_rpc(rpc_request(
+            55,
+            "peer_sync",
+            json!({ "peer": "peer-manual-queue", "transfer_limit_kb": 1 }),
+        ))
         .expect("peer sync")
         .result
         .expect("peer sync result");
@@ -4132,7 +4184,11 @@ fn peer_sync_result_reports_cumulative_acceptance_rate_like_python() {
         .mark_peer_unhandled_propagation("peer-cumulative-acceptance", first.transient_id.as_str())
         .expect("mark first unhandled");
     daemon
-        .handle_rpc(rpc_request(57, "peer_sync", json!({ "peer": "peer-cumulative-acceptance" })))
+        .handle_rpc(rpc_request(
+            57,
+            "peer_sync",
+            json!({ "peer": "peer-cumulative-acceptance", "transfer_limit_kb": 1 }),
+        ))
         .expect("initial peer sync");
     daemon.event_queue.lock().expect("event_queue mutex poisoned").clear();
 
@@ -6772,7 +6828,7 @@ fn selected_propagation_node_queues_existing_entries_for_peer_sync() {
         .find(|row| row["peer"].as_str() == Some("peer-selected-queue"))
         .expect("selected peer row");
     assert_eq!(row["peer_type"].as_str(), Some("manual"));
-    assert_eq!(row["messages"]["offered"].as_u64(), Some(1));
+    assert_eq!(row["messages"]["offered"].as_u64(), Some(0));
     assert_eq!(row["messages"]["unhandled"].as_u64(), Some(1));
     assert_eq!(
         row["messages"]["unhandled_ids"].as_array().expect("message unhandled ids"),
