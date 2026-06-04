@@ -626,33 +626,6 @@ impl RpcDaemon {
                 let mut propagation_transfer_limited = 0usize;
                 let mut propagation_transfer_limited_bytes = 0u64;
                 let mut propagation_transfer_limited_ids = Vec::new();
-                if let Some(limit) = transfer_limit_bytes {
-                    let mut candidates = Vec::with_capacity(pending_propagation.len());
-                    for entry in pending_propagation {
-                        let entry_size = usize::try_from(entry.size_bytes).unwrap_or(usize::MAX);
-                        let transfer_size = entry_size.saturating_add(16);
-                        let wanted = wanted_ids
-                            .as_ref()
-                            .is_none_or(|ids| ids.contains(entry.transient_id.as_str()));
-                        if wanted && transfer_size > limit {
-                            propagation_transfer_limited =
-                                propagation_transfer_limited.saturating_add(1);
-                            propagation_transfer_limited_bytes =
-                                propagation_transfer_limited_bytes.saturating_add(entry.size_bytes);
-                            let transient_id = entry.transient_id;
-                            self.store
-                                .mark_peer_transfer_limited_propagation(
-                                    peer_id,
-                                    transient_id.as_str(),
-                                )
-                                .map_err(std::io::Error::other)?;
-                            propagation_transfer_limited_ids.push(transient_id);
-                            continue;
-                        }
-                        candidates.push(entry);
-                    }
-                    pending_propagation = candidates;
-                }
                 let mut propagation_rejected = 0usize;
                 let mut propagation_rejected_bytes = 0u64;
                 let mut propagation_rejected_ids = Vec::new();
@@ -697,6 +670,33 @@ impl RpcDaemon {
                         }
                         pending_propagation = accepted_propagation;
                     }
+                }
+                if let Some(limit) = transfer_limit_bytes {
+                    let mut candidates = Vec::with_capacity(pending_propagation.len());
+                    for entry in pending_propagation {
+                        let entry_size = usize::try_from(entry.size_bytes).unwrap_or(usize::MAX);
+                        let transfer_size = entry_size.saturating_add(16);
+                        let wanted = wanted_ids
+                            .as_ref()
+                            .is_none_or(|ids| ids.contains(entry.transient_id.as_str()));
+                        if wanted && transfer_size > limit {
+                            propagation_transfer_limited =
+                                propagation_transfer_limited.saturating_add(1);
+                            propagation_transfer_limited_bytes =
+                                propagation_transfer_limited_bytes.saturating_add(entry.size_bytes);
+                            let transient_id = entry.transient_id;
+                            self.store
+                                .mark_peer_transfer_limited_propagation(
+                                    peer_id,
+                                    transient_id.as_str(),
+                                )
+                                .map_err(std::io::Error::other)?;
+                            propagation_transfer_limited_ids.push(transient_id);
+                            continue;
+                        }
+                        candidates.push(entry);
+                    }
+                    pending_propagation = candidates;
                 }
                 let (remaining_policy_relevant, remaining_policy_relevant_has_stamp) =
                     peer_sync_policy_relevance(

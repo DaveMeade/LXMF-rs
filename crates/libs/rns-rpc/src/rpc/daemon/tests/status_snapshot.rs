@@ -5387,6 +5387,77 @@ fn peer_sync_rejects_low_value_stamped_entries_before_peering_key_gate() {
 }
 
 #[test]
+fn peer_sync_rejects_low_value_stamped_entries_before_transfer_limit() {
+    let daemon = RpcDaemon::test_instance();
+    daemon
+        .handle_rpc(rpc_request(63, "peer_sync", json!({ "peer": "peer-low-value-oversized" })))
+        .expect("initial peer sync");
+    {
+        let mut peers = daemon.peers.lock().expect("peers mutex poisoned");
+        let peer = peers.get_mut("peer-low-value-oversized").expect("peer record");
+        peer.propagation_transfer_limit = Some(80);
+        peer.propagation_sync_limit = Some(1_000);
+        peer.propagation_stamp_cost = Some(8);
+        peer.propagation_stamp_cost_flexibility = Some(2);
+        peer.peering_cost = Some(1);
+    }
+
+    let low_value = PropagationEntryRecord {
+        transient_id: "d4".repeat(32),
+        destination: "18".repeat(16),
+        payload_hex: "23".repeat(100),
+        received_at: 1_700_000_617,
+        size_bytes: 100,
+        stamp_value: Some(5),
+    };
+    daemon.store.upsert_propagation_entry(&low_value).expect("store propagation entry");
+    daemon
+        .store
+        .mark_peer_unhandled_propagation(
+            "peer-low-value-oversized",
+            low_value.transient_id.as_str(),
+        )
+        .expect("mark unhandled");
+
+    let result = daemon
+        .handle_rpc(rpc_request(64, "peer_sync", json!({ "peer": "peer-low-value-oversized" })))
+        .expect("peer sync")
+        .result
+        .expect("peer sync result");
+    assert_eq!(result["synced"].as_bool(), Some(true));
+    assert_eq!(result["propagation"]["handled"].as_u64(), Some(0));
+    assert_eq!(result["propagation"]["rejected"].as_u64(), Some(1));
+    assert_eq!(result["propagation"]["rejected_bytes"].as_u64(), Some(100));
+    assert_eq!(result["propagation"]["transfer_limited"].as_u64(), Some(0));
+    assert_eq!(result["propagation"]["transfer_limited_bytes"].as_u64(), Some(0));
+    assert_eq!(
+        result["propagation"]["rejected_ids"].as_array().expect("rejected ids"),
+        &[json!(low_value.transient_id.as_str())]
+    );
+    assert!(
+        result["propagation"]["transfer_limited_ids"]
+            .as_array()
+            .expect("transfer-limited ids")
+            .is_empty()
+    );
+
+    assert!(
+        daemon
+            .store
+            .list_peer_unhandled_propagation("peer-low-value-oversized")
+            .expect("pending propagation")
+            .is_empty()
+    );
+    assert!(
+        daemon
+            .store
+            .list_peer_handled_propagation_ids("peer-low-value-oversized")
+            .expect("handled propagation")
+            .is_empty()
+    );
+}
+
+#[test]
 fn peer_sync_rejects_low_value_stamped_entries_with_unconfigured_peering_cost() {
     let daemon = RpcDaemon::test_instance();
     daemon
