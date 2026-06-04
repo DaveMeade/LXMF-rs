@@ -133,6 +133,7 @@ Recent focused evidence:
 - `cargo test -p reticulum-rs-rpc --lib outbound_lxm -- --nocapture`
 - `cargo test -p reticulum-rs-rpc --lib propagation_remote_sync -- --nocapture`
 - `cargo test -p reticulum-rs-rpc --lib propagation_remote_sync_missing_bridge_does_not_create_peer -- --nocapture`
+- `cargo test -p reticulum-rs-rpc --lib propagation_remote_sync_updates_peer_runtime_state -- --nocapture`
 - `cargo test -p reticulum-rs-rpc --lib propagation_remote_fetch -- --nocapture`
 - `cargo test -p reticulum-rs-rpc --lib propagation_remote_download -- --nocapture`
 - PR #215 GitHub CI rollup at `0c4588c`, including the pinned

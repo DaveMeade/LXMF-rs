@@ -6634,6 +6634,13 @@ fn propagation_remote_sync_updates_peer_runtime_state() {
     assert_eq!(remote_sync["peer_sync"]["sync_limit"].as_u64(), Some(84_000));
     assert_eq!(remote_sync["peer_sync"]["propagation"]["transfer_limit"].as_u64(), Some(42_500));
     assert_eq!(remote_sync["peer_sync"]["propagation"]["sync_limit"].as_u64(), Some(84_000));
+    assert_eq!(remote_sync["peer_sync"]["propagation"]["rejected"].as_u64(), Some(0));
+    assert_eq!(
+        remote_sync["peer_sync"]["propagation"]["rejected_ids"]
+            .as_array()
+            .expect("response rejected ids"),
+        &[] as &[JsonValue]
+    );
 
     let peers = daemon
         .handle_rpc(RpcRequest { id: 75, method: "list_peers".to_string(), params: None })
@@ -6693,6 +6700,13 @@ fn propagation_remote_sync_updates_peer_runtime_state() {
     assert_eq!(event.payload["propagation"]["peering_key"].as_u64(), Some(peering_key));
     assert_eq!(event.payload["propagation"]["transfer_limit"].as_u64(), Some(42_500));
     assert_eq!(event.payload["propagation"]["sync_limit"].as_u64(), Some(84_000));
+    assert_eq!(event.payload["propagation"]["rejected"].as_u64(), Some(0));
+    assert_eq!(
+        event.payload["propagation"]["rejected_ids"]
+            .as_array()
+            .expect("event rejected ids"),
+        &[] as &[JsonValue]
+    );
     assert_eq!(event.payload["sync_backoff"].as_u64(), Some(0));
     assert_eq!(event.payload["next_sync_attempt"].as_i64(), Some(0));
     assert_eq!(event.payload["tx_bytes"].as_u64(), Some(payload.len() as u64));
