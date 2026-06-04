@@ -921,10 +921,11 @@ impl MessagesStore {
         self.with_write_conn(|conn| {
             conn.execute(
                 "INSERT INTO propagation_peer_entries (peer, transient_id, state, updated_at)
-                 VALUES (?1, ?2, 'transferred', ?3)
-                 ON CONFLICT(peer, transient_id) DO UPDATE SET
-                    state = 'transferred',
-                    updated_at = excluded.updated_at",
+             VALUES (?1, ?2, 'transferred', ?3)
+             ON CONFLICT(peer, transient_id) DO UPDATE SET
+                state = 'transferred',
+                updated_at = excluded.updated_at
+             WHERE propagation_peer_entries.state != 'received'",
                 params![peer, normalize_hex_key(transient_id), now_unix_secs()],
             )?;
             Ok(())
@@ -2485,6 +2486,39 @@ mod tests {
                 offered: 1,
                 unhandled: 0,
                 offered_bytes: 16,
+                unhandled_bytes: 0,
+            }
+        );
+    }
+
+    #[test]
+    fn transferred_report_does_not_downgrade_received_peer_mark() {
+        let store = MessagesStore::in_memory().expect("in-memory store");
+        let received = PropagationEntryRecord {
+            transient_id: "c4".repeat(32),
+            destination: "44".repeat(16),
+            payload_hex: "44".repeat(20),
+            received_at: 103,
+            size_bytes: 20,
+            stamp_value: None,
+        };
+        store.upsert_propagation_entry(&received).expect("received entry");
+        store
+            .mark_peer_received_propagation("peer-completed", received.transient_id.as_str())
+            .expect("mark received");
+
+        store
+            .mark_peer_transferred_propagation("peer-completed", received.transient_id.as_str())
+            .expect("ignore transferred downgrade");
+
+        assert_eq!(
+            store.peer_propagation_message_stats("peer-completed").expect("peer stats"),
+            PeerPropagationMessageStats {
+                outgoing: 0,
+                incoming: 1,
+                offered: 0,
+                unhandled: 0,
+                offered_bytes: 0,
                 unhandled_bytes: 0,
             }
         );
