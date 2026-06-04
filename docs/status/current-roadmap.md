@@ -147,6 +147,10 @@ gap, even though deeper propagation-router parity remains open.
 - Local peer sync now preserves the previous sync transfer rate when pending
   offers are only skipped by sync limits or marked transfer-limited, matching
   Python's resource-completion-only transfer-rate updates.
+- Local offer-response handling now applies Python's offer-construction gates
+  before interpreting `wanted_ids`: transfer-limited entries are filtered before
+  the peer response, while sync-limited entries that were never offered remain
+  queued for a later sync instead of being marked handled.
 - Reticulum interface breadth is still narrower than the Python reference, but
   KISS and LoRa/RNode are active implemented areas in the current branch. The
   daemon and transport crates now cover serial KISS

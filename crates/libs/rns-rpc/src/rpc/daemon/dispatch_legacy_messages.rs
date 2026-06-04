@@ -748,10 +748,7 @@ impl RpcDaemon {
                 for entry in pending_propagation {
                     let entry_size = usize::try_from(entry.size_bytes).unwrap_or(usize::MAX);
                     let transfer_size = entry_size.saturating_add(16);
-                    let wanted = wanted_ids
-                        .as_ref()
-                        .is_none_or(|ids| ids.contains(entry.transient_id.as_str()));
-                    if wanted && transfer_limit_bytes.is_some_and(|limit| transfer_size > limit) {
+                    if transfer_limit_bytes.is_some_and(|limit| transfer_size > limit) {
                         propagation_transfer_limited =
                             propagation_transfer_limited.saturating_add(1);
                         propagation_transfer_limited_bytes =
@@ -763,17 +760,18 @@ impl RpcDaemon {
                         propagation_transfer_limited_ids.push(transient_id);
                         continue;
                     }
-                    if wanted {
-                        let next_size = cumulative_size.saturating_add(transfer_size);
-                        if sync_limit_bytes.is_some_and(|limit| next_size >= limit) {
-                            propagation_skipped = propagation_skipped.saturating_add(1);
-                            propagation_remaining_bytes =
-                                propagation_remaining_bytes.saturating_add(entry.size_bytes);
-                            propagation_skipped_ids.push(entry.transient_id);
-                            continue;
-                        }
-                        cumulative_size = next_size;
+                    let next_size = cumulative_size.saturating_add(transfer_size);
+                    if sync_limit_bytes.is_some_and(|limit| next_size >= limit) {
+                        propagation_skipped = propagation_skipped.saturating_add(1);
+                        propagation_remaining_bytes =
+                            propagation_remaining_bytes.saturating_add(entry.size_bytes);
+                        propagation_skipped_ids.push(entry.transient_id);
+                        continue;
                     }
+                    cumulative_size = next_size;
+                    let wanted = wanted_ids
+                        .as_ref()
+                        .is_none_or(|ids| ids.contains(entry.transient_id.as_str()));
                     let transient_id = entry.transient_id.clone();
                     propagation_handled = propagation_handled.saturating_add(1);
                     propagation_offered_bytes =
