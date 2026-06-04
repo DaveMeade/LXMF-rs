@@ -656,24 +656,31 @@ impl RpcDaemon {
                 let mut propagation_rejected = 0usize;
                 let mut propagation_rejected_bytes = 0u64;
                 let mut propagation_rejected_ids = Vec::new();
+                pending_propagation.sort_by(|left, right| {
+                    let left_weight = propagation_peer_sync_weight(left, timestamp);
+                    let right_weight = propagation_peer_sync_weight(right, timestamp);
+                    left_weight
+                        .partial_cmp(&right_weight)
+                        .unwrap_or(std::cmp::Ordering::Equal)
+                        .then_with(|| left.transient_id.cmp(&right.transient_id))
+                });
                 let mut policy_relevant_pending = 0usize;
                 let mut policy_relevant_has_stamp = false;
-                let mut sync_limit_excludes_all_policy_relevant = sync_limit_bytes.is_some();
+                let mut policy_relevant_size = 24usize;
                 for entry in pending_propagation.iter().filter(|entry| {
                     wanted_ids.as_ref().is_none_or(|ids| ids.contains(entry.transient_id.as_str()))
                 }) {
+                    let entry_size = usize::try_from(entry.size_bytes).unwrap_or(usize::MAX);
+                    let transfer_size = entry_size.saturating_add(16);
+                    let next_size = policy_relevant_size.saturating_add(transfer_size);
+                    if sync_limit_bytes.is_some_and(|limit| next_size >= limit) {
+                        continue;
+                    }
+                    policy_relevant_size = next_size;
                     policy_relevant_pending = policy_relevant_pending.saturating_add(1);
                     policy_relevant_has_stamp |= entry.stamp_value.is_some();
-                    if sync_limit_bytes.is_none_or(|limit| {
-                        let entry_size = usize::try_from(entry.size_bytes).unwrap_or(usize::MAX);
-                        let transfer_size = entry_size.saturating_add(16);
-                        24usize.saturating_add(transfer_size) < limit
-                    }) {
-                        sync_limit_excludes_all_policy_relevant = false;
-                    }
                 }
                 let peer_policy_required = policy_relevant_pending > 0
-                    && !sync_limit_excludes_all_policy_relevant
                     && (policy_relevant_has_stamp || peer_stamp_policy_partially_known(&record));
                 if peer_policy_required {
                     if !peer_stamp_policy_known(&record) {
@@ -723,14 +730,6 @@ impl RpcDaemon {
                         pending_propagation = accepted_propagation;
                     }
                 }
-                pending_propagation.sort_by(|left, right| {
-                    let left_weight = propagation_peer_sync_weight(left, timestamp);
-                    let right_weight = propagation_peer_sync_weight(right, timestamp);
-                    left_weight
-                        .partial_cmp(&right_weight)
-                        .unwrap_or(std::cmp::Ordering::Equal)
-                        .then_with(|| left.transient_id.cmp(&right.transient_id))
-                });
                 let mut cumulative_size = 24usize;
                 let mut propagation_handled = 0usize;
                 let mut propagation_transferred = 0usize;

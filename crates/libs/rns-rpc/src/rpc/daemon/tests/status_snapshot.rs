@@ -3933,6 +3933,79 @@ fn peer_sync_handles_unwanted_entries_without_sync_limit() {
 }
 
 #[test]
+fn peer_sync_ignores_stamp_policy_for_entries_skipped_by_cumulative_sync_limit() {
+    let daemon = RpcDaemon::test_instance();
+    daemon
+        .handle_rpc(rpc_request(52, "peer_sync", json!({ "peer": "peer-stamped-skipped" })))
+        .expect("initial peer sync");
+    {
+        let mut peers = daemon.peers.lock().expect("peers mutex poisoned");
+        let peer = peers.get_mut("peer-stamped-skipped").expect("peer record");
+        peer.propagation_sync_limit = Some(80);
+    }
+    let transferable = PropagationEntryRecord {
+        transient_id: "a6".repeat(32),
+        destination: "12".repeat(16),
+        payload_hex: "12".repeat(10),
+        received_at: 1_700_000_611,
+        size_bytes: 10,
+        stamp_value: None,
+    };
+    let skipped = PropagationEntryRecord {
+        transient_id: "a7".repeat(32),
+        destination: "12".repeat(16),
+        payload_hex: "12".repeat(40),
+        received_at: 1_700_000_612,
+        size_bytes: 40,
+        stamp_value: Some(1),
+    };
+    for entry in [&transferable, &skipped] {
+        daemon.store.upsert_propagation_entry(entry).expect("store propagation entry");
+        daemon
+            .store
+            .mark_peer_unhandled_propagation("peer-stamped-skipped", entry.transient_id.as_str())
+            .expect("mark unhandled");
+    }
+
+    let result = daemon
+        .handle_rpc(rpc_request(55, "peer_sync", json!({ "peer": "peer-stamped-skipped" })))
+        .expect("peer sync")
+        .result
+        .expect("peer sync result");
+
+    assert_eq!(result["synced"].as_bool(), Some(true));
+    assert_eq!(result["propagation"]["postponed"].as_bool(), Some(false));
+    assert_eq!(result["propagation"]["handled"].as_u64(), Some(1));
+    assert_eq!(result["propagation"]["transferred"].as_u64(), Some(1));
+    assert_eq!(result["propagation"]["skipped"].as_u64(), Some(1));
+    assert_eq!(
+        result["propagation"]["transferred_ids"]
+            .as_array()
+            .expect("transferred ids"),
+        &[json!(transferable.transient_id.as_str())]
+    );
+    assert_eq!(
+        result["propagation"]["skipped_ids"].as_array().expect("skipped ids"),
+        &[json!(skipped.transient_id.as_str())]
+    );
+
+    assert_eq!(
+        daemon
+            .store
+            .list_peer_handled_propagation_ids("peer-stamped-skipped")
+            .expect("handled ids"),
+        vec![transferable.transient_id]
+    );
+    assert_eq!(
+        daemon
+            .store
+            .list_peer_unhandled_propagation("peer-stamped-skipped")
+            .expect("pending propagation"),
+        vec![skipped]
+    );
+}
+
+#[test]
 fn peer_sync_rejects_malformed_wanted_ids_without_mutating_queue() {
     let daemon = RpcDaemon::test_instance();
     let pending = PropagationEntryRecord {
