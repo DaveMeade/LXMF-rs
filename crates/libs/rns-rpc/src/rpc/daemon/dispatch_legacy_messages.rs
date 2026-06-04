@@ -595,6 +595,8 @@ impl RpcDaemon {
                     record.propagation_transfer_limit.map(|limit| limit as usize);
                 let requested_transfer_limit_bytes =
                     parsed.transfer_limit_kb.map(|limit| (limit.max(0.0) * 1000.0) as usize);
+                let explicit_peer_sync_selection =
+                    wanted_ids.is_some() || requested_transfer_limit_bytes.is_some();
                 let transfer_limit_bytes =
                     match (record_transfer_limit_bytes, requested_transfer_limit_bytes) {
                         (Some(record_limit), Some(requested_limit)) => {
@@ -707,9 +709,7 @@ impl RpcDaemon {
                         sync_limit_bytes,
                     );
                 let peer_policy_required = remaining_policy_relevant > 0
-                    && ((wanted_ids.is_none()
-                        && transfer_limit_bytes.is_none()
-                        && sync_limit_bytes.is_none())
+                    && (!explicit_peer_sync_selection
                         || remaining_policy_relevant_has_stamp
                         || peer_stamp_policy_partially_known(&record));
                 if peer_policy_required && !peer_stamp_policy_known(&record) {

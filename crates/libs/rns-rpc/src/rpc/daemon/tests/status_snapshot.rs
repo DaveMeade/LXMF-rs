@@ -2879,7 +2879,14 @@ fn peer_sync_during_backoff_postpones_skipped_offers() {
         )
         .expect("mark previous transfer unhandled");
     daemon
-        .handle_rpc(rpc_request(53, "peer_sync", json!({ "peer": "peer-backoff-skipped" })))
+        .handle_rpc(rpc_request(
+            53,
+            "peer_sync",
+            json!({
+                "peer": "peer-backoff-skipped",
+                "transfer_limit_kb": 1.0,
+            }),
+        ))
         .expect("peer sync with previous transfer");
     let previous_resource_bytes =
         rmp_serde::to_vec(&(1.0_f64, vec![vec![0x19; 40]])).expect("pack sync resource").len();
@@ -3174,6 +3181,56 @@ fn peer_sync_postpones_unstamped_offers_until_stamp_policy_is_known() {
     let unhandled = daemon
         .store
         .list_peer_unhandled_propagation("peer-unknown-stamp-policy")
+        .expect("list unhandled");
+    assert_eq!(unhandled.len(), 1);
+    assert_eq!(unhandled[0].transient_id, entry.transient_id);
+}
+
+#[test]
+fn peer_sync_requires_stamp_policy_for_ordinary_limited_peer_like_python() {
+    let daemon = RpcDaemon::test_instance();
+    daemon
+        .handle_rpc(rpc_request(52, "peer_sync", json!({ "peer": "peer-limited-policy" })))
+        .expect("initial peer sync");
+    {
+        let mut peers = daemon.peers.lock().expect("peers mutex poisoned");
+        let peer = peers.get_mut("peer-limited-policy").expect("peer record");
+        peer.propagation_transfer_limit = Some(1_000);
+        peer.propagation_sync_limit = Some(1_000);
+        peer.propagation_stamp_cost = None;
+        peer.propagation_stamp_cost_flexibility = None;
+        peer.peering_cost = None;
+    }
+    let entry = PropagationEntryRecord {
+        transient_id: "ea".repeat(32),
+        destination: "1a".repeat(16),
+        payload_hex: "1a".repeat(20),
+        received_at: 1_700_000_624,
+        size_bytes: 20,
+        stamp_value: None,
+    };
+    daemon.store.upsert_propagation_entry(&entry).expect("store entry");
+    daemon
+        .store
+        .mark_peer_unhandled_propagation("peer-limited-policy", entry.transient_id.as_str())
+        .expect("mark unhandled");
+
+    let result = daemon
+        .handle_rpc(rpc_request(54, "peer_sync", json!({ "peer": "peer-limited-policy" })))
+        .expect("policy-gated peer sync")
+        .result
+        .expect("peer sync result");
+    assert_eq!(result["synced"].as_bool(), Some(false));
+    assert_eq!(result["postponed"].as_bool(), Some(true));
+    assert_eq!(result["postpone_reason"].as_str(), Some("stamp_policy"));
+    assert_eq!(result["propagation"]["offered"].as_u64(), Some(0));
+    assert_eq!(result["propagation"]["handled"].as_u64(), Some(0));
+    assert_eq!(result["propagation"]["skipped"].as_u64(), Some(0));
+    assert_eq!(result["propagation"]["transfer_limited"].as_u64(), Some(0));
+
+    let unhandled = daemon
+        .store
+        .list_peer_unhandled_propagation("peer-limited-policy")
         .expect("list unhandled");
     assert_eq!(unhandled.len(), 1);
     assert_eq!(unhandled[0].transient_id, entry.transient_id);
@@ -4081,7 +4138,14 @@ fn peer_sync_ignores_stamp_policy_for_entries_skipped_by_cumulative_sync_limit()
     }
 
     let result = daemon
-        .handle_rpc(rpc_request(55, "peer_sync", json!({ "peer": "peer-stamped-skipped" })))
+        .handle_rpc(rpc_request(
+            55,
+            "peer_sync",
+            json!({
+                "peer": "peer-stamped-skipped",
+                "transfer_limit_kb": 1.0,
+            }),
+        ))
         .expect("peer sync")
         .result
         .expect("peer sync result");
@@ -4447,7 +4511,14 @@ fn peer_sync_applies_per_peer_propagation_sync_limit() {
     }
 
     daemon
-        .handle_rpc(rpc_request(57, "peer_sync", json!({ "peer": "peer-sync-budget" })))
+        .handle_rpc(rpc_request(
+            57,
+            "peer_sync",
+            json!({
+                "peer": "peer-sync-budget",
+                "transfer_limit_kb": 1.0,
+            }),
+        ))
         .expect("budgeted peer sync");
 
     let handled = daemon
@@ -4543,7 +4614,14 @@ fn peer_sync_applies_python_per_message_overhead_for_sync_limit() {
         .expect("mark unhandled");
 
     let result = daemon
-        .handle_rpc(rpc_request(57, "peer_sync", json!({ "peer": "peer-sync-overhead" })))
+        .handle_rpc(rpc_request(
+            57,
+            "peer_sync",
+            json!({
+                "peer": "peer-sync-overhead",
+                "transfer_limit_kb": 1.0,
+            }),
+        ))
         .expect("budgeted peer sync")
         .result
         .expect("peer sync result");
@@ -4600,7 +4678,14 @@ fn peer_sync_uses_transfer_limit_when_sync_limit_is_absent() {
     }
 
     daemon
-        .handle_rpc(rpc_request(59, "peer_sync", json!({ "peer": "peer-transfer-budget" })))
+        .handle_rpc(rpc_request(
+            59,
+            "peer_sync",
+            json!({
+                "peer": "peer-transfer-budget",
+                "transfer_limit_kb": 1.0,
+            }),
+        ))
         .expect("budgeted peer sync");
 
     let handled = daemon
@@ -4758,7 +4843,14 @@ fn peer_sync_retries_transfer_limited_entries_when_limit_increases() {
     }
 
     let retried = daemon
-        .handle_rpc(rpc_request(62, "peer_sync", json!({ "peer": "peer-transfer-retry" })))
+        .handle_rpc(rpc_request(
+            62,
+            "peer_sync",
+            json!({
+                "peer": "peer-transfer-retry",
+                "transfer_limit_kb": 1.0,
+            }),
+        ))
         .expect("retried peer sync")
         .result
         .expect("retried peer sync result");
@@ -5011,7 +5103,14 @@ fn peer_sync_orders_offers_by_python_weight_before_sync_limit() {
     }
 
     let result = daemon
-        .handle_rpc(rpc_request(63, "peer_sync", json!({ "peer": "peer-weight-order" })))
+        .handle_rpc(rpc_request(
+            63,
+            "peer_sync",
+            json!({
+                "peer": "peer-weight-order",
+                "transfer_limit_kb": 1.0,
+            }),
+        ))
         .expect("peer sync")
         .result
         .expect("peer sync result");
@@ -5075,7 +5174,14 @@ fn peer_sync_reports_propagation_transfer_accounting() {
     }
 
     let result = daemon
-        .handle_rpc(rpc_request(61, "peer_sync", json!({ "peer": "peer-sync-report" })))
+        .handle_rpc(rpc_request(
+            61,
+            "peer_sync",
+            json!({
+                "peer": "peer-sync-report",
+                "transfer_limit_kb": 1.0,
+            }),
+        ))
         .expect("peer sync")
         .result
         .expect("peer sync result");
@@ -5187,7 +5293,14 @@ fn peer_sync_updates_transfer_rate_from_transferred_bytes() {
         .expect("mark unhandled");
 
     let result = daemon
-        .handle_rpc(rpc_request(64, "peer_sync", json!({ "peer": "peer-sync-rate" })))
+        .handle_rpc(rpc_request(
+            64,
+            "peer_sync",
+            json!({
+                "peer": "peer-sync-rate",
+                "transfer_limit_kb": 1.0,
+            }),
+        ))
         .expect("peer sync")
         .result
         .expect("peer sync result");
@@ -5292,7 +5405,14 @@ fn peer_sync_clears_transfer_rate_when_offers_are_skipped() {
         .mark_peer_unhandled_propagation("peer-sync-rate-skipped", handled.transient_id.as_str())
         .expect("mark handled unhandled");
     daemon
-        .handle_rpc(rpc_request(64, "peer_sync", json!({ "peer": "peer-sync-rate-skipped" })))
+        .handle_rpc(rpc_request(
+            64,
+            "peer_sync",
+            json!({
+                "peer": "peer-sync-rate-skipped",
+                "transfer_limit_kb": 1.0,
+            }),
+        ))
         .expect("peer sync with transfer");
 
     {
@@ -5315,7 +5435,14 @@ fn peer_sync_clears_transfer_rate_when_offers_are_skipped() {
         .expect("mark skipped unhandled");
 
     let result = daemon
-        .handle_rpc(rpc_request(65, "peer_sync", json!({ "peer": "peer-sync-rate-skipped" })))
+        .handle_rpc(rpc_request(
+            65,
+            "peer_sync",
+            json!({
+                "peer": "peer-sync-rate-skipped",
+                "transfer_limit_kb": 1.0,
+            }),
+        ))
         .expect("peer sync with skipped offer")
         .result
         .expect("peer sync result");
@@ -5363,7 +5490,14 @@ fn peer_sync_clears_transfer_rate_when_offers_are_skipped() {
         )
         .expect("mark second handled unhandled");
     daemon
-        .handle_rpc(rpc_request(67, "peer_sync", json!({ "peer": "peer-sync-rate-skipped" })))
+        .handle_rpc(rpc_request(
+            67,
+            "peer_sync",
+            json!({
+                "peer": "peer-sync-rate-skipped",
+                "transfer_limit_kb": 1.0,
+            }),
+        ))
         .expect("peer sync with second transfer");
 
     {
@@ -5393,7 +5527,14 @@ fn peer_sync_clears_transfer_rate_when_offers_are_skipped() {
         .expect("mark transfer limited unhandled");
 
     let result = daemon
-        .handle_rpc(rpc_request(68, "peer_sync", json!({ "peer": "peer-sync-rate-skipped" })))
+        .handle_rpc(rpc_request(
+            68,
+            "peer_sync",
+            json!({
+                "peer": "peer-sync-rate-skipped",
+                "transfer_limit_kb": 1.0,
+            }),
+        ))
         .expect("peer sync with transfer-limited offer")
         .result
         .expect("peer sync result");
