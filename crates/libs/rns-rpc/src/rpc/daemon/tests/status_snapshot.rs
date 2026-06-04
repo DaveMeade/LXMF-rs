@@ -3301,7 +3301,7 @@ fn peer_sync_postpones_unstamped_offers_until_peering_key_is_ready() {
 }
 
 #[test]
-fn repeated_skipped_peer_sync_is_postponed_until_backoff_expires() {
+fn repeated_skipped_peer_sync_retries_without_failure_backoff() {
     let daemon = RpcDaemon::test_instance();
     daemon
         .handle_rpc(rpc_request(52, "peer_sync", json!({ "peer": "peer-skipped-repeat" })))
@@ -3340,19 +3340,21 @@ fn repeated_skipped_peer_sync_is_postponed_until_backoff_expires() {
         .find(|row| row["peer"].as_str() == Some("peer-skipped-repeat"))
         .expect("peer row");
     let first_attempt = first_row["last_sync_attempt"].as_i64().expect("first attempt");
-    assert_eq!(first_row["sync_backoff"].as_u64(), Some(12 * 60));
+    assert_eq!(first_row["sync_backoff"].as_u64(), Some(0));
+    assert_eq!(first_row["next_sync_attempt"].as_i64(), Some(0));
 
     let second_result = daemon
         .handle_rpc(rpc_request(55, "peer_sync", json!({ "peer": "peer-skipped-repeat" })))
         .expect("second skipped peer sync")
         .result
         .expect("second peer sync result");
-    assert_eq!(second_result["synced"].as_bool(), Some(false));
-    assert_eq!(second_result["postponed"].as_bool(), Some(true));
-    assert_eq!(second_result["postpone_reason"].as_str(), Some("backoff"));
+    assert_eq!(second_result["synced"].as_bool(), Some(true));
+    assert_eq!(second_result["propagation"]["postponed"].as_bool(), Some(false));
     assert_eq!(second_result["propagation"]["offered"].as_u64(), Some(0));
     assert_eq!(second_result["propagation"]["handled"].as_u64(), Some(0));
-    assert_eq!(second_result["propagation"]["skipped"].as_u64(), Some(0));
+    assert_eq!(second_result["propagation"]["skipped"].as_u64(), Some(1));
+    assert_eq!(second_result["sync_backoff"].as_u64(), Some(0));
+    assert_eq!(second_result["next_sync_attempt"].as_i64(), Some(0));
 
     let second = daemon
         .handle_rpc(RpcRequest { id: 56, method: "list_peers".to_string(), params: None })
@@ -3365,16 +3367,13 @@ fn repeated_skipped_peer_sync_is_postponed_until_backoff_expires() {
         .iter()
         .find(|row| row["peer"].as_str() == Some("peer-skipped-repeat"))
         .expect("peer row");
-    assert_eq!(second_row["sync_backoff"].as_u64(), Some(12 * 60));
+    assert_eq!(second_row["sync_backoff"].as_u64(), Some(0));
     assert!(second_row["last_sync_attempt"].as_i64().is_some_and(|value| value >= first_attempt));
-    assert_eq!(
-        second_row["next_sync_attempt"].as_i64(),
-        first_row["next_sync_attempt"].as_i64()
-    );
+    assert_eq!(second_row["next_sync_attempt"].as_i64(), Some(0));
 }
 
 #[test]
-fn peer_sync_with_only_skipped_offers_schedules_initial_backoff() {
+fn peer_sync_with_only_skipped_offers_clears_failure_backoff_like_python() {
     let daemon = RpcDaemon::test_instance();
     daemon
         .handle_rpc(rpc_request(52, "peer_sync", json!({ "peer": "peer-skipped-initial" })))
@@ -3383,6 +3382,9 @@ fn peer_sync_with_only_skipped_offers_schedules_initial_backoff() {
         let mut peers = daemon.peers.lock().expect("peers mutex poisoned");
         let peer = peers.get_mut("peer-skipped-initial").expect("peer record");
         peer.propagation_sync_limit = Some(24);
+        peer.alive = false;
+        peer.sync_backoff = 12 * 60;
+        peer.next_sync_attempt = 0;
     }
     let entry = PropagationEntryRecord {
         transient_id: "ef".repeat(32),
@@ -3408,6 +3410,9 @@ fn peer_sync_with_only_skipped_offers_schedules_initial_backoff() {
     assert_eq!(result["propagation"]["handled"].as_u64(), Some(0));
     assert_eq!(result["propagation"]["skipped"].as_u64(), Some(1));
     assert_eq!(result["acceptance_rate"].as_f64(), Some(0.0));
+    assert_eq!(result["alive"].as_bool(), Some(true));
+    assert_eq!(result["sync_backoff"].as_u64(), Some(0));
+    assert_eq!(result["next_sync_attempt"].as_i64(), Some(0));
 
     let peers = daemon
         .handle_rpc(RpcRequest { id: 54, method: "list_peers".to_string(), params: None })
@@ -3420,15 +3425,13 @@ fn peer_sync_with_only_skipped_offers_schedules_initial_backoff() {
         .iter()
         .find(|row| row["peer"].as_str() == Some("peer-skipped-initial"))
         .expect("peer row");
-    assert_eq!(row["sync_backoff"].as_u64(), Some(12 * 60));
-    assert_eq!(
-        row["next_sync_attempt"].as_i64(),
-        Some(row["last_sync_attempt"].as_i64().expect("last sync attempt") + 12 * 60)
-    );
+    assert_eq!(row["alive"].as_bool(), Some(true));
+    assert_eq!(row["sync_backoff"].as_u64(), Some(0));
+    assert_eq!(row["next_sync_attempt"].as_i64(), Some(0));
 }
 
 #[test]
-fn peer_sync_result_and_event_report_backoff_schedule() {
+fn peer_sync_result_and_event_report_skipped_only_completion() {
     let daemon = RpcDaemon::test_instance();
     daemon
         .handle_rpc(rpc_request(55, "peer_sync", json!({ "peer": "peer-backoff-report" })))
@@ -3458,12 +3461,13 @@ fn peer_sync_result_and_event_report_backoff_schedule() {
         .expect("skipped peer sync")
         .result
         .expect("peer sync result");
-    assert_eq!(result["sync_backoff"].as_u64(), Some(12 * 60));
+    assert_eq!(result["sync_backoff"].as_u64(), Some(0));
     let last_sync_attempt = result["last_sync_attempt"].as_i64().expect("last sync attempt");
     let last_heard = result["last_heard"].as_i64().expect("last heard");
     assert!(last_sync_attempt > 0);
     assert!(last_heard > 0);
-    assert_eq!(result["next_sync_attempt"].as_i64(), Some(last_sync_attempt + 12 * 60));
+    assert_eq!(result["next_sync_attempt"].as_i64(), Some(0));
+    assert_eq!(result["propagation"]["skipped"].as_u64(), Some(1));
 
     let event = daemon
         .event_queue
@@ -3474,10 +3478,11 @@ fn peer_sync_result_and_event_report_backoff_schedule() {
         .find(|event| event.event_type == "peer_sync")
         .cloned()
         .expect("peer sync event");
-    assert_eq!(event.payload["sync_backoff"].as_u64(), Some(12 * 60));
+    assert_eq!(event.payload["sync_backoff"].as_u64(), Some(0));
     assert_eq!(event.payload["last_sync_attempt"].as_i64(), Some(last_sync_attempt));
     assert_eq!(event.payload["last_heard"].as_i64(), Some(last_heard));
-    assert_eq!(event.payload["next_sync_attempt"].as_i64(), Some(last_sync_attempt + 12 * 60));
+    assert_eq!(event.payload["next_sync_attempt"].as_i64(), Some(0));
+    assert_eq!(event.payload["propagation"]["skipped"].as_u64(), Some(1));
 }
 
 #[test]

@@ -848,7 +848,8 @@ impl RpcDaemon {
                         let propagation_pending = propagation_skipped;
                         let propagation_completed = propagation_handled > 0
                             || propagation_rejected > 0
-                            || propagation_transfer_limited > 0;
+                            || propagation_transfer_limited > 0
+                            || propagation_skipped > 0;
                         existing.last_sync_attempt = timestamp;
                         existing.alive = propagation_completed
                             || existing.last_sync_attempt < existing.last_seen;
