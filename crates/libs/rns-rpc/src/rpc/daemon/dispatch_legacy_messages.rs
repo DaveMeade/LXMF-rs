@@ -653,19 +653,25 @@ impl RpcDaemon {
                 let mut propagation_rejected = 0usize;
                 let mut propagation_rejected_bytes = 0u64;
                 let mut propagation_rejected_ids = Vec::new();
-                let sync_limit_excludes_all_pending = sync_limit_bytes.is_some_and(|limit| {
-                    !pending_propagation.is_empty()
-                        && pending_propagation.iter().all(|entry| {
-                            let entry_size =
-                                usize::try_from(entry.size_bytes).unwrap_or(usize::MAX);
-                            let transfer_size = entry_size.saturating_add(16);
-                            24usize.saturating_add(transfer_size) >= limit
-                        })
-                });
-                let peer_policy_required = !pending_propagation.is_empty()
-                    && !sync_limit_excludes_all_pending
-                    && (pending_propagation.iter().any(|entry| entry.stamp_value.is_some())
-                        || peer_stamp_policy_partially_known(&record));
+                let mut policy_relevant_pending = 0usize;
+                let mut policy_relevant_has_stamp = false;
+                let mut sync_limit_excludes_all_policy_relevant = sync_limit_bytes.is_some();
+                for entry in pending_propagation.iter().filter(|entry| {
+                    wanted_ids.as_ref().is_none_or(|ids| ids.contains(entry.transient_id.as_str()))
+                }) {
+                    policy_relevant_pending = policy_relevant_pending.saturating_add(1);
+                    policy_relevant_has_stamp |= entry.stamp_value.is_some();
+                    if sync_limit_bytes.is_none_or(|limit| {
+                        let entry_size = usize::try_from(entry.size_bytes).unwrap_or(usize::MAX);
+                        let transfer_size = entry_size.saturating_add(16);
+                        24usize.saturating_add(transfer_size) < limit
+                    }) {
+                        sync_limit_excludes_all_policy_relevant = false;
+                    }
+                }
+                let peer_policy_required = policy_relevant_pending > 0
+                    && !sync_limit_excludes_all_policy_relevant
+                    && (policy_relevant_has_stamp || peer_stamp_policy_partially_known(&record));
                 if peer_policy_required {
                     if !peer_stamp_policy_known(&record) {
                         return Ok(self.postponed_peer_sync_response(
