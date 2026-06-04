@@ -1083,9 +1083,9 @@ impl MessagesStore {
                 "SELECT
                     COALESCE(SUM(CASE WHEN e.transient_id IS NOT NULL AND state = 'transferred' THEN 1 ELSE 0 END), 0),
                     COALESCE(SUM(CASE WHEN e.transient_id IS NOT NULL AND state = 'received' THEN 1 ELSE 0 END), 0),
-                    COALESCE(SUM(CASE WHEN e.transient_id IS NOT NULL AND state IN ('handled', 'transferred', 'unhandled', 'transfer_limited') THEN 1 ELSE 0 END), 0),
+                    COALESCE(SUM(CASE WHEN e.transient_id IS NOT NULL AND state IN ('handled', 'transferred', 'unhandled') THEN 1 ELSE 0 END), 0),
                     COALESCE(SUM(CASE WHEN e.transient_id IS NOT NULL AND state = 'unhandled' THEN 1 ELSE 0 END), 0),
-                    COALESCE(SUM(CASE WHEN e.transient_id IS NOT NULL AND state IN ('handled', 'transferred', 'unhandled', 'transfer_limited') THEN e.size_bytes ELSE 0 END), 0),
+                    COALESCE(SUM(CASE WHEN e.transient_id IS NOT NULL AND state IN ('handled', 'transferred', 'unhandled') THEN e.size_bytes ELSE 0 END), 0),
                     COALESCE(SUM(CASE WHEN e.transient_id IS NOT NULL AND state = 'unhandled' THEN e.size_bytes ELSE 0 END), 0)
                  FROM propagation_peer_entries p
                  LEFT JOIN propagation_entries e
@@ -2638,9 +2638,9 @@ mod tests {
             PeerPropagationMessageStats {
                 outgoing: 1,
                 incoming: 1,
-                offered: 3,
+                offered: 2,
                 unhandled: 1,
-                offered_bytes: 72,
+                offered_bytes: 36,
                 unhandled_bytes: 24,
             }
         );
