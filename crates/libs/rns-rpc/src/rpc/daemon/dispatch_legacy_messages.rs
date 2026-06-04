@@ -77,7 +77,6 @@ impl RpcDaemon {
                 if postpone_reason == "backoff" {
                     existing.alive = existing.last_sync_attempt < existing.last_seen;
                 }
-                existing.sync_transfer_rate = 0.0;
                 (
                     existing.acceptance_rate,
                     existing.last_sync_attempt,

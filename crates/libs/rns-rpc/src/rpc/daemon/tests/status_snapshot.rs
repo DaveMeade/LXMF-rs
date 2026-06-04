@@ -3208,8 +3208,8 @@ fn peer_sync_during_backoff_postpones_skipped_offers() {
     assert_eq!(result["rx_bytes"].as_u64(), Some(0));
     assert_eq!(result["tx_bytes"].as_u64(), Some((previous_resource_bytes + 64) as u64));
     assert_eq!(result["alive"].as_bool(), Some(false));
-    assert_eq!(result["sync_transfer_rate"].as_f64(), Some(0.0));
-    assert_eq!(result["str"].as_u64(), Some(0));
+    assert_eq!(result["sync_transfer_rate"].as_f64(), Some(previous_resource_bytes as f64));
+    assert_eq!(result["str"].as_u64(), Some(previous_resource_bytes as u64));
     assert!(result["last_heard"].as_i64().is_some_and(|value| value > 0));
     assert_eq!(result["propagation"]["synced"].as_bool(), Some(false));
     assert_eq!(result["propagation"]["postponed"].as_bool(), Some(true));
@@ -3251,8 +3251,8 @@ fn peer_sync_during_backoff_postpones_skipped_offers() {
         .expect("peer row");
     assert_eq!(after_row["sync_backoff"].as_u64(), Some(sync_backoff));
     assert_eq!(after_row["next_sync_attempt"].as_i64(), Some(next_sync_attempt));
-    assert_eq!(after_row["sync_transfer_rate"].as_f64(), Some(0.0));
-    assert_eq!(after_row["str"].as_u64(), Some(0));
+    assert_eq!(after_row["sync_transfer_rate"].as_f64(), Some(previous_resource_bytes as f64));
+    assert_eq!(after_row["str"].as_u64(), Some(previous_resource_bytes as u64));
 }
 
 #[test]
