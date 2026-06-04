@@ -682,17 +682,22 @@ impl RpcDaemon {
             .is_some();
         let payload_hex = hex::encode(normalized_payload);
         self.store_propagation_payload_hex(transient_id.as_str(), payload_hex.as_str())?;
+        let source_is_active = self.active_peer_ids().iter().any(|peer| peer == &source_peer);
         if !already_known {
             self.queue_propagation_entry_from_source_for_active_peers(
                 source_peer.as_str(),
                 transient_id.as_str(),
             )?;
-        } else {
+        } else if source_is_active {
             self.store
                 .mark_peer_received_propagation(source_peer.as_str(), transient_id.as_str())
                 .map_err(std::io::Error::other)?;
         }
-        self.record_inbound_peer_activity(source_peer.as_str(), normalized_payload.len());
+        if source_is_active {
+            self.record_inbound_peer_activity(source_peer.as_str(), normalized_payload.len());
+        } else {
+            self.record_unpeered_propagation_attempt(normalized_payload.len());
+        }
         self.propagation_payloads
             .lock()
             .expect("propagation payload mutex poisoned")

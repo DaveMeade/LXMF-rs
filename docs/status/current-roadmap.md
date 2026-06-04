@@ -163,6 +163,9 @@ gap, even though deeper propagation-router parity remains open.
   Python's source-peer queueing rule: the source peer is marked received/handled
   and records inbound bytes, while newly ingested propagation entries are queued
   only for other active peers.
+- Inbound peer propagation resources from identified but unpeered senders now
+  update the Python-style unpeered propagation counters instead of client
+  counters, while still queueing accepted payloads for active peers.
 - Reticulum interface breadth is still narrower than the Python reference, but
   KISS and LoRa/RNode are active implemented areas in the current branch. The
   daemon and transport crates now cover serial KISS
