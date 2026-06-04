@@ -846,8 +846,10 @@ impl RpcDaemon {
                     if let Some(existing) = guard.get_mut(&record.peer) {
                         let propagation_offered = propagation_handled;
                         let propagation_pending = propagation_skipped;
+                        let propagation_completed =
+                            propagation_handled > 0 || propagation_rejected > 0;
                         existing.last_sync_attempt = timestamp;
-                        existing.alive = propagation_handled > 0
+                        existing.alive = propagation_completed
                             || existing.last_sync_attempt < existing.last_seen;
                         existing.tx_bytes =
                             existing.tx_bytes.saturating_add(propagation_resource_bytes);
@@ -857,7 +859,7 @@ impl RpcDaemon {
                                 / propagation_offered as f64)
                                 .clamp(0.0, 1.0);
                         }
-                        if propagation_handled > 0 {
+                        if propagation_completed {
                             existing.sync_backoff = 0;
                             existing.next_sync_attempt = 0;
                         } else if propagation_pending > 0 {

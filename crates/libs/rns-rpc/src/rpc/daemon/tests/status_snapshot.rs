@@ -5400,6 +5400,9 @@ fn peer_sync_rejects_low_value_stamped_entries_before_transfer_limit() {
         peer.propagation_stamp_cost = Some(8);
         peer.propagation_stamp_cost_flexibility = Some(2);
         peer.peering_cost = Some(1);
+        peer.alive = false;
+        peer.sync_backoff = 12 * 60;
+        peer.next_sync_attempt = 0;
     }
 
     let low_value = PropagationEntryRecord {
@@ -5430,6 +5433,9 @@ fn peer_sync_rejects_low_value_stamped_entries_before_transfer_limit() {
     assert_eq!(result["propagation"]["rejected_bytes"].as_u64(), Some(100));
     assert_eq!(result["propagation"]["transfer_limited"].as_u64(), Some(0));
     assert_eq!(result["propagation"]["transfer_limited_bytes"].as_u64(), Some(0));
+    assert_eq!(result["alive"].as_bool(), Some(true));
+    assert_eq!(result["sync_backoff"].as_u64(), Some(0));
+    assert_eq!(result["next_sync_attempt"].as_i64(), Some(0));
     assert_eq!(
         result["propagation"]["rejected_ids"].as_array().expect("rejected ids"),
         &[json!(low_value.transient_id.as_str())]
@@ -5455,6 +5461,21 @@ fn peer_sync_rejects_low_value_stamped_entries_before_transfer_limit() {
             .expect("handled propagation")
             .is_empty()
     );
+
+    let peers = daemon
+        .handle_rpc(RpcRequest { id: 65, method: "list_peers".to_string(), params: None })
+        .expect("list peers")
+        .result
+        .expect("list peers result");
+    let row = peers["peers"]
+        .as_array()
+        .expect("peer rows")
+        .iter()
+        .find(|row| row["peer"].as_str() == Some("peer-low-value-oversized"))
+        .expect("peer row");
+    assert_eq!(row["alive"].as_bool(), Some(true));
+    assert_eq!(row["sync_backoff"].as_u64(), Some(0));
+    assert_eq!(row["next_sync_attempt"].as_i64(), Some(0));
 }
 
 #[test]
