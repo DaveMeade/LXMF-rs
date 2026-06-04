@@ -906,7 +906,8 @@ impl MessagesStore {
                  VALUES (?1, ?2, 'handled', ?3)
                  ON CONFLICT(peer, transient_id) DO UPDATE SET
                     state = 'handled',
-                    updated_at = excluded.updated_at",
+                    updated_at = excluded.updated_at
+                 WHERE propagation_peer_entries.state NOT IN ('transferred', 'received')",
                 params![peer, normalize_hex_key(transient_id), now_unix_secs()],
             )?;
             Ok(())
@@ -2519,6 +2520,54 @@ mod tests {
                 offered: 0,
                 unhandled: 0,
                 offered_bytes: 0,
+                unhandled_bytes: 0,
+            }
+        );
+    }
+
+    #[test]
+    fn handled_report_does_not_downgrade_completed_peer_marks() {
+        let store = MessagesStore::in_memory().expect("in-memory store");
+        let transferred = PropagationEntryRecord {
+            transient_id: "c5".repeat(32),
+            destination: "55".repeat(16),
+            payload_hex: "55".repeat(24),
+            received_at: 104,
+            size_bytes: 24,
+            stamp_value: None,
+        };
+        let received = PropagationEntryRecord {
+            transient_id: "c6".repeat(32),
+            destination: "66".repeat(16),
+            payload_hex: "66".repeat(28),
+            received_at: 105,
+            size_bytes: 28,
+            stamp_value: None,
+        };
+        store.upsert_propagation_entry(&transferred).expect("transferred entry");
+        store.upsert_propagation_entry(&received).expect("received entry");
+        store
+            .mark_peer_transferred_propagation("peer-completed", transferred.transient_id.as_str())
+            .expect("mark transferred");
+        store
+            .mark_peer_received_propagation("peer-completed", received.transient_id.as_str())
+            .expect("mark received");
+
+        store
+            .mark_peer_handled_propagation("peer-completed", transferred.transient_id.as_str())
+            .expect("ignore transferred downgrade");
+        store
+            .mark_peer_handled_propagation("peer-completed", received.transient_id.as_str())
+            .expect("ignore received downgrade");
+
+        assert_eq!(
+            store.peer_propagation_message_stats("peer-completed").expect("peer stats"),
+            PeerPropagationMessageStats {
+                outgoing: 1,
+                incoming: 1,
+                offered: 1,
+                unhandled: 0,
+                offered_bytes: 24,
                 unhandled_bytes: 0,
             }
         );
