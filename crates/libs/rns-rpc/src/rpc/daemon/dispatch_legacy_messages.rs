@@ -1660,9 +1660,10 @@ fn peer_stamp_policy_partially_known(peer: &PeerRecord) -> bool {
 }
 
 fn peer_minimum_accepted_stamp_value(peer: &PeerRecord) -> Option<u32> {
-    let cost = peer.propagation_stamp_cost?;
-    let flexibility = peer.propagation_stamp_cost_flexibility?;
-    Some(cost.saturating_sub(flexibility))
+    let _cost = peer.propagation_stamp_cost?;
+    let _flexibility = peer.propagation_stamp_cost_flexibility?;
+    // Python LXMPeer uses min(0, cost - flexibility), so positive stamp values are never rejected here.
+    Some(0)
 }
 
 fn peer_sync_policy_relevance(

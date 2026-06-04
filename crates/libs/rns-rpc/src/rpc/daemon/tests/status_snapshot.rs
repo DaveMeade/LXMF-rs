@@ -5677,7 +5677,7 @@ fn peer_sync_reports_transferred_propagation_messages() {
 }
 
 #[test]
-fn peer_sync_drops_low_value_stamped_entries_before_offer() {
+fn peer_sync_offers_low_value_stamped_entries_like_python() {
     let store = MessagesStore::in_memory().expect("store");
     let daemon = RpcDaemon::with_store(store, hex::encode([2u8; 16]));
     let peer_id = hex::encode([5u8; 16]);
@@ -5722,17 +5722,18 @@ fn peer_sync_drops_low_value_stamped_entries_before_offer() {
         .expect("peer sync")
         .result
         .expect("peer sync result");
-    assert_eq!(result["propagation"]["handled"].as_u64(), Some(1));
-    assert_eq!(result["propagation"]["rejected"].as_u64(), Some(1));
-    assert_eq!(result["propagation"]["rejected_bytes"].as_u64(), Some(24));
+    assert_eq!(result["propagation"]["handled"].as_u64(), Some(2));
+    assert_eq!(result["propagation"]["transferred"].as_u64(), Some(2));
+    assert_eq!(result["propagation"]["rejected"].as_u64(), Some(0));
+    assert_eq!(result["propagation"]["rejected_bytes"].as_u64(), Some(0));
     assert_eq!(result["propagation"]["skipped"].as_u64(), Some(0));
     assert_eq!(
         result["propagation"]["handled_ids"].as_array().expect("handled ids"),
-        &[json!(accepted.transient_id.as_str())]
+        &[json!(accepted.transient_id.as_str()), json!(low_value.transient_id.as_str())]
     );
     assert_eq!(
         result["propagation"]["rejected_ids"].as_array().expect("rejected ids"),
-        &[json!(low_value.transient_id.as_str())]
+        &[] as &[JsonValue]
     );
     let event = daemon
         .event_queue
@@ -5743,10 +5744,11 @@ fn peer_sync_drops_low_value_stamped_entries_before_offer() {
         .find(|event| event.event_type == "peer_sync")
         .cloned()
         .expect("peer sync event");
-    assert_eq!(event.payload["propagation"]["rejected"].as_u64(), Some(1));
+    assert_eq!(event.payload["propagation"]["transferred"].as_u64(), Some(2));
+    assert_eq!(event.payload["propagation"]["rejected"].as_u64(), Some(0));
     assert_eq!(
         event.payload["propagation"]["rejected_ids"].as_array().expect("event rejected ids"),
-        &[json!(low_value.transient_id.as_str())]
+        &[] as &[JsonValue]
     );
 
     let pending = daemon
@@ -5758,11 +5760,11 @@ fn peer_sync_drops_low_value_stamped_entries_before_offer() {
         .store
         .list_peer_handled_propagation_ids(peer_id.as_str())
         .expect("handled propagation");
-    assert_eq!(handled, vec![accepted.transient_id]);
+    assert_eq!(handled, vec![low_value.transient_id, accepted.transient_id]);
 }
 
 #[test]
-fn peer_sync_rejects_low_value_stamped_entries_before_peering_key_gate() {
+fn peer_sync_postpones_low_value_stamped_entries_before_peering_key_gate_like_python() {
     let daemon = RpcDaemon::test_instance();
     daemon
         .handle_rpc(rpc_request(63, "peer_sync", json!({ "peer": "peer-low-value-no-key" })))
@@ -5795,23 +5797,25 @@ fn peer_sync_rejects_low_value_stamped_entries_before_peering_key_gate() {
         .expect("peer sync")
         .result
         .expect("peer sync result");
-    assert_eq!(result["synced"].as_bool(), Some(true));
+    assert_eq!(result["synced"].as_bool(), Some(false));
+    assert_eq!(result["postponed"].as_bool(), Some(true));
+    assert_eq!(result["postpone_reason"].as_str(), Some("peering_key"));
     assert_eq!(result["peering_key"], JsonValue::Null);
-    assert_eq!(result["propagation"]["postponed"].as_bool(), Some(false));
+    assert_eq!(result["propagation"]["postponed"].as_bool(), Some(true));
     assert_eq!(result["propagation"]["handled"].as_u64(), Some(0));
-    assert_eq!(result["propagation"]["rejected"].as_u64(), Some(1));
-    assert_eq!(result["propagation"]["rejected_bytes"].as_u64(), Some(24));
+    assert_eq!(result["propagation"]["rejected"].as_u64(), Some(0));
+    assert_eq!(result["propagation"]["rejected_bytes"].as_u64(), Some(0));
     assert_eq!(
         result["propagation"]["rejected_ids"].as_array().expect("rejected ids"),
-        &[json!(low_value.transient_id.as_str())]
+        &[] as &[JsonValue]
     );
 
-    assert!(
+    assert_eq!(
         daemon
             .store
             .list_peer_unhandled_propagation("peer-low-value-no-key")
-            .expect("pending propagation")
-            .is_empty()
+            .expect("pending propagation"),
+        vec![low_value]
     );
     assert!(
         daemon
@@ -5823,7 +5827,7 @@ fn peer_sync_rejects_low_value_stamped_entries_before_peering_key_gate() {
 }
 
 #[test]
-fn peer_sync_rejects_low_value_stamped_entries_before_transfer_limit() {
+fn peer_sync_transfer_limits_low_value_stamped_entries_like_python() {
     let daemon = RpcDaemon::test_instance();
     daemon
         .handle_rpc(rpc_request(63, "peer_sync", json!({ "peer": "peer-low-value-oversized" })))
@@ -5865,22 +5869,22 @@ fn peer_sync_rejects_low_value_stamped_entries_before_transfer_limit() {
         .expect("peer sync result");
     assert_eq!(result["synced"].as_bool(), Some(true));
     assert_eq!(result["propagation"]["handled"].as_u64(), Some(0));
-    assert_eq!(result["propagation"]["rejected"].as_u64(), Some(1));
-    assert_eq!(result["propagation"]["rejected_bytes"].as_u64(), Some(100));
-    assert_eq!(result["propagation"]["transfer_limited"].as_u64(), Some(0));
-    assert_eq!(result["propagation"]["transfer_limited_bytes"].as_u64(), Some(0));
+    assert_eq!(result["propagation"]["rejected"].as_u64(), Some(0));
+    assert_eq!(result["propagation"]["rejected_bytes"].as_u64(), Some(0));
+    assert_eq!(result["propagation"]["transfer_limited"].as_u64(), Some(1));
+    assert_eq!(result["propagation"]["transfer_limited_bytes"].as_u64(), Some(100));
     assert_eq!(result["alive"].as_bool(), Some(true));
     assert_eq!(result["sync_backoff"].as_u64(), Some(0));
     assert_eq!(result["next_sync_attempt"].as_i64(), Some(0));
     assert_eq!(
         result["propagation"]["rejected_ids"].as_array().expect("rejected ids"),
-        &[json!(low_value.transient_id.as_str())]
+        &[] as &[JsonValue]
     );
-    assert!(
+    assert_eq!(
         result["propagation"]["transfer_limited_ids"]
             .as_array()
-            .expect("transfer-limited ids")
-            .is_empty()
+            .expect("transfer-limited ids"),
+        &[json!(low_value.transient_id.as_str())]
     );
 
     assert!(
@@ -5890,12 +5894,12 @@ fn peer_sync_rejects_low_value_stamped_entries_before_transfer_limit() {
             .expect("pending propagation")
             .is_empty()
     );
-    assert!(
+    assert_eq!(
         daemon
             .store
             .list_peer_handled_propagation_ids("peer-low-value-oversized")
-            .expect("handled propagation")
-            .is_empty()
+            .expect("handled propagation"),
+        vec![low_value.transient_id]
     );
 
     let peers = daemon
@@ -5915,7 +5919,7 @@ fn peer_sync_rejects_low_value_stamped_entries_before_transfer_limit() {
 }
 
 #[test]
-fn peer_sync_rejects_low_value_stamped_entries_with_unconfigured_peering_cost() {
+fn peer_sync_postpones_low_value_stamped_entries_with_unconfigured_peering_cost_like_python() {
     let daemon = RpcDaemon::test_instance();
     daemon
         .handle_rpc(rpc_request(63, "peer_sync", json!({ "peer": "peer-low-value-no-cost" })))
@@ -5948,22 +5952,24 @@ fn peer_sync_rejects_low_value_stamped_entries_with_unconfigured_peering_cost() 
         .expect("peer sync")
         .result
         .expect("peer sync result");
-    assert_eq!(result["synced"].as_bool(), Some(true));
+    assert_eq!(result["synced"].as_bool(), Some(false));
+    assert_eq!(result["postponed"].as_bool(), Some(true));
+    assert_eq!(result["postpone_reason"].as_str(), Some("stamp_policy"));
     assert_eq!(result["peering_key_status"].as_str(), Some("unconfigured"));
-    assert_eq!(result["propagation"]["postponed"].as_bool(), Some(false));
+    assert_eq!(result["propagation"]["postponed"].as_bool(), Some(true));
     assert_eq!(result["propagation"]["handled"].as_u64(), Some(0));
-    assert_eq!(result["propagation"]["rejected"].as_u64(), Some(1));
+    assert_eq!(result["propagation"]["rejected"].as_u64(), Some(0));
     assert_eq!(
         result["propagation"]["rejected_ids"].as_array().expect("rejected ids"),
-        &[json!(low_value.transient_id.as_str())]
+        &[] as &[JsonValue]
     );
 
-    assert!(
+    assert_eq!(
         daemon
             .store
             .list_peer_unhandled_propagation("peer-low-value-no-cost")
-            .expect("pending propagation")
-            .is_empty()
+            .expect("pending propagation"),
+        vec![low_value]
     );
 }
 

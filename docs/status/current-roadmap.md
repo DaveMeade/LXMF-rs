@@ -93,6 +93,10 @@ gap, even though deeper propagation-router parity remains open.
   stamp-cost queries now suppress stale target-cost metadata after terminal
   normal or propagation stamp work states.
 - Peer/router/runtime parity remains partial.
+- Peer sync now follows Python `LXMPeer` sender behavior for low-value stamped
+  propagation entries: those entries are not rejected before the offer path, so
+  they continue through the normal peering-key, stamp-policy, sync-limit, and
+  transfer-limit gates.
 - Reticulum interface breadth is still narrower than the Python reference, but
   KISS and LoRa/RNode are active implemented areas in the current branch. The
   daemon and transport crates now cover serial KISS
