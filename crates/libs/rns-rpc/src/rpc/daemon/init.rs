@@ -1228,8 +1228,12 @@ impl RpcDaemon {
                     "peer": peer.as_str(),
                     "removed": true,
                     "reason": "static_only_policy",
-                    "propagation_cleared": propagation_stats.offered,
-                    "propagation_cleared_bytes": propagation_stats.offered_bytes,
+                    "propagation_cleared": propagation_stats
+                        .offered
+                        .saturating_add(propagation_stats.unhandled),
+                    "propagation_cleared_bytes": propagation_stats
+                        .offered_bytes
+                        .saturating_add(propagation_stats.unhandled_bytes),
                     "messages": messages,
                 }),
             });
@@ -1471,8 +1475,12 @@ impl RpcDaemon {
                 "peer": peer,
                 "removed": true,
                 "reason": "peering_cost_policy",
-                "propagation_cleared": propagation_stats.offered,
-                "propagation_cleared_bytes": propagation_stats.offered_bytes,
+                "propagation_cleared": propagation_stats
+                    .offered
+                    .saturating_add(propagation_stats.unhandled),
+                "propagation_cleared_bytes": propagation_stats
+                    .offered_bytes
+                    .saturating_add(propagation_stats.unhandled_bytes),
                 "messages": messages,
             }),
         });

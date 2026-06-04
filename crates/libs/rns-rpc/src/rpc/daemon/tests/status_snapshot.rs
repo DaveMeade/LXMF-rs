@@ -1024,10 +1024,10 @@ fn propagation_enable_autopeer_false_unpeers_existing_autopeers() {
     assert_eq!(event.payload["removed"].as_bool(), Some(true));
     assert_eq!(event.payload["reason"].as_str(), Some("autopeer_disabled"));
     assert_eq!(event.payload["propagation_cleared"].as_u64(), Some(1));
-    assert_eq!(event.payload["offered"].as_u64(), Some(1));
+    assert_eq!(event.payload["offered"].as_u64(), Some(0));
     assert_eq!(event.payload["outgoing"].as_u64(), Some(0));
     assert_eq!(event.payload["incoming"].as_u64(), Some(0));
-    assert_eq!(event.payload["messages"]["offered"].as_u64(), Some(1));
+    assert_eq!(event.payload["messages"]["offered"].as_u64(), Some(0));
 
     let selected = daemon
         .handle_rpc(RpcRequest {
@@ -2187,7 +2187,7 @@ fn autopeered_announce_queues_existing_propagation_entries() {
         .find(|row| row["peer"].as_str() == Some("peer-auto-queue"))
         .expect("peer row");
     assert_eq!(row["peer_type"].as_str(), Some("auto"));
-    assert_eq!(row["messages"]["offered"].as_u64(), Some(1));
+    assert_eq!(row["messages"]["offered"].as_u64(), Some(0));
     assert_eq!(row["messages"]["unhandled"].as_u64(), Some(1));
     assert_eq!(
         row["messages"]["unhandled_ids"].as_array().expect("message unhandled ids"),
@@ -8865,12 +8865,12 @@ fn propagation_remote_unpeer_clears_local_peer_and_queue_state() {
     assert_eq!(result["removed"].as_bool(), Some(true));
     assert_eq!(result["propagation_cleared"].as_u64(), Some(1));
     assert_eq!(result["propagation_cleared_bytes"].as_u64(), Some(24));
-    assert_eq!(result["messages"]["offered"].as_u64(), Some(2));
+    assert_eq!(result["messages"]["offered"].as_u64(), Some(1));
     assert_eq!(result["messages"]["outgoing"].as_u64(), Some(1));
     assert_eq!(result["messages"]["incoming"].as_u64(), Some(1));
     assert_eq!(result["messages"]["unhandled"].as_u64(), Some(2));
     assert_eq!(result["messages"]["unhandled_bytes"].as_u64(), Some(24));
-    assert_eq!(result["offered"].as_u64(), Some(2));
+    assert_eq!(result["offered"].as_u64(), Some(1));
     assert_eq!(result["outgoing"].as_u64(), Some(1));
     assert_eq!(result["incoming"].as_u64(), Some(1));
 
@@ -9472,7 +9472,11 @@ fn peer_unpeer_clears_persisted_propagation_queue_marks() {
     );
 
     daemon
-        .handle_rpc(rpc_request(92, "peer_sync", json!({ "peer": "peer-unpeer-queue" })))
+        .handle_rpc(rpc_request(
+            92,
+            "peer_sync",
+            json!({ "peer": "peer-unpeer-queue", "transfer_limit_kb": 1 }),
+        ))
         .expect("resync peer");
     let peers = daemon
         .handle_rpc(RpcRequest { id: 93, method: "list_peers".to_string(), params: None })
