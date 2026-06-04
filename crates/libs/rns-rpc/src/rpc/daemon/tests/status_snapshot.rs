@@ -5377,6 +5377,59 @@ fn peer_sync_rejects_low_value_stamped_entries_before_peering_key_gate() {
 }
 
 #[test]
+fn peer_sync_rejects_low_value_stamped_entries_with_unconfigured_peering_cost() {
+    let daemon = RpcDaemon::test_instance();
+    daemon
+        .handle_rpc(rpc_request(63, "peer_sync", json!({ "peer": "peer-low-value-no-cost" })))
+        .expect("initial peer sync");
+    {
+        let mut peers = daemon.peers.lock().expect("peers mutex poisoned");
+        let peer = peers.get_mut("peer-low-value-no-cost").expect("peer record");
+        peer.propagation_sync_limit = Some(1_000);
+        peer.propagation_stamp_cost = Some(8);
+        peer.propagation_stamp_cost_flexibility = Some(2);
+        peer.peering_cost = None;
+    }
+
+    let low_value = PropagationEntryRecord {
+        transient_id: "d0".repeat(32),
+        destination: "18".repeat(16),
+        payload_hex: "23".repeat(24),
+        received_at: 1_700_000_617,
+        size_bytes: 24,
+        stamp_value: Some(5),
+    };
+    daemon.store.upsert_propagation_entry(&low_value).expect("store propagation entry");
+    daemon
+        .store
+        .mark_peer_unhandled_propagation("peer-low-value-no-cost", low_value.transient_id.as_str())
+        .expect("mark unhandled");
+
+    let result = daemon
+        .handle_rpc(rpc_request(64, "peer_sync", json!({ "peer": "peer-low-value-no-cost" })))
+        .expect("peer sync")
+        .result
+        .expect("peer sync result");
+    assert_eq!(result["synced"].as_bool(), Some(true));
+    assert_eq!(result["peering_key_status"].as_str(), Some("unconfigured"));
+    assert_eq!(result["propagation"]["postponed"].as_bool(), Some(false));
+    assert_eq!(result["propagation"]["handled"].as_u64(), Some(0));
+    assert_eq!(result["propagation"]["rejected"].as_u64(), Some(1));
+    assert_eq!(
+        result["propagation"]["rejected_ids"].as_array().expect("rejected ids"),
+        &[json!(low_value.transient_id.as_str())]
+    );
+
+    assert!(
+        daemon
+            .store
+            .list_peer_unhandled_propagation("peer-low-value-no-cost")
+            .expect("pending propagation")
+            .is_empty()
+    );
+}
+
+#[test]
 fn peer_sync_result_and_event_report_message_accounting() {
     let store = MessagesStore::in_memory().expect("store");
     let daemon = RpcDaemon::with_store(store, hex::encode([2u8; 16]));

@@ -670,19 +670,7 @@ impl RpcDaemon {
                         wanted_ids.as_ref(),
                         sync_limit_bytes,
                     );
-                let peer_policy_required = policy_relevant_pending > 0
-                    && (policy_relevant_has_stamp || peer_stamp_policy_partially_known(&record));
-                if peer_policy_required {
-                    if !peer_stamp_policy_known(&record) {
-                        return Ok(self.postponed_peer_sync_response(
-                            request.id,
-                            &record,
-                            timestamp,
-                            "stamp_policy",
-                            transfer_limit_bytes,
-                            sync_limit_bytes,
-                        ));
-                    }
+                if policy_relevant_pending > 0 && policy_relevant_has_stamp {
                     if let Some(min_accepted_stamp_value) =
                         peer_minimum_accepted_stamp_value(&record)
                     {
@@ -709,23 +697,37 @@ impl RpcDaemon {
                         }
                         pending_propagation = accepted_propagation;
                     }
-                    let (remaining_policy_relevant, _) = peer_sync_policy_relevance(
+                }
+                let (remaining_policy_relevant, remaining_policy_relevant_has_stamp) =
+                    peer_sync_policy_relevance(
                         pending_propagation.as_slice(),
                         wanted_ids.as_ref(),
                         sync_limit_bytes,
                     );
-                    if remaining_policy_relevant > 0
-                        && peer_peering_key_value(&record, self.identity_hash.as_str()).is_none()
-                    {
-                        return Ok(self.postponed_peer_sync_response(
-                            request.id,
-                            &record,
-                            timestamp,
-                            "peering_key",
-                            transfer_limit_bytes,
-                            sync_limit_bytes,
-                        ));
-                    }
+                let peer_policy_required = remaining_policy_relevant > 0
+                    && (remaining_policy_relevant_has_stamp
+                        || peer_stamp_policy_partially_known(&record));
+                if peer_policy_required && !peer_stamp_policy_known(&record) {
+                    return Ok(self.postponed_peer_sync_response(
+                        request.id,
+                        &record,
+                        timestamp,
+                        "stamp_policy",
+                        transfer_limit_bytes,
+                        sync_limit_bytes,
+                    ));
+                }
+                if peer_policy_required
+                    && peer_peering_key_value(&record, self.identity_hash.as_str()).is_none()
+                {
+                    return Ok(self.postponed_peer_sync_response(
+                        request.id,
+                        &record,
+                        timestamp,
+                        "peering_key",
+                        transfer_limit_bytes,
+                        sync_limit_bytes,
+                    ));
                 }
                 let mut cumulative_size = 24usize;
                 let mut propagation_handled = 0usize;
