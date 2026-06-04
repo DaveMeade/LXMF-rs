@@ -623,6 +623,33 @@ impl RpcDaemon {
                     .store
                     .list_peer_unhandled_propagation(peer_id)
                     .map_err(std::io::Error::other)?;
+                let mut propagation_transfer_limited = 0usize;
+                let mut propagation_transfer_limited_bytes = 0u64;
+                let mut propagation_transfer_limited_ids = Vec::new();
+                if let Some(limit) = transfer_limit_bytes {
+                    let mut candidates = Vec::with_capacity(pending_propagation.len());
+                    for entry in pending_propagation {
+                        let entry_size = usize::try_from(entry.size_bytes).unwrap_or(usize::MAX);
+                        let transfer_size = entry_size.saturating_add(16);
+                        if transfer_size > limit {
+                            propagation_transfer_limited =
+                                propagation_transfer_limited.saturating_add(1);
+                            propagation_transfer_limited_bytes =
+                                propagation_transfer_limited_bytes.saturating_add(entry.size_bytes);
+                            let transient_id = entry.transient_id;
+                            self.store
+                                .mark_peer_transfer_limited_propagation(
+                                    peer_id,
+                                    transient_id.as_str(),
+                                )
+                                .map_err(std::io::Error::other)?;
+                            propagation_transfer_limited_ids.push(transient_id);
+                            continue;
+                        }
+                        candidates.push(entry);
+                    }
+                    pending_propagation = candidates;
+                }
                 let mut propagation_rejected = 0usize;
                 let mut propagation_rejected_bytes = 0u64;
                 let mut propagation_rejected_ids = Vec::new();
@@ -695,9 +722,6 @@ impl RpcDaemon {
                 let mut propagation_handled_ids = Vec::new();
                 let mut propagation_transferred_ids = Vec::new();
                 let mut propagation_skipped_ids = Vec::new();
-                let mut propagation_transfer_limited = 0usize;
-                let mut propagation_transfer_limited_bytes = 0u64;
-                let mut propagation_transfer_limited_ids = Vec::new();
                 let mut propagation_messages = Vec::new();
                 for entry in pending_propagation {
                     let entry_size = usize::try_from(entry.size_bytes).unwrap_or(usize::MAX);
