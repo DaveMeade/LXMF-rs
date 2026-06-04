@@ -567,9 +567,9 @@ impl RpcDaemon {
             })
             .unwrap_or((0, 0, 0));
         Ok((
-            record_outgoing.saturating_add(stats.outgoing).saturating_add(propagation.outgoing),
-            record_incoming.saturating_add(stats.incoming).saturating_add(propagation.incoming),
-            record_offered.saturating_add(stats.offered).saturating_add(propagation.offered),
+            stats.outgoing.saturating_add(record_outgoing.max(propagation.outgoing)),
+            stats.incoming.saturating_add(record_incoming.max(propagation.incoming)),
+            stats.offered.saturating_add(record_offered.max(propagation.offered)),
             stats.unhandled.saturating_add(propagation.unhandled),
             propagation.offered_bytes,
             propagation.unhandled_bytes,

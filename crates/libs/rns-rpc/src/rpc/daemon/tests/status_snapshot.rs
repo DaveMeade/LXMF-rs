@@ -4376,6 +4376,79 @@ fn peer_sync_result_reports_cumulative_acceptance_rate_like_python() {
 }
 
 #[test]
+fn peer_sync_persists_counters_after_propagation_entries_are_purged_like_python() {
+    let daemon = RpcDaemon::test_instance();
+    let wanted = PropagationEntryRecord {
+        transient_id: "b4".repeat(32),
+        destination: "12".repeat(16),
+        payload_hex: "15".repeat(24),
+        received_at: 1_700_000_614,
+        size_bytes: 24,
+        stamp_value: None,
+    };
+    let already_known = PropagationEntryRecord {
+        transient_id: "b5".repeat(32),
+        destination: "12".repeat(16),
+        payload_hex: "16".repeat(24),
+        received_at: 1_700_000_615,
+        size_bytes: 24,
+        stamp_value: None,
+    };
+    for entry in [&wanted, &already_known] {
+        daemon.store.upsert_propagation_entry(entry).expect("store propagation entry");
+        daemon
+            .store
+            .mark_peer_unhandled_propagation(
+                "peer-persistent-counters",
+                entry.transient_id.as_str(),
+            )
+            .expect("mark unhandled");
+    }
+
+    let synced = daemon
+        .handle_rpc(rpc_request(
+            59,
+            "peer_sync",
+            json!({
+                "peer": "peer-persistent-counters",
+                "wanted_ids": [wanted.transient_id.as_str()],
+            }),
+        ))
+        .expect("peer sync")
+        .result
+        .expect("peer sync result");
+    assert_eq!(synced["messages"]["offered"].as_u64(), Some(2));
+    assert_eq!(synced["messages"]["outgoing"].as_u64(), Some(1));
+
+    let purged = daemon
+        .store
+        .purge_propagation_entries_for_destination(
+            wanted.destination.as_str(),
+            &[wanted.transient_id.clone(), already_known.transient_id.clone()],
+        )
+        .expect("purge propagation entries");
+    assert_eq!(purged, 2);
+
+    let peers = daemon
+        .handle_rpc(RpcRequest { id: 60, method: "list_peers".to_string(), params: None })
+        .expect("list peers")
+        .result
+        .expect("list peers result");
+    let row = peers["peers"]
+        .as_array()
+        .expect("peer rows")
+        .iter()
+        .find(|row| row["peer"].as_str() == Some("peer-persistent-counters"))
+        .expect("peer row");
+    assert_eq!(row["messages"]["offered"].as_u64(), Some(2));
+    assert_eq!(row["messages"]["outgoing"].as_u64(), Some(1));
+    assert_eq!(row["messages"]["unhandled"].as_u64(), Some(0));
+    assert_eq!(row["offered"].as_u64(), Some(2));
+    assert_eq!(row["outgoing"].as_u64(), Some(1));
+    assert_eq!(row["acceptance_rate"].as_f64(), Some(0.5));
+}
+
+#[test]
 fn peer_sync_drops_stale_unhandled_propagation_marks() {
     let daemon = RpcDaemon::test_instance();
     daemon
