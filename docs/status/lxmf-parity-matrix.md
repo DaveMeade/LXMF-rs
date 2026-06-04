@@ -89,8 +89,8 @@ names are `lxmf-wire` and `reticulum-rs-rpc`.
   runtime counters, acceptance-rate/backoff fields, Python-style message
   accounting, per-peer propagation transfer/sync limits, propagation stamp
   policy, Python-compatible low-value stamped peer-offer handling,
-  peering-key values, and explicit peering-key readiness status values are
-  exposed, but the active workspace
+  strict peering-timebase config refresh, peering-key values, and explicit
+  peering-key readiness status values are exposed, but the active workspace
   does not yet match Python `LXMPeer` queueing, transfer, and peering behavior.
 - Paper-command baseline is implemented for bridge-backed `reticulumd`: SDK
   paper encode/decode uses canonical `lxmf-wire` paper URI helpers and tests
@@ -148,6 +148,7 @@ Recent focused evidence:
 - `cargo test -p reticulum-rs-rpc --lib list_peers_exposes_peering_key_status_values -- --nocapture`
 - `cargo test -p reticulum-rs-rpc --lib autopeered_announce_records_propagation_peer_state -- --nocapture`
 - `cargo test -p reticulum-rs-rpc --lib low_value_stamped_entries -- --nocapture`
+- `cargo test -p reticulum-rs-rpc --lib equal_timebase_announce_does_not_refresh_propagation_peer_state_like_python -- --nocapture`
 - `cargo test -p reticulumd --bin reticulumd python_status_exposes_peer_peering_key_value -- --nocapture`
 - `cargo test -p reticulumd --bin reticulumd python_status_exposes_peer_peering_key_status -- --nocapture`
 - `cargo test -p reticulumd --bin reticulumd peer_sync_command_reports_peering_key_status -- --nocapture`

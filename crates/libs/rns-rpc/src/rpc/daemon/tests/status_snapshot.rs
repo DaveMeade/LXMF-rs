@@ -2365,6 +2365,77 @@ fn stale_announce_does_not_regress_propagation_peer_state() {
 }
 
 #[test]
+fn equal_timebase_announce_does_not_refresh_propagation_peer_state_like_python() {
+    let daemon = RpcDaemon::test_instance();
+    daemon
+        .handle_rpc(rpc_request(
+            49,
+            "propagation_enable",
+            json!({
+                "enabled": true,
+                "autopeer": true,
+            }),
+        ))
+        .expect("enable propagation");
+
+    daemon
+        .accept_announce_with_metadata(
+            "peer-auto-equal-timebase".to_string(),
+            1_700_000_210,
+            Some("Equal Timebase Peer".to_string()),
+            Some("announce".to_string()),
+            None,
+            Some(vec!["propagation".to_string()]),
+            None,
+            None,
+            None,
+            Some(5),
+            Some(Some(2)),
+            Some(Some(6)),
+            None,
+            Some(1),
+            None,
+            None,
+            None,
+            None,
+        )
+        .expect("accept initial announce");
+    daemon
+        .accept_announce_with_metadata(
+            "peer-auto-equal-timebase".to_string(),
+            1_700_000_210,
+            Some("Equal Timebase Peer".to_string()),
+            Some("announce".to_string()),
+            None,
+            Some(vec!["propagation".to_string()]),
+            None,
+            None,
+            None,
+            Some(2),
+            Some(Some(0)),
+            Some(Some(3)),
+            None,
+            Some(1),
+            None,
+            None,
+            None,
+            None,
+        )
+        .expect("accept equal-timebase announce");
+
+    let peers = daemon
+        .handle_rpc(RpcRequest { id: 50, method: "list_peers".to_string(), params: None })
+        .expect("list peers")
+        .result
+        .expect("list peers result");
+    let row = peers["peers"].as_array().and_then(|rows| rows.first()).expect("peer row");
+    assert_eq!(row["peering_timebase"].as_i64(), Some(1_700_000_210));
+    assert_eq!(row["propagation_stamp_cost"].as_u64(), Some(5));
+    assert_eq!(row["propagation_stamp_cost_flexibility"].as_u64(), Some(2));
+    assert_eq!(row["peering_cost"].as_u64(), Some(6));
+}
+
+#[test]
 fn discovered_announce_bursts_do_not_collapse_in_announce_log() {
     let daemon = RpcDaemon::test_instance();
     let timestamp = 1_700_000_250;

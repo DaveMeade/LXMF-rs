@@ -1415,7 +1415,7 @@ impl RpcDaemon {
             return;
         };
         let peering_timebase = state.peering_timebase.unwrap_or(timestamp);
-        if peering_timebase < existing.peering_timebase {
+        if peering_timebase <= existing.peering_timebase {
             return;
         }
 

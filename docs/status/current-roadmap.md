@@ -97,6 +97,10 @@ gap, even though deeper propagation-router parity remains open.
   propagation entries: those entries are not rejected before the offer path, so
   they continue through the normal peering-key, stamp-policy, sync-limit, and
   transfer-limit gates.
+- Propagation peer config refresh now follows Python's strict peering-timebase
+  ordering: equal-timebase announces are retained in the announce log but no
+  longer overwrite the active peer's propagation limits, costs, or peering
+  policy fields.
 - Reticulum interface breadth is still narrower than the Python reference, but
   KISS and LoRa/RNode are active implemented areas in the current branch. The
   daemon and transport crates now cover serial KISS
