@@ -942,7 +942,8 @@ impl MessagesStore {
                  VALUES (?1, ?2, 'received', ?3)
                  ON CONFLICT(peer, transient_id) DO UPDATE SET
                     state = 'received',
-                    updated_at = excluded.updated_at",
+                    updated_at = excluded.updated_at
+                 WHERE propagation_peer_entries.state != 'transferred'",
                 params![peer, normalize_hex_key(transient_id), now_unix_secs()],
             )?;
             Ok(())
@@ -2451,6 +2452,39 @@ mod tests {
                 offered: 1,
                 unhandled: 0,
                 offered_bytes: 8,
+                unhandled_bytes: 0,
+            }
+        );
+    }
+
+    #[test]
+    fn received_report_does_not_downgrade_transferred_peer_mark() {
+        let store = MessagesStore::in_memory().expect("in-memory store");
+        let transferred = PropagationEntryRecord {
+            transient_id: "c3".repeat(32),
+            destination: "33".repeat(16),
+            payload_hex: "33".repeat(16),
+            received_at: 102,
+            size_bytes: 16,
+            stamp_value: None,
+        };
+        store.upsert_propagation_entry(&transferred).expect("transferred entry");
+        store
+            .mark_peer_transferred_propagation("peer-completed", transferred.transient_id.as_str())
+            .expect("mark transferred");
+
+        store
+            .mark_peer_received_propagation("peer-completed", transferred.transient_id.as_str())
+            .expect("ignore received downgrade");
+
+        assert_eq!(
+            store.peer_propagation_message_stats("peer-completed").expect("peer stats"),
+            PeerPropagationMessageStats {
+                outgoing: 1,
+                incoming: 0,
+                offered: 1,
+                unhandled: 0,
+                offered_bytes: 16,
                 unhandled_bytes: 0,
             }
         );
