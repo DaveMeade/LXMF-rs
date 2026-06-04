@@ -4241,6 +4241,7 @@ fn peer_sync_unwanted_offer_response_does_not_revive_unheard_peer_like_python() 
         peer.sync_backoff = 0;
         peer.next_sync_attempt = 0;
         peer.acceptance_rate = 0.75;
+        peer.sync_transfer_rate = 12_345.0;
     }
     let already_known = PropagationEntryRecord {
         transient_id: "a9".repeat(32),
@@ -4278,6 +4279,7 @@ fn peer_sync_unwanted_offer_response_does_not_revive_unheard_peer_like_python() 
     assert_eq!(result["messages"]["outgoing"].as_u64(), Some(0));
     assert_eq!(result["alive"].as_bool(), Some(false));
     assert_eq!(result["acceptance_rate"].as_f64(), Some(0.0));
+    assert_eq!(result["sync_transfer_rate"].as_f64(), Some(12_345.0));
     assert_eq!(result["sync_backoff"].as_u64(), Some(0));
     assert_eq!(result["next_sync_attempt"].as_i64(), Some(0));
 
@@ -4294,6 +4296,7 @@ fn peer_sync_unwanted_offer_response_does_not_revive_unheard_peer_like_python() 
         .expect("peer row");
     assert_eq!(row["alive"].as_bool(), Some(false));
     assert_eq!(row["acceptance_rate"].as_f64(), Some(0.0));
+    assert_eq!(row["sync_transfer_rate"].as_f64(), Some(12_345.0));
 }
 
 #[test]
