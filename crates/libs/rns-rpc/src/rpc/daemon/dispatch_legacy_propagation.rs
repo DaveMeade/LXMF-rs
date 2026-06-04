@@ -150,6 +150,35 @@ impl RpcDaemon {
         );
     }
 
+    fn break_remote_peer_sync_peering_on_denied_access(
+        &self,
+        peer_id: &str,
+        remote: &str,
+        error: &str,
+    ) -> Result<(), std::io::Error> {
+        let cleanup = self.unpeer_local_state(peer_id)?;
+        let offered = cleanup.messages["offered"].as_u64().unwrap_or(0);
+        let outgoing = cleanup.messages["outgoing"].as_u64().unwrap_or(0);
+        let incoming = cleanup.messages["incoming"].as_u64().unwrap_or(0);
+        self.publish_event(RpcEvent {
+            event_type: "peer_unpeer".into(),
+            payload: json!({
+                "peer": peer_id,
+                "remote": remote,
+                "removed": cleanup.removed,
+                "reason": "access_denied",
+                "error": error,
+                "propagation_cleared": cleanup.propagation_cleared,
+                "propagation_cleared_bytes": cleanup.propagation_cleared_bytes,
+                "offered": offered,
+                "outgoing": outgoing,
+                "incoming": incoming,
+                "messages": cleanup.messages,
+            }),
+        });
+        Ok(())
+    }
+
     fn store_propagation_payload_hex(
         &self,
         transient_id: &str,
@@ -1540,6 +1569,12 @@ impl RpcDaemon {
                                 transfer_limit,
                                 sync_limit,
                             );
+                        } else if is_remote_access_denied_error(&err) {
+                            self.break_remote_peer_sync_peering_on_denied_access(
+                                peer_id.as_str(),
+                                remote_id.as_str(),
+                                error.as_str(),
+                            )?;
                         } else {
                             self.record_outbound_peer_activity(peer_id.as_str(), 0, false);
                             self.publish_failed_remote_peer_sync_event(
@@ -1888,6 +1923,11 @@ fn effective_transfer_limit_kb(
         (None, Some(request_limit)) => Some(request_limit),
         (None, None) => None,
     }
+}
+
+fn is_remote_access_denied_error(err: &std::io::Error) -> bool {
+    err.kind() == std::io::ErrorKind::PermissionDenied
+        && err.to_string() == "propagation node denied access"
 }
 
 fn normalize_propagation_transient_key(transient_id: &str) -> String {

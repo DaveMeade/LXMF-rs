@@ -114,6 +114,10 @@ gap, even though deeper propagation-router parity remains open.
   Python throttle path: the peer's next sync attempt is postponed by
   `PN_STAMP_THROTTLE` while liveness, acceptance, and generic sync backoff are
   preserved.
+- Remote propagation sync now also treats peer `ERROR_NO_ACCESS` as a peering
+  break like Python `LXMPeer.offer_response`: the denied peer is unpeered
+  locally and its propagation queue marks are cleared instead of being retained
+  as a generic failed sync peer.
 - Reticulum interface breadth is still narrower than the Python reference, but
   KISS and LoRa/RNode are active implemented areas in the current branch. The
   daemon and transport crates now cover serial KISS

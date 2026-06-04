@@ -6890,6 +6890,8 @@ struct FailingTransferLimitRemoteControlBridge {
     expected_sync_transfer_limit_kb: Option<f64>,
 }
 
+struct DeniedAccessRemoteSyncBridge;
+
 struct CountingRemoteControlBridge {
     status_calls: Arc<std::sync::atomic::AtomicUsize>,
     download_calls: Arc<std::sync::atomic::AtomicUsize>,
@@ -7044,6 +7046,73 @@ impl RemoteControlBridge for CountingRemoteControlBridge {
             "remote": remote,
             "peer": peer,
             "unpeered": true,
+        }))
+    }
+}
+
+impl RemoteControlBridge for DeniedAccessRemoteSyncBridge {
+    fn propagation_remote_status(
+        &self,
+        remote: &str,
+        _identity_private_key_hex: Option<&str>,
+        _timeout_secs: f64,
+    ) -> Result<JsonValue, std::io::Error> {
+        Ok(json!({
+            "remote": remote,
+            "status": "ok",
+        }))
+    }
+
+    fn propagation_remote_sync(
+        &self,
+        _remote: &str,
+        _peer: &str,
+        _identity_private_key_hex: Option<&str>,
+        _timeout_secs: f64,
+        _transfer_limit_kb: Option<f64>,
+    ) -> Result<JsonValue, std::io::Error> {
+        Err(std::io::Error::new(
+            std::io::ErrorKind::PermissionDenied,
+            "propagation node denied access",
+        ))
+    }
+
+    fn propagation_remote_download(
+        &self,
+        remote: &str,
+        _identity_private_key_hex: Option<&str>,
+        _timeout_secs: f64,
+        _transfer_limit_kb: Option<f64>,
+    ) -> Result<JsonValue, std::io::Error> {
+        Ok(json!({
+            "remote": remote,
+            "synced": true,
+        }))
+    }
+
+    fn propagation_remote_fetch(
+        &self,
+        remote: &str,
+        _identity_private_key_hex: Option<&str>,
+        _timeout_secs: f64,
+        _transfer_limit_kb: Option<f64>,
+    ) -> Result<JsonValue, std::io::Error> {
+        Ok(json!({
+            "remote": remote,
+            "messages": [],
+        }))
+    }
+
+    fn propagation_remote_unpeer(
+        &self,
+        remote: &str,
+        peer: &str,
+        _identity_private_key_hex: Option<&str>,
+        _timeout_secs: f64,
+    ) -> Result<JsonValue, std::io::Error> {
+        Ok(json!({
+            "remote": remote,
+            "peer": peer,
         }))
     }
 }
@@ -9256,6 +9325,80 @@ fn throttled_propagation_remote_sync_uses_python_retry_window_without_breaking_l
         event.payload["next_sync_attempt"].as_i64(),
         Some(last_sync_attempt + 180)
     );
+}
+
+#[test]
+fn denied_access_propagation_remote_sync_breaks_peering_like_python() {
+    let daemon = RpcDaemon::test_instance();
+    daemon.set_remote_control_bridge(Arc::new(DeniedAccessRemoteSyncBridge));
+    daemon
+        .handle_rpc(rpc_request(78, "peer_sync", json!({ "peer": "peer-remote-denied" })))
+        .expect("initial peer sync");
+    let entry = PropagationEntryRecord {
+        transient_id: "d1".repeat(32),
+        destination: "23".repeat(16),
+        payload_hex: "23".repeat(24),
+        received_at: 1_700_000_850,
+        size_bytes: 24,
+        stamp_value: None,
+    };
+    daemon.store.upsert_propagation_entry(&entry).expect("store propagation entry");
+    daemon
+        .store
+        .mark_peer_unhandled_propagation("peer-remote-denied", entry.transient_id.as_str())
+        .expect("mark peer unhandled");
+    daemon.event_queue.lock().expect("event_queue mutex poisoned").clear();
+
+    let err = daemon
+        .handle_rpc(rpc_request(
+            79,
+            "propagation_remote_sync",
+            json!({
+                "remote": "remote-node",
+                "peer": "peer-remote-denied",
+            }),
+        ))
+        .expect_err("denied remote sync should still return the bridge error");
+    assert_eq!(err.kind(), std::io::ErrorKind::PermissionDenied);
+    assert_eq!(err.to_string(), "propagation node denied access");
+
+    let peers = daemon
+        .handle_rpc(RpcRequest { id: 80, method: "list_peers".to_string(), params: None })
+        .expect("list peers")
+        .result
+        .expect("list peers result");
+    assert!(
+        !peers["peers"]
+            .as_array()
+            .expect("peer rows")
+            .iter()
+            .any(|row| row["peer"].as_str() == Some("peer-remote-denied")),
+        "denied access should break local peering"
+    );
+    assert!(
+        daemon
+            .store
+            .list_peer_unhandled_propagation("peer-remote-denied")
+            .expect("list unhandled")
+            .is_empty(),
+        "denied access should clear peer propagation queue marks"
+    );
+
+    let event = daemon
+        .event_queue
+        .lock()
+        .expect("event_queue mutex poisoned")
+        .iter()
+        .rev()
+        .find(|event| event.event_type == "peer_unpeer")
+        .cloned()
+        .expect("denied access unpeer event");
+    assert_eq!(event.payload["peer"].as_str(), Some("peer-remote-denied"));
+    assert_eq!(event.payload["remote"].as_str(), Some("remote-node"));
+    assert_eq!(event.payload["reason"].as_str(), Some("access_denied"));
+    assert_eq!(event.payload["removed"].as_bool(), Some(true));
+    assert_eq!(event.payload["propagation_cleared"].as_u64(), Some(1));
+    assert_eq!(event.payload["propagation_cleared_bytes"].as_u64(), Some(24));
 }
 
 #[test]
