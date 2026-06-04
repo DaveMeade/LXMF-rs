@@ -740,6 +740,7 @@ impl RpcDaemon {
                 let mut propagation_transferred_ids = Vec::new();
                 let mut propagation_skipped_ids = Vec::new();
                 let mut propagation_messages = Vec::new();
+                let mut propagation_resource_payloads = Vec::new();
                 for entry in pending_propagation {
                     let entry_size = usize::try_from(entry.size_bytes).unwrap_or(usize::MAX);
                     let transfer_size = entry_size.saturating_add(16);
@@ -774,6 +775,13 @@ impl RpcDaemon {
                     propagation_offered_bytes =
                         propagation_offered_bytes.saturating_add(entry.size_bytes);
                     if wanted {
+                        let payload_bytes =
+                            hex::decode(entry.payload_hex.as_str()).map_err(|err| {
+                                std::io::Error::new(
+                                    std::io::ErrorKind::InvalidData,
+                                    format!("invalid propagation payload hex: {err}"),
+                                )
+                            })?;
                         let propagation_message = json!({
                             "transient_id": entry.transient_id,
                             "destination": entry.destination,
@@ -789,6 +797,7 @@ impl RpcDaemon {
                         propagation_bytes = propagation_bytes.saturating_add(entry.size_bytes);
                         propagation_transferred_ids.push(transient_id.clone());
                         propagation_messages.push(propagation_message);
+                        propagation_resource_payloads.push(payload_bytes);
                     } else {
                         self.store
                             .mark_peer_handled_propagation(peer_id, transient_id.as_str())
@@ -796,6 +805,8 @@ impl RpcDaemon {
                     }
                     propagation_handled_ids.push(transient_id);
                 }
+                let propagation_resource_bytes =
+                    peer_sync_resource_data_size(propagation_resource_payloads.as_slice())?;
                 let mut propagation_sync = json!({
                     "synced": true,
                     "postponed": false,
@@ -838,8 +849,9 @@ impl RpcDaemon {
                         existing.last_sync_attempt = timestamp;
                         existing.alive = propagation_handled > 0
                             || existing.last_sync_attempt < existing.last_seen;
-                        existing.tx_bytes = existing.tx_bytes.saturating_add(propagation_bytes);
-                        existing.sync_transfer_rate = propagation_bytes as f64;
+                        existing.tx_bytes =
+                            existing.tx_bytes.saturating_add(propagation_resource_bytes);
+                        existing.sync_transfer_rate = propagation_resource_bytes as f64;
                         if propagation_offered > 0 {
                             existing.acceptance_rate = (propagation_transferred as f64
                                 / propagation_offered as f64)
@@ -1676,6 +1688,14 @@ fn canonical_peer_sync_wanted_ids(
         canonical.insert(wanted_id.to_ascii_lowercase());
     }
     Ok(Some(canonical))
+}
+
+fn peer_sync_resource_data_size(payloads: &[Vec<u8>]) -> Result<u64, std::io::Error> {
+    if payloads.is_empty() {
+        return Ok(0);
+    }
+    let packed = rmp_serde::to_vec(&(1.0_f64, payloads)).map_err(std::io::Error::other)?;
+    Ok(packed.len() as u64)
 }
 
 fn propagation_peer_sync_weight(entry: &PropagationEntryRecord, now: i64) -> f64 {

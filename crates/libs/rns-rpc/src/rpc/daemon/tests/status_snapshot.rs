@@ -2877,6 +2877,8 @@ fn peer_sync_during_backoff_postpones_skipped_offers() {
     daemon
         .handle_rpc(rpc_request(53, "peer_sync", json!({ "peer": "peer-backoff-skipped" })))
         .expect("peer sync with previous transfer");
+    let previous_resource_bytes =
+        rmp_serde::to_vec(&(1.0_f64, vec![vec![0x19; 40]])).expect("pack sync resource").len();
     daemon.record_outbound_peer_activity("peer-backoff-skipped", 64, false);
     {
         let mut peers = daemon.peers.lock().expect("peers mutex poisoned");
@@ -2928,7 +2930,7 @@ fn peer_sync_during_backoff_postpones_skipped_offers() {
     assert_eq!(result["network_distance"].as_u64(), Some(3));
     assert_eq!(result["peering_timebase"].as_i64(), Some(1_700_000_000));
     assert_eq!(result["rx_bytes"].as_u64(), Some(0));
-    assert_eq!(result["tx_bytes"].as_u64(), Some(104));
+    assert_eq!(result["tx_bytes"].as_u64(), Some((previous_resource_bytes + 64) as u64));
     assert_eq!(result["alive"].as_bool(), Some(false));
     assert_eq!(result["sync_transfer_rate"].as_f64(), Some(0.0));
     assert_eq!(result["str"].as_u64(), Some(0));
@@ -4871,6 +4873,12 @@ fn peer_sync_reports_propagation_transfer_accounting() {
         .expect("peer sync")
         .result
         .expect("peer sync result");
+    let expected_resource_bytes =
+        rmp_serde::to_vec(&(1.0_f64, vec![vec![0x17; 20]])).expect("pack sync resource").len();
+    assert!(
+        expected_resource_bytes > small.size_bytes as usize,
+        "resource accounting should include Python LXMPeer msgpack envelope overhead"
+    );
     assert_eq!(result["propagation"]["handled"].as_u64(), Some(1));
     assert_eq!(result["propagation"]["skipped"].as_u64(), Some(1));
     assert_eq!(result["propagation"]["offered"].as_u64(), Some(1));
@@ -4882,7 +4890,7 @@ fn peer_sync_reports_propagation_transfer_accounting() {
         result["propagation"]["sync_limit"].as_u64(),
         Some((24 + 20 + 32 + 16 + 1) as u64)
     );
-    assert_eq!(result["tx_bytes"].as_u64(), Some(20));
+    assert_eq!(result["tx_bytes"].as_u64(), Some(expected_resource_bytes as u64));
     assert_eq!(result["messages"]["outgoing"].as_u64(), Some(1));
     assert_eq!(result["alive"].as_bool(), Some(true));
     assert_eq!(result["acceptance_rate"].as_f64(), Some(1.0));
@@ -4914,7 +4922,7 @@ fn peer_sync_reports_propagation_transfer_accounting() {
     assert_eq!(event.payload["synced"].as_bool(), Some(true));
     assert_eq!(event.payload["propagation"]["synced"].as_bool(), Some(true));
     assert_eq!(event.payload["propagation"]["postponed"].as_bool(), Some(false));
-    assert_eq!(event.payload["tx_bytes"].as_u64(), Some(20));
+    assert_eq!(event.payload["tx_bytes"].as_u64(), Some(expected_resource_bytes as u64));
     assert_eq!(event.payload["messages"]["outgoing"].as_u64(), Some(1));
     assert_eq!(event.payload["alive"].as_bool(), Some(true));
     assert_eq!(event.payload["acceptance_rate"].as_f64(), Some(1.0));
@@ -4938,7 +4946,7 @@ fn peer_sync_reports_propagation_transfer_accounting() {
         .iter()
         .find(|row| row["peer"].as_str() == Some("peer-sync-report"))
         .expect("peer row");
-    assert_eq!(row["tx_bytes"].as_u64(), Some(20));
+    assert_eq!(row["tx_bytes"].as_u64(), Some(expected_resource_bytes as u64));
     assert_eq!(row["messages"]["outgoing"].as_u64(), Some(1));
     assert_eq!(row["alive"].as_bool(), Some(true));
     assert_eq!(row["acceptance_rate"].as_f64(), Some(0.5));
@@ -4975,9 +4983,11 @@ fn peer_sync_updates_transfer_rate_from_transferred_bytes() {
         .expect("peer sync")
         .result
         .expect("peer sync result");
+    let expected_resource_bytes =
+        rmp_serde::to_vec(&(1.0_f64, vec![vec![0x25; 40]])).expect("pack sync resource").len();
     assert_eq!(result["propagation"]["bytes"].as_u64(), Some(40));
-    assert_eq!(result["sync_transfer_rate"].as_f64(), Some(40.0));
-    assert_eq!(result["str"].as_u64(), Some(40));
+    assert_eq!(result["sync_transfer_rate"].as_f64(), Some(expected_resource_bytes as f64));
+    assert_eq!(result["str"].as_u64(), Some(expected_resource_bytes as u64));
 
     let peers = daemon
         .handle_rpc(RpcRequest { id: 65, method: "list_peers".to_string(), params: None })
@@ -4990,8 +5000,8 @@ fn peer_sync_updates_transfer_rate_from_transferred_bytes() {
         .iter()
         .find(|row| row["peer"].as_str() == Some("peer-sync-rate"))
         .expect("peer row");
-    assert_eq!(row["sync_transfer_rate"].as_f64(), Some(40.0));
-    assert_eq!(row["str"].as_u64(), Some(40));
+    assert_eq!(row["sync_transfer_rate"].as_f64(), Some(expected_resource_bytes as f64));
+    assert_eq!(row["str"].as_u64(), Some(expected_resource_bytes as u64));
 }
 
 #[test]
