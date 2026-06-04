@@ -664,22 +664,12 @@ impl RpcDaemon {
                         .unwrap_or(std::cmp::Ordering::Equal)
                         .then_with(|| left.transient_id.cmp(&right.transient_id))
                 });
-                let mut policy_relevant_pending = 0usize;
-                let mut policy_relevant_has_stamp = false;
-                let mut policy_relevant_size = 24usize;
-                for entry in pending_propagation.iter().filter(|entry| {
-                    wanted_ids.as_ref().is_none_or(|ids| ids.contains(entry.transient_id.as_str()))
-                }) {
-                    let entry_size = usize::try_from(entry.size_bytes).unwrap_or(usize::MAX);
-                    let transfer_size = entry_size.saturating_add(16);
-                    let next_size = policy_relevant_size.saturating_add(transfer_size);
-                    if sync_limit_bytes.is_some_and(|limit| next_size >= limit) {
-                        continue;
-                    }
-                    policy_relevant_size = next_size;
-                    policy_relevant_pending = policy_relevant_pending.saturating_add(1);
-                    policy_relevant_has_stamp |= entry.stamp_value.is_some();
-                }
+                let (policy_relevant_pending, policy_relevant_has_stamp) =
+                    peer_sync_policy_relevance(
+                        pending_propagation.as_slice(),
+                        wanted_ids.as_ref(),
+                        sync_limit_bytes,
+                    );
                 let peer_policy_required = policy_relevant_pending > 0
                     && (policy_relevant_has_stamp || peer_stamp_policy_partially_known(&record));
                 if peer_policy_required {
@@ -689,16 +679,6 @@ impl RpcDaemon {
                             &record,
                             timestamp,
                             "stamp_policy",
-                            transfer_limit_bytes,
-                            sync_limit_bytes,
-                        ));
-                    }
-                    if peer_peering_key_value(&record, self.identity_hash.as_str()).is_none() {
-                        return Ok(self.postponed_peer_sync_response(
-                            request.id,
-                            &record,
-                            timestamp,
-                            "peering_key",
                             transfer_limit_bytes,
                             sync_limit_bytes,
                         ));
@@ -728,6 +708,23 @@ impl RpcDaemon {
                             accepted_propagation.push(entry);
                         }
                         pending_propagation = accepted_propagation;
+                    }
+                    let (remaining_policy_relevant, _) = peer_sync_policy_relevance(
+                        pending_propagation.as_slice(),
+                        wanted_ids.as_ref(),
+                        sync_limit_bytes,
+                    );
+                    if remaining_policy_relevant > 0
+                        && peer_peering_key_value(&record, self.identity_hash.as_str()).is_none()
+                    {
+                        return Ok(self.postponed_peer_sync_response(
+                            request.id,
+                            &record,
+                            timestamp,
+                            "peering_key",
+                            transfer_limit_bytes,
+                            sync_limit_bytes,
+                        ));
                     }
                 }
                 let mut cumulative_size = 24usize;
@@ -1632,6 +1629,31 @@ fn peer_minimum_accepted_stamp_value(peer: &PeerRecord) -> Option<u32> {
     let cost = peer.propagation_stamp_cost?;
     let flexibility = peer.propagation_stamp_cost_flexibility?;
     Some(cost.saturating_sub(flexibility))
+}
+
+fn peer_sync_policy_relevance(
+    pending_propagation: &[PropagationEntryRecord],
+    wanted_ids: Option<&std::collections::HashSet<String>>,
+    sync_limit_bytes: Option<usize>,
+) -> (usize, bool) {
+    let mut policy_relevant_pending = 0usize;
+    let mut policy_relevant_has_stamp = false;
+    let mut policy_relevant_size = 24usize;
+    for entry in pending_propagation
+        .iter()
+        .filter(|entry| wanted_ids.is_none_or(|ids| ids.contains(entry.transient_id.as_str())))
+    {
+        let entry_size = usize::try_from(entry.size_bytes).unwrap_or(usize::MAX);
+        let transfer_size = entry_size.saturating_add(16);
+        let next_size = policy_relevant_size.saturating_add(transfer_size);
+        if sync_limit_bytes.is_some_and(|limit| next_size >= limit) {
+            continue;
+        }
+        policy_relevant_size = next_size;
+        policy_relevant_pending = policy_relevant_pending.saturating_add(1);
+        policy_relevant_has_stamp |= entry.stamp_value.is_some();
+    }
+    (policy_relevant_pending, policy_relevant_has_stamp)
 }
 
 fn canonical_peer_sync_wanted_ids(
