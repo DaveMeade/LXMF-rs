@@ -206,7 +206,10 @@ mod tests {
         let response = handle_peer_command(
             &daemon,
             control_path_hash("/pn/peer/sync"),
-            Some(rmpv::Value::Binary(peer_bytes.to_vec())),
+            Some(rmpv::Value::Array(vec![
+                rmpv::Value::Binary(peer_bytes.to_vec()),
+                rmpv::Value::F64(1.0),
+            ])),
             ERROR_INVALID_DATA,
             ERROR_NOT_FOUND,
         )

@@ -535,7 +535,7 @@ mod tests {
             .handle_rpc(RpcRequest {
                 id: 3,
                 method: "peer_sync".to_string(),
-                params: Some(json!({ "peer": peer })),
+                params: Some(json!({ "peer": peer, "transfer_limit_kb": 1 })),
             })
             .expect("peer sync")
             .result
@@ -585,7 +585,7 @@ mod tests {
             .handle_rpc(RpcRequest {
                 id: 2,
                 method: "peer_sync".to_string(),
-                params: Some(json!({ "peer": peer })),
+                params: Some(json!({ "peer": peer, "transfer_limit_kb": 1 })),
             })
             .expect("handle first payload");
         daemon
@@ -639,14 +639,31 @@ mod tests {
                 params: Some(json!({ "peer": peer })),
             })
             .expect("peer sync");
-        let payload_id = "8c".repeat(32);
+        let handled_id = "8c".repeat(32);
+        let handled_payload = [0x14; 32];
         daemon
             .ingest_propagation_payload_bytes_with_aliases(
-                b"top-level status counter payload",
-                payload_id.as_str(),
+                handled_payload.as_slice(),
+                handled_id.as_str(),
                 &[],
             )
-            .expect("store propagation payload");
+            .expect("store handled propagation payload");
+        daemon
+            .handle_rpc(RpcRequest {
+                id: 2,
+                method: "peer_sync".to_string(),
+                params: Some(json!({ "peer": peer, "transfer_limit_kb": 1 })),
+            })
+            .expect("handle first payload");
+        let unhandled_id = "8d".repeat(32);
+        let unhandled_payload = [0x15; 32];
+        daemon
+            .ingest_propagation_payload_bytes_with_aliases(
+                unhandled_payload.as_slice(),
+                unhandled_id.as_str(),
+                &[],
+            )
+            .expect("store unhandled propagation payload");
         daemon.record_propagation_offer_peer(peer.as_str()).expect("record offered peer");
 
         let status = status::compose_python_status(
@@ -667,7 +684,7 @@ mod tests {
         assert_eq!(peer_status["messages"]["offered_bytes"].as_u64(), Some(32));
         assert_eq!(peer_status["messages"]["unhandled_bytes"].as_u64(), Some(32));
         assert_eq!(peer_status["offered"].as_u64(), Some(1));
-        assert_eq!(peer_status["outgoing"].as_u64(), Some(0));
+        assert_eq!(peer_status["outgoing"].as_u64(), Some(1));
         assert_eq!(peer_status["incoming"].as_u64(), Some(0));
         assert_eq!(peer_status["unhandled"].as_u64(), Some(1));
         assert_eq!(peer_status["offered_bytes"].as_u64(), Some(32));

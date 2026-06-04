@@ -156,7 +156,7 @@ Recent focused evidence:
 - `cargo test -p reticulumd --bin reticulumd python_status_uses_zero_acceptance_rate_before_offers -- --nocapture`
 - `cargo test -p reticulumd --bin reticulumd python_status_collapses_internal_peer_types_to_static_or_discovered -- --nocapture`
 - `cargo test -p reticulumd --bin reticulumd propagation_offer_ignores_control_allow_list_like_python -- --nocapture`
-- `cargo test -p reticulumd --bin reticulumd offer_request_marks_known_offers_received_for_authenticated_peer -- --nocapture`
+- `cargo test -p reticulumd --bin reticulumd offer_request_does_not_mark_known_offers_received_like_python -- --nocapture`
 - `cargo test -p reticulumd --bin reticulumd message_get_marks_served_wanted_payloads_transferred_for_peer -- --nocapture`
 - `cargo test -p reticulumd --bin reticulumd transport_bridge_regenerates_propagation_app_data_from_daemon_state -- --nocapture`
 - `cargo test -p reticulum-rs-rpc --lib propagation -- --nocapture`

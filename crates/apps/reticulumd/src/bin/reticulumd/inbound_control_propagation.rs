@@ -114,7 +114,6 @@ pub(super) fn handle_offer_request(
     }
 
     let mut wanted = Vec::new();
-    let mut known = Vec::new();
     for transient_id in transient_ids {
         let rmpv::Value::Binary(bytes) = transient_id else {
             return ControlResponse::Code(error_invalid_data);
@@ -125,24 +124,11 @@ pub(super) fn handle_offer_request(
         let transient_hex = hex::encode(bytes);
         if !daemon.has_propagation_payload(transient_hex.as_str()) {
             wanted.push(bytes.clone());
-        } else {
-            known.push(transient_hex);
         }
     }
     let remote_propagation_hash = hex::encode(remote_propagation_hash);
     if daemon.record_propagation_offer_peer(remote_propagation_hash.as_str()).is_err() {
         return ControlResponse::Code(error_no_access);
-    }
-    for transient_id in known {
-        if daemon
-            .record_peer_received_propagation(
-                remote_propagation_hash.as_str(),
-                transient_id.as_str(),
-            )
-            .is_err()
-        {
-            return ControlResponse::Code(error_no_access);
-        }
     }
 
     if wanted.is_empty() {
@@ -361,7 +347,7 @@ mod tests {
     }
 
     #[test]
-    fn offer_request_marks_known_offers_received_for_authenticated_peer() {
+    fn offer_request_does_not_mark_known_offers_received_like_python() {
         let daemon = RpcDaemon::test_instance();
         daemon
             .handle_rpc(RpcRequest {
@@ -428,10 +414,10 @@ mod tests {
             .iter()
             .find(|row| row["peer"].as_str() == Some(remote_propagation_hash.as_str()))
             .expect("authenticated offer peer row");
-        assert_eq!(row["messages"]["incoming"].as_u64(), Some(1));
-        assert_eq!(row["messages"]["unhandled"].as_u64(), Some(0));
-        assert_eq!(row["messages"]["handled_ids"], json!([known_transient_id]));
-        assert_eq!(row["messages"]["unhandled_ids"], json!([]));
+        assert_eq!(row["messages"]["incoming"].as_u64(), Some(0));
+        assert_eq!(row["messages"]["unhandled"].as_u64(), Some(1));
+        assert_eq!(row["messages"]["handled_ids"], json!([]));
+        assert_eq!(row["messages"]["unhandled_ids"], json!([known_transient_id]));
     }
 
     #[test]
