@@ -375,7 +375,11 @@ impl RpcDaemon {
             return Ok(());
         }
 
-        self.record_inbound_peer_activity(source_peer, transferred_bytes);
+        self.record_inbound_propagation_peer_activity_count(
+            source_peer,
+            transferred_bytes,
+            imported_ids.len(),
+        );
         let active_peers = self.active_peer_ids();
         for transient_id in imported_ids {
             self.store
@@ -403,7 +407,11 @@ impl RpcDaemon {
             return Ok(());
         }
 
-        self.record_inbound_peer_activity(source_peer, transferred_bytes);
+        self.record_inbound_propagation_peer_activity_count(
+            source_peer,
+            transferred_bytes,
+            imported_ids.len(),
+        );
         let active_peers = self.active_peer_ids();
         for transient_id in imported_ids {
             for peer in &active_peers {

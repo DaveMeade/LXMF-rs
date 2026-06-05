@@ -8379,6 +8379,62 @@ fn propagation_remote_sync_marks_source_handled_and_queues_other_peers() {
 }
 
 #[test]
+fn propagation_remote_sync_counts_source_incoming_after_prior_transfer_like_python() {
+    let payload = b"remote-sync-prior-transfer-source-payload";
+    let payload_hex = hex::encode(payload);
+    let transient_id = hex::encode(Sha256::digest(payload));
+    let source_peer = hex::encode([0x31_u8; 16]);
+    let daemon =
+        RpcDaemon::with_store(MessagesStore::in_memory().expect("store"), hex::encode([2u8; 16]));
+    daemon
+        .handle_rpc(rpc_request(76, "peer_sync", json!({ "peer": source_peer })))
+        .expect("seed source peer");
+    daemon
+        .store
+        .upsert_propagation_entry(&PropagationEntryRecord {
+            transient_id: transient_id.clone(),
+            destination: "31".repeat(16),
+            payload_hex: payload_hex.clone(),
+            received_at: 1_700_000_731,
+            size_bytes: payload.len() as u64,
+            stamp_value: None,
+        })
+        .expect("seed known propagation entry");
+    daemon
+        .store
+        .mark_peer_transferred_propagation(source_peer.as_str(), transient_id.as_str())
+        .expect("mark prior transfer to source");
+    daemon.set_remote_control_bridge(Arc::new(TestRemoteControlBridge {
+        result: Ok(json!({
+            "synced": true,
+            "messages": [{
+                "transient_id": transient_id,
+                "payload_hex": payload_hex,
+            }],
+        })),
+    }));
+
+    let remote_sync = daemon
+        .handle_rpc(rpc_request(
+            77,
+            "propagation_remote_sync",
+            json!({
+                "remote": "remote-node",
+                "peer": source_peer,
+            }),
+        ))
+        .expect("remote sync")
+        .result
+        .expect("remote sync result");
+
+    assert_eq!(remote_sync["result"]["imported_count"].as_u64(), Some(0));
+    assert_eq!(remote_sync["result"]["duplicate_count"].as_u64(), Some(1));
+    assert_eq!(remote_sync["peer_sync"]["rx_bytes"].as_u64(), Some(payload.len() as u64));
+    assert_eq!(remote_sync["peer_sync"]["messages"]["incoming"].as_u64(), Some(1));
+    assert_eq!(remote_sync["peer_sync"]["incoming"].as_u64(), Some(1));
+}
+
+#[test]
 fn propagation_remote_sync_creates_missing_peer_record() {
     let daemon = RpcDaemon::test_instance();
     daemon.set_remote_control_bridge(Arc::new(TestRemoteControlBridge {

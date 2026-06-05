@@ -589,6 +589,15 @@ impl RpcDaemon {
     }
 
     pub fn record_inbound_propagation_peer_activity(&self, peer: &str, bytes: usize) -> bool {
+        self.record_inbound_propagation_peer_activity_count(peer, bytes, 1)
+    }
+
+    pub fn record_inbound_propagation_peer_activity_count(
+        &self,
+        peer: &str,
+        bytes: usize,
+        messages: usize,
+    ) -> bool {
         let peer = peer.trim();
         if let Ok(mut guard) = self.peers.lock() {
             if let Some(existing) =
@@ -596,7 +605,7 @@ impl RpcDaemon {
             {
                 existing.alive = true;
                 existing.last_seen = now_i64();
-                existing.incoming = existing.incoming.saturating_add(1);
+                existing.incoming = existing.incoming.saturating_add(messages as u64);
                 existing.rx_bytes = existing.rx_bytes.saturating_add(bytes as u64);
                 return true;
             }

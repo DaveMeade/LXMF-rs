@@ -59,12 +59,14 @@ gap, even though deeper propagation-router parity remains open.
   side effects. Remote sync also rejects blank peers before bridge lookup and
   does not create local peer state when the remote-control bridge is
   unavailable, while preserving existing-peer backoff postponement before
-  bridge lookup. Remote sync imports now record inbound runtime activity and
-  received-byte counters for the synced source peer. Remote fetch and download
-  imports now treat an active remote source peer as already received and queue
-  the imported payload only for other active peers, matching the source-peer
-  handling already used by remote sync. Those fetch/download source peers now
-  also record inbound runtime activity and received-byte counters.
+  bridge lookup. Remote sync imports now record inbound runtime activity,
+  received-byte counters, and inbound message accounting for the synced source
+  peer, including duplicate payloads that had previously been transferred to
+  that peer. Remote fetch and download imports now treat an active remote
+  source peer as already received and queue the imported payload only for other
+  active peers, matching the source-peer handling already used by remote sync.
+  Those fetch/download source peers now also record inbound runtime activity
+  and received-byte counters.
 - Daemon receipt status and peer-activity bookkeeping now preserve Python's
   distinction between transport `sent:*` states and final `delivered` receipts:
   send/resource completion records sent-only peer tx bookkeeping, while actual

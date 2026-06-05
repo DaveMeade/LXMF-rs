@@ -92,7 +92,7 @@ names are `lxmf-wire` and `reticulum-rs-rpc`.
   strict peering-timebase config refresh, Python-style unreachable-peer
   maintenance culling, mixed invalid-stamp peer resource handling that preserves
   valid entries before throttling, inbound propagation resource source-peer
-  queueing, remote-sync source-peer inbound byte accounting,
+  queueing, remote-sync source-peer inbound byte/message accounting,
   local-delivery source-peer accounting, unpeered identified-sender
   accounting, peering-key values, and explicit peering-key readiness status
   values are exposed, but the active workspace does not yet match Python
@@ -141,6 +141,7 @@ Recent focused evidence:
 - `cargo test -p reticulum-rs-rpc --lib propagation_remote_sync_missing_bridge_does_not_create_peer -- --nocapture`
 - `cargo test -p reticulum-rs-rpc --lib propagation_remote_sync_updates_peer_runtime_state -- --nocapture`
 - `cargo test -p reticulum-rs-rpc --lib propagation_remote_sync_marks_source_handled_and_queues_other_peers -- --nocapture`
+- `cargo test -p reticulum-rs-rpc --lib propagation_remote_sync_counts_source_incoming_after_prior_transfer_like_python -- --nocapture`
 - `cargo test -p reticulum-rs-rpc --lib propagation_remote_fetch -- --nocapture`
 - `cargo test -p reticulum-rs-rpc --lib propagation_remote_download -- --nocapture`
 - PR #215 GitHub CI rollup at `0c4588c`, including the pinned
