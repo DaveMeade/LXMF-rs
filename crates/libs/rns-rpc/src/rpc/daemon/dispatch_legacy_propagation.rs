@@ -1534,14 +1534,14 @@ impl RpcDaemon {
                             state.last_sync_completed = Some(now_i64());
                             state.last_sync_error = None;
                         });
-                        self.record_outbound_peer_activity(
-                            peer_id.as_str(),
-                            imported.transferred_bytes,
-                            true,
-                        );
+                        let peer_sync_completed_at = now_i64();
                         if let Ok(mut peers) = self.peers.lock() {
                             if let Some(peer) = peers.get_mut(peer_id.as_str()) {
-                                peer.sync_transfer_rate = imported.transferred_bytes as f64;
+                                peer.alive = true;
+                                peer.last_seen = peer_sync_completed_at;
+                                peer.last_sync_attempt = peer_sync_completed_at;
+                                peer.sync_backoff = 0;
+                                peer.next_sync_attempt = 0;
                             }
                         }
                         let peer = self

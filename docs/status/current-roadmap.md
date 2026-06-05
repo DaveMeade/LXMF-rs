@@ -137,6 +137,10 @@ gap, even though deeper propagation-router parity remains open.
 - Remote propagation sync now preserves peers on `ERROR_NOT_FOUND` offer
   responses as explicit peer-response cleanup, without treating that reply as
   a local peering break or generic liveness failure.
+- Remote propagation sync success now treats imported payload bytes as inbound
+  peer traffic only: it updates source-peer liveness/backoff and inbound
+  counters without inflating outbound `tx_bytes`, `sync_transfer_rate`, or
+  offer acceptance when no outbound LXMPeer transfer completed.
 - Local peer sync now preserves existing liveness when a peer explicitly wants
   none of the offered messages (`wanted_ids: []`), matching Python's
   no-resource-transfer offer-response path while still marking the offer

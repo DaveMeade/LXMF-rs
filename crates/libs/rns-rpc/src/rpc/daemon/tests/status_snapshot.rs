@@ -8275,15 +8275,12 @@ fn propagation_remote_sync_updates_peer_runtime_state() {
     assert_eq!(remote_sync["peer_sync"]["name"].as_str(), Some("Remote Sync State"));
     assert_eq!(remote_sync["peer_sync"]["name_source"].as_str(), Some("test"));
     assert_eq!(remote_sync["peer_sync"]["rx_bytes"].as_u64(), Some(payload.len() as u64));
-    assert_eq!(remote_sync["peer_sync"]["tx_bytes"].as_u64(), Some(payload.len() as u64));
+    assert_eq!(remote_sync["peer_sync"]["tx_bytes"].as_u64(), Some(0));
     assert_eq!(remote_sync["peer_sync"]["messages"]["incoming"].as_u64(), Some(1));
     assert_eq!(remote_sync["peer_sync"]["offered"].as_u64(), Some(0));
     assert_eq!(remote_sync["peer_sync"]["outgoing"].as_u64(), Some(0));
     assert_eq!(remote_sync["peer_sync"]["incoming"].as_u64(), Some(1));
-    assert_eq!(
-        remote_sync["peer_sync"]["sync_transfer_rate"].as_f64(),
-        Some(payload.len() as f64)
-    );
+    assert_eq!(remote_sync["peer_sync"]["sync_transfer_rate"].as_f64(), Some(0.0));
     let response_peering_key =
         remote_sync["peer_sync"]["peering_key"].as_u64().expect("response peering key");
     assert!(response_peering_key >= 1);
@@ -8321,10 +8318,10 @@ fn propagation_remote_sync_updates_peer_runtime_state() {
     assert_eq!(row["sync_backoff"].as_u64(), Some(0));
     assert_eq!(row["next_sync_attempt"].as_i64(), Some(0));
     assert_eq!(row["rx_bytes"].as_u64(), Some(payload.len() as u64));
-    assert_eq!(row["tx_bytes"].as_u64(), Some(payload.len() as u64));
+    assert_eq!(row["tx_bytes"].as_u64(), Some(0));
     assert_eq!(row["messages"]["incoming"].as_u64(), Some(1));
-    assert_eq!(row["sync_transfer_rate"].as_f64(), Some(payload.len() as f64));
-    assert!(row["acceptance_rate"].as_f64().is_some_and(|value| value > 0.25));
+    assert_eq!(row["sync_transfer_rate"].as_f64(), Some(0.0));
+    assert_eq!(row["acceptance_rate"].as_f64(), Some(0.25));
 
     let event = daemon
         .event_queue
@@ -8374,8 +8371,8 @@ fn propagation_remote_sync_updates_peer_runtime_state() {
     assert_eq!(event.payload["sync_backoff"].as_u64(), Some(0));
     assert_eq!(event.payload["next_sync_attempt"].as_i64(), Some(0));
     assert_eq!(event.payload["rx_bytes"].as_u64(), Some(payload.len() as u64));
-    assert_eq!(event.payload["tx_bytes"].as_u64(), Some(payload.len() as u64));
-    assert_eq!(event.payload["sync_transfer_rate"].as_f64(), Some(payload.len() as f64));
+    assert_eq!(event.payload["tx_bytes"].as_u64(), Some(0));
+    assert_eq!(event.payload["sync_transfer_rate"].as_f64(), Some(0.0));
     assert_eq!(event.payload["messages"]["outgoing"].as_u64(), Some(0));
     assert_eq!(event.payload["messages"]["incoming"].as_u64(), Some(1));
     assert_eq!(event.payload["messages"]["offered"].as_u64(), Some(0));
@@ -8575,7 +8572,7 @@ fn propagation_remote_sync_creates_missing_peer_record() {
     assert!(row["last_sync_attempt"].as_i64().is_some_and(|value| value > 0));
     assert_eq!(row["sync_backoff"].as_u64(), Some(0));
     assert_eq!(row["next_sync_attempt"].as_i64(), Some(0));
-    assert!(row["acceptance_rate"].as_f64().is_some_and(|value| value > 0.0));
+    assert_eq!(row["acceptance_rate"].as_f64(), Some(0.0));
 }
 
 #[test]
