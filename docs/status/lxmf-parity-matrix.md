@@ -2,14 +2,14 @@
 
 Status: historical parity snapshot; check `docs/status/current-roadmap.md` for
 current repo-wide status before relying on this file for active execution order.
-As of 2026-06-02, the live Python-reference interop workflow is green for the
+As of 2026-06-05, the live Python-reference interop workflow is green for the
 current branch, but that checkpoint does not convert the partial peer, router,
 propagation, and stamper rows below into full parity. The Reticulum
 KISS/LoRa/RNode interface work improves the transport substrate available to
 LXMF, but it does not by itself complete LXMF peer sync, propagation router, or
 stamp worker parity.
 
-Last reassessed: 2026-06-02 (PR #215 GitHub CI rollup green at `0c4588c`; local `cargo +nightly udeps --workspace --all-targets`)
+Last reassessed: 2026-06-05 (peer offer-response queue-state regression added; latest `main` CI green at `cd2d668a`)
 
 Status legend: `not-started` | `partial` | `done`
 
@@ -95,8 +95,10 @@ names are `lxmf-wire` and `reticulum-rs-rpc`.
   queueing, remote-sync source-peer inbound byte/message accounting,
   local-delivery source-peer accounting, unpeered identified-sender
   accounting, peering-key values, and explicit peering-key readiness status
-  values are exposed, but the active workspace does not yet match Python
-  `LXMPeer` queueing, transfer, and peering behavior.
+  values are exposed. Local offer responses now reject valid-looking wanted
+  transient IDs outside the current offer before mutating queue state, but the
+  active workspace does not yet match Python `LXMPeer` queueing, transfer, and
+  peering behavior.
 - Paper-command baseline is implemented for bridge-backed `reticulumd`: SDK
   paper encode/decode uses canonical `lxmf-wire` paper URI helpers and tests
   reject the old placeholder `lxm://{destination}/{message_id}` path. Broader
@@ -142,6 +144,9 @@ Recent focused evidence:
 - `cargo test -p reticulum-rs-rpc --lib propagation_remote_sync_updates_peer_runtime_state -- --nocapture`
 - `cargo test -p reticulum-rs-rpc --lib propagation_remote_sync_marks_source_handled_and_queues_other_peers -- --nocapture`
 - `cargo test -p reticulum-rs-rpc --lib propagation_remote_sync_counts_source_incoming_after_prior_transfer_like_python -- --nocapture`
+- `cargo test -p reticulum-rs-rpc --lib peer_sync_rejects_unknown_wanted_ids_without_mutating_queue -- --nocapture`
+- `cargo test -p reticulum-rs-rpc --lib peer_sync_rejects_transfer_limited_wanted_ids_without_mutating_queue -- --nocapture`
+- `cargo test -p reticulum-rs-rpc --lib peer_sync -- --nocapture`
 - `cargo test -p reticulum-rs-rpc --lib propagation_remote_fetch -- --nocapture`
 - `cargo test -p reticulum-rs-rpc --lib propagation_remote_download -- --nocapture`
 - PR #215 GitHub CI rollup at `0c4588c`, including the pinned

@@ -640,6 +640,12 @@ impl RpcDaemon {
                         .unwrap_or(std::cmp::Ordering::Equal)
                         .then_with(|| left.transient_id.cmp(&right.transient_id))
                 });
+                validate_peer_sync_wanted_ids_in_offer(
+                    wanted_ids.as_ref(),
+                    pending_propagation.as_slice(),
+                    transfer_limit_bytes,
+                    sync_limit_bytes,
+                )?;
                 let (policy_relevant_pending, policy_relevant_has_stamp) =
                     peer_sync_policy_relevance(
                         pending_propagation.as_slice(),
@@ -1730,6 +1736,41 @@ fn canonical_peer_sync_wanted_ids(
         canonical.insert(wanted_id.to_ascii_lowercase());
     }
     Ok(Some(canonical))
+}
+
+fn validate_peer_sync_wanted_ids_in_offer(
+    wanted_ids: Option<&std::collections::HashSet<String>>,
+    pending_propagation: &[PropagationEntryRecord],
+    transfer_limit_bytes: Option<usize>,
+    sync_limit_bytes: Option<usize>,
+) -> Result<(), std::io::Error> {
+    let Some(wanted_ids) = wanted_ids else {
+        return Ok(());
+    };
+    let mut offerable_ids = std::collections::HashSet::with_capacity(pending_propagation.len());
+    let mut cumulative_size = 24usize;
+    for entry in pending_propagation {
+        let entry_size = usize::try_from(entry.size_bytes).unwrap_or(usize::MAX);
+        let transfer_size = entry_size.saturating_add(16);
+        if transfer_limit_bytes.is_some_and(|limit| transfer_size > limit) {
+            continue;
+        }
+        let next_size = cumulative_size.saturating_add(transfer_size);
+        if sync_limit_bytes.is_some_and(|limit| next_size >= limit) {
+            continue;
+        }
+        cumulative_size = next_size;
+        offerable_ids.insert(entry.transient_id.as_str());
+    }
+    for wanted_id in wanted_ids {
+        if !offerable_ids.contains(wanted_id.as_str()) {
+            return Err(std::io::Error::new(
+                std::io::ErrorKind::InvalidInput,
+                "wanted_ids must reference the current peer offer",
+            ));
+        }
+    }
+    Ok(())
 }
 
 fn peer_sync_resource_data_size(payloads: &[Vec<u8>]) -> Result<u64, std::io::Error> {

@@ -4644,6 +4644,113 @@ fn peer_sync_rejects_malformed_wanted_ids_without_mutating_queue() {
 }
 
 #[test]
+fn peer_sync_rejects_unknown_wanted_ids_without_mutating_queue() {
+    let daemon = RpcDaemon::test_instance();
+    let pending = PropagationEntryRecord {
+        transient_id: "a8".repeat(32),
+        destination: "12".repeat(16),
+        payload_hex: "12".repeat(24),
+        received_at: 1_700_000_607,
+        size_bytes: 24,
+        stamp_value: None,
+    };
+    daemon.store.upsert_propagation_entry(&pending).expect("store propagation entry");
+    daemon
+        .store
+        .mark_peer_unhandled_propagation("peer-unknown-wanted", pending.transient_id.as_str())
+        .expect("mark unhandled");
+
+    let error = daemon
+        .handle_rpc(rpc_request(
+            55,
+            "peer_sync",
+            json!({
+                "peer": "peer-unknown-wanted",
+                "wanted_ids": ["ff".repeat(32)],
+            }),
+        ))
+        .expect_err("unknown wanted ids should be rejected");
+    assert_eq!(error.kind(), std::io::ErrorKind::InvalidInput);
+    assert!(
+        error.to_string().contains("current peer offer"),
+        "unexpected error: {error}"
+    );
+
+    assert!(
+        daemon
+            .store
+            .list_peer_handled_propagation_ids("peer-unknown-wanted")
+            .expect("handled ids")
+            .is_empty()
+    );
+    assert_eq!(
+        daemon
+            .store
+            .list_peer_unhandled_propagation("peer-unknown-wanted")
+            .expect("pending propagation"),
+        vec![pending]
+    );
+}
+
+#[test]
+fn peer_sync_rejects_transfer_limited_wanted_ids_without_mutating_queue() {
+    let daemon = RpcDaemon::test_instance();
+    daemon
+        .handle_rpc(rpc_request(52, "peer_sync", json!({ "peer": "peer-limited-wanted" })))
+        .expect("initial peer sync");
+    {
+        let mut peers = daemon.peers.lock().expect("peers mutex poisoned");
+        let peer = peers.get_mut("peer-limited-wanted").expect("peer record");
+        peer.propagation_transfer_limit = Some(80);
+        peer.propagation_sync_limit = Some(1_000);
+    }
+    let pending = PropagationEntryRecord {
+        transient_id: "a9".repeat(32),
+        destination: "12".repeat(16),
+        payload_hex: "12".repeat(100),
+        received_at: 1_700_000_608,
+        size_bytes: 100,
+        stamp_value: None,
+    };
+    daemon.store.upsert_propagation_entry(&pending).expect("store propagation entry");
+    daemon
+        .store
+        .mark_peer_unhandled_propagation("peer-limited-wanted", pending.transient_id.as_str())
+        .expect("mark unhandled");
+
+    let error = daemon
+        .handle_rpc(rpc_request(
+            55,
+            "peer_sync",
+            json!({
+                "peer": "peer-limited-wanted",
+                "wanted_ids": [pending.transient_id.as_str()],
+            }),
+        ))
+        .expect_err("transfer-limited wanted id should be rejected");
+    assert_eq!(error.kind(), std::io::ErrorKind::InvalidInput);
+    assert!(
+        error.to_string().contains("current peer offer"),
+        "unexpected error: {error}"
+    );
+
+    assert!(
+        daemon
+            .store
+            .list_peer_handled_propagation_ids("peer-limited-wanted")
+            .expect("handled ids")
+            .is_empty()
+    );
+    assert_eq!(
+        daemon
+            .store
+            .list_peer_unhandled_propagation("peer-limited-wanted")
+            .expect("pending propagation"),
+        vec![pending]
+    );
+}
+
+#[test]
 fn list_peers_top_level_message_counters_match_python_sync_accounting() {
     let daemon = RpcDaemon::test_instance();
     let wanted = PropagationEntryRecord {

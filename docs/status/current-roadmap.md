@@ -1,6 +1,6 @@
 # Current Roadmap Status
 
-Last updated: 2026-06-04
+Last updated: 2026-06-05
 
 This document is the current source of truth for repository-wide delivery
 status. Update this file first when parity status, release confidence, or the
@@ -154,6 +154,10 @@ gap, even though deeper propagation-router parity remains open.
   before interpreting `wanted_ids`: transfer-limited entries are filtered before
   the peer response, while sync-limited entries that were never offered remain
   queued for a later sync instead of being marked handled.
+- Local offer-response handling now rejects valid-looking `wanted_ids` that are
+  not part of the current peer offer before mutating queue state, avoiding the
+  false completion path where an out-of-offer request marked pending messages
+  handled.
 - Inbound propagation peer-resource handling now tracks Python's validated
   peering-link rule: a successful `/offer` peering-key validation marks the
   link as peer-validated, and peer resource transfers with multiple propagation
