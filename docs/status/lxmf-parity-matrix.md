@@ -9,7 +9,7 @@ KISS/LoRa/RNode interface work improves the transport substrate available to
 LXMF, but it does not by itself complete LXMF peer sync, propagation router, or
 stamp worker parity.
 
-Last reassessed: 2026-06-05 (new-peer wanted-ID queue preflight regression added)
+Last reassessed: 2026-06-05 (boolean offer-response peer-sync regressions added)
 
 Status legend: `not-started` | `partial` | `done`
 
@@ -96,7 +96,8 @@ names are `lxmf-wire` and `reticulum-rs-rpc`.
   source-peer inbound byte/message accounting without outbound transfer-rate or
   `tx_bytes` inflation, local-delivery source-peer accounting, unpeered
   identified-sender accounting, peering-key values, and explicit peering-key
-  readiness status values are exposed. Local offer responses now reject
+  readiness status values are exposed. Local offer responses now accept
+  Python's boolean all/none and list-shaped response forms and reject
   valid-looking wanted transient IDs outside the current offer before mutating
   queue state or creating a new peer queue, but the active workspace does not
   yet match Python `LXMPeer` queueing, transfer, and peering behavior.
@@ -149,6 +150,7 @@ Recent focused evidence:
 - `cargo test -p reticulum-rs-rpc --lib peer_sync_rejects_unknown_wanted_ids_without_mutating_queue -- --nocapture`
 - `cargo test -p reticulum-rs-rpc --lib peer_sync_rejects_unknown_wanted_ids_without_creating_new_peer_queue -- --nocapture`
 - `cargo test -p reticulum-rs-rpc --lib peer_sync_rejects_transfer_limited_wanted_ids_without_mutating_queue -- --nocapture`
+- `cargo test -p reticulum-rs-rpc --lib peer_sync_boolean -- --nocapture`
 - `cargo test -p reticulum-rs-rpc --lib peer_sync -- --nocapture`
 - `cargo test -p reticulum-rs-rpc --lib propagation_remote_fetch -- --nocapture`
 - `cargo test -p reticulum-rs-rpc --lib propagation_remote_download -- --nocapture`

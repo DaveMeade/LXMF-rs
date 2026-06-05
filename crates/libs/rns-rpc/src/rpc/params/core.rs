@@ -71,7 +71,7 @@ struct PeerOpParams {
     #[serde(default, deserialize_with = "deserialize_python_transfer_limit_kb")]
     transfer_limit_kb: Option<f64>,
     #[serde(default)]
-    wanted_ids: Option<Vec<String>>,
+    wanted_ids: Option<JsonValue>,
 }
 
 #[derive(Debug, Deserialize)]

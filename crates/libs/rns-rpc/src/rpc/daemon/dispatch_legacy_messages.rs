@@ -570,7 +570,9 @@ impl RpcDaemon {
                 let timestamp = now_i64();
                 let existing_peer =
                     self.peers.lock().expect("peers mutex poisoned").get(peer_id).cloned();
-                if existing_peer.is_none() && wanted_ids.is_some() {
+                if existing_peer.is_none()
+                    && wanted_ids.as_ref().is_some_and(PeerSyncWantedIds::requires_offer_validation)
+                {
                     let requested_transfer_limit_bytes =
                         parsed.transfer_limit_kb.map(|limit| (limit.max(0.0) * 1000.0) as usize);
                     let mut prospective_propagation = self
@@ -707,7 +709,7 @@ impl RpcDaemon {
                         let transfer_size = entry_size.saturating_add(16);
                         let wanted = wanted_ids
                             .as_ref()
-                            .map_or(true, |ids| ids.contains(entry.transient_id.as_str()));
+                            .map_or(true, |ids| ids.wants(entry.transient_id.as_str()));
                         if wanted && transfer_size > limit {
                             propagation_transfer_limited =
                                 propagation_transfer_limited.saturating_add(1);
@@ -797,7 +799,7 @@ impl RpcDaemon {
                     cumulative_size = next_size;
                     let wanted = wanted_ids
                         .as_ref()
-                        .map_or(true, |ids| ids.contains(entry.transient_id.as_str()));
+                        .map_or(true, |ids| ids.wants(entry.transient_id.as_str()));
                     let transient_id = entry.transient_id.clone();
                     propagation_handled = propagation_handled.saturating_add(1);
                     propagation_offered_bytes =
@@ -881,7 +883,7 @@ impl RpcDaemon {
                         let propagation_no_work =
                             !propagation_completed && propagation_pending == 0;
                         let propagation_no_transfer_offer_response =
-                            wanted_ids.as_ref().is_some_and(std::collections::HashSet::is_empty)
+                            wanted_ids.as_ref().is_some_and(PeerSyncWantedIds::wants_none)
                                 && propagation_transferred == 0
                                 && propagation_handled > 0;
                         let had_prior_peer_activity = existing.last_sync_attempt > 0
@@ -1715,7 +1717,7 @@ fn peer_minimum_accepted_stamp_value(peer: &PeerRecord) -> Option<u32> {
 
 fn peer_sync_policy_relevance(
     pending_propagation: &[PropagationEntryRecord],
-    wanted_ids: Option<&std::collections::HashSet<String>>,
+    wanted_ids: Option<&PeerSyncWantedIds>,
     sync_limit_bytes: Option<usize>,
 ) -> (usize, bool) {
     let mut policy_relevant_pending = 0usize;
@@ -1723,7 +1725,7 @@ fn peer_sync_policy_relevance(
     let mut policy_relevant_size = 24usize;
     for entry in pending_propagation
         .iter()
-        .filter(|entry| wanted_ids.map_or(true, |ids| ids.contains(entry.transient_id.as_str())))
+        .filter(|entry| wanted_ids.map_or(true, |ids| ids.wants(entry.transient_id.as_str())))
     {
         let entry_size = usize::try_from(entry.size_bytes).unwrap_or(usize::MAX);
         let transfer_size = entry_size.saturating_add(16);
@@ -1738,14 +1740,62 @@ fn peer_sync_policy_relevance(
     (policy_relevant_pending, policy_relevant_has_stamp)
 }
 
+#[derive(Debug)]
+enum PeerSyncWantedIds {
+    All,
+    Selected(std::collections::HashSet<String>),
+}
+
+impl PeerSyncWantedIds {
+    fn wants(&self, transient_id: &str) -> bool {
+        match self {
+            Self::All => true,
+            Self::Selected(ids) => ids.contains(transient_id),
+        }
+    }
+
+    fn wants_none(&self) -> bool {
+        matches!(self, Self::Selected(ids) if ids.is_empty())
+    }
+
+    fn requires_offer_validation(&self) -> bool {
+        matches!(self, Self::Selected(_))
+    }
+
+    fn selected_ids(&self) -> Option<&std::collections::HashSet<String>> {
+        match self {
+            Self::All => None,
+            Self::Selected(ids) => Some(ids),
+        }
+    }
+}
+
 fn canonical_peer_sync_wanted_ids(
-    wanted_ids: Option<&Vec<String>>,
-) -> Result<Option<std::collections::HashSet<String>>, std::io::Error> {
-    let Some(wanted_ids) = wanted_ids else {
+    wanted_ids: Option<&JsonValue>,
+) -> Result<Option<PeerSyncWantedIds>, std::io::Error> {
+    let Some(value) = wanted_ids else {
         return Ok(None);
     };
+    if value.as_bool() == Some(true) {
+        return Ok(Some(PeerSyncWantedIds::All));
+    }
+    if value.as_bool() == Some(false) {
+        return Ok(Some(PeerSyncWantedIds::Selected(std::collections::HashSet::new())));
+    }
+    let wanted_ids = value.as_array().ok_or_else(|| {
+        std::io::Error::new(
+            std::io::ErrorKind::InvalidInput,
+            "wanted_ids must be true, false, or a list of 32-byte transient ids",
+        )
+    })?;
     let mut canonical = std::collections::HashSet::with_capacity(wanted_ids.len());
     for wanted_id in wanted_ids {
+        let wanted_id = wanted_id.as_str().ok_or_else(|| {
+            std::io::Error::new(
+                std::io::ErrorKind::InvalidInput,
+                "wanted_ids must contain 32-byte transient ids",
+            )
+        })?;
         let wanted_id = wanted_id.trim();
         if wanted_id.len() != 64 || !wanted_id.as_bytes().iter().all(u8::is_ascii_hexdigit) {
             return Err(std::io::Error::new(
@@ -1755,16 +1805,16 @@ fn canonical_peer_sync_wanted_ids(
         }
         canonical.insert(wanted_id.to_ascii_lowercase());
     }
-    Ok(Some(canonical))
+    Ok(Some(PeerSyncWantedIds::Selected(canonical)))
 }
 
 fn validate_peer_sync_wanted_ids_in_offer(
-    wanted_ids: Option<&std::collections::HashSet<String>>,
+    wanted_ids: Option<&PeerSyncWantedIds>,
     pending_propagation: &[PropagationEntryRecord],
     transfer_limit_bytes: Option<usize>,
     sync_limit_bytes: Option<usize>,
 ) -> Result<(), std::io::Error> {
-    let Some(wanted_ids) = wanted_ids else {
+    let Some(wanted_ids) = wanted_ids.and_then(PeerSyncWantedIds::selected_ids) else {
         return Ok(());
     };
     let mut offerable_ids = std::collections::HashSet::with_capacity(pending_propagation.len());

@@ -141,10 +141,10 @@ gap, even though deeper propagation-router parity remains open.
   peer traffic only: it updates source-peer liveness/backoff and inbound
   counters without inflating outbound `tx_bytes`, `sync_transfer_rate`, or
   offer acceptance when no outbound LXMPeer transfer completed.
-- Local peer sync now preserves existing liveness when a peer explicitly wants
-  none of the offered messages (`wanted_ids: []`), matching Python's
-  no-resource-transfer offer-response path while still marking the offer
-  handled and preserving the prior sync transfer rate.
+- Local peer sync now accepts Python's boolean and list-shaped offer responses:
+  `wanted_ids: true` transfers every offered message, while `wanted_ids: false`
+  and `wanted_ids: []` mark the whole offer handled without resource transfer,
+  preserving the no-transfer liveness and transfer-rate behavior.
 - Empty local peer sync now follows Python's no-unhandled-messages path: a
   clean peer with no pending propagation entries records the attempt but
   preserves liveness and the previous sync transfer rate, and avoids synthetic
