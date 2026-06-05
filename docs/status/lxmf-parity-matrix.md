@@ -9,7 +9,7 @@ KISS/LoRa/RNode interface work improves the transport substrate available to
 LXMF, but it does not by itself complete LXMF peer sync, propagation router, or
 stamp worker parity.
 
-Last reassessed: 2026-06-05 (capacity-denied offer link validation regression added)
+Last reassessed: 2026-06-05 (new-peer wanted-ID queue preflight regression added)
 
 Status legend: `not-started` | `partial` | `done`
 
@@ -96,10 +96,10 @@ names are `lxmf-wire` and `reticulum-rs-rpc`.
   source-peer inbound byte/message accounting without outbound transfer-rate or
   `tx_bytes` inflation, local-delivery source-peer accounting, unpeered
   identified-sender accounting, peering-key values, and explicit peering-key
-  readiness status values are exposed. Local offer
-  responses now reject valid-looking wanted transient IDs outside the current
-  offer before mutating queue state, but the active workspace does not yet
-  match Python `LXMPeer` queueing, transfer, and peering behavior.
+  readiness status values are exposed. Local offer responses now reject
+  valid-looking wanted transient IDs outside the current offer before mutating
+  queue state or creating a new peer queue, but the active workspace does not
+  yet match Python `LXMPeer` queueing, transfer, and peering behavior.
 - Paper-command baseline is implemented for bridge-backed `reticulumd`: SDK
   paper encode/decode uses canonical `lxmf-wire` paper URI helpers and tests
   reject the old placeholder `lxm://{destination}/{message_id}` path. Broader
@@ -147,6 +147,7 @@ Recent focused evidence:
 - `cargo test -p reticulum-rs-rpc --lib propagation_remote_sync_marks_source_handled_and_queues_other_peers -- --nocapture`
 - `cargo test -p reticulum-rs-rpc --lib propagation_remote_sync_counts_source_incoming_after_prior_transfer_like_python -- --nocapture`
 - `cargo test -p reticulum-rs-rpc --lib peer_sync_rejects_unknown_wanted_ids_without_mutating_queue -- --nocapture`
+- `cargo test -p reticulum-rs-rpc --lib peer_sync_rejects_unknown_wanted_ids_without_creating_new_peer_queue -- --nocapture`
 - `cargo test -p reticulum-rs-rpc --lib peer_sync_rejects_transfer_limited_wanted_ids_without_mutating_queue -- --nocapture`
 - `cargo test -p reticulum-rs-rpc --lib peer_sync -- --nocapture`
 - `cargo test -p reticulum-rs-rpc --lib propagation_remote_fetch -- --nocapture`

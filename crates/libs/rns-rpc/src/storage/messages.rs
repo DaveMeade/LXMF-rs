@@ -1002,6 +1002,25 @@ impl MessagesStore {
         })
     }
 
+    pub fn list_peer_prospective_unhandled_propagation(
+        &self,
+        peer: &str,
+    ) -> rusqlite::Result<Vec<PropagationEntryRecord>> {
+        self.with_read_conn(|conn| {
+            let mut stmt = conn.prepare(
+                "SELECT e.transient_id, e.destination, e.payload_hex, e.received_at, e.size_bytes, e.stamp_value
+                 FROM propagation_entries e
+                 LEFT JOIN propagation_peer_entries p
+                    ON p.peer = ?1
+                   AND p.transient_id = e.transient_id
+                 WHERE p.state IS NULL OR p.state = 'unhandled'
+                 ORDER BY e.received_at ASC, e.transient_id ASC",
+            )?;
+            let rows = stmt.query_map(params![peer], propagation_entry_from_row)?;
+            rows.collect()
+        })
+    }
+
     pub fn list_peer_handled_propagation_ids(&self, peer: &str) -> rusqlite::Result<Vec<String>> {
         self.with_read_conn(|conn| {
             let mut stmt = conn.prepare(

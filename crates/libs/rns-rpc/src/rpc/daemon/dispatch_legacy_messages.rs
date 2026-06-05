@@ -568,12 +568,32 @@ impl RpcDaemon {
                 let wanted_ids = canonical_peer_sync_wanted_ids(parsed.wanted_ids.as_ref())?;
 
                 let timestamp = now_i64();
-                let existing_peer_type = self
-                    .peers
-                    .lock()
-                    .expect("peers mutex poisoned")
-                    .get(peer_id)
-                    .and_then(|record| record.peer_type.clone());
+                let existing_peer =
+                    self.peers.lock().expect("peers mutex poisoned").get(peer_id).cloned();
+                if existing_peer.is_none() && wanted_ids.is_some() {
+                    let requested_transfer_limit_bytes =
+                        parsed.transfer_limit_kb.map(|limit| (limit.max(0.0) * 1000.0) as usize);
+                    let mut prospective_propagation = self
+                        .store
+                        .list_peer_prospective_unhandled_propagation(peer_id)
+                        .map_err(std::io::Error::other)?;
+                    prospective_propagation.sort_by(|left, right| {
+                        let left_weight = propagation_peer_sync_weight(left, timestamp);
+                        let right_weight = propagation_peer_sync_weight(right, timestamp);
+                        left_weight
+                            .partial_cmp(&right_weight)
+                            .unwrap_or(std::cmp::Ordering::Equal)
+                            .then_with(|| left.transient_id.cmp(&right.transient_id))
+                    });
+                    validate_peer_sync_wanted_ids_in_offer(
+                        wanted_ids.as_ref(),
+                        prospective_propagation.as_slice(),
+                        requested_transfer_limit_bytes,
+                        requested_transfer_limit_bytes,
+                    )?;
+                }
+                let existing_peer_type =
+                    existing_peer.as_ref().and_then(|record| record.peer_type.clone());
                 let peer_type = if self.is_static_peer(peer_id) {
                     Some("static".to_string())
                 } else if existing_peer_type.as_deref() == Some("unpeered") {
