@@ -118,9 +118,6 @@ pub(super) fn handle_offer_request(
     if validate_peering_key(peering_id.as_slice(), peering_key, peering_cost).is_none() {
         return ControlResponse::Code(error_invalid_key);
     }
-    if let Ok(mut guard) = control.validated_peer_links.lock() {
-        guard.insert(*link_id);
-    }
 
     let mut wanted = Vec::new();
     for transient_id in transient_ids {
@@ -138,6 +135,9 @@ pub(super) fn handle_offer_request(
     let remote_propagation_hash = hex::encode(remote_propagation_hash);
     if daemon.record_propagation_offer_peer(remote_propagation_hash.as_str()).is_err() {
         return ControlResponse::Code(error_no_access);
+    }
+    if let Ok(mut guard) = control.validated_peer_links.lock() {
+        guard.insert(*link_id);
     }
 
     if wanted.is_empty() {
@@ -613,11 +613,12 @@ mod tests {
             allowed_control_identities: Vec::new(),
             validated_peer_links: test_validated_peer_links(),
         };
+        let link_id = test_link_id();
 
         let response = handle_offer_request(
             &daemon,
             &control,
-            &test_link_id(),
+            &link_id,
             &remote_identity,
             Some(rmpv::Value::Array(vec![
                 rmpv::Value::Binary(peering_key),
@@ -642,6 +643,10 @@ mod tests {
                 .iter()
                 .all(|row| row["peer"].as_str() != Some(remote_propagation_hash.as_str())),
             "capacity-limited offer must not create a peer record"
+        );
+        assert!(
+            !control.validated_peer_links.lock().expect("validated peer links").contains(&link_id),
+            "capacity-limited offer must not validate the peering link"
         );
     }
 

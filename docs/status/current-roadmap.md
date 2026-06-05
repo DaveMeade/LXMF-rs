@@ -163,10 +163,11 @@ gap, even though deeper propagation-router parity remains open.
   false completion path where an out-of-offer request marked pending messages
   handled.
 - Inbound propagation peer-resource handling now tracks Python's validated
-  peering-link rule: a successful `/offer` peering-key validation marks the
-  link as peer-validated, and peer resource transfers with multiple propagation
-  messages are rejected unless they arrive on such a validated link. Validated
-  link state is cleared when the link closes.
+  peering-link rule: a successful admitted `/offer` peering-key validation
+  marks the link as peer-validated, capacity-denied offers do not authorize the
+  link, and peer resource transfers with multiple propagation messages are
+  rejected unless they arrive on such a validated link. Validated link state is
+  cleared when the link closes.
 - Inbound peer propagation resources with mixed valid and invalid propagation
   stamps now follow Python's transfer handling more closely: valid messages are
   ingested before the transfer is rejected and the offending peer is throttled.
