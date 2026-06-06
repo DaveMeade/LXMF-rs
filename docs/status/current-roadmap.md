@@ -212,6 +212,9 @@ gap, even though deeper propagation-router parity remains open.
   not part of the current peer offer before mutating queue state, avoiding the
   false completion path where an out-of-offer request marked pending messages
   handled or created a new peer queue from existing propagation entries.
+- Local peer sync now persists the peer acceptance-rate cache from cumulative
+  `outgoing/offered` counters, matching Python `LXMPeer.acceptance_rate`
+  instead of replacing the cache with only the latest offer-response ratio.
 - Local peer sync offer ordering now also applies Python's prioritised
   destination weighting before sync-limit selection, so propagation entries for
   prioritised destinations are offered ahead of lower raw-weight entries when
