@@ -9,7 +9,7 @@ KISS/LoRa/RNode interface work improves the transport substrate available to
 LXMF, but it does not by itself complete LXMF peer sync, propagation router, or
 stamp worker parity.
 
-Last reassessed: 2026-06-06 (prioritised destination peer-offer weighting regression added)
+Last reassessed: 2026-06-06 (local-delivery source-peer queue mark regression added)
 
 Status legend: `not-started` | `partial` | `done`
 
@@ -96,6 +96,11 @@ names are `lxmf-wire` and `reticulum-rs-rpc`.
   selection, and unreachable static peer sync-pool skipping, high-cost
   existing-peer peering breaks with queue cleanup,
   admitted-offer-only
+  validated peering links, mixed invalid-stamp peer resource handling that
+  preserves valid entries before throttling, inbound propagation resource
+  source-peer queueing, remote-sync source-peer inbound byte/message accounting
+  without outbound transfer-rate or `tx_bytes` inflation, local-delivery
+  source-peer accounting and queue marks, unpeered identified-sender accounting, peering-key
   validated peering links for multi-message client or peer propagation
   resources while packet propagation keeps Python-style multi-message
   acceptance, mixed invalid-stamp peer resource handling that preserves valid
