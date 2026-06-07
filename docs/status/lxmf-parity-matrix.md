@@ -9,6 +9,8 @@ KISS/LoRa/RNode interface work improves the transport substrate available to
 LXMF, but it does not by itself complete LXMF peer sync, propagation router, or
 stamp worker parity.
 
+Last reassessed: 2026-06-06 (new-peer offer-response guard and prioritised
+destination peer-offer weighting regressions added)
 Last reassessed: 2026-06-06 (local-delivery source-peer queue mark regression added)
 
 Status legend: `not-started` | `partial` | `done`
@@ -109,20 +111,16 @@ names are `lxmf-wire` and `reticulum-rs-rpc`.
   transfer-rate or `tx_bytes` inflation, local-delivery source-peer accounting,
   unpeered identified-sender accounting, peering-key
   values, and explicit peering-key readiness status values are exposed. Local
-  offer responses now accept
-  Python's boolean all/none and list-shaped response forms, keep full-offer
-  stamp-policy and peering-key gates for boolean wants-all, request-limited,
-  selected-ID transfer, and no-transfer responses, preserve previous
-  last-heard/seen-count values for no-transfer responses, and reject
-  valid-looking wanted transient IDs outside the current offer before mutating
-  queue state or creating a new peer queue.
-  selected-ID transfer, and no-transfer responses, and reject valid-looking
-  wanted transient IDs outside the current offer before mutating queue state or
-  creating a new peer queue.
-  Local peer sync also persists Python-style cumulative acceptance-rate cache
-  values after multiple offer responses.
-  creating a new peer queue. Local peer sync offer ordering now applies
-  Python's prioritised destination weighting before sync-limit selection.
+  offer responses now accept Python's boolean all/none and list-shaped response
+  forms, keep full-offer stamp-policy and peering-key gates for boolean
+  wants-all, request-limited, selected-ID transfer, and no-transfer responses,
+  and preserve previous last-heard/seen-count values for no-transfer
+  responses. They reject valid-looking wanted transient IDs outside the current
+  offer, including explicit `wanted_ids` for brand-new peers, before mutating
+  queue state or creating a new peer queue. Local peer sync offer ordering now
+  applies Python's prioritised destination weighting before sync-limit
+  selection, and peer sync persists Python-style cumulative acceptance-rate
+  cache values after multiple offer responses.
   Existing peers in local sync
   backoff now also postpone before the local existing-entry queue-fill path,
   but the active workspace does not yet match Python `LXMPeer` queueing,
@@ -175,6 +173,7 @@ Recent focused evidence:
 - `cargo test -p reticulum-rs-rpc --lib propagation_remote_sync_counts_source_incoming_after_prior_transfer_like_python -- --nocapture`
 - `cargo test -p reticulum-rs-rpc --lib peer_sync_rejects_unknown_wanted_ids_without_mutating_queue -- --nocapture`
 - `cargo test -p reticulum-rs-rpc --lib peer_sync_rejects_unknown_wanted_ids_without_creating_new_peer_queue -- --nocapture`
+- `cargo test -p reticulum-rs-rpc --lib peer_sync_rejects_offer_response_without_existing_peer_queue -- --nocapture`
 - `cargo test -p reticulum-rs-rpc --lib peer_sync_rejects_transfer_limited_wanted_ids_without_mutating_queue -- --nocapture`
 - `cargo test -p reticulum-rs-rpc --lib peer_sync_boolean -- --nocapture`
 - `cargo test -p reticulum-rs-rpc --lib peer_sync_boolean_wanted_ids_true_keeps_full_offer_policy_gates_like_python -- --nocapture`
