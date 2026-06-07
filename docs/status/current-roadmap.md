@@ -56,6 +56,47 @@ The project is best described by capability level:
 - Propagation peers have real queue, policy, maintenance, throttling, peering,
   offer-response, source-accounting, and acceptance-rate behavior. These are
   substantial implementations, not SDK-only placeholders.
+- Local and remote peer-sync offer-response cleanup now preserves peers and
+  propagation queues for retry on retryable or otherwise unexpected numeric
+  responses, while still treating access denial and throttling as distinct
+  Python paths.
+- Retryable numeric local offer responses now mirror payload-backed live queue
+  marks into the active peer record snapshot before returning, so restart/export
+  state preserves the retry queue even when the serialized snapshot was empty.
+- Restored Python peer records now update their serialized queue ID snapshot
+  when peer sync handles, transfers, or transfer-limits queued offers, reducing
+  restart/export drift after live offer-response processing.
+- Peer sync queue creation also records newly queued existing propagation IDs in
+  the peer record snapshot, so postponed syncs can restart/export with the same
+  unhandled queue visible in live status.
+- Inbound and remotely imported propagation payloads update active peer record
+  snapshots when they queue new unhandled IDs or mark source peers handled,
+  keeping restart/export state aligned with live queue fan-out and source
+  accounting.
+- Propagation purge cleanup removes deleted local payload IDs from active peer
+  record snapshots, so restart/export state does not retain purged queue entries
+  after the live peer marks have been cleared.
+- Duplicate or replayed propagation queue attempts respect already-completed
+  peer marks when updating peer record snapshots, avoiding restart/export drift
+  that would reopen handled IDs as unhandled.
+- Peer sync queue replay records preexisting live unhandled marks into the peer
+  record snapshot even when the store did not insert new rows, preserving
+  restart/export visibility for already-queued work.
+- Reactivating a persisted `unpeered` record clears stale serialized peer queue
+  snapshots before the peer becomes active again, avoiding restart/export
+  resurrection of pre-unpeer propagation work.
+- Peer sync stale queue cleanup now removes matching unhandled and completed
+  IDs from active peer record snapshots when the underlying propagation payload
+  no longer exists, keeping export/restart state aligned with live queue
+  cleanup.
+- Restored peer records now accept Python MessagePack binary
+  `destination_hash`, handled, and unhandled IDs, prune serialized queue IDs
+  whose payloads are missing during replay, and canonicalize/deduplicate the
+  surviving IDs, avoiding restart/export drift when Python snapshot entries
+  outlive or duplicate local propagation storage.
+- Early transfer-limit decisions made before peering-key handling now update
+  active peer record snapshots as completed work, keeping serialized state in
+  sync with the live transfer-limited mark.
 
 ## Remaining Release Blockers
 

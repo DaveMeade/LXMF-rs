@@ -36,6 +36,7 @@ use tokio::sync::Mutex;
 use tokio::time::timeout;
 
 const MCAST_GROUP: &str = "224.0.0.100";
+static MULTICAST_TEST_LOCK: Mutex<()> = Mutex::const_new(());
 
 fn bind_listener(port: u16, join_mcast: bool) -> UdpSocket {
     let socket = Socket::new(Domain::IPV4, Type::DGRAM, Some(Protocol::UDP))
@@ -75,6 +76,7 @@ fn link_proof_packet() -> Packet {
 
 #[tokio::test]
 async fn broadcast_tx_reaches_multicast_listeners() {
+    let _guard = MULTICAST_TEST_LOCK.lock().await;
     let port = pick_free_port();
     let group_addr = format!("{}:{}", MCAST_GROUP, port);
     let bind_addr = format!("127.0.0.1:{}", port);
@@ -100,6 +102,7 @@ async fn broadcast_tx_reaches_multicast_listeners() {
 
 #[tokio::test]
 async fn direct_tx_targeting_multicast_iface_is_dropped() {
+    let _guard = MULTICAST_TEST_LOCK.lock().await;
     let port = pick_free_port();
     let group_addr = format!("{}:{}", MCAST_GROUP, port);
     let bind_addr = format!("127.0.0.1:{}", port);
@@ -136,6 +139,7 @@ async fn direct_tx_targeting_multicast_iface_is_dropped() {
 
 #[tokio::test]
 async fn direct_link_proof_targeting_multicast_iface_falls_back_to_broadcast() {
+    let _guard = MULTICAST_TEST_LOCK.lock().await;
     let port = pick_free_port();
     let group_addr = format!("{}:{}", MCAST_GROUP, port);
     let bind_addr = format!("127.0.0.1:{}", port);
@@ -165,6 +169,7 @@ async fn direct_link_proof_targeting_multicast_iface_falls_back_to_broadcast() {
 
 #[tokio::test]
 async fn direct_tx_to_registered_virtual_iface_is_sent_unicast() {
+    let _guard = MULTICAST_TEST_LOCK.lock().await;
     // Two sockets, two ports:
     //   - multicast iface in the manager, using `mcast_port`
     //   - unicast listener at `peer_port`, NOT joined to the group
@@ -218,6 +223,7 @@ async fn direct_tx_to_registered_virtual_iface_is_sent_unicast() {
 
 #[tokio::test]
 async fn direct_tx_to_unknown_virtual_iface_is_dropped() {
+    let _guard = MULTICAST_TEST_LOCK.lock().await;
     use rns_transport::hash::{AddressHash, Hash};
 
     let port = pick_free_port();

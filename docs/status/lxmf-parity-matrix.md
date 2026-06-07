@@ -22,7 +22,7 @@ Workspace paths are used for navigation. `crates/libs/lxmf-core` publishes as
 | --- | --- | --- | --- | --- |
 | `LXMF/LXMF.py` | `crates/libs/lxmf-core` | partial | Constants, payload fields, message identity, inbound decoding, and wire helpers. | The complete convenience/module surface is not mirrored. |
 | `LXMF/LXMessage.py` | `crates/libs/lxmf-core` | done | Wire, storage, propagation, paper, signatures, message IDs, binary fidelity, and timestamp precision metadata. | No confirmed base-message blocker. |
-| `LXMF/LXMPeer.py` | `crates/libs/rns-rpc`, `crates/apps/reticulumd` | partial | Persistent peers, queue marks, offer selection, policy gates, peering keys, throttling, maintenance, source accounting, cumulative acceptance, and boolean/list offer responses. | Complete transfer/retry/restart lifecycle and broad live peer interop remain. |
+| `LXMF/LXMPeer.py` | `crates/libs/rns-rpc`, `crates/apps/reticulumd` | partial | Persistent peers, queue marks, offer selection, policy gates, peering keys, throttling, maintenance, source accounting, cumulative acceptance, serialized restored queue snapshots, and boolean/list/numeric offer responses. | Complete transfer/retry/restart lifecycle and broad live peer interop remain. |
 | `LXMF/LXMRouter.py` | `crates/libs/rns-rpc`, `crates/apps/reticulumd` | partial | Outbound modes, selected propagation nodes, direct/propagated resources, cancellation, fetch/download/sync RPCs, receipts, persistence, and status. | Full Python queue, retry, propagation-node, and command side effects remain. |
 | `LXMF/Handlers.py` | `crates/apps/reticulumd`, `crates/libs/rns-rpc` | partial | Delivery, announce, propagation app-data, receipt, and inbound bridge handling. | Some router-coupled side effects and negative/drop observability remain narrower. |
 | `LXMF/LXStamper.py` | `crates/libs/lxmf-core`, `crates/libs/rns-rpc`, `crates/apps/reticulumd` | partial | Validation, generation, ticket-derived stamps, cancellation-aware task work, and lifecycle metadata. | Python-style deferred worker queue, retry ownership, and continuous progress remain. |
@@ -95,7 +95,39 @@ Workspace paths are used for navigation. `crates/libs/lxmf-core` publishes as
   selection, unreachable culling, low-acceptance rotation, and prioritized
   offers.
 - Offer responses support Python boolean and list forms, reject out-of-offer
-  IDs, preserve no-transfer liveness, and retain cumulative acceptance rates.
+  IDs, preserve no-transfer liveness, retain cumulative acceptance rates, and
+  preserve peers and queues on retryable or otherwise unexpected numeric
+  offer-response cleanup paths.
+- Retryable numeric local offer responses mirror payload-backed live handled and
+  unhandled queue marks into active peer record snapshots before returning,
+  preserving restart/export retry state even when the serialized snapshot was
+  previously empty.
+- Restored peer record queue IDs are replayed into the live store, newly queued
+  existing and inbound/imported propagation IDs are reflected in the serialized
+  peer snapshot, source-peer handled IDs are preserved for restart/export, and
+  offer-response handling keeps IDs in sync when queued messages become handled,
+  transferred, or transfer-limited.
+- Purging local propagation payloads removes matching deleted IDs from active
+  peer record snapshots, preventing restart/export drift after queue cleanup.
+- Duplicate or replayed propagation queue attempts preserve completed peer
+  snapshot state instead of reopening handled IDs as serialized unhandled work.
+- Peer sync queue replay mirrors preexisting live unhandled marks into active
+  peer record snapshots, keeping restart/export state aligned even when no new
+  store rows were inserted.
+- Rejoining from a persisted `unpeered` peer record clears stale serialized
+  queue snapshots before the peer is active again, preventing pre-unpeer work
+  from being restored on export/restart.
+- Peer sync stale queue cleanup prunes matching active peer record snapshot IDs
+  for unhandled and completed marks when the propagation payload has already
+  been removed, keeping serialized restart/export state aligned with live queue
+  cleanup.
+- Restored peer record replay accepts Python MessagePack binary
+  `destination_hash`, handled, and unhandled IDs, prunes serialized IDs whose
+  payloads are absent, and canonicalizes/deduplicates surviving IDs, so stale
+  or repeated Python snapshot entries are not exported again after replay.
+- Transfer-limit decisions made before peering-key handling update active peer
+  record snapshots as completed queue work, so restart/export state reflects
+  the live transfer-limited mark.
 - Inbound propagation distinguishes clients, validated peers, unpeered
   identified senders, and local delivery; source peers are accounted and not
   re-offered their own payloads.
