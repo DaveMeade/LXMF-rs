@@ -201,6 +201,9 @@ Workspace paths are used for navigation. `crates/libs/lxmf-core` publishes as
 - Transfer-limit decisions made before peering-key handling update active peer
   record snapshots as completed queue work, so restart/export state reflects
   the live transfer-limited mark.
+- Transfer-limit handling also wins over explicit "wants none" offer responses
+  before peering-key gates, keeping oversized entries out of retryable queues
+  when the peer declines the current offer.
 - Persistent peer sync preserves explicit offer-response boundaries by keeping
   sync-limit-skipped IDs queued for the next offer instead of auto-transferring
   messages outside the peer's current response.

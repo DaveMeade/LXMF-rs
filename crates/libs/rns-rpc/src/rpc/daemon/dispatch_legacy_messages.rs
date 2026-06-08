@@ -966,10 +966,7 @@ impl RpcDaemon {
                     for entry in pending_propagation {
                         let entry_size = usize::try_from(entry.size_bytes).unwrap_or(usize::MAX);
                         let transfer_size = entry_size.saturating_add(16);
-                        let wanted = wanted_ids
-                            .as_ref()
-                            .map_or(true, |ids| ids.wants(entry.transient_id.as_str()));
-                        if wanted && transfer_size > limit {
+                        if transfer_size > limit {
                             propagation_transfer_limited =
                                 propagation_transfer_limited.saturating_add(1);
                             propagation_transfer_limited_bytes =
