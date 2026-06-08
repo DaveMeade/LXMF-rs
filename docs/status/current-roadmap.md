@@ -171,6 +171,9 @@ The project is best described by capability level:
 - Inbound propagation message-get listing now also applies peer admission before
   returning non-empty payload ID lists, so rejected peers cannot enumerate
   queued transfers they are not allowed to fetch.
+- Inbound propagation message-get `haves` handling now applies peer admission
+  before purging matching local payloads, so rejected peers cannot delete queued
+  transfers they are not allowed to acknowledge.
 - Remote fetch and download imports now mark inactive source peers as received
   before later activation, so a propagation node is not offered back payloads it
   previously supplied just because it was not yet an active peer record.

@@ -204,6 +204,9 @@ Workspace paths are used for navigation. `crates/libs/lxmf-core` publishes as
 - Inbound propagation message-get listing applies peer admission before
   returning non-empty payload ID lists, so rejected peers cannot enumerate
   queued transfers they are not allowed to fetch.
+- Inbound propagation message-get `haves` handling applies peer admission
+  before purging matching local payloads, so rejected peers cannot delete queued
+  transfers they are not allowed to acknowledge.
 - Remote fetch and download imports mark inactive source peers as received
   before later activation, so source-accounting survives even when the
   propagation node was not yet an active peer record.

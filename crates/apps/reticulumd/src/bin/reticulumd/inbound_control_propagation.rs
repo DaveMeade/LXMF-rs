@@ -20,12 +20,12 @@ pub(super) fn handle_message_get_request(
         return ControlResponse::Code(error_invalid_data);
     }
     let remote_delivery_hash = delivery_destination_hash_for_identity(remote_identity);
+    let remote_propagation_hash =
+        hex::encode(propagation_destination_hash_for_identity(remote_identity));
     if entries.first().is_some_and(rmpv::Value::is_nil)
         && entries.get(1).is_some_and(rmpv::Value::is_nil)
     {
         let available = daemon.list_propagation_payloads_for_destination(&remote_delivery_hash);
-        let remote_propagation_hash =
-            hex::encode(propagation_destination_hash_for_identity(remote_identity));
         if !available.is_empty()
             && daemon.record_propagation_offer_peer(remote_propagation_hash.as_str()).is_err()
         {
@@ -45,6 +45,17 @@ pub(super) fn handle_message_get_request(
         _ => return ControlResponse::Code(error_invalid_data),
     };
     if !haves.is_empty() {
+        let haves_match_local_payload = daemon
+            .list_propagation_payloads_for_destination(&remote_delivery_hash)
+            .into_iter()
+            .any(|(transient_id, _size)| {
+                haves.iter().any(|have| have.as_slice() == transient_id.as_slice())
+            });
+        if haves_match_local_payload
+            && daemon.record_propagation_offer_peer(remote_propagation_hash.as_str()).is_err()
+        {
+            return ControlResponse::Code(error_no_access);
+        }
         daemon.purge_propagation_payloads_for_destination(&remote_delivery_hash, &haves);
     }
 
@@ -62,8 +73,6 @@ pub(super) fn handle_message_get_request(
         &wants,
         transfer_limit_bytes,
     );
-    let remote_propagation_hash =
-        hex::encode(propagation_destination_hash_for_identity(remote_identity));
     if !preview.is_empty()
         && daemon.record_propagation_offer_peer(remote_propagation_hash.as_str()).is_err()
     {
@@ -1212,6 +1221,69 @@ mod tests {
                 .iter()
                 .all(|row| row["peer"].as_str() != Some(remote_propagation_hash.as_str())),
             "rejected message-get list must not create a peer record"
+        );
+    }
+
+    #[test]
+    fn message_get_rejected_peer_cannot_purge_haves() {
+        let daemon = RpcDaemon::test_instance();
+        let remote_private =
+            rns_transport::identity::PrivateIdentity::new_from_rand(rand_core::OsRng);
+        let remote_identity = *remote_private.as_identity();
+        let remote_delivery_hash = delivery_destination_hash_for_identity(&remote_identity);
+        let remote_propagation_hash =
+            hex::encode(propagation_destination_hash_for_identity(&remote_identity));
+        daemon
+            .handle_rpc(RpcRequest {
+                id: 10,
+                method: "propagation_enable".to_string(),
+                params: Some(json!({
+                    "enabled": true,
+                    "from_static_only": true,
+                    "static_peers": ["not-this-peer"],
+                    "peering_cost": 1,
+                })),
+            })
+            .expect("enable static-only propagation");
+        let have = [0x28; 32];
+        let mut have_payload = remote_delivery_hash.to_vec();
+        have_payload.extend_from_slice(b" rejected peer should not purge haves");
+        daemon
+            .ingest_propagation_payload_bytes_with_aliases(
+                have_payload.as_slice(),
+                hex::encode(have).as_str(),
+                &[],
+            )
+            .expect("store have payload");
+
+        let response = handle_message_get_request(
+            &daemon,
+            &remote_identity,
+            Some(rmpv::Value::Array(vec![
+                rmpv::Value::Nil,
+                rmpv::Value::Array(vec![rmpv::Value::Binary(have.to_vec())]),
+            ])),
+            0xF1,
+            0xF4,
+        );
+
+        assert!(matches!(response, ControlResponse::Code(0xF1)));
+        assert!(
+            daemon.has_propagation_payload(hex::encode(have).as_str()),
+            "rejected message-get haves must not purge queued payload"
+        );
+        let peers = daemon
+            .handle_rpc(RpcRequest { id: 11, method: "list_peers".to_string(), params: None })
+            .expect("list peers")
+            .result
+            .expect("list peers result");
+        assert!(
+            peers["peers"]
+                .as_array()
+                .expect("peer rows")
+                .iter()
+                .all(|row| row["peer"].as_str() != Some(remote_propagation_hash.as_str())),
+            "rejected message-get haves must not create a peer record"
         );
     }
 
