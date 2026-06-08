@@ -8496,6 +8496,74 @@ fn peer_sync_prunes_stale_handled_peer_record_snapshot_ids() {
 }
 
 #[test]
+fn peer_sync_prunes_case_variant_stale_live_queue_marks_like_python() {
+    let daemon = RpcDaemon::test_instance();
+    let stored_peer = "Peer-Stale-Live-Case";
+    let request_peer = stored_peer.to_ascii_lowercase();
+    let stale_unhandled_id = "fe".repeat(32);
+    let stale_handled_id = "ff".repeat(32);
+    daemon
+        .handle_rpc(rpc_request(55, "peer_sync", json!({ "peer": stored_peer })))
+        .expect("initial peer sync");
+    daemon
+        .store
+        .mark_peer_unhandled_propagation(request_peer.as_str(), stale_unhandled_id.as_str())
+        .expect("mark case-variant stale unhandled");
+    daemon
+        .store
+        .mark_peer_handled_propagation(request_peer.as_str(), stale_handled_id.as_str())
+        .expect("mark case-variant stale handled");
+    {
+        let mut peers = daemon.peers.lock().expect("peers mutex poisoned");
+        let record = peers.get_mut(stored_peer).expect("peer record");
+        record.restored_unhandled_ids.push(stale_unhandled_id.clone());
+        record.restored_handled_ids.push(stale_handled_id.clone());
+    }
+
+    let result = daemon
+        .handle_rpc(rpc_request(57, "peer_sync", json!({ "peer": stored_peer })))
+        .expect("peer sync")
+        .result
+        .expect("peer sync result");
+    assert_eq!(result["peer"].as_str(), Some(stored_peer));
+    assert!(
+        result["messages"]["handled_ids"].as_array().expect("result handled ids").is_empty()
+    );
+    assert!(
+        result["messages"]["unhandled_ids"]
+            .as_array()
+            .expect("result unhandled ids")
+            .is_empty()
+    );
+
+    let peers = daemon.peers.lock().expect("peers mutex poisoned");
+    let record = peers.get(stored_peer).expect("stored peer");
+    let serialized = serde_json::to_value(record).expect("serialize peer record");
+    assert!(
+        serialized["handled_ids"].as_array().expect("serialized handled ids").is_empty()
+    );
+    assert!(
+        serialized["unhandled_ids"].as_array().expect("serialized unhandled ids").is_empty()
+    );
+    drop(peers);
+
+    assert!(
+        daemon
+            .store
+            .remove_stale_peer_unhandled_propagation_ids(request_peer.as_str())
+            .expect("case-variant stale unhandled cleanup")
+            .is_empty()
+    );
+    assert!(
+        daemon
+            .store
+            .remove_stale_peer_completed_propagation_ids(request_peer.as_str())
+            .expect("case-variant stale completed cleanup")
+            .is_empty()
+    );
+}
+
+#[test]
 fn peer_sync_applies_per_peer_propagation_sync_limit() {
     let (daemon, peer) = ready_propagation_peer_daemon(0x44);
     {

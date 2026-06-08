@@ -1,6 +1,6 @@
 # LXMF Parity Matrix
 
-Last reassessed: 2026-06-07
+Last reassessed: 2026-06-08
 
 This is the maintained row-level status for Python LXMF compatibility.
 Repository-level posture and execution order live in
@@ -209,6 +209,9 @@ Workspace paths are used for navigation. `crates/libs/lxmf-core` publishes as
   for unhandled and completed marks when the propagation payload has already
   been removed, keeping serialized restart/export state aligned with live queue
   cleanup.
+- Peer sync stale queue cleanup treats case-variant live peer marks as the same
+  peer, so stale unhandled or completed rows cannot survive under caller-case
+  variants and later reappear in restart/export state.
 - Restored peer record replay accepts Python MessagePack binary
   `destination_hash`, handled, and unhandled IDs, prunes serialized IDs whose
   payloads are absent, and canonicalizes/deduplicates surviving IDs, so stale

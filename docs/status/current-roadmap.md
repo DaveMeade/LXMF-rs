@@ -178,6 +178,9 @@ The project is best described by capability level:
   IDs from active peer record snapshots when the underlying propagation payload
   no longer exists, keeping export/restart state aligned with live queue
   cleanup.
+- Peer sync stale queue cleanup now also treats case-variant live peer marks as
+  the same peer, so stale unhandled or completed rows cannot survive under a
+  caller-case variant and later reappear in restart/export state.
 - Restored peer records now accept Python MessagePack binary
   `destination_hash`, handled, and unhandled IDs, prune serialized queue IDs
   whose payloads are missing during replay, and canonicalize/deduplicate the

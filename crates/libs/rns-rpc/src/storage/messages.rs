@@ -1013,7 +1013,7 @@ impl MessagesStore {
                 let mut stmt = conn.prepare(
                     "SELECT transient_id
                      FROM propagation_peer_entries
-                     WHERE peer = ?1
+                     WHERE LOWER(peer) = LOWER(?1)
                        AND state = 'unhandled'
                        AND NOT EXISTS (
                            SELECT 1
@@ -1027,7 +1027,7 @@ impl MessagesStore {
             };
             conn.execute(
                 "DELETE FROM propagation_peer_entries
-                 WHERE peer = ?1
+                 WHERE LOWER(peer) = LOWER(?1)
                    AND state = 'unhandled'
                    AND NOT EXISTS (
                        SELECT 1
@@ -1049,7 +1049,7 @@ impl MessagesStore {
                 let mut stmt = conn.prepare(
                     "SELECT transient_id
                      FROM propagation_peer_entries
-                     WHERE peer = ?1
+                     WHERE LOWER(peer) = LOWER(?1)
                        AND state IN ('handled', 'transferred', 'received', 'transfer_limited')
                        AND NOT EXISTS (
                            SELECT 1
@@ -1063,7 +1063,7 @@ impl MessagesStore {
             };
             conn.execute(
                 "DELETE FROM propagation_peer_entries
-                 WHERE peer = ?1
+                 WHERE LOWER(peer) = LOWER(?1)
                    AND state IN ('handled', 'transferred', 'received', 'transfer_limited')
                    AND NOT EXISTS (
                        SELECT 1
@@ -2453,6 +2453,43 @@ mod tests {
         let handled =
             store.list_peer_handled_propagation_ids("peer-a").expect("list peer handled ids");
         assert_eq!(handled, vec![first.transient_id]);
+    }
+
+    #[test]
+    fn stale_peer_mark_cleanup_matches_peer_case_insensitively_like_python() {
+        let store = MessagesStore::in_memory().expect("in-memory store");
+        let stored_peer = "Peer-Stale-Mixed";
+        let request_peer = stored_peer.to_ascii_lowercase();
+        let unhandled_id = "ac".repeat(32);
+        let handled_id = "ad".repeat(32);
+
+        store
+            .mark_peer_unhandled_propagation(stored_peer, unhandled_id.as_str())
+            .expect("mark stale unhandled");
+        store
+            .mark_peer_handled_propagation(stored_peer, handled_id.as_str())
+            .expect("mark stale handled");
+
+        assert_eq!(
+            store
+                .remove_stale_peer_unhandled_propagation_ids(request_peer.as_str())
+                .expect("remove stale unhandled"),
+            vec![unhandled_id]
+        );
+        assert_eq!(
+            store
+                .remove_stale_peer_completed_propagation_ids(request_peer.as_str())
+                .expect("remove stale completed"),
+            vec![handled_id]
+        );
+        assert!(store
+            .remove_stale_peer_unhandled_propagation_ids(stored_peer)
+            .expect("stored-case stale unhandled")
+            .is_empty());
+        assert!(store
+            .remove_stale_peer_completed_propagation_ids(stored_peer)
+            .expect("stored-case stale completed")
+            .is_empty());
     }
 
     #[test]
