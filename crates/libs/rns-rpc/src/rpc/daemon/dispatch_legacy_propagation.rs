@@ -279,8 +279,15 @@ impl RpcDaemon {
         &self,
         result: &JsonValue,
     ) -> Result<RemotePropagationImportSummary, std::io::Error> {
-        let Some(messages) =
-            result.get("messages").or_else(|| result.get("payloads")).and_then(JsonValue::as_array)
+        let Some(messages) = result
+            .get("messages")
+            .or_else(|| result.get("payloads"))
+            .or_else(|| {
+                result.get("propagation").and_then(|propagation| {
+                    propagation.get("messages").or_else(|| propagation.get("payloads"))
+                })
+            })
+            .and_then(JsonValue::as_array)
         else {
             return Ok(RemotePropagationImportSummary {
                 imported_count: 0,
