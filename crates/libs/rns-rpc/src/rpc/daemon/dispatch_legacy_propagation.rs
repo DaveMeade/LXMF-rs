@@ -299,7 +299,6 @@ impl RpcDaemon {
                     format!("invalid remote propagation payload hex: {err}"),
                 )
             })?;
-            transferred_bytes = transferred_bytes.saturating_add(payload.len());
             let canonical_transient_id = {
                 let mut hasher = Sha256::new();
                 hasher.update(payload.as_slice());
@@ -353,6 +352,7 @@ impl RpcDaemon {
                 .expect("propagation payload mutex poisoned")
                 .insert(transient_id.clone(), record.payload_hex);
             if !accepted_ids.iter().any(|id| id.eq_ignore_ascii_case(transient_id.as_str())) {
+                transferred_bytes = transferred_bytes.saturating_add(payload.len());
                 accepted_ids.push(transient_id.clone());
             }
             if already_known {

@@ -192,6 +192,9 @@ Workspace paths are used for navigation. `crates/libs/lxmf-core` publishes as
 - Remote import batches deduplicate accepted transient IDs before peer queue
   and incoming-message side effects are applied, so duplicate payloads in one
   fetch/download/sync response do not inflate peer queue accounting.
+- Remote import batch byte accounting follows the same deduplicated accepted
+  IDs, so duplicate payloads in one fetch/download/sync response do not inflate
+  transferred byte totals or source peer receive byte counters.
 - Purging local propagation payloads removes matching deleted IDs from active
   peer record snapshots, preventing restart/export drift after queue cleanup.
 - Duplicate or replayed propagation queue attempts preserve completed peer

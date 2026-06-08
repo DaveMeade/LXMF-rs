@@ -159,6 +159,9 @@ The project is best described by capability level:
 - Remote import batches now deduplicate accepted transient IDs before applying
   peer queue and incoming-message side effects, so duplicate payloads in one
   fetch/download/sync response do not inflate peer queue accounting.
+- Remote import batch byte accounting now uses the same deduplicated accepted
+  IDs, so duplicate payloads in one fetch/download/sync response do not inflate
+  transferred byte totals or source peer receive byte counters.
 - Propagation purge cleanup removes deleted local payload IDs from active peer
   record snapshots, so restart/export state does not retain purged queue entries
   after the live peer marks have been cleared.

@@ -13704,6 +13704,7 @@ fn propagation_remote_fetch_deduplicates_same_response_for_peer_incoming_like_py
     assert_eq!(result["result"]["imported_count"].as_u64(), Some(1));
     assert_eq!(result["result"]["duplicate_count"].as_u64(), Some(1));
     assert_eq!(result["result"]["imported_ids"], json!([transient_id]));
+    assert_eq!(result["result"]["transferred_bytes"].as_u64(), Some(payload.len() as u64));
 
     assert_eq!(
         daemon
@@ -13732,6 +13733,7 @@ fn propagation_remote_fetch_deduplicates_same_response_for_peer_incoming_like_py
         .expect("source peer row");
     assert_eq!(source_row["messages"]["incoming"].as_u64(), Some(1));
     assert_eq!(source_row["incoming"].as_u64(), Some(1));
+    assert_eq!(source_row["rx_bytes"].as_u64(), Some(payload.len() as u64));
 }
 
 #[test]
