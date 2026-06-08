@@ -112,6 +112,9 @@ Workspace paths are used for navigation. `crates/libs/lxmf-core` publishes as
 - Zero-cost peer stamp policies transfer unstamped queued offers immediately
   without waiting for absent peering metadata, matching the Python no-stamp
   path and avoiding repeated peer-sync postponement.
+- Python propagation announce transfer and sync limits are converted from
+  advertised kilobytes into the byte limits used by peer-sync queue selection,
+  so valid queued payloads are not misclassified as transfer-limited.
 - Malformed remote fetch and download imports mirror existing payload-backed
   queue marks into active peer record snapshots before returning the import
   failure, so already queued relay work remains visible after restart/export.

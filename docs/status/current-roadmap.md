@@ -73,6 +73,9 @@ The project is best described by capability level:
 - Zero-cost peer stamp policies now sync unstamped queued offers immediately
   without waiting for absent peering metadata, matching the Python "no stamp
   required" path and avoiding repeated peer-sync postponement.
+- Python propagation announce transfer and sync limits are now converted from
+  advertised kilobytes into the byte limits used by peer-sync queue selection,
+  so valid queued payloads are not misclassified as transfer-limited.
 - Malformed remote fetch and download imports now mirror existing
   payload-backed live queue marks into active peer record snapshots before
   failing, preserving restart/export retry state for already queued relay work.
