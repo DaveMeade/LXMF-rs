@@ -127,6 +127,9 @@ The project is best described by capability level:
 - Transfer-limited peer marks now remain terminal when later generic handled
   reports arrive, so transfer-limit retry decisions do not get reclassified as
   offered/handled work in peer queue accounting.
+- Transfer-limited peer marks also remain terminal when later transferred
+  reports arrive, so completed transfer-limit decisions cannot be reclassified
+  as outgoing/offered work by a subsequent queue update.
 - Static-only propagation peer replacement now routes removed static peers
   through the same local unpeer cleanup as explicit unpeer, so handled,
   received, transfer-limited, and unhandled queue marks are cleared and

@@ -904,10 +904,10 @@ impl MessagesStore {
             conn.execute(
                 "INSERT INTO propagation_peer_entries (peer, transient_id, state, updated_at)
              VALUES (?1, ?2, 'transferred', ?3)
-             ON CONFLICT(peer, transient_id) DO UPDATE SET
-                state = 'transferred',
-                updated_at = excluded.updated_at
-             WHERE propagation_peer_entries.state != 'received'",
+                 ON CONFLICT(peer, transient_id) DO UPDATE SET
+                    state = 'transferred',
+                    updated_at = excluded.updated_at
+                 WHERE propagation_peer_entries.state NOT IN ('received', 'transfer_limited')",
                 params![peer, normalize_hex_key(transient_id), now_unix_secs()],
             )?;
             Ok(())
@@ -2625,6 +2625,49 @@ mod tests {
                 offered_bytes: 0,
                 unhandled_bytes: 0,
             }
+        );
+    }
+
+    #[test]
+    fn transferred_report_does_not_downgrade_transfer_limited_peer_mark() {
+        let store = MessagesStore::in_memory().expect("in-memory store");
+        let transfer_limited = PropagationEntryRecord {
+            transient_id: "c8".repeat(32),
+            destination: "88".repeat(16),
+            payload_hex: "88".repeat(24),
+            received_at: 107,
+            size_bytes: 24,
+            stamp_value: None,
+        };
+        store.upsert_propagation_entry(&transfer_limited).expect("transfer limited entry");
+        store
+            .mark_peer_transfer_limited_propagation(
+                "peer-completed",
+                transfer_limited.transient_id.as_str(),
+            )
+            .expect("mark transfer limited");
+
+        store
+            .mark_peer_transferred_propagation(
+                "peer-completed",
+                transfer_limited.transient_id.as_str(),
+            )
+            .expect("ignore transferred downgrade");
+
+        assert_eq!(
+            store.peer_propagation_message_stats("peer-completed").expect("peer stats"),
+            PeerPropagationMessageStats {
+                outgoing: 0,
+                incoming: 0,
+                offered: 0,
+                unhandled: 0,
+                offered_bytes: 0,
+                unhandled_bytes: 0,
+            }
+        );
+        assert_eq!(
+            store.list_peer_handled_propagation_ids("peer-completed").expect("handled ids"),
+            vec![transfer_limited.transient_id]
         );
     }
 
