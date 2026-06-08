@@ -1150,7 +1150,7 @@ impl MessagesStore {
                 "SELECT EXISTS(
                     SELECT 1
                     FROM propagation_peer_entries
-                    WHERE peer = ?1
+                    WHERE LOWER(peer) = LOWER(?1)
                       AND transient_id = ?2
                       AND state IN ('handled', 'transferred', 'received', 'transfer_limited')
                     LIMIT 1

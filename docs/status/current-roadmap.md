@@ -159,6 +159,10 @@ The project is best described by capability level:
 - Duplicate or replayed propagation queue attempts respect already-completed
   peer marks when updating peer record snapshots, avoiding restart/export drift
   that would reopen handled IDs as unhandled.
+- Duplicate or replayed propagation queue attempts also respect case-variant
+  completed live marks, so a handled, transferred, received, or
+  transfer-limited ID cannot be serialized as retryable unhandled work through
+  the stored peer key.
 - Peer sync queue replay records preexisting live unhandled marks into the peer
   record snapshot even when the store did not insert new rows, preserving
   restart/export visibility for already-queued work.

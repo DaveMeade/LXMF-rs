@@ -190,6 +190,9 @@ Workspace paths are used for navigation. `crates/libs/lxmf-core` publishes as
   peer record snapshots, preventing restart/export drift after queue cleanup.
 - Duplicate or replayed propagation queue attempts preserve completed peer
   snapshot state instead of reopening handled IDs as serialized unhandled work.
+- Duplicate or replayed queue attempts also respect case-variant completed live
+  marks, so handled, transferred, received, or transfer-limited IDs are not
+  serialized as retryable unhandled work through the stored peer key.
 - Peer sync queue replay mirrors preexisting live unhandled marks into active
   peer record snapshots, keeping restart/export state aligned even when no new
   store rows were inserted.
