@@ -223,6 +223,9 @@ The project is best described by capability level:
 - Persisted `unpeered` non-static records now re-run peer admission before
   reactivation, so static-only propagation policy cannot be bypassed by a
   stale teardown record.
+- Static peer activation now clears stale serialized queue snapshots when it
+  revives a persisted `unpeered` record, so configured static peering cannot
+  resurrect pre-unpeer propagation work on restart/export.
 - Peer sync stale queue cleanup now removes matching unhandled and completed
   IDs from active peer record snapshots when the underlying propagation payload
   no longer exists, keeping export/restart state aligned with live queue

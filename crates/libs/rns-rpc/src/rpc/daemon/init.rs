@@ -1352,6 +1352,10 @@ impl RpcDaemon {
                 .iter()
                 .any(|peer| peer.eq_ignore_ascii_case(existing.peer.as_str()));
             if is_configured_static {
+                if existing.peer_type.as_deref() == Some("unpeered") {
+                    existing.restored_handled_ids.clear();
+                    existing.restored_unhandled_ids.clear();
+                }
                 existing.peer_type = Some("static".to_string());
             } else if existing.peer_type.as_deref() == Some("static") {
                 if from_static_only {

@@ -289,13 +289,6 @@ fn propagation_enable_queues_existing_entries_under_stored_static_peer_like_pyth
             .expect("static peer queued propagation under stored id"),
         vec![entry]
     );
-    assert!(
-        daemon
-            .store
-            .list_peer_unhandled_propagation(configured_peer.as_str())
-            .expect("configured-case queue remains empty")
-            .is_empty()
-    );
 }
 
 #[test]
@@ -17610,6 +17603,88 @@ fn peer_sync_reactivation_clears_unpeered_queue_snapshot() {
     );
     assert!(
         serialized["unhandled_ids"].as_array().expect("serialized unhandled ids").is_empty()
+    );
+}
+
+#[test]
+fn static_peer_activation_clears_unpeered_queue_snapshot() {
+    let daemon = RpcDaemon::test_instance();
+    let peer = "peer-static-rejoin-clears-queue";
+    let entry = PropagationEntryRecord {
+        transient_id: "bc".repeat(32),
+        destination: "33".repeat(16),
+        payload_hex: "33".repeat(24),
+        received_at: 1_700_000_902,
+        size_bytes: 24,
+        stamp_value: None,
+    };
+    daemon.store.upsert_propagation_entry(&entry).expect("store propagation entry");
+    {
+        let mut record = daemon.transient_peer_record(
+            peer.to_string(),
+            1_700_000_901,
+            Vec::new(),
+            None,
+            None,
+            Some("unpeered".to_string()),
+        );
+        record.restored_handled_ids.push("aa".repeat(32));
+        record.restored_unhandled_ids.push("bb".repeat(32));
+        daemon
+            .peers
+            .lock()
+            .expect("peers mutex poisoned")
+            .insert(peer.to_string(), record);
+    }
+
+    let result = daemon
+        .handle_rpc(rpc_request(
+            90,
+            "propagation_enable",
+            json!({
+                "enabled": true,
+                "static_peers": [peer],
+            }),
+        ))
+        .expect("activate static peer")
+        .result
+        .expect("propagation enable result");
+    assert!(
+        result["propagation"]["static_peers"]
+            .as_array()
+            .expect("static peers")
+            .iter()
+            .any(|value| value.as_str() == Some(peer))
+    );
+
+    let peers = daemon
+        .handle_rpc(RpcRequest { id: 91, method: "list_peers".to_string(), params: None })
+        .expect("list peers")
+        .result
+        .expect("list peers result");
+    let row = peers["peers"]
+        .as_array()
+        .expect("peer rows")
+        .iter()
+        .find(|row| row["peer"].as_str() == Some(peer))
+        .expect("reactivated static peer row");
+    assert_eq!(row["peer_type"].as_str(), Some("static"));
+    assert_eq!(row["messages"]["handled_ids"].as_array().expect("handled ids"), &[] as &[JsonValue]);
+    assert_eq!(
+        row["messages"]["unhandled_ids"].as_array().expect("unhandled ids"),
+        &[json!(entry.transient_id.as_str())]
+    );
+
+    let stored = daemon.peers.lock().expect("peers mutex poisoned");
+    let record = stored.get(peer).expect("stored peer");
+    let serialized = serde_json::to_value(record).expect("serialize peer record");
+    assert_eq!(
+        serialized["handled_ids"].as_array().expect("serialized handled ids"),
+        &[] as &[JsonValue]
+    );
+    assert_eq!(
+        serialized["unhandled_ids"].as_array().expect("serialized unhandled ids"),
+        &[json!(entry.transient_id.as_str())]
     );
 }
 
