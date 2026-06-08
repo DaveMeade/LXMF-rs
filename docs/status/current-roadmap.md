@@ -162,6 +162,9 @@ The project is best described by capability level:
 - Peer sync queue replay records preexisting live unhandled marks into the peer
   record snapshot even when the store did not insert new rows, preserving
   restart/export visibility for already-queued work.
+- Peer activation now also snapshots preexisting live completed marks, so
+  transfers recorded before the peer record exists survive restart/export as
+  handled IDs once the propagation peer is active.
 - Reactivating a persisted `unpeered` record clears stale serialized peer queue
   snapshots before the peer becomes active again, avoiding restart/export
   resurrection of pre-unpeer propagation work.

@@ -48,6 +48,11 @@ impl RpcDaemon {
         let unhandled_ids =
             self.store.list_peer_unhandled_propagation_ids(peer).map_err(std::io::Error::other)?;
         self.record_peer_queue_unhandled(peer, unhandled_ids.as_slice());
+        let handled_ids =
+            self.store.list_peer_handled_propagation_ids(peer).map_err(std::io::Error::other)?;
+        for transient_id in handled_ids {
+            self.record_peer_queue_handled_id(peer, transient_id.as_str());
+        }
         Ok(())
     }
 

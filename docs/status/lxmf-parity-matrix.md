@@ -193,6 +193,9 @@ Workspace paths are used for navigation. `crates/libs/lxmf-core` publishes as
 - Peer sync queue replay mirrors preexisting live unhandled marks into active
   peer record snapshots, keeping restart/export state aligned even when no new
   store rows were inserted.
+- Peer activation also mirrors preexisting live completed marks into active
+  peer record snapshots, so transfers recorded before the peer record exists
+  survive restart/export as handled IDs once the propagation peer is active.
 - Rejoining from a persisted `unpeered` peer record clears stale serialized
   queue snapshots before the peer is active again, preventing pre-unpeer work
   from being restored on export/restart.
