@@ -2366,30 +2366,42 @@ fn remote_propagation_message_payload(
     }
 
     for field in ["payload", "payload_bytes"] {
-        let Some(value) = message.get(field) else {
-            continue;
-        };
-        let Some(items) = value.as_array() else {
-            return Err(std::io::Error::new(
-                std::io::ErrorKind::InvalidInput,
-                format!("invalid remote propagation {field} byte array"),
-            ));
-        };
-        let payload = items
-            .iter()
-            .map(|item| item.as_u64().and_then(|value| u8::try_from(value).ok()))
-            .collect::<Option<Vec<_>>>()
-            .ok_or_else(|| {
-                std::io::Error::new(
-                    std::io::ErrorKind::InvalidInput,
-                    format!("invalid remote propagation {field} byte array"),
-                )
-            })?;
-        let payload_hex = hex::encode(payload.as_slice());
-        return Ok(Some((payload, payload_hex)));
+        if let Some(value) = message.get(field) {
+            if let Some(payload) = remote_propagation_byte_array(value, field)? {
+                let payload_hex = hex::encode(payload.as_slice());
+                return Ok(Some((payload, payload_hex)));
+            }
+        }
     }
 
     Ok(None)
+}
+
+fn remote_propagation_byte_array(
+    value: &JsonValue,
+    field: &str,
+) -> Result<Option<Vec<u8>>, std::io::Error> {
+    let Some(items) = value.as_array() else {
+        return if field == "payload_bytes" && value.as_u64().is_some() {
+            Ok(None)
+        } else {
+            Err(std::io::Error::new(
+                std::io::ErrorKind::InvalidInput,
+                format!("invalid remote propagation {field} byte array"),
+            ))
+        };
+    };
+    items
+        .iter()
+        .map(|item| item.as_u64().and_then(|value| u8::try_from(value).ok()))
+        .collect::<Option<Vec<_>>>()
+        .map(Some)
+        .ok_or_else(|| {
+            std::io::Error::new(
+                std::io::ErrorKind::InvalidInput,
+                format!("invalid remote propagation {field} byte array"),
+            )
+        })
 }
 
 fn is_remote_access_denied_error(err: &std::io::Error) -> bool {
