@@ -2185,6 +2185,16 @@ impl RpcDaemon {
                 {
                     Some(bridge) => bridge,
                     None => {
+                        let timestamp = now_i64();
+                        self.update_propagation_sync_state(|state| {
+                            state.sync_state = PR_FAILED;
+                            state.state_name = "failed".to_string();
+                            state.sync_progress = 0.0;
+                            state.last_sync_started = Some(timestamp);
+                            state.last_sync_completed = None;
+                            state.last_sync_error =
+                                Some("remote control bridge unavailable".to_string());
+                        });
                         let _ =
                             self.record_payload_backed_peer_queue_snapshot(snapshot_peer.as_str());
                         return Err(std::io::Error::other("remote control bridge unavailable"));
@@ -2199,6 +2209,16 @@ impl RpcDaemon {
                 ) {
                     Ok(result) => result,
                     Err(err) => {
+                        let timestamp = now_i64();
+                        let error = err.to_string();
+                        self.update_propagation_sync_state(|state| {
+                            state.sync_state = PR_FAILED;
+                            state.state_name = "failed".to_string();
+                            state.sync_progress = 0.0;
+                            state.last_sync_started = Some(timestamp);
+                            state.last_sync_completed = None;
+                            state.last_sync_error = Some(error);
+                        });
                         let _ =
                             self.record_payload_backed_peer_queue_snapshot(snapshot_peer.as_str());
                         return Err(err);

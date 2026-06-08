@@ -16370,6 +16370,19 @@ fn failed_propagation_remote_unpeer_preserves_local_peer_and_queue_state() {
     assert_eq!(err.kind(), std::io::ErrorKind::TimedOut);
     assert_eq!(err.to_string(), "remote unpeer failed");
 
+    let status = daemon
+        .handle_rpc(rpc_request(82, "propagation_status", JsonValue::Null))
+        .expect("propagation status after failed remote unpeer")
+        .result
+        .expect("status result");
+    let propagation = &status["propagation"];
+    assert_eq!(propagation["sync_state"].as_u64(), Some(0xfe));
+    assert_eq!(propagation["state_name"].as_str(), Some("failed"));
+    assert_eq!(propagation["sync_progress"].as_f64(), Some(0.0));
+    assert!(propagation["last_sync_started"].as_i64().is_some());
+    assert!(propagation["last_sync_completed"].is_null());
+    assert_eq!(propagation["last_sync_error"].as_str(), Some("remote unpeer failed"));
+
     let peers = daemon
         .handle_rpc(RpcRequest { id: 81, method: "list_peers".to_string(), params: None })
         .expect("list peers")
@@ -16430,6 +16443,19 @@ fn failed_propagation_remote_unpeer_records_existing_queue_snapshot_like_python(
         ))
         .expect_err("remote unpeer failure should be returned");
     assert_eq!(err.kind(), std::io::ErrorKind::TimedOut);
+
+    let status = daemon
+        .handle_rpc(rpc_request(81, "propagation_status", JsonValue::Null))
+        .expect("propagation status after failed remote unpeer")
+        .result
+        .expect("status result");
+    let propagation = &status["propagation"];
+    assert_eq!(propagation["sync_state"].as_u64(), Some(0xfe));
+    assert_eq!(propagation["state_name"].as_str(), Some("failed"));
+    assert_eq!(propagation["sync_progress"].as_f64(), Some(0.0));
+    assert!(propagation["last_sync_started"].as_i64().is_some());
+    assert!(propagation["last_sync_completed"].is_null());
+    assert_eq!(propagation["last_sync_error"].as_str(), Some("remote unpeer failed"));
 
     let peers = daemon.peers.lock().expect("peers mutex poisoned");
     let record = peers.get(peer).expect("stored peer");
@@ -16587,6 +16613,22 @@ fn unavailable_propagation_remote_unpeer_records_existing_queue_snapshot_like_py
         .expect_err("missing bridge should be returned");
     assert_eq!(err.kind(), std::io::ErrorKind::Other);
     assert_eq!(err.to_string(), "remote control bridge unavailable");
+
+    let status = daemon
+        .handle_rpc(rpc_request(81, "propagation_status", JsonValue::Null))
+        .expect("propagation status after unavailable remote unpeer bridge")
+        .result
+        .expect("status result");
+    let propagation = &status["propagation"];
+    assert_eq!(propagation["sync_state"].as_u64(), Some(0xfe));
+    assert_eq!(propagation["state_name"].as_str(), Some("failed"));
+    assert_eq!(propagation["sync_progress"].as_f64(), Some(0.0));
+    assert!(propagation["last_sync_started"].as_i64().is_some());
+    assert!(propagation["last_sync_completed"].is_null());
+    assert_eq!(
+        propagation["last_sync_error"].as_str(),
+        Some("remote control bridge unavailable")
+    );
 
     let peers = daemon.peers.lock().expect("peers mutex poisoned");
     let record = peers.get(peer).expect("stored peer");
