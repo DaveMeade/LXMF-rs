@@ -394,22 +394,28 @@ impl RpcDaemon {
         let active_peers = self.active_peer_ids();
         let source_active_peer =
             active_peers.iter().find(|peer| peer.eq_ignore_ascii_case(source_peer)).cloned();
-        self.record_inbound_propagation_peer_activity_count(
-            source_active_peer.as_deref().unwrap_or(source_peer),
-            transferred_bytes,
-            imported_ids.len(),
-        );
+        let source_peer_key = source_active_peer.as_deref().unwrap_or(source_peer);
+        let mut source_received_count = 0usize;
+        let mut source_received_bytes = 0usize;
         for transient_id in imported_ids {
+            let already_received = self
+                .store
+                .peer_received_propagation_mark_exists(source_peer_key, transient_id.as_str())
+                .unwrap_or(false);
+            if !already_received {
+                source_received_count = source_received_count.saturating_add(1);
+                source_received_bytes = source_received_bytes.saturating_add(
+                    self.store
+                        .get_propagation_entry(transient_id.as_str())
+                        .map_err(std::io::Error::other)?
+                        .map(|entry| entry.size_bytes as usize)
+                        .unwrap_or(0),
+                );
+            }
             self.store
-                .mark_peer_received_propagation(
-                    source_active_peer.as_deref().unwrap_or(source_peer),
-                    transient_id.as_str(),
-                )
+                .mark_peer_received_propagation(source_peer_key, transient_id.as_str())
                 .map_err(std::io::Error::other)?;
-            self.record_peer_queue_handled_id(
-                source_active_peer.as_deref().unwrap_or(source_peer),
-                transient_id.as_str(),
-            );
+            self.record_peer_queue_handled_id(source_peer_key, transient_id.as_str());
             for peer in &active_peers {
                 if peer.eq_ignore_ascii_case(source_peer) {
                     continue;
@@ -419,6 +425,13 @@ impl RpcDaemon {
                     .map_err(std::io::Error::other)?;
                 self.record_peer_queue_unhandled_id(peer.as_str(), transient_id.as_str());
             }
+        }
+        if source_received_count > 0 {
+            self.record_inbound_propagation_peer_activity_count(
+                source_peer_key,
+                source_received_bytes.min(transferred_bytes),
+                source_received_count,
+            );
         }
         Ok(())
     }
@@ -437,12 +450,23 @@ impl RpcDaemon {
         let source_active_peer =
             active_peers.iter().find(|peer| peer.eq_ignore_ascii_case(source_peer)).cloned();
         let source_peer_key = source_active_peer.as_deref().unwrap_or(source_peer);
-        self.record_inbound_propagation_peer_activity_count(
-            source_peer_key,
-            transferred_bytes,
-            imported_ids.len(),
-        );
+        let mut source_received_count = 0usize;
+        let mut source_received_bytes = 0usize;
         for transient_id in imported_ids {
+            let already_received = self
+                .store
+                .peer_received_propagation_mark_exists(source_peer_key, transient_id.as_str())
+                .unwrap_or(false);
+            if !already_received {
+                source_received_count = source_received_count.saturating_add(1);
+                source_received_bytes = source_received_bytes.saturating_add(
+                    self.store
+                        .get_propagation_entry(transient_id.as_str())
+                        .map_err(std::io::Error::other)?
+                        .map(|entry| entry.size_bytes as usize)
+                        .unwrap_or(0),
+                );
+            }
             self.store
                 .mark_peer_received_propagation(source_peer_key, transient_id.as_str())
                 .map_err(std::io::Error::other)?;
@@ -456,6 +480,13 @@ impl RpcDaemon {
                     .map_err(std::io::Error::other)?;
                 self.record_peer_queue_unhandled_id(peer.as_str(), transient_id.as_str());
             }
+        }
+        if source_received_count > 0 {
+            self.record_inbound_propagation_peer_activity_count(
+                source_peer_key,
+                source_received_bytes.min(transferred_bytes),
+                source_received_count,
+            );
         }
         Ok(())
     }

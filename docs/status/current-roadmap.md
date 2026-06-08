@@ -183,6 +183,10 @@ The project is best described by capability level:
 - Remote import batch byte accounting now uses the same deduplicated accepted
   IDs, so duplicate payloads in one fetch/download/sync response do not inflate
   transferred byte totals or source peer receive byte counters.
+- Repeated remote fetch/download/sync imports now increment source peer
+  incoming counts and receive bytes only for payload IDs not already marked
+  received from that source, while still replaying known payloads into relay
+  queues when their live marks were cleared.
 - Propagation purge cleanup removes deleted local payload IDs from active peer
   record snapshots, so restart/export state does not retain purged queue entries
   after the live peer marks have been cleared.

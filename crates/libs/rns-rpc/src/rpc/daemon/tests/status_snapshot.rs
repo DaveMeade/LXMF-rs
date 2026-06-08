@@ -13813,6 +13813,60 @@ fn duplicate_propagation_remote_fetch_queues_known_payload_without_double_counti
 }
 
 #[test]
+fn duplicate_propagation_remote_fetch_does_not_double_count_source_receive_bytes() {
+    let payload = b"duplicate-remote-fetch-source-accounting-payload";
+    let payload_hex = hex::encode(payload);
+    let transient_id = hex::encode(Sha256::digest(payload));
+    let source_peer = "remote-fetch-duplicate-source";
+    let daemon = RpcDaemon::test_instance();
+    daemon
+        .handle_rpc(rpc_request(72, "peer_sync", json!({ "peer": source_peer })))
+        .expect("seed source peer");
+    daemon.set_remote_control_bridge(Arc::new(TestRemoteControlBridge {
+        result: Ok(json!({
+            "available_count": 1,
+            "fetched_count": 1,
+            "messages": [{
+                "transient_id": transient_id,
+                "payload_hex": payload_hex,
+            }],
+        })),
+    }));
+
+    for request_id in [73, 74] {
+        daemon
+            .handle_rpc(rpc_request(
+                request_id,
+                "propagation_remote_fetch",
+                json!({ "remote": source_peer }),
+            ))
+            .expect("remote fetch from source peer");
+    }
+
+    let peers = daemon
+        .handle_rpc(RpcRequest { id: 75, method: "list_peers".to_string(), params: None })
+        .expect("list peers")
+        .result
+        .expect("list peers result");
+    let source_row = peers["peers"]
+        .as_array()
+        .expect("peer rows")
+        .iter()
+        .find(|row| row["peer"].as_str() == Some(source_peer))
+        .expect("source peer row");
+    assert_eq!(source_row["messages"]["incoming"].as_u64(), Some(1));
+    assert_eq!(source_row["incoming"].as_u64(), Some(1));
+    assert_eq!(source_row["rx_bytes"].as_u64(), Some(payload.len() as u64));
+    assert_eq!(
+        daemon
+            .store
+            .list_peer_handled_propagation_ids(source_peer)
+            .expect("source handled ids"),
+        vec![transient_id]
+    );
+}
+
+#[test]
 fn propagation_remote_fetch_deduplicates_same_response_for_peer_incoming_like_python() {
     let payload = b"duplicate-same-fetch-response-payload";
     let payload_hex = hex::encode(payload);
