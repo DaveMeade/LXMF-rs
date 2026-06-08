@@ -2248,6 +2248,96 @@ fn peer_sync_treats_python_announced_limits_as_kilobytes() {
 }
 
 #[test]
+fn peer_sync_applies_fractional_python_announced_transfer_limit() {
+    let daemon = RpcDaemon::test_instance();
+    let peer = "ac".repeat(16);
+    daemon
+        .handle_rpc(rpc_request(
+            51,
+            "propagation_enable",
+            json!({
+                "enabled": true,
+                "autopeer": true,
+            }),
+        ))
+        .expect("enable propagation");
+    let app_data = rmp_serde::to_vec_named(&MsgPackValue::Array(vec![
+        MsgPackValue::Boolean(false),
+        MsgPackValue::from(1_700_000_016i64),
+        MsgPackValue::Boolean(true),
+        MsgPackValue::F64(0.08),
+        MsgPackValue::from(1),
+        MsgPackValue::Array(vec![
+            MsgPackValue::from(0),
+            MsgPackValue::from(0),
+            MsgPackValue::from(0),
+        ]),
+        MsgPackValue::Map(Vec::new()),
+    ]))
+    .expect("encode propagation app data");
+    daemon
+        .handle_rpc(rpc_request(
+            52,
+            "announce_received",
+            json!({
+                "peer": peer.as_str(),
+                "timestamp": 1_700_000_016i64,
+                "app_data_hex": hex::encode(app_data),
+                "aspect": "lxmf.propagation",
+                "hops": 1,
+            }),
+        ))
+        .expect("announce received");
+    {
+        let mut peers = daemon.peers.lock().expect("peers mutex poisoned");
+        let record = peers.get_mut(peer.as_str()).expect("peer record");
+        record.peering_key_value = Some(0);
+    }
+    let oversized = PropagationEntryRecord {
+        transient_id: "e2".repeat(32),
+        destination: "16".repeat(16),
+        payload_hex: "16".repeat(100),
+        received_at: 1_700_000_617,
+        size_bytes: 100,
+        stamp_value: None,
+    };
+    daemon.store.upsert_propagation_entry(&oversized).expect("store entry");
+    daemon
+        .store
+        .mark_peer_unhandled_propagation(peer.as_str(), oversized.transient_id.as_str())
+        .expect("mark unhandled");
+
+    let result = daemon
+        .handle_rpc(rpc_request(53, "peer_sync", json!({ "peer": peer.as_str() })))
+        .expect("peer sync")
+        .result
+        .expect("peer sync result");
+
+    assert_eq!(result["propagation"]["transfer_limit"].as_u64(), Some(80));
+    assert_eq!(result["propagation"]["sync_limit"].as_u64(), Some(1_000));
+    assert_eq!(result["propagation"]["transferred"].as_u64(), Some(0));
+    assert_eq!(result["propagation"]["transfer_limited"].as_u64(), Some(1));
+    assert_eq!(
+        result["propagation"]["transfer_limited_ids"].as_array().expect("limited ids"),
+        &[json!(oversized.transient_id.as_str())]
+    );
+    assert_eq!(
+        daemon
+            .store
+            .list_peer_handled_propagation_ids(peer.as_str())
+            .expect("handled ids"),
+        vec![oversized.transient_id.clone()]
+    );
+    assert!(
+        daemon
+            .store
+            .list_peer_unhandled_propagation(peer.as_str())
+            .expect("pending propagation")
+            .is_empty()
+    );
+}
+
+#[test]
 fn announce_received_clamps_sync_limit_below_transfer_limit_like_python() {
     let store = MessagesStore::in_memory().expect("store");
     let daemon = RpcDaemon::with_store(store, hex::encode([2u8; 16]));
