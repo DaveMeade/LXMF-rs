@@ -141,6 +141,9 @@ Workspace paths are used for navigation. `crates/libs/lxmf-core` publishes as
   into active peer record snapshots after applying imports, preserving queued
   retry work across restart/export even when the remote sync succeeds without
   transferring those local queued offers.
+- Remote peer-sync imports transferred propagation payloads from both daemon
+  `payload_hex` fields and MessagePack binary payload arrays, so bridge results
+  converted through `rmpv_to_json` enqueue the same relay work.
 - Remote peer-sync uses the stored peer ID case for the bridge call, import
   source accounting, state updates, and response envelope when callers supply a
   case-variant peer request.

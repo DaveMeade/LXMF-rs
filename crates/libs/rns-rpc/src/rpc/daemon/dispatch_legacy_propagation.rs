@@ -303,15 +303,9 @@ impl RpcDaemon {
         let mut accepted_ids: Vec<String> = Vec::new();
         let mut transferred_bytes = 0usize;
         for message in messages {
-            let Some(payload_hex) = message.get("payload_hex").and_then(JsonValue::as_str) else {
+            let Some((payload, payload_hex)) = remote_propagation_message_payload(message)? else {
                 continue;
             };
-            let payload = hex::decode(payload_hex.trim()).map_err(|err| {
-                std::io::Error::new(
-                    std::io::ErrorKind::InvalidInput,
-                    format!("invalid remote propagation payload hex: {err}"),
-                )
-            })?;
             let canonical_transient_id = {
                 let mut hasher = Sha256::new();
                 hasher.update(payload.as_slice());
@@ -2356,6 +2350,46 @@ fn effective_transfer_limit_kb(
         (None, Some(request_limit)) => Some(request_limit),
         (None, None) => None,
     }
+}
+
+fn remote_propagation_message_payload(
+    message: &JsonValue,
+) -> Result<Option<(Vec<u8>, String)>, std::io::Error> {
+    if let Some(payload_hex) = message.get("payload_hex").and_then(JsonValue::as_str) {
+        let payload = hex::decode(payload_hex.trim()).map_err(|err| {
+            std::io::Error::new(
+                std::io::ErrorKind::InvalidInput,
+                format!("invalid remote propagation payload hex: {err}"),
+            )
+        })?;
+        return Ok(Some((payload, payload_hex.trim().to_ascii_lowercase())));
+    }
+
+    for field in ["payload", "payload_bytes"] {
+        let Some(value) = message.get(field) else {
+            continue;
+        };
+        let Some(items) = value.as_array() else {
+            return Err(std::io::Error::new(
+                std::io::ErrorKind::InvalidInput,
+                format!("invalid remote propagation {field} byte array"),
+            ));
+        };
+        let payload = items
+            .iter()
+            .map(|item| item.as_u64().and_then(|value| u8::try_from(value).ok()))
+            .collect::<Option<Vec<_>>>()
+            .ok_or_else(|| {
+                std::io::Error::new(
+                    std::io::ErrorKind::InvalidInput,
+                    format!("invalid remote propagation {field} byte array"),
+                )
+            })?;
+        let payload_hex = hex::encode(payload.as_slice());
+        return Ok(Some((payload, payload_hex)));
+    }
+
+    Ok(None)
 }
 
 fn is_remote_access_denied_error(err: &std::io::Error) -> bool {

@@ -13393,6 +13393,65 @@ fn propagation_remote_sync_imports_nested_peer_sync_messages_like_python() {
 }
 
 #[test]
+fn propagation_remote_sync_imports_binary_peer_sync_payloads_from_msgpack() {
+    let payload = b"remote-sync-binary-peer-sync-payload";
+    let payload_hex = hex::encode(payload);
+    let transient_id = hex::encode(Sha256::digest(payload));
+    let daemon = RpcDaemon::test_instance();
+    daemon.set_remote_control_bridge(Arc::new(TestRemoteControlBridge {
+        result: Ok(json!({
+            "synced": true,
+            "messages": {
+                "offered": 1,
+                "outgoing": 1,
+                "incoming": 0,
+                "unhandled": 0,
+                "handled_ids": [transient_id],
+                "unhandled_ids": [],
+            },
+            "propagation": {
+                "synced": true,
+                "transferred": 1,
+                "messages": [{
+                    "transient_id": transient_id,
+                    "payload": payload.to_vec(),
+                }],
+            },
+        })),
+    }));
+
+    let result = daemon
+        .handle_rpc(rpc_request(
+            73,
+            "propagation_remote_sync",
+            json!({
+                "remote": "remote-node",
+                "peer": "peer-binary-sync",
+            }),
+        ))
+        .expect("remote sync")
+        .result
+        .expect("remote sync result");
+    assert_eq!(result["result"]["imported_count"].as_u64(), Some(1));
+    assert_eq!(result["result"]["imported_ids"], json!([transient_id]));
+    assert_eq!(result["result"]["transferred_bytes"].as_u64(), Some(payload.len() as u64));
+
+    daemon.propagation_payloads.lock().expect("propagation payload mutex poisoned").clear();
+    let fetched = daemon
+        .handle_rpc(rpc_request(
+            74,
+            "propagation_fetch",
+            json!({
+                "transient_id": transient_id,
+            }),
+        ))
+        .expect("local fetch after binary remote sync")
+        .result
+        .expect("local fetch result");
+    assert_eq!(fetched["payload_hex"].as_str(), Some(payload_hex.as_str()));
+}
+
+#[test]
 fn duplicate_propagation_remote_sync_import_does_not_double_count_received() {
     let payload = b"duplicate-remote-sync-propagation-payload";
     let payload_hex = hex::encode(payload);
