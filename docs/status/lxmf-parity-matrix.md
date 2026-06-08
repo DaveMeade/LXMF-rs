@@ -220,9 +220,10 @@ Workspace paths are used for navigation. `crates/libs/lxmf-core` publishes as
   counts and receive bytes only for payload IDs not already marked received
   from that source, while still replaying known payloads into relay queues when
   their live marks were cleared.
-- Remote peer-sync imports accept transferred payloads from nested Python-style
-  `propagation.messages`/`propagation.payloads` responses as well as the legacy
-  top-level `messages`/`payloads` envelope.
+- Remote peer-sync imports accept transferred payload arrays from full
+  Python-style responses where top-level `messages` is a peer counter object
+  and payloads live under `propagation.messages`/`propagation.payloads`, as
+  well as legacy top-level `messages`/`payloads` envelopes.
 - Purging local propagation payloads removes matching deleted IDs from active
   peer record snapshots, preventing restart/export drift after queue cleanup.
 - Duplicate or replayed propagation queue attempts preserve completed peer

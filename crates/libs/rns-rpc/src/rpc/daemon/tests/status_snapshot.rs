@@ -13339,6 +13339,14 @@ fn propagation_remote_sync_imports_nested_peer_sync_messages_like_python() {
     daemon.set_remote_control_bridge(Arc::new(TestRemoteControlBridge {
         result: Ok(json!({
             "synced": true,
+            "messages": {
+                "offered": 1,
+                "outgoing": 1,
+                "incoming": 0,
+                "unhandled": 0,
+                "handled_ids": [transient_id],
+                "unhandled_ids": [],
+            },
             "propagation": {
                 "synced": true,
                 "transferred": 1,
