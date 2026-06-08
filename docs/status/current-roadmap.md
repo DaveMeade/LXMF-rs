@@ -168,6 +168,9 @@ The project is best described by capability level:
 - Inbound propagation message-get serving now previews fetchable payloads and
   passes peer admission before mutating served counters, so peers rejected by
   static-only or capacity policy do not look like successful transfers.
+- Inbound propagation message-get listing now also applies peer admission before
+  returning non-empty payload ID lists, so rejected peers cannot enumerate
+  queued transfers they are not allowed to fetch.
 - Remote fetch and download imports now mark inactive source peers as received
   before later activation, so a propagation node is not offered back payloads it
   previously supplied just because it was not yet an active peer record.
