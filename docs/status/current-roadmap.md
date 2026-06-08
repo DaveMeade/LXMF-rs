@@ -81,7 +81,8 @@ The project is best described by capability level:
   failure, preserving restart/export retry state for already queued relay work.
 - Remote fetch and download bridge-unavailable errors now mirror existing
   payload-backed live queue marks into active peer record snapshots before
-  returning, so already queued relay work stays restart/export visible even
+  returning and mark the propagation sync lifecycle failed, so already queued
+  relay work stays restart/export visible without leaving stale lifecycle state
   when no bridge is configured.
 - Successful remote fetch and download now also mirror existing payload-backed
   live queue marks into active peer record snapshots after applying imports, so

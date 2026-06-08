@@ -14046,6 +14046,22 @@ fn propagation_remote_fetch_missing_bridge_records_existing_queue_snapshot_like_
     assert_eq!(err.kind(), std::io::ErrorKind::Other);
     assert_eq!(err.to_string(), "remote control bridge unavailable");
 
+    let status = daemon
+        .handle_rpc(rpc_request(80, "propagation_status", JsonValue::Null))
+        .expect("propagation status after missing fetch bridge")
+        .result
+        .expect("status result");
+    let propagation = &status["propagation"];
+    assert_eq!(propagation["sync_state"].as_u64(), Some(0xfe));
+    assert_eq!(propagation["state_name"].as_str(), Some("failed"));
+    assert_eq!(propagation["sync_progress"].as_f64(), Some(0.0));
+    assert!(propagation["last_sync_started"].as_i64().is_some());
+    assert!(propagation["last_sync_completed"].is_null());
+    assert_eq!(
+        propagation["last_sync_error"].as_str(),
+        Some("remote control bridge unavailable")
+    );
+
     let peers = daemon.peers.lock().expect("peers mutex poisoned");
     let record = peers.get(peer).expect("stored peer");
     let serialized = serde_json::to_value(record).expect("serialize peer record");
@@ -14098,6 +14114,22 @@ fn propagation_remote_download_missing_bridge_records_existing_queue_snapshot_li
         .expect_err("missing bridge should reject remote download");
     assert_eq!(err.kind(), std::io::ErrorKind::Other);
     assert_eq!(err.to_string(), "remote control bridge unavailable");
+
+    let status = daemon
+        .handle_rpc(rpc_request(80, "propagation_status", JsonValue::Null))
+        .expect("propagation status after missing download bridge")
+        .result
+        .expect("status result");
+    let propagation = &status["propagation"];
+    assert_eq!(propagation["sync_state"].as_u64(), Some(0xfe));
+    assert_eq!(propagation["state_name"].as_str(), Some("failed"));
+    assert_eq!(propagation["sync_progress"].as_f64(), Some(0.0));
+    assert!(propagation["last_sync_started"].as_i64().is_some());
+    assert!(propagation["last_sync_completed"].is_null());
+    assert_eq!(
+        propagation["last_sync_error"].as_str(),
+        Some("remote control bridge unavailable")
+    );
 
     let peers = daemon.peers.lock().expect("peers mutex poisoned");
     let record = peers.get(peer).expect("stored peer");

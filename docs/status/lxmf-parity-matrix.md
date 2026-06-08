@@ -120,7 +120,8 @@ Workspace paths are used for navigation. `crates/libs/lxmf-core` publishes as
   so already queued relay work remains visible after restart/export.
 - Remote fetch and download bridge-unavailable errors mirror existing
   payload-backed queue marks into active peer record snapshots before
-  returning, so queued relay work remains visible after restart/export even
+  returning and mark the propagation sync lifecycle failed, so queued relay work
+  remains visible after restart/export without leaving stale lifecycle state
   when no bridge is configured.
 - Successful remote fetch and download mirror existing payload-backed queue
   marks into active peer record snapshots after applying imports, preserving

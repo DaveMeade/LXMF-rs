@@ -1900,6 +1900,16 @@ impl RpcDaemon {
                 {
                     Some(bridge) => bridge,
                     None => {
+                        let timestamp = now_i64();
+                        self.update_propagation_sync_state(|state| {
+                            state.sync_state = PR_FAILED;
+                            state.state_name = "failed".to_string();
+                            state.sync_progress = 0.0;
+                            state.last_sync_started = Some(timestamp);
+                            state.last_sync_completed = None;
+                            state.last_sync_error =
+                                Some("remote control bridge unavailable".to_string());
+                        });
                         for peer in self.active_peer_ids() {
                             let _ = self.record_payload_backed_peer_queue_snapshot(peer.as_str());
                         }
@@ -2045,6 +2055,16 @@ impl RpcDaemon {
                 {
                     Some(bridge) => bridge,
                     None => {
+                        let timestamp = now_i64();
+                        self.update_propagation_sync_state(|state| {
+                            state.sync_state = PR_FAILED;
+                            state.state_name = "failed".to_string();
+                            state.sync_progress = 0.0;
+                            state.last_sync_started = Some(timestamp);
+                            state.last_sync_completed = None;
+                            state.last_sync_error =
+                                Some("remote control bridge unavailable".to_string());
+                        });
                         for peer in self.active_peer_ids() {
                             self.record_payload_backed_peer_queue_snapshot(peer.as_str())?;
                         }
