@@ -17488,6 +17488,60 @@ fn peer_unpeer_clears_persisted_propagation_queue_marks() {
 }
 
 #[test]
+fn peer_unpeer_clears_case_variant_completed_queue_marks_before_reactivation_like_python() {
+    let daemon = RpcDaemon::test_instance();
+    let stored_peer = "Peer-Unpeer-Case-Completed";
+    let request_peer = stored_peer.to_ascii_lowercase();
+    let entry = PropagationEntryRecord {
+        transient_id: "e6".repeat(32),
+        destination: "30".repeat(16),
+        payload_hex: "30".repeat(24),
+        received_at: 1_700_000_954,
+        size_bytes: 24,
+        stamp_value: None,
+    };
+    daemon.store.upsert_propagation_entry(&entry).expect("store propagation entry");
+    daemon
+        .record_peer_transferred_propagation(request_peer.as_str(), entry.transient_id.as_str())
+        .expect("record transfer before peer activation");
+    daemon.record_propagation_offer_peer(stored_peer).expect("activate propagation peer");
+
+    daemon
+        .handle_rpc(rpc_request(94, "peer_unpeer", json!({ "peer": stored_peer })))
+        .expect("unpeer peer");
+    daemon.record_propagation_offer_peer(stored_peer).expect("reactivate propagation peer");
+
+    assert!(
+        daemon
+            .store
+            .list_peer_handled_propagation_ids(stored_peer)
+            .expect("handled ids after reactivation")
+            .is_empty()
+    );
+    assert_eq!(
+        daemon
+            .store
+            .list_peer_unhandled_propagation(stored_peer)
+            .expect("unhandled propagation after reactivation")
+            .into_iter()
+            .map(|entry| entry.transient_id)
+            .collect::<Vec<_>>(),
+        vec![entry.transient_id.clone()]
+    );
+    let peers = daemon.peers.lock().expect("peers mutex poisoned");
+    let record = peers.get(stored_peer).expect("peer record");
+    let serialized = serde_json::to_value(record).expect("serialize peer record");
+    assert_eq!(
+        serialized["handled_ids"].as_array().expect("serialized handled ids"),
+        &[] as &[JsonValue]
+    );
+    assert_eq!(
+        serialized["unhandled_ids"].as_array().expect("serialized unhandled ids"),
+        &[json!(entry.transient_id.as_str())]
+    );
+}
+
+#[test]
 fn clear_peers_clears_persisted_propagation_queue_marks() {
     let daemon = RpcDaemon::test_instance();
     daemon

@@ -168,6 +168,9 @@ The project is best described by capability level:
 - Peer activation also merges case-variant preexisting live completed marks
   into the activated peer key before queue replay, avoiding restart/export
   drift when transfer accounting arrives before the peer record case is known.
+- Peer unpeer cleanup now clears case-variant propagation marks as one peer,
+  so completed marks merged during activation cannot survive teardown and
+  reappear as handled work when that peer is later reactivated.
 - Reactivating a persisted `unpeered` record clears stale serialized peer queue
   snapshots before the peer becomes active again, avoiding restart/export
   resurrection of pre-unpeer propagation work.

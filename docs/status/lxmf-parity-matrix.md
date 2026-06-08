@@ -199,6 +199,9 @@ Workspace paths are used for navigation. `crates/libs/lxmf-core` publishes as
 - Peer activation also merges case-variant preexisting completed marks into
   the activated peer key before queue replay, keeping restart/export state
   aligned when transfer accounting arrives before the peer record case is known.
+- Peer unpeer cleanup clears case-variant propagation marks as one peer, so
+  completed marks merged during activation cannot survive teardown and reappear
+  as handled work when that peer is later reactivated.
 - Rejoining from a persisted `unpeered` peer record clears stale serialized
   queue snapshots before the peer is active again, preventing pre-unpeer work
   from being restored on export/restart.

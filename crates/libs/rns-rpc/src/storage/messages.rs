@@ -1167,8 +1167,10 @@ impl MessagesStore {
 
     pub fn clear_peer_propagation_marks(&self, peer: &str) -> rusqlite::Result<usize> {
         self.with_write_conn(|conn| {
-            let affected = conn
-                .execute("DELETE FROM propagation_peer_entries WHERE peer = ?1", params![peer])?;
+            let affected = conn.execute(
+                "DELETE FROM propagation_peer_entries WHERE LOWER(peer) = LOWER(?1)",
+                params![peer],
+            )?;
             Ok(affected)
         })
     }
