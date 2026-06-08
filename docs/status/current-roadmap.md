@@ -162,6 +162,9 @@ The project is best described by capability level:
 - Inbound peer propagation ingest now also marks inactive identified sources
   as received before later activation, so newly peered sources are not offered
   payloads they supplied while still unpeered.
+- Inbound propagation message-get serving now admits or refreshes the remote
+  propagation peer before marking served payloads transferred, so peer transfer
+  accounting is preserved even when the peer fetches before a prior offer row.
 - Remote fetch and download imports now mark inactive source peers as received
   before later activation, so a propagation node is not offered back payloads it
   previously supplied just because it was not yet an active peer record.

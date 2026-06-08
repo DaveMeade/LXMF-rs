@@ -195,6 +195,9 @@ Workspace paths are used for navigation. `crates/libs/lxmf-core` publishes as
 - Inbound peer propagation ingest marks inactive identified sources as
   received before later activation, so source-accounting survives when a sender
   becomes a propagation peer after supplying payloads.
+- Inbound propagation message-get serving admits or refreshes the remote
+  propagation peer before marking served payloads transferred, so transfer
+  accounting survives when a peer fetches before a prior offer row exists.
 - Remote fetch and download imports mark inactive source peers as received
   before later activation, so source-accounting survives even when the
   propagation node was not yet an active peer record.

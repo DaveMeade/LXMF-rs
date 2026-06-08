@@ -57,6 +57,11 @@ pub(super) fn handle_message_get_request(
     );
     let remote_propagation_hash =
         hex::encode(propagation_destination_hash_for_identity(remote_identity));
+    if !fetched.is_empty()
+        && daemon.record_propagation_offer_peer(remote_propagation_hash.as_str()).is_err()
+    {
+        return ControlResponse::Code(error_no_access);
+    }
     for (transient_id, _) in &fetched {
         if daemon
             .record_peer_transferred_propagation(remote_propagation_hash.as_str(), transient_id)
@@ -1008,6 +1013,60 @@ mod tests {
             .iter()
             .find(|row| row["peer"].as_str() == Some(remote_propagation_hash.as_str()))
             .expect("peer row");
+        assert_eq!(row["messages"]["outgoing"].as_u64(), Some(1));
+        assert_eq!(row["messages"]["unhandled"].as_u64(), Some(0));
+        assert_eq!(row["messages"]["handled_ids"], json!([hex::encode(wanted)]));
+        assert_eq!(row["messages"]["unhandled_ids"], json!([]));
+    }
+
+    #[test]
+    fn message_get_admits_served_peer_for_transfer_accounting_like_python() {
+        let daemon = RpcDaemon::test_instance();
+        let remote_private =
+            rns_transport::identity::PrivateIdentity::new_from_rand(rand_core::OsRng);
+        let remote_identity = *remote_private.as_identity();
+        let remote_delivery_hash = delivery_destination_hash_for_identity(&remote_identity);
+        let remote_propagation_hash =
+            hex::encode(propagation_destination_hash_for_identity(&remote_identity));
+        let wanted = [0x25; 32];
+        let mut wanted_payload = remote_delivery_hash.to_vec();
+        wanted_payload.extend_from_slice(b" wanted propagation accounting without prior offer");
+        daemon
+            .ingest_propagation_payload_bytes_with_aliases(
+                wanted_payload.as_slice(),
+                hex::encode(wanted).as_str(),
+                &[],
+            )
+            .expect("store wanted payload");
+
+        let fetch_response = handle_message_get_request(
+            &daemon,
+            &remote_identity,
+            Some(rmpv::Value::Array(vec![
+                rmpv::Value::Array(vec![rmpv::Value::Binary(wanted.to_vec())]),
+                rmpv::Value::Array(Vec::new()),
+                rmpv::Value::from(10u64),
+            ])),
+            0xF1,
+            0xF4,
+        );
+
+        let ControlResponse::Rmpv(rmpv::Value::Array(messages)) = fetch_response else {
+            panic!("expected fetched message list");
+        };
+        assert_eq!(messages, vec![rmpv::Value::Binary(wanted_payload)]);
+        let peers = daemon
+            .handle_rpc(RpcRequest { id: 12, method: "list_peers".to_string(), params: None })
+            .expect("list peers")
+            .result
+            .expect("list peers result");
+        let row = peers["peers"]
+            .as_array()
+            .expect("peer rows")
+            .iter()
+            .find(|row| row["peer"].as_str() == Some(remote_propagation_hash.as_str()))
+            .expect("served peer row");
+        assert_eq!(row["peer_type"].as_str(), Some("manual"));
         assert_eq!(row["messages"]["outgoing"].as_u64(), Some(1));
         assert_eq!(row["messages"]["unhandled"].as_u64(), Some(0));
         assert_eq!(row["messages"]["handled_ids"], json!([hex::encode(wanted)]));
