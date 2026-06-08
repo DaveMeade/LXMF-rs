@@ -1154,6 +1154,51 @@ fn duplicate_peer_propagation_ingest_still_queues_relay_peers_like_python() {
 }
 
 #[test]
+fn peer_propagation_ingest_marks_inactive_source_received_for_later_activation_like_python() {
+    let daemon = RpcDaemon::test_instance();
+    let source_peer = "peer-late-inbound-source";
+    let relay_peer = "peer-late-inbound-relay";
+    daemon
+        .handle_rpc(rpc_request(29, "peer_sync", json!({ "peer": relay_peer })))
+        .expect("seed relay peer");
+
+    let payload = b"inactive-source-peer-payload";
+    let transient_id = daemon
+        .ingest_peer_propagation_payload_bytes_at_cost(payload, None, 0, source_peer)
+        .expect("inactive source peer propagation ingest");
+
+    assert_eq!(
+        daemon
+            .store
+            .list_peer_handled_propagation_ids(source_peer)
+            .expect("inactive source handled ids"),
+        vec![transient_id.clone()],
+        "inactive source should be marked received before later peer activation"
+    );
+    let relay_pending = daemon
+        .store
+        .list_peer_unhandled_propagation(relay_peer)
+        .expect("relay unhandled");
+    assert_eq!(relay_pending.len(), 1);
+    assert_eq!(relay_pending[0].transient_id, transient_id);
+
+    let sync = daemon
+        .handle_rpc(rpc_request(30, "peer_sync", json!({ "peer": source_peer })))
+        .expect("activate source peer")
+        .result
+        .expect("peer sync result");
+    assert_eq!(sync["propagation"]["transferred"].as_u64(), Some(0));
+    assert!(
+        sync["propagation"]["messages"].as_array().expect("transferred messages").is_empty()
+    );
+    assert_eq!(sync["messages"]["incoming"].as_u64(), Some(1));
+    assert_eq!(
+        sync["messages"]["handled_ids"].as_array().expect("handled ids"),
+        &[json!(transient_id.as_str())]
+    );
+}
+
+#[test]
 fn message_storage_stats_track_count_and_bytes() {
     let daemon = RpcDaemon::test_instance();
     daemon

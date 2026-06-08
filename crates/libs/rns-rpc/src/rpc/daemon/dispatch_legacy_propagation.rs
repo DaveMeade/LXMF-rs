@@ -252,11 +252,18 @@ impl RpcDaemon {
         transient_id: &str,
     ) -> Result<(), std::io::Error> {
         let source_peer = source_peer.trim().to_ascii_lowercase();
-        for peer in self.active_peer_ids() {
+        let active_peers = self.active_peer_ids();
+        let source_peer_key = active_peers
+            .iter()
+            .find(|peer| peer.eq_ignore_ascii_case(source_peer.as_str()))
+            .map(String::as_str)
+            .unwrap_or(source_peer.as_str());
+        self.store
+            .mark_peer_received_propagation(source_peer_key, transient_id)
+            .map_err(std::io::Error::other)?;
+        self.record_peer_queue_handled_id(source_peer_key, transient_id);
+        for peer in active_peers {
             if peer.eq_ignore_ascii_case(source_peer.as_str()) {
-                self.store
-                    .mark_peer_received_propagation(peer.as_str(), transient_id)
-                    .map_err(std::io::Error::other)?;
                 self.record_peer_queue_handled_id(peer.as_str(), transient_id);
             } else {
                 self.store
