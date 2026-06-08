@@ -169,9 +169,9 @@ The project is best described by capability level:
 - Early transfer-limit decisions made before peering-key handling now update
   active peer record snapshots as completed work, keeping serialized state in
   sync with the live transfer-limited mark.
-- Persistent peer sync now preserves explicit selected-offer boundaries by
+- Persistent peer sync now preserves explicit offer-response boundaries by
   leaving sync-limit-skipped IDs queued for the next offer instead of
-  auto-transferring messages the peer did not select in the current response.
+  auto-transferring messages outside the peer's current response.
 
 ## Remaining Release Blockers
 
