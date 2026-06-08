@@ -189,6 +189,9 @@ Workspace paths are used for navigation. `crates/libs/lxmf-core` publishes as
   peer snapshot, source-peer handled IDs are preserved for restart/export, and
   offer-response handling keeps IDs in sync when queued messages become handled,
   transferred, or transfer-limited.
+- Duplicate inbound peer propagation payloads still fan out to active relay
+  peers while keeping the source peer handled, so a known local payload does
+  not bypass relay queue creation.
 - Remote import batches deduplicate accepted transient IDs before peer queue
   and incoming-message side effects are applied, so duplicate payloads in one
   fetch/download/sync response do not inflate peer queue accounting.

@@ -708,28 +708,16 @@ impl RpcDaemon {
         }
         let transient_id =
             transient_id.map(normalize_propagation_transient_key).unwrap_or(canonical_transient_id);
-        let already_known = self
-            .store
-            .get_propagation_entry(transient_id.as_str())
-            .map_err(std::io::Error::other)?
-            .is_some();
         let payload_hex = hex::encode(normalized_payload);
         self.store_propagation_payload_hex(transient_id.as_str(), payload_hex.as_str())?;
         let source_active_peer = self
             .active_peer_ids()
             .into_iter()
             .find(|peer| peer.eq_ignore_ascii_case(source_peer.as_str()));
-        if !already_known {
-            self.queue_propagation_entry_from_source_for_active_peers(
-                source_peer.as_str(),
-                transient_id.as_str(),
-            )?;
-        } else if let Some(peer) = source_active_peer.as_ref() {
-            self.store
-                .mark_peer_received_propagation(peer.as_str(), transient_id.as_str())
-                .map_err(std::io::Error::other)?;
-            self.record_peer_queue_handled_id(peer.as_str(), transient_id.as_str());
-        }
+        self.queue_propagation_entry_from_source_for_active_peers(
+            source_peer.as_str(),
+            transient_id.as_str(),
+        )?;
         if let Some(peer) = source_active_peer {
             self.record_inbound_peer_activity(peer.as_str(), normalized_payload.len());
         } else {

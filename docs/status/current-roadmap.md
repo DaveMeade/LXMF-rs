@@ -1,6 +1,6 @@
 # Current Roadmap Status
 
-Last reassessed: 2026-06-07
+Last reassessed: 2026-06-08
 
 This file is the repository-level source of truth for parity posture, release
 confidence, and execution order. Detailed row-level status lives in:
@@ -156,6 +156,9 @@ The project is best described by capability level:
   snapshots when they queue new unhandled IDs or mark source peers handled,
   keeping restart/export state aligned with live queue fan-out and source
   accounting.
+- Duplicate inbound peer propagation payloads now still apply source-aware
+  fan-out to active relay peers while keeping the source peer handled, so a
+  known local payload does not skip relay queue creation.
 - Remote import batches now deduplicate accepted transient IDs before applying
   peer queue and incoming-message side effects, so duplicate payloads in one
   fetch/download/sync response do not inflate peer queue accounting.

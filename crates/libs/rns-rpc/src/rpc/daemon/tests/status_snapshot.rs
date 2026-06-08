@@ -1099,6 +1099,61 @@ fn peer_propagation_ingest_matches_source_peer_case_insensitively_like_python() 
 }
 
 #[test]
+fn duplicate_peer_propagation_ingest_still_queues_relay_peers_like_python() {
+    let daemon = RpcDaemon::test_instance();
+    let source_peer = "peer-duplicate-source";
+    let relay_peer = "peer-duplicate-relay";
+    daemon
+        .handle_rpc(rpc_request(29, "peer_sync", json!({ "peer": source_peer })))
+        .expect("seed source peer");
+    daemon
+        .handle_rpc(rpc_request(30, "peer_sync", json!({ "peer": relay_peer })))
+        .expect("seed relay peer");
+
+    let payload = b"known-source-peer-payload";
+    let transient_id = hex::encode(Sha256::digest(payload));
+    daemon
+        .store
+        .upsert_propagation_entry(&PropagationEntryRecord {
+            transient_id: transient_id.clone(),
+            destination: hex::encode(&payload[..16]),
+            payload_hex: hex::encode(payload),
+            received_at: 1_700_000_113,
+            size_bytes: payload.len() as u64,
+            stamp_value: None,
+        })
+        .expect("seed known propagation entry");
+
+    let duplicate = daemon
+        .ingest_peer_propagation_payload_bytes_at_cost(payload, None, 0, source_peer)
+        .expect("duplicate peer propagation ingest");
+    assert_eq!(duplicate, transient_id);
+
+    assert_eq!(
+        daemon
+            .store
+            .list_peer_handled_propagation_ids(source_peer)
+            .expect("source handled ids"),
+        vec![transient_id.clone()]
+    );
+    assert!(
+        daemon
+            .store
+            .list_peer_unhandled_propagation(source_peer)
+            .expect("source unhandled")
+            .is_empty(),
+        "source peer should not be re-offered its own duplicate payload"
+    );
+
+    let relay_pending = daemon
+        .store
+        .list_peer_unhandled_propagation(relay_peer)
+        .expect("relay unhandled");
+    assert_eq!(relay_pending.len(), 1);
+    assert_eq!(relay_pending[0].transient_id, transient_id);
+}
+
+#[test]
 fn message_storage_stats_track_count_and_bytes() {
     let daemon = RpcDaemon::test_instance();
     daemon
