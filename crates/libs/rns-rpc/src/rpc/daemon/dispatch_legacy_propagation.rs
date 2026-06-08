@@ -132,7 +132,7 @@ impl RpcDaemon {
         error: &str,
         transfer_limit: Option<u64>,
         sync_limit: Option<u64>,
-    ) {
+    ) -> Result<(), std::io::Error> {
         let timestamp = now_i64();
         if let Ok(mut peers) = self.peers.lock() {
             if let Some(peer) = peers.get_mut(peer_id) {
@@ -140,6 +140,7 @@ impl RpcDaemon {
                 peer.next_sync_attempt = timestamp.saturating_add(PN_STAMP_THROTTLE_SECS);
             }
         }
+        self.record_payload_backed_peer_queue_snapshot(peer_id)?;
         self.publish_failed_remote_peer_sync_event(
             peer_id,
             remote,
@@ -148,6 +149,7 @@ impl RpcDaemon {
             sync_limit,
             Some("throttled"),
         );
+        Ok(())
     }
 
     fn record_retryable_remote_peer_sync_error(
@@ -157,7 +159,7 @@ impl RpcDaemon {
         error: &str,
         transfer_limit: Option<u64>,
         sync_limit: Option<u64>,
-    ) {
+    ) -> Result<(), std::io::Error> {
         let timestamp = now_i64();
         if let Ok(mut peers) = self.peers.lock() {
             if let Some(peer) = peers.get_mut(peer_id) {
@@ -165,6 +167,7 @@ impl RpcDaemon {
                 peer.next_sync_attempt = 0;
             }
         }
+        self.record_payload_backed_peer_queue_snapshot(peer_id)?;
         self.publish_failed_remote_peer_sync_event(
             peer_id,
             remote,
@@ -173,6 +176,7 @@ impl RpcDaemon {
             sync_limit,
             None,
         );
+        Ok(())
     }
 
     fn break_remote_peer_sync_peering_on_denied_access(
@@ -283,7 +287,7 @@ impl RpcDaemon {
         let mut imported_count = 0usize;
         let mut duplicate_count = 0usize;
         let mut imported_ids = Vec::new();
-        let mut accepted_ids = Vec::new();
+        let mut accepted_ids: Vec<String> = Vec::new();
         let mut transferred_bytes = 0usize;
         for message in messages {
             let Some(payload_hex) = message.get("payload_hex").and_then(JsonValue::as_str) else {
@@ -348,7 +352,9 @@ impl RpcDaemon {
                 .lock()
                 .expect("propagation payload mutex poisoned")
                 .insert(transient_id.clone(), record.payload_hex);
-            accepted_ids.push(transient_id.clone());
+            if !accepted_ids.iter().any(|id| id.eq_ignore_ascii_case(transient_id.as_str())) {
+                accepted_ids.push(transient_id.clone());
+            }
             if already_known {
                 duplicate_count = duplicate_count.saturating_add(1);
             } else {
@@ -752,16 +758,27 @@ impl RpcDaemon {
             .contains_key(normalize_propagation_transient_key(transient_id).as_str())
     }
 
+    fn peer_store_key_or_input(&self, peer: &str) -> String {
+        self.peers
+            .lock()
+            .expect("peers mutex poisoned")
+            .keys()
+            .find(|existing| existing.eq_ignore_ascii_case(peer))
+            .cloned()
+            .unwrap_or_else(|| peer.to_string())
+    }
+
     pub fn record_peer_received_propagation(
         &self,
         peer: &str,
         transient_id: &str,
     ) -> Result<(), std::io::Error> {
         let transient_id = normalize_propagation_transient_key(transient_id);
+        let peer_key = self.peer_store_key_or_input(peer);
         self.store
-            .mark_peer_received_propagation(peer, transient_id.as_str())
+            .mark_peer_received_propagation(peer_key.as_str(), transient_id.as_str())
             .map_err(std::io::Error::other)?;
-        self.record_peer_queue_handled_id(peer, transient_id.as_str());
+        self.record_peer_queue_handled_id(peer_key.as_str(), transient_id.as_str());
         Ok(())
     }
 
@@ -770,9 +787,10 @@ impl RpcDaemon {
         peer: &str,
         transient_id: &str,
     ) -> Result<bool, std::io::Error> {
+        let peer_key = self.peer_store_key_or_input(peer);
         self.store
             .peer_completed_propagation_mark_exists(
-                peer,
+                peer_key.as_str(),
                 normalize_propagation_transient_key(transient_id).as_str(),
             )
             .map_err(std::io::Error::other)
@@ -784,10 +802,11 @@ impl RpcDaemon {
         transient_id: &str,
     ) -> Result<(), std::io::Error> {
         let transient_id = normalize_propagation_transient_key(transient_id);
+        let peer_key = self.peer_store_key_or_input(peer);
         self.store
-            .mark_peer_transferred_propagation(peer, transient_id.as_str())
+            .mark_peer_transferred_propagation(peer_key.as_str(), transient_id.as_str())
             .map_err(std::io::Error::other)?;
-        self.record_peer_queue_handled_id(peer, transient_id.as_str());
+        self.record_peer_queue_handled_id(peer_key.as_str(), transient_id.as_str());
         Ok(())
     }
 
@@ -1501,7 +1520,7 @@ impl RpcDaemon {
                         .find(|record| record.peer.eq_ignore_ascii_case(peer_id.as_str()))
                         .cloned()
                 };
-                if let Some(record) = existing_record {
+                if let Some(record) = existing_record.as_ref() {
                     let peer_transfer_limit_kb =
                         record.propagation_transfer_limit.map(|limit| f64::from(limit) / 1000.0);
                     let request_transfer_limit_kb =
@@ -1518,9 +1537,10 @@ impl RpcDaemon {
                         timestamp,
                         record.next_sync_attempt,
                     ) {
+                        self.record_payload_backed_peer_queue_snapshot(record.peer.as_str())?;
                         return Ok(self.postponed_peer_sync_response(
                             request.id,
-                            &record,
+                            record,
                             timestamp,
                             "backoff",
                             transfer_limit.map(|limit| limit as usize),
@@ -1528,12 +1548,50 @@ impl RpcDaemon {
                         ));
                     }
                 }
-                let bridge = self
+                let bridge = match self
                     .remote_control_bridge
                     .lock()
                     .expect("remote control bridge mutex poisoned")
                     .clone()
-                    .ok_or_else(|| std::io::Error::other("remote control bridge unavailable"))?;
+                {
+                    Some(bridge) => bridge,
+                    None => {
+                        if let Some(record) = existing_record.as_ref() {
+                            let peer_transfer_limit_kb = record
+                                .propagation_transfer_limit
+                                .map(|limit| f64::from(limit) / 1000.0);
+                            let request_transfer_limit_kb =
+                                parsed.transfer_limit_kb.map(|limit| limit.max(0.0));
+                            let transfer_limit_kb = effective_transfer_limit_kb(
+                                peer_transfer_limit_kb,
+                                request_transfer_limit_kb,
+                            );
+                            let transfer_limit =
+                                transfer_limit_kb.map(|limit| (limit.max(0.0) * 1000.0) as u64);
+                            let sync_limit =
+                                record.propagation_sync_limit.map(u64::from).or(transfer_limit);
+                            self.update_propagation_sync_state(|state| {
+                                state.sync_state = PR_FAILED;
+                                state.state_name = "failed".to_string();
+                                state.sync_progress = 0.0;
+                                state.last_sync_started = Some(timestamp);
+                                state.last_sync_completed = None;
+                                state.last_sync_error =
+                                    Some("remote control bridge unavailable".to_string());
+                            });
+                            self.record_payload_backed_peer_queue_snapshot(record.peer.as_str())?;
+                            self.publish_failed_remote_peer_sync_event(
+                                record.peer.as_str(),
+                                remote_id.as_str(),
+                                "remote control bridge unavailable",
+                                transfer_limit,
+                                sync_limit,
+                                None,
+                            );
+                        }
+                        return Err(std::io::Error::other("remote control bridge unavailable"));
+                    }
+                };
                 let record = self.ensure_peer_for_sync(peer_id.as_str(), timestamp)?;
                 let peer_transfer_limit_kb =
                     record.propagation_transfer_limit.map(|limit| f64::from(limit) / 1000.0);
@@ -1569,7 +1627,7 @@ impl RpcDaemon {
                 let mut peer_sync_result = JsonValue::Null;
                 let result = match bridge.propagation_remote_sync(
                     remote_id.as_str(),
-                    peer_id.as_str(),
+                    peer_key.as_str(),
                     parsed.identity_private_key_hex.as_deref(),
                     timeout_secs,
                     transfer_limit_kb,
@@ -1585,6 +1643,7 @@ impl RpcDaemon {
                                     state.last_sync_error = Some(err.to_string());
                                 });
                                 self.record_outbound_peer_activity(peer_key.as_str(), 0, false);
+                                self.record_payload_backed_peer_queue_snapshot(peer_key.as_str())?;
                                 self.publish_failed_remote_peer_sync_event(
                                     peer_key.as_str(),
                                     remote_id.as_str(),
@@ -1612,10 +1671,11 @@ impl RpcDaemon {
                             );
                         }
                         self.queue_remote_sync_imports_for_peers(
-                            peer_id.as_str(),
+                            peer_key.as_str(),
                             imported.accepted_ids.as_slice(),
                             imported.transferred_bytes,
                         )?;
+                        self.record_payload_backed_peer_queue_snapshot(peer_key.as_str())?;
                         self.update_propagation_sync_state(|state| {
                             state.sync_state = PR_COMPLETE;
                             state.state_name = "completed".to_string();
@@ -1627,7 +1687,7 @@ impl RpcDaemon {
                         if let Ok(mut peers) = self.peers.lock() {
                             if let Some(peer) = peers
                                 .values_mut()
-                                .find(|record| record.peer.eq_ignore_ascii_case(peer_id.as_str()))
+                                .find(|record| record.peer.eq_ignore_ascii_case(peer_key.as_str()))
                             {
                                 peer.alive = true;
                                 peer.last_seen = peer_sync_completed_at;
@@ -1641,7 +1701,7 @@ impl RpcDaemon {
                             .lock()
                             .expect("peers mutex poisoned")
                             .values()
-                            .find(|record| record.peer.eq_ignore_ascii_case(peer_id.as_str()))
+                            .find(|record| record.peer.eq_ignore_ascii_case(peer_key.as_str()))
                             .cloned();
                         if let Some(peer) = peer {
                             let (
@@ -1775,7 +1835,7 @@ impl RpcDaemon {
                                 error.as_str(),
                                 transfer_limit,
                                 sync_limit,
-                            );
+                            )?;
                         } else if is_retryable_remote_peer_sync_error(&err) {
                             self.record_retryable_remote_peer_sync_error(
                                 peer_key.as_str(),
@@ -1783,7 +1843,7 @@ impl RpcDaemon {
                                 error.as_str(),
                                 transfer_limit,
                                 sync_limit,
-                            );
+                            )?;
                         } else if is_remote_access_denied_error(&err) {
                             self.break_remote_peer_sync_peering_on_denied_access(
                                 peer_key.as_str(),
@@ -1792,6 +1852,7 @@ impl RpcDaemon {
                             )?;
                         } else {
                             self.record_outbound_peer_activity(peer_key.as_str(), 0, false);
+                            self.record_payload_backed_peer_queue_snapshot(peer_key.as_str())?;
                             self.publish_failed_remote_peer_sync_event(
                                 peer_key.as_str(),
                                 remote_id.as_str(),
@@ -1810,7 +1871,7 @@ impl RpcDaemon {
                     id: request.id,
                     result: Some(json!({
                         "remote": remote_id,
-                        "peer": peer_id,
+                        "peer": peer_key,
                         "propagation": propagation,
                         "peer_sync": peer_sync_result,
                         "result": result,
@@ -1831,12 +1892,20 @@ impl RpcDaemon {
                         "remote is required",
                     ));
                 }
-                let bridge = self
+                let bridge = match self
                     .remote_control_bridge
                     .lock()
                     .expect("remote control bridge mutex poisoned")
                     .clone()
-                    .ok_or_else(|| std::io::Error::other("remote control bridge unavailable"))?;
+                {
+                    Some(bridge) => bridge,
+                    None => {
+                        for peer in self.active_peer_ids() {
+                            let _ = self.record_payload_backed_peer_queue_snapshot(peer.as_str());
+                        }
+                        return Err(std::io::Error::other("remote control bridge unavailable"));
+                    }
+                };
                 let timeout_secs = parsed.timeout_secs.unwrap_or(5.0).max(0.1);
                 self.update_propagation_sync_state(|state| {
                     state.sync_state = PR_REQUEST_SENT;
@@ -1862,6 +1931,9 @@ impl RpcDaemon {
                                     state.sync_progress = 0.0;
                                     state.last_sync_error = Some(err.to_string());
                                 });
+                                for peer in self.active_peer_ids() {
+                                    self.record_payload_backed_peer_queue_snapshot(peer.as_str())?;
+                                }
                                 return Err(err);
                             }
                         };
@@ -1885,6 +1957,9 @@ impl RpcDaemon {
                             imported.accepted_ids.as_slice(),
                             imported.transferred_bytes,
                         )?;
+                        for peer in self.active_peer_ids() {
+                            self.record_payload_backed_peer_queue_snapshot(peer.as_str())?;
+                        }
                         self.update_propagation_sync_state(|state| {
                             state.sync_state = PR_COMPLETE;
                             state.state_name = "completed".to_string();
@@ -1901,6 +1976,9 @@ impl RpcDaemon {
                             state.sync_progress = 0.0;
                             state.last_sync_error = Some(err.to_string());
                         });
+                        for peer in self.active_peer_ids() {
+                            self.record_payload_backed_peer_queue_snapshot(peer.as_str())?;
+                        }
                         return Err(err);
                     }
                 };
@@ -1959,12 +2037,20 @@ impl RpcDaemon {
                         "remote is required",
                     ));
                 }
-                let bridge = self
+                let bridge = match self
                     .remote_control_bridge
                     .lock()
                     .expect("remote control bridge mutex poisoned")
                     .clone()
-                    .ok_or_else(|| std::io::Error::other("remote control bridge unavailable"))?;
+                {
+                    Some(bridge) => bridge,
+                    None => {
+                        for peer in self.active_peer_ids() {
+                            self.record_payload_backed_peer_queue_snapshot(peer.as_str())?;
+                        }
+                        return Err(std::io::Error::other("remote control bridge unavailable"));
+                    }
+                };
                 let timeout_secs = parsed.timeout_secs.unwrap_or(8.0).max(0.1);
                 self.update_propagation_sync_state(|state| {
                     state.sync_state = PR_REQUEST_SENT;
@@ -1988,6 +2074,9 @@ impl RpcDaemon {
                             state.sync_progress = 0.0;
                             state.last_sync_error = Some(err.to_string());
                         });
+                        for peer in self.active_peer_ids() {
+                            self.record_payload_backed_peer_queue_snapshot(peer.as_str())?;
+                        }
                         return Err(err);
                     }
                 };
@@ -2000,6 +2089,9 @@ impl RpcDaemon {
                             state.sync_progress = 0.0;
                             state.last_sync_error = Some(err.to_string());
                         });
+                        for peer in self.active_peer_ids() {
+                            self.record_payload_backed_peer_queue_snapshot(peer.as_str())?;
+                        }
                         return Err(err);
                     }
                 };
@@ -2015,6 +2107,9 @@ impl RpcDaemon {
                     imported.accepted_ids.as_slice(),
                     imported.transferred_bytes,
                 )?;
+                for peer in self.active_peer_ids() {
+                    self.record_payload_backed_peer_queue_snapshot(peer.as_str())?;
+                }
                 self.update_propagation_sync_state(|state| {
                     state.sync_state = PR_COMPLETE;
                     state.state_name = "completed".to_string();
@@ -2054,19 +2149,41 @@ impl RpcDaemon {
                         "peer is required",
                     ));
                 }
-                let bridge = self
+                let snapshot_peer = {
+                    let guard = self.peers.lock().expect("peers mutex poisoned");
+                    guard
+                        .values()
+                        .find(|record| record.peer.eq_ignore_ascii_case(peer_id))
+                        .map(|record| record.peer.clone())
+                        .unwrap_or_else(|| peer_id.to_string())
+                };
+                let bridge = match self
                     .remote_control_bridge
                     .lock()
                     .expect("remote control bridge mutex poisoned")
                     .clone()
-                    .ok_or_else(|| std::io::Error::other("remote control bridge unavailable"))?;
+                {
+                    Some(bridge) => bridge,
+                    None => {
+                        let _ =
+                            self.record_payload_backed_peer_queue_snapshot(snapshot_peer.as_str());
+                        return Err(std::io::Error::other("remote control bridge unavailable"));
+                    }
+                };
                 let timeout_secs = parsed.timeout_secs.unwrap_or(5.0).max(0.1);
-                let result = bridge.propagation_remote_unpeer(
+                let result = match bridge.propagation_remote_unpeer(
                     remote_id.as_str(),
-                    peer_id,
+                    snapshot_peer.as_str(),
                     parsed.identity_private_key_hex.as_deref(),
                     timeout_secs,
-                )?;
+                ) {
+                    Ok(result) => result,
+                    Err(err) => {
+                        let _ =
+                            self.record_payload_backed_peer_queue_snapshot(snapshot_peer.as_str());
+                        return Err(err);
+                    }
+                };
                 let cleanup = self.unpeer_local_state(peer_id)?;
                 let offered = cleanup.messages["offered"].as_u64().unwrap_or(0);
                 let outgoing = cleanup.messages["outgoing"].as_u64().unwrap_or(0);

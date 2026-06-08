@@ -542,6 +542,139 @@ fn propagation_enable_unpeers_removed_static_peers_when_static_only() {
 }
 
 #[test]
+fn propagation_enable_static_only_removed_static_peer_counts_all_queue_marks_like_python() {
+    let daemon = RpcDaemon::test_instance();
+    daemon
+        .handle_rpc(rpc_request(
+            41,
+            "propagation_enable",
+            json!({
+                "enabled": true,
+                "from_static_only": true,
+                "static_peers": ["peer-static-all-marks"],
+            }),
+        ))
+        .expect("enable old static peer");
+    daemon.event_queue.lock().expect("event_queue mutex poisoned").clear();
+
+    let handled = PropagationEntryRecord {
+        transient_id: "b1".repeat(32),
+        destination: "13".repeat(16),
+        payload_hex: "13".repeat(10),
+        received_at: 1_700_000_106,
+        size_bytes: 10,
+        stamp_value: None,
+    };
+    let unhandled = PropagationEntryRecord {
+        transient_id: "b2".repeat(32),
+        destination: "14".repeat(16),
+        payload_hex: "14".repeat(20),
+        received_at: 1_700_000_107,
+        size_bytes: 20,
+        stamp_value: None,
+    };
+    let received = PropagationEntryRecord {
+        transient_id: "b3".repeat(32),
+        destination: "15".repeat(16),
+        payload_hex: "15".repeat(30),
+        received_at: 1_700_000_108,
+        size_bytes: 30,
+        stamp_value: None,
+    };
+    let transfer_limited = PropagationEntryRecord {
+        transient_id: "b4".repeat(32),
+        destination: "16".repeat(16),
+        payload_hex: "16".repeat(40),
+        received_at: 1_700_000_109,
+        size_bytes: 40,
+        stamp_value: None,
+    };
+    for entry in [&handled, &unhandled, &received, &transfer_limited] {
+        daemon.store.upsert_propagation_entry(entry).expect("store entry");
+    }
+    daemon
+        .store
+        .mark_peer_handled_propagation(
+            "peer-static-all-marks",
+            handled.transient_id.as_str(),
+        )
+        .expect("mark handled");
+    daemon
+        .store
+        .mark_peer_unhandled_propagation(
+            "peer-static-all-marks",
+            unhandled.transient_id.as_str(),
+        )
+        .expect("mark unhandled");
+    daemon
+        .store
+        .mark_peer_received_propagation(
+            "peer-static-all-marks",
+            received.transient_id.as_str(),
+        )
+        .expect("mark received");
+    daemon
+        .store
+        .mark_peer_transfer_limited_propagation(
+            "peer-static-all-marks",
+            transfer_limited.transient_id.as_str(),
+        )
+        .expect("mark transfer limited");
+
+    daemon
+        .handle_rpc(rpc_request(
+            42,
+            "propagation_enable",
+            json!({
+                "enabled": true,
+                "from_static_only": true,
+                "static_peers": ["peer-static-replacement"],
+            }),
+        ))
+        .expect("replace static peer list");
+
+    let event = daemon
+        .event_queue
+        .lock()
+        .expect("event_queue mutex poisoned")
+        .iter()
+        .rev()
+        .find(|event| event.event_type == "peer_unpeer")
+        .cloned()
+        .expect("static-only peer removal event");
+    assert_eq!(event.payload["peer"].as_str(), Some("peer-static-all-marks"));
+    assert_eq!(event.payload["reason"].as_str(), Some("static_only_policy"));
+    assert_eq!(event.payload["propagation_cleared"].as_u64(), Some(4));
+    assert_eq!(event.payload["propagation_cleared_bytes"].as_u64(), Some(100));
+    assert_eq!(
+        event.payload["messages"]["handled_ids"].as_array().expect("event handled ids"),
+        &[
+            json!(handled.transient_id.as_str()),
+            json!(received.transient_id.as_str()),
+            json!(transfer_limited.transient_id.as_str()),
+        ]
+    );
+    assert_eq!(
+        event.payload["messages"]["unhandled_ids"].as_array().expect("event unhandled ids"),
+        &[json!(unhandled.transient_id.as_str())]
+    );
+    assert_eq!(
+        daemon
+            .store
+            .list_peer_handled_propagation_ids("peer-static-all-marks")
+            .expect("remaining handled ids"),
+        Vec::<String>::new()
+    );
+    assert_eq!(
+        daemon
+            .store
+            .list_peer_unhandled_propagation("peer-static-all-marks")
+            .expect("remaining unhandled entries"),
+        Vec::<PropagationEntryRecord>::new()
+    );
+}
+
+#[test]
 fn propagation_enable_static_only_unpeers_existing_non_static_peers() {
     let daemon = RpcDaemon::test_instance();
     daemon
@@ -4590,6 +4723,61 @@ fn peer_sync_during_backoff_does_not_queue_new_existing_entries_like_python() {
 }
 
 #[test]
+fn peer_sync_backoff_records_preexisting_live_queue_snapshot_like_python() {
+    let daemon = RpcDaemon::test_instance();
+    let peer = "peer-backoff-live-queue-snapshot";
+    daemon
+        .handle_rpc(rpc_request(52, "peer_sync", json!({ "peer": peer })))
+        .expect("initial peer sync");
+    {
+        let mut peers = daemon.peers.lock().expect("peers mutex poisoned");
+        let record = peers.get_mut(peer).expect("peer record");
+        record.sync_backoff = 12 * 60;
+        record.next_sync_attempt = now_i64().saturating_add(12 * 60);
+        record.restored_handled_ids.clear();
+        record.restored_unhandled_ids.clear();
+    }
+    let pending = PropagationEntryRecord {
+        transient_id: "e7".repeat(32),
+        destination: "18".repeat(16),
+        payload_hex: "18".repeat(20),
+        received_at: 1_700_000_616,
+        size_bytes: 20,
+        stamp_value: None,
+    };
+    daemon.store.upsert_propagation_entry(&pending).expect("store entry");
+    daemon
+        .store
+        .mark_peer_unhandled_propagation(peer, pending.transient_id.as_str())
+        .expect("seed live queue mark");
+
+    let result = daemon
+        .handle_rpc(rpc_request(54, "peer_sync", json!({ "peer": peer })))
+        .expect("backoff peer sync")
+        .result
+        .expect("peer sync result");
+    assert_eq!(result["synced"].as_bool(), Some(false));
+    assert_eq!(result["postponed"].as_bool(), Some(true));
+    assert_eq!(result["postpone_reason"].as_str(), Some("backoff"));
+    assert_eq!(
+        result["messages"]["unhandled_ids"].as_array().expect("result unhandled ids"),
+        &[json!(pending.transient_id.as_str())]
+    );
+
+    let peers = daemon.peers.lock().expect("peers mutex poisoned");
+    let record = peers.get(peer).expect("stored peer");
+    let serialized = serde_json::to_value(record).expect("serialize peer record");
+    assert_eq!(
+        serialized["handled_ids"].as_array().expect("serialized handled ids"),
+        &[] as &[JsonValue]
+    );
+    assert_eq!(
+        serialized["unhandled_ids"].as_array().expect("serialized unhandled ids"),
+        &[json!(pending.transient_id.as_str())]
+    );
+}
+
+#[test]
 fn peer_sync_postpones_offers_until_stamp_policy_is_known() {
     let daemon = RpcDaemon::test_instance();
     daemon
@@ -5548,6 +5736,68 @@ fn peer_sync_postpones_unstamped_offers_until_peering_key_is_ready() {
         .expect("list unhandled");
     assert_eq!(unhandled.len(), 1);
     assert_eq!(unhandled[0].transient_id, entry.transient_id);
+}
+
+#[test]
+fn peer_sync_transfers_unstamped_offers_when_stamp_cost_zero_like_python() {
+    let daemon = RpcDaemon::test_instance();
+    daemon
+        .handle_rpc(rpc_request(52, "peer_sync", json!({ "peer": "peer-zero-stamp-cost" })))
+        .expect("initial peer sync");
+    {
+        let mut peers = daemon.peers.lock().expect("peers mutex poisoned");
+        let peer = peers.get_mut("peer-zero-stamp-cost").expect("peer record");
+        peer.propagation_sync_limit = Some(1_000);
+        peer.propagation_stamp_cost = Some(0);
+        peer.propagation_stamp_cost_flexibility = Some(0);
+        peer.peering_cost = None;
+    }
+    let entry = PropagationEntryRecord {
+        transient_id: "ec".repeat(32),
+        destination: "1c".repeat(16),
+        payload_hex: "1c".repeat(20),
+        received_at: 1_700_000_623,
+        size_bytes: 20,
+        stamp_value: None,
+    };
+    daemon.store.upsert_propagation_entry(&entry).expect("store entry");
+    daemon
+        .store
+        .mark_peer_unhandled_propagation("peer-zero-stamp-cost", entry.transient_id.as_str())
+        .expect("mark unhandled");
+
+    let result = daemon
+        .handle_rpc(rpc_request(54, "peer_sync", json!({ "peer": "peer-zero-stamp-cost" })))
+        .expect("zero-stamp peer sync")
+        .result
+        .expect("peer sync result");
+    assert_eq!(result["synced"].as_bool(), Some(true));
+    assert_ne!(result["postponed"].as_bool(), Some(true));
+    assert_eq!(result["postpone_reason"], JsonValue::Null);
+    assert_eq!(result["peering_key"], JsonValue::Null);
+    assert_eq!(result["peering_key_status"].as_str(), Some("unconfigured"));
+    assert_eq!(result["propagation"]["handled"].as_u64(), Some(1));
+    assert_eq!(result["propagation"]["transferred"].as_u64(), Some(1));
+    assert_eq!(
+        result["propagation"]["transferred_ids"]
+            .as_array()
+            .expect("transferred ids"),
+        &[json!(entry.transient_id.as_str())]
+    );
+    assert!(
+        daemon
+            .store
+            .list_peer_unhandled_propagation("peer-zero-stamp-cost")
+            .expect("list unhandled")
+            .is_empty()
+    );
+    assert_eq!(
+        daemon
+            .store
+            .list_peer_handled_propagation_ids("peer-zero-stamp-cost")
+            .expect("handled ids"),
+        vec![entry.transient_id]
+    );
 }
 
 #[test]
@@ -11791,6 +12041,45 @@ fn propagation_remote_sync_trims_remote_before_bridge_event_and_response() {
 }
 
 #[test]
+fn propagation_remote_sync_uses_stored_peer_case_for_bridge_and_response_like_python() {
+    let stored_peer = "Ab".repeat(16);
+    let request_peer = stored_peer.to_ascii_lowercase();
+    let daemon = RpcDaemon::test_instance();
+    daemon.set_remote_control_bridge(Arc::new(TestRemoteControlBridge {
+        result: Ok(json!({"synced": true})),
+    }));
+    daemon
+        .handle_rpc(rpc_request(89, "peer_sync", json!({ "peer": stored_peer.as_str() })))
+        .expect("seed mixed-case peer");
+
+    let result = daemon
+        .handle_rpc(rpc_request(
+            90,
+            "propagation_remote_sync",
+            json!({
+                "remote": "remote-case-peer",
+                "peer": request_peer.as_str(),
+            }),
+        ))
+        .expect("remote sync with case-variant peer")
+        .result
+        .expect("remote sync result");
+
+    assert_eq!(result["peer"].as_str(), Some(stored_peer.as_str()));
+    assert_eq!(result["result"]["peer"].as_str(), Some(stored_peer.as_str()));
+    assert_eq!(result["peer_sync"]["peer"].as_str(), Some(stored_peer.as_str()));
+
+    let peers = daemon
+        .handle_rpc(RpcRequest { id: 91, method: "list_peers".to_string(), params: None })
+        .expect("list peers")
+        .result
+        .expect("list peers result");
+    let rows = peers["peers"].as_array().expect("peer rows");
+    assert!(rows.iter().any(|row| row["peer"].as_str() == Some(stored_peer.as_str())));
+    assert!(rows.iter().all(|row| row["peer"].as_str() != Some(request_peer.as_str())));
+}
+
+#[test]
 fn propagation_remote_sync_respects_peer_backoff_before_bridge_call() {
     let daemon = RpcDaemon::test_instance();
     daemon
@@ -11879,6 +12168,68 @@ fn propagation_remote_sync_backoff_does_not_require_bridge() {
 }
 
 #[test]
+fn propagation_remote_sync_backoff_records_preexisting_live_queue_snapshot_like_python() {
+    let daemon = RpcDaemon::test_instance();
+    let peer = "peer-remote-backoff-live-queue-snapshot";
+    daemon
+        .handle_rpc(rpc_request(92, "peer_sync", json!({ "peer": peer })))
+        .expect("seed peer");
+    {
+        let mut peers = daemon.peers.lock().expect("peers mutex poisoned");
+        let record = peers.get_mut(peer).expect("peer record");
+        record.sync_backoff = 12 * 60;
+        record.next_sync_attempt = now_i64().saturating_add(12 * 60);
+        record.restored_handled_ids.clear();
+        record.restored_unhandled_ids.clear();
+    }
+    let pending = PropagationEntryRecord {
+        transient_id: "e6".repeat(32),
+        destination: "18".repeat(16),
+        payload_hex: "18".repeat(20),
+        received_at: 1_700_000_617,
+        size_bytes: 20,
+        stamp_value: None,
+    };
+    daemon.store.upsert_propagation_entry(&pending).expect("store entry");
+    daemon
+        .store
+        .mark_peer_unhandled_propagation(peer, pending.transient_id.as_str())
+        .expect("seed live queue mark");
+
+    let result = daemon
+        .handle_rpc(rpc_request(
+            93,
+            "propagation_remote_sync",
+            json!({
+                "remote": "remote-backoff-no-bridge",
+                "peer": peer,
+            }),
+        ))
+        .expect("remote sync should postpone before bridge lookup")
+        .result
+        .expect("remote sync result");
+    assert_eq!(result["synced"].as_bool(), Some(false));
+    assert_eq!(result["postponed"].as_bool(), Some(true));
+    assert_eq!(result["postpone_reason"].as_str(), Some("backoff"));
+    assert_eq!(
+        result["messages"]["unhandled_ids"].as_array().expect("result unhandled ids"),
+        &[json!(pending.transient_id.as_str())]
+    );
+
+    let peers = daemon.peers.lock().expect("peers mutex poisoned");
+    let record = peers.get(peer).expect("stored peer");
+    let serialized = serde_json::to_value(record).expect("serialize peer record");
+    assert_eq!(
+        serialized["handled_ids"].as_array().expect("serialized handled ids"),
+        &[] as &[JsonValue]
+    );
+    assert_eq!(
+        serialized["unhandled_ids"].as_array().expect("serialized unhandled ids"),
+        &[json!(pending.transient_id.as_str())]
+    );
+}
+
+#[test]
 fn propagation_remote_sync_missing_bridge_does_not_create_peer() {
     let daemon = RpcDaemon::test_instance();
 
@@ -11916,6 +12267,192 @@ fn propagation_remote_sync_missing_bridge_does_not_create_peer() {
         .expect("propagation status result");
     assert_eq!(status["propagation"]["sync_state"].as_u64(), Some(0x00));
     assert_eq!(status["propagation"]["last_sync_started"], JsonValue::Null);
+}
+
+#[test]
+fn propagation_remote_sync_missing_bridge_records_existing_queue_snapshot_like_python() {
+    let daemon = RpcDaemon::test_instance();
+    let peer = "peer-remote-sync-unavailable-snapshot";
+    daemon
+        .handle_rpc(rpc_request(95, "peer_sync", json!({ "peer": peer })))
+        .expect("seed peer");
+    {
+        let mut peers = daemon.peers.lock().expect("peers mutex poisoned");
+        let record = peers.get_mut(peer).expect("peer record");
+        record.restored_handled_ids.clear();
+        record.restored_unhandled_ids.clear();
+    }
+
+    let pending = PropagationEntryRecord {
+        transient_id: "e5".repeat(32),
+        destination: "1d".repeat(16),
+        payload_hex: "1d".repeat(20),
+        received_at: 1_700_000_805,
+        size_bytes: 20,
+        stamp_value: None,
+    };
+    daemon.store.upsert_propagation_entry(&pending).expect("store entry");
+    daemon
+        .store
+        .mark_peer_unhandled_propagation(peer, pending.transient_id.as_str())
+        .expect("seed live queue mark");
+
+    let err = daemon
+        .handle_rpc(rpc_request(
+            96,
+            "propagation_remote_sync",
+            json!({
+                "remote": "remote-without-bridge",
+                "peer": peer,
+            }),
+        ))
+        .expect_err("missing bridge should reject remote sync");
+    assert_eq!(err.kind(), std::io::ErrorKind::Other);
+    assert_eq!(err.to_string(), "remote control bridge unavailable");
+
+    let peers = daemon.peers.lock().expect("peers mutex poisoned");
+    let record = peers.get(peer).expect("stored peer");
+    let serialized = serde_json::to_value(record).expect("serialize peer record");
+    assert_eq!(
+        serialized["handled_ids"].as_array().expect("serialized handled ids"),
+        &[] as &[JsonValue]
+    );
+    assert_eq!(
+        serialized["unhandled_ids"].as_array().expect("serialized unhandled ids"),
+        &[json!(pending.transient_id.as_str())]
+    );
+}
+
+#[test]
+fn propagation_remote_sync_missing_bridge_reports_existing_peer_failure_like_python() {
+    let daemon = RpcDaemon::test_instance();
+    let peer = "peer-remote-sync-unavailable-event";
+    daemon
+        .handle_rpc(rpc_request(96, "peer_sync", json!({ "peer": peer })))
+        .expect("seed peer");
+    {
+        let mut peers = daemon.peers.lock().expect("peers mutex poisoned");
+        let record = peers.get_mut(peer).expect("peer record");
+        record.restored_handled_ids.clear();
+        record.restored_unhandled_ids.clear();
+    }
+
+    let pending = PropagationEntryRecord {
+        transient_id: "e6".repeat(32),
+        destination: "1e".repeat(16),
+        payload_hex: "1e".repeat(20),
+        received_at: 1_700_000_806,
+        size_bytes: 20,
+        stamp_value: None,
+    };
+    daemon.store.upsert_propagation_entry(&pending).expect("store entry");
+    daemon
+        .store
+        .mark_peer_unhandled_propagation(peer, pending.transient_id.as_str())
+        .expect("seed live queue mark");
+    daemon.event_queue.lock().expect("event_queue mutex poisoned").clear();
+
+    let err = daemon
+        .handle_rpc(rpc_request(
+            97,
+            "propagation_remote_sync",
+            json!({
+                "remote": "remote-without-bridge",
+                "peer": peer,
+            }),
+        ))
+        .expect_err("missing bridge should reject remote sync");
+    assert_eq!(err.kind(), std::io::ErrorKind::Other);
+    assert_eq!(err.to_string(), "remote control bridge unavailable");
+
+    let status = daemon
+        .handle_rpc(RpcRequest { id: 98, method: "propagation_status".to_string(), params: None })
+        .expect("propagation status")
+        .result
+        .expect("propagation status result");
+    assert_eq!(status["propagation"]["sync_state"].as_u64(), Some(0xfe));
+    assert_eq!(status["propagation"]["state_name"].as_str(), Some("failed"));
+    assert_eq!(
+        status["propagation"]["last_sync_error"].as_str(),
+        Some("remote control bridge unavailable")
+    );
+
+    let event = daemon
+        .event_queue
+        .lock()
+        .expect("event_queue mutex poisoned")
+        .iter()
+        .rev()
+        .find(|event| event.event_type == "peer_sync")
+        .cloned()
+        .expect("missing bridge peer sync event");
+    assert_eq!(event.payload["peer"].as_str(), Some(peer));
+    assert_eq!(event.payload["remote"].as_str(), Some("remote-without-bridge"));
+    assert_eq!(event.payload["remote_sync"].as_bool(), Some(true));
+    assert_eq!(event.payload["synced"].as_bool(), Some(false));
+    assert_eq!(
+        event.payload["propagation"]["error"].as_str(),
+        Some("remote control bridge unavailable")
+    );
+    assert_eq!(
+        event.payload["messages"]["unhandled_ids"].as_array().expect("event unhandled ids"),
+        &[json!(pending.transient_id.as_str())]
+    );
+}
+
+#[test]
+fn propagation_remote_sync_missing_bridge_records_case_insensitive_queue_snapshot_like_python() {
+    let daemon = RpcDaemon::test_instance();
+    let stored_peer = "Peer-Remote-Sync-Unavailable-Snapshot-Case";
+    let request_peer = stored_peer.to_ascii_lowercase();
+    daemon
+        .handle_rpc(rpc_request(78, "peer_sync", json!({ "peer": stored_peer })))
+        .expect("seed peer");
+    {
+        let mut peers = daemon.peers.lock().expect("peers mutex poisoned");
+        let record = peers.get_mut(stored_peer).expect("peer record");
+        record.restored_handled_ids.clear();
+        record.restored_unhandled_ids.clear();
+    }
+
+    let pending = PropagationEntryRecord {
+        transient_id: "ea".repeat(32),
+        destination: "20".repeat(16),
+        payload_hex: "20".repeat(20),
+        received_at: 1_700_000_808,
+        size_bytes: 20,
+        stamp_value: None,
+    };
+    daemon.store.upsert_propagation_entry(&pending).expect("store entry");
+    daemon
+        .store
+        .mark_peer_unhandled_propagation(stored_peer, pending.transient_id.as_str())
+        .expect("seed live queue mark");
+
+    let err = daemon
+        .handle_rpc(rpc_request(
+            79,
+            "propagation_remote_sync",
+            json!({
+                "remote": "remote-without-bridge",
+                "peer": request_peer,
+            }),
+        ))
+        .expect_err("missing bridge should reject remote sync");
+    assert_eq!(err.kind(), std::io::ErrorKind::Other);
+    assert_eq!(err.to_string(), "remote control bridge unavailable");
+
+    let peers = daemon.peers.lock().expect("peers mutex poisoned");
+    let record = peers.get(stored_peer).expect("stored peer");
+    let serialized = serde_json::to_value(record).expect("serialize peer record");
+    assert_eq!(
+        serialized["handled_ids"].as_array().expect("serialized handled ids"),
+        &[] as &[JsonValue]
+    );
+    assert_eq!(
+        serialized["unhandled_ids"].as_array().expect("serialized unhandled ids"),
+        &[json!(pending.transient_id.as_str())]
+    );
 }
 
 #[test]
@@ -12189,6 +12726,72 @@ fn propagation_remote_sync_updates_peer_runtime_state() {
     assert_eq!(
         event.payload["propagation"]["transferred_bytes"].as_u64(),
         Some(payload.len() as u64)
+    );
+}
+
+#[test]
+fn propagation_remote_sync_success_records_existing_queue_snapshot_like_python() {
+    let daemon = RpcDaemon::test_instance();
+    let peer = "peer-remote-success-live-queue-snapshot";
+    daemon.set_remote_control_bridge(Arc::new(TestRemoteControlBridge {
+        result: Ok(json!({
+            "synced": true,
+            "messages": [],
+        })),
+    }));
+    daemon
+        .handle_rpc(rpc_request(73, "peer_sync", json!({ "peer": peer })))
+        .expect("initial peer sync");
+    {
+        let mut peers = daemon.peers.lock().expect("peers mutex poisoned");
+        let record = peers.get_mut(peer).expect("peer record");
+        record.restored_handled_ids.clear();
+        record.restored_unhandled_ids.clear();
+    }
+    let pending = PropagationEntryRecord {
+        transient_id: "d2".repeat(32),
+        destination: "18".repeat(16),
+        payload_hex: "18".repeat(20),
+        received_at: 1_700_000_732,
+        size_bytes: 20,
+        stamp_value: None,
+    };
+    daemon.store.upsert_propagation_entry(&pending).expect("store pending entry");
+    daemon
+        .store
+        .mark_peer_unhandled_propagation(peer, pending.transient_id.as_str())
+        .expect("seed live queue mark");
+
+    let remote_sync = daemon
+        .handle_rpc(rpc_request(
+            74,
+            "propagation_remote_sync",
+            json!({
+                "remote": "remote-node",
+                "peer": peer,
+            }),
+        ))
+        .expect("remote sync")
+        .result
+        .expect("remote sync result");
+    assert_eq!(remote_sync["peer_sync"]["synced"].as_bool(), Some(true));
+    assert_eq!(
+        remote_sync["peer_sync"]["messages"]["unhandled_ids"]
+            .as_array()
+            .expect("response unhandled ids"),
+        &[json!(pending.transient_id.as_str())]
+    );
+
+    let peers = daemon.peers.lock().expect("peers mutex poisoned");
+    let record = peers.get(peer).expect("stored peer");
+    let serialized = serde_json::to_value(record).expect("serialize peer record");
+    assert_eq!(
+        serialized["handled_ids"].as_array().expect("serialized handled ids"),
+        &[] as &[JsonValue]
+    );
+    assert_eq!(
+        serialized["unhandled_ids"].as_array().expect("serialized unhandled ids"),
+        &[json!(pending.transient_id.as_str())]
     );
 }
 
@@ -12846,6 +13449,79 @@ fn duplicate_propagation_remote_fetch_queues_known_payload_without_double_counti
 }
 
 #[test]
+fn propagation_remote_fetch_deduplicates_same_response_for_peer_incoming_like_python() {
+    let payload = b"duplicate-same-fetch-response-payload";
+    let payload_hex = hex::encode(payload);
+    let transient_id = hex::encode(Sha256::digest(payload));
+    let source_peer = "remote-fetch-dedup-source";
+    let relay_peer = "remote-fetch-dedup-relay";
+    let daemon = RpcDaemon::test_instance();
+    daemon
+        .handle_rpc(rpc_request(72, "peer_sync", json!({ "peer": source_peer })))
+        .expect("seed source peer");
+    daemon
+        .handle_rpc(rpc_request(73, "peer_sync", json!({ "peer": relay_peer })))
+        .expect("seed relay peer");
+    daemon.set_remote_control_bridge(Arc::new(TestRemoteControlBridge {
+        result: Ok(json!({
+            "available_count": 2,
+            "fetched_count": 2,
+            "messages": [
+                {
+                    "transient_id": transient_id,
+                    "payload_hex": payload_hex,
+                },
+                {
+                    "transient_id": transient_id,
+                    "payload_hex": payload_hex,
+                },
+            ],
+        })),
+    }));
+
+    let result = daemon
+        .handle_rpc(rpc_request(
+            74,
+            "propagation_remote_fetch",
+            json!({ "remote": source_peer }),
+        ))
+        .expect("remote fetch")
+        .result
+        .expect("remote fetch result");
+    assert_eq!(result["result"]["imported_count"].as_u64(), Some(1));
+    assert_eq!(result["result"]["duplicate_count"].as_u64(), Some(1));
+    assert_eq!(result["result"]["imported_ids"], json!([transient_id]));
+
+    assert_eq!(
+        daemon
+            .store
+            .list_peer_handled_propagation_ids(source_peer)
+            .expect("source handled ids"),
+        vec![transient_id.clone()]
+    );
+    let relay_pending = daemon
+        .store
+        .list_peer_unhandled_propagation(relay_peer)
+        .expect("relay pending");
+    assert_eq!(relay_pending.len(), 1);
+    assert_eq!(relay_pending[0].transient_id, transient_id);
+
+    let peers = daemon
+        .handle_rpc(RpcRequest { id: 75, method: "list_peers".to_string(), params: None })
+        .expect("list peers")
+        .result
+        .expect("list peers result");
+    let source_row = peers["peers"]
+        .as_array()
+        .expect("peer rows")
+        .iter()
+        .find(|row| row["peer"].as_str() == Some(source_peer))
+        .expect("source peer row");
+    assert_eq!(source_row["messages"]["incoming"].as_u64(), Some(1));
+    assert_eq!(source_row["incoming"].as_u64(), Some(1));
+}
+
+#[test]
 fn propagation_remote_fetch_preserves_transfer_limited_peer_queue_mark_like_python() {
     let payload = b"remote-fetch-retry-transfer-limited-payload";
     let payload_hex = hex::encode(payload);
@@ -13331,6 +14007,239 @@ fn propagation_remote_download_forwards_transfer_limit_to_bridge() {
 }
 
 #[test]
+fn propagation_remote_fetch_missing_bridge_records_existing_queue_snapshot_like_python() {
+    let daemon = RpcDaemon::test_instance();
+    let peer = "peer-remote-fetch-unavailable-snapshot";
+    daemon
+        .handle_rpc(rpc_request(78, "peer_sync", json!({ "peer": peer })))
+        .expect("seed peer");
+    {
+        let mut peers = daemon.peers.lock().expect("peers mutex poisoned");
+        let record = peers.get_mut(peer).expect("peer record");
+        record.restored_handled_ids.clear();
+        record.restored_unhandled_ids.clear();
+    }
+
+    let pending = PropagationEntryRecord {
+        transient_id: "e9".repeat(32),
+        destination: "1f".repeat(16),
+        payload_hex: "1f".repeat(20),
+        received_at: 1_700_000_807,
+        size_bytes: 20,
+        stamp_value: None,
+    };
+    daemon.store.upsert_propagation_entry(&pending).expect("store entry");
+    daemon
+        .store
+        .mark_peer_unhandled_propagation(peer, pending.transient_id.as_str())
+        .expect("seed live queue mark");
+
+    let err = daemon
+        .handle_rpc(rpc_request(
+            79,
+            "propagation_remote_fetch",
+            json!({
+                "remote": "remote-without-bridge",
+            }),
+        ))
+        .expect_err("missing bridge should reject remote fetch");
+    assert_eq!(err.kind(), std::io::ErrorKind::Other);
+    assert_eq!(err.to_string(), "remote control bridge unavailable");
+
+    let peers = daemon.peers.lock().expect("peers mutex poisoned");
+    let record = peers.get(peer).expect("stored peer");
+    let serialized = serde_json::to_value(record).expect("serialize peer record");
+    assert_eq!(
+        serialized["handled_ids"].as_array().expect("serialized handled ids"),
+        &[] as &[JsonValue]
+    );
+    assert_eq!(
+        serialized["unhandled_ids"].as_array().expect("serialized unhandled ids"),
+        &[json!(pending.transient_id.as_str())]
+    );
+}
+
+#[test]
+fn propagation_remote_download_missing_bridge_records_existing_queue_snapshot_like_python() {
+    let daemon = RpcDaemon::test_instance();
+    let peer = "peer-remote-download-unavailable-snapshot";
+    daemon
+        .handle_rpc(rpc_request(78, "peer_sync", json!({ "peer": peer })))
+        .expect("seed peer");
+    {
+        let mut peers = daemon.peers.lock().expect("peers mutex poisoned");
+        let record = peers.get_mut(peer).expect("peer record");
+        record.restored_handled_ids.clear();
+        record.restored_unhandled_ids.clear();
+    }
+
+    let pending = PropagationEntryRecord {
+        transient_id: "e8".repeat(32),
+        destination: "1e".repeat(16),
+        payload_hex: "1e".repeat(20),
+        received_at: 1_700_000_806,
+        size_bytes: 20,
+        stamp_value: None,
+    };
+    daemon.store.upsert_propagation_entry(&pending).expect("store entry");
+    daemon
+        .store
+        .mark_peer_unhandled_propagation(peer, pending.transient_id.as_str())
+        .expect("seed live queue mark");
+
+    let err = daemon
+        .handle_rpc(rpc_request(
+            79,
+            "propagation_remote_download",
+            json!({
+                "remote": "remote-without-bridge",
+            }),
+        ))
+        .expect_err("missing bridge should reject remote download");
+    assert_eq!(err.kind(), std::io::ErrorKind::Other);
+    assert_eq!(err.to_string(), "remote control bridge unavailable");
+
+    let peers = daemon.peers.lock().expect("peers mutex poisoned");
+    let record = peers.get(peer).expect("stored peer");
+    let serialized = serde_json::to_value(record).expect("serialize peer record");
+    assert_eq!(
+        serialized["handled_ids"].as_array().expect("serialized handled ids"),
+        &[] as &[JsonValue]
+    );
+    assert_eq!(
+        serialized["unhandled_ids"].as_array().expect("serialized unhandled ids"),
+        &[json!(pending.transient_id.as_str())]
+    );
+}
+
+#[test]
+fn propagation_remote_fetch_success_records_existing_queue_snapshot_like_python() {
+    let daemon = RpcDaemon::test_instance();
+    daemon.set_remote_control_bridge(Arc::new(TestRemoteControlBridge {
+        result: Ok(json!({
+            "available_count": 0,
+            "fetched_count": 0,
+            "messages": [],
+        })),
+    }));
+    let peer = "peer-remote-fetch-success-snapshot";
+    daemon
+        .handle_rpc(rpc_request(80, "peer_sync", json!({ "peer": peer })))
+        .expect("initial peer sync");
+    {
+        let mut peers = daemon.peers.lock().expect("peers mutex poisoned");
+        let record = peers.get_mut(peer).expect("peer record");
+        record.restored_handled_ids.clear();
+        record.restored_unhandled_ids.clear();
+    }
+    let pending = PropagationEntryRecord {
+        transient_id: "e7".repeat(32),
+        destination: "17".repeat(16),
+        payload_hex: "17".repeat(24),
+        received_at: 1_700_000_805,
+        size_bytes: 24,
+        stamp_value: None,
+    };
+    daemon.store.upsert_propagation_entry(&pending).expect("store propagation entry");
+    daemon
+        .store
+        .mark_peer_unhandled_propagation(peer, pending.transient_id.as_str())
+        .expect("mark unhandled");
+
+    daemon
+        .handle_rpc(rpc_request(
+            81,
+            "propagation_remote_fetch",
+            json!({
+                "remote": "remote-node",
+            }),
+        ))
+        .expect("remote fetch success should preserve queued retry snapshot");
+    assert_eq!(
+        daemon
+            .store
+            .list_peer_unhandled_propagation(peer)
+            .expect("pending propagation"),
+        vec![pending.clone()]
+    );
+
+    let peers = daemon.peers.lock().expect("peers mutex poisoned");
+    let record = peers.get(peer).expect("stored peer");
+    let serialized = serde_json::to_value(record).expect("serialize peer record");
+    assert_eq!(
+        serialized["handled_ids"].as_array().expect("serialized handled ids"),
+        &[] as &[JsonValue]
+    );
+    assert_eq!(
+        serialized["unhandled_ids"].as_array().expect("serialized unhandled ids"),
+        &[json!(pending.transient_id.as_str())]
+    );
+}
+
+#[test]
+fn propagation_remote_download_success_records_existing_queue_snapshot_like_python() {
+    let daemon = RpcDaemon::test_instance();
+    daemon.set_remote_control_bridge(Arc::new(TestRemoteControlBridge {
+        result: Ok(json!({
+            "downloaded_count": 0,
+            "messages": [],
+        })),
+    }));
+    let peer = "peer-remote-download-success-snapshot";
+    daemon
+        .handle_rpc(rpc_request(80, "peer_sync", json!({ "peer": peer })))
+        .expect("initial peer sync");
+    {
+        let mut peers = daemon.peers.lock().expect("peers mutex poisoned");
+        let record = peers.get_mut(peer).expect("peer record");
+        record.restored_handled_ids.clear();
+        record.restored_unhandled_ids.clear();
+    }
+    let pending = PropagationEntryRecord {
+        transient_id: "e6".repeat(32),
+        destination: "16".repeat(16),
+        payload_hex: "16".repeat(24),
+        received_at: 1_700_000_804,
+        size_bytes: 24,
+        stamp_value: None,
+    };
+    daemon.store.upsert_propagation_entry(&pending).expect("store propagation entry");
+    daemon
+        .store
+        .mark_peer_unhandled_propagation(peer, pending.transient_id.as_str())
+        .expect("mark unhandled");
+
+    daemon
+        .handle_rpc(rpc_request(
+            81,
+            "propagation_remote_download",
+            json!({
+                "remote": "remote-node",
+            }),
+        ))
+        .expect("remote download success should preserve queued retry snapshot");
+    assert_eq!(
+        daemon
+            .store
+            .list_peer_unhandled_propagation(peer)
+            .expect("pending propagation"),
+        vec![pending.clone()]
+    );
+
+    let peers = daemon.peers.lock().expect("peers mutex poisoned");
+    let record = peers.get(peer).expect("stored peer");
+    let serialized = serde_json::to_value(record).expect("serialize peer record");
+    assert_eq!(
+        serialized["handled_ids"].as_array().expect("serialized handled ids"),
+        &[] as &[JsonValue]
+    );
+    assert_eq!(
+        serialized["unhandled_ids"].as_array().expect("serialized unhandled ids"),
+        &[json!(pending.transient_id.as_str())]
+    );
+}
+
+#[test]
 fn propagation_remote_sync_forwards_transfer_limit_to_bridge() {
     let daemon = RpcDaemon::test_instance();
     daemon.set_remote_control_bridge(Arc::new(TransferLimitRemoteControlBridge));
@@ -13412,6 +14321,322 @@ fn failed_propagation_remote_download_import_updates_lifecycle_error() {
     assert!(propagation["last_sync_error"]
         .as_str()
         .is_some_and(|value| value.contains("invalid remote propagation payload hex")));
+}
+
+#[test]
+fn failed_propagation_remote_download_import_records_existing_queue_snapshot_like_python() {
+    let daemon = RpcDaemon::test_instance();
+    daemon.set_remote_control_bridge(Arc::new(TestRemoteControlBridge {
+        result: Ok(json!({
+            "downloaded_count": 1,
+            "imported_count": 1,
+            "messages": [{
+                "payload_hex": "not-hex",
+            }],
+        })),
+    }));
+    let peer = "peer-remote-download-import-fail-snapshot";
+    daemon
+        .handle_rpc(rpc_request(80, "peer_sync", json!({ "peer": peer })))
+        .expect("initial peer sync");
+    {
+        let mut peers = daemon.peers.lock().expect("peers mutex poisoned");
+        let record = peers.get_mut(peer).expect("peer record");
+        record.restored_handled_ids.clear();
+        record.restored_unhandled_ids.clear();
+    }
+    let pending = PropagationEntryRecord {
+        transient_id: "b7".repeat(32),
+        destination: "12".repeat(16),
+        payload_hex: "12".repeat(24),
+        received_at: 1_700_000_618,
+        size_bytes: 24,
+        stamp_value: None,
+    };
+    daemon.store.upsert_propagation_entry(&pending).expect("store propagation entry");
+    daemon
+        .store
+        .mark_peer_unhandled_propagation(peer, pending.transient_id.as_str())
+        .expect("mark unhandled");
+
+    let err = daemon
+        .handle_rpc(rpc_request(
+            81,
+            "propagation_remote_download",
+            json!({
+                "remote": "remote-node",
+            }),
+        ))
+        .expect_err("remote download import failure should be returned");
+    assert_eq!(err.kind(), std::io::ErrorKind::InvalidInput);
+    assert!(err.to_string().contains("invalid remote propagation payload hex"));
+    assert_eq!(
+        daemon
+            .store
+            .list_peer_unhandled_propagation(peer)
+            .expect("pending propagation"),
+        vec![pending.clone()]
+    );
+
+    let peers = daemon.peers.lock().expect("peers mutex poisoned");
+    let record = peers.get(peer).expect("stored peer");
+    let serialized = serde_json::to_value(record).expect("serialize peer record");
+    assert_eq!(
+        serialized["handled_ids"].as_array().expect("serialized handled ids"),
+        &[] as &[JsonValue]
+    );
+    assert_eq!(
+        serialized["unhandled_ids"].as_array().expect("serialized unhandled ids"),
+        &[json!(pending.transient_id.as_str())]
+    );
+}
+
+#[test]
+fn failed_propagation_remote_download_records_existing_queue_snapshot_like_python() {
+    let daemon = RpcDaemon::test_instance();
+    daemon.set_remote_control_bridge(Arc::new(TestRemoteControlBridge {
+        result: Err(std::io::ErrorKind::TimedOut),
+    }));
+    let peer = "peer-remote-download-fail-snapshot";
+    daemon
+        .handle_rpc(rpc_request(80, "peer_sync", json!({ "peer": peer })))
+        .expect("initial peer sync");
+    {
+        let mut peers = daemon.peers.lock().expect("peers mutex poisoned");
+        let record = peers.get_mut(peer).expect("peer record");
+        record.restored_handled_ids.clear();
+        record.restored_unhandled_ids.clear();
+    }
+    let pending = PropagationEntryRecord {
+        transient_id: "b8".repeat(32),
+        destination: "12".repeat(16),
+        payload_hex: "12".repeat(24),
+        received_at: 1_700_000_619,
+        size_bytes: 24,
+        stamp_value: None,
+    };
+    daemon.store.upsert_propagation_entry(&pending).expect("store propagation entry");
+    daemon
+        .store
+        .mark_peer_unhandled_propagation(peer, pending.transient_id.as_str())
+        .expect("mark unhandled");
+
+    let err = daemon
+        .handle_rpc(rpc_request(
+            81,
+            "propagation_remote_download",
+            json!({
+                "remote": "remote-node",
+            }),
+        ))
+        .expect_err("remote download bridge failure should be returned");
+    assert_eq!(err.kind(), std::io::ErrorKind::TimedOut);
+    assert_eq!(
+        daemon
+            .store
+            .list_peer_unhandled_propagation(peer)
+            .expect("pending propagation"),
+        vec![pending.clone()]
+    );
+
+    let peers = daemon.peers.lock().expect("peers mutex poisoned");
+    let record = peers.get(peer).expect("stored peer");
+    let serialized = serde_json::to_value(record).expect("serialize peer record");
+    assert_eq!(
+        serialized["handled_ids"].as_array().expect("serialized handled ids"),
+        &[] as &[JsonValue]
+    );
+    assert_eq!(
+        serialized["unhandled_ids"].as_array().expect("serialized unhandled ids"),
+        &[json!(pending.transient_id.as_str())]
+    );
+}
+
+#[test]
+fn failed_propagation_remote_fetch_import_records_existing_queue_snapshot_like_python() {
+    let daemon = RpcDaemon::test_instance();
+    daemon.set_remote_control_bridge(Arc::new(TestRemoteControlBridge {
+        result: Ok(json!({
+            "available_count": 1,
+            "fetched_count": 1,
+            "messages": [{
+                "payload_hex": "not-hex",
+            }],
+        })),
+    }));
+    let peer = "peer-remote-fetch-import-fail-snapshot";
+    daemon
+        .handle_rpc(rpc_request(80, "peer_sync", json!({ "peer": peer })))
+        .expect("initial peer sync");
+    {
+        let mut peers = daemon.peers.lock().expect("peers mutex poisoned");
+        let record = peers.get_mut(peer).expect("peer record");
+        record.restored_handled_ids.clear();
+        record.restored_unhandled_ids.clear();
+    }
+    let pending = PropagationEntryRecord {
+        transient_id: "b6".repeat(32),
+        destination: "12".repeat(16),
+        payload_hex: "12".repeat(24),
+        received_at: 1_700_000_617,
+        size_bytes: 24,
+        stamp_value: None,
+    };
+    daemon.store.upsert_propagation_entry(&pending).expect("store propagation entry");
+    daemon
+        .store
+        .mark_peer_unhandled_propagation(peer, pending.transient_id.as_str())
+        .expect("mark unhandled");
+
+    let err = daemon
+        .handle_rpc(rpc_request(
+            81,
+            "propagation_remote_fetch",
+            json!({
+                "remote": "remote-node",
+            }),
+        ))
+        .expect_err("remote fetch import failure should be returned");
+    assert_eq!(err.kind(), std::io::ErrorKind::InvalidInput);
+    assert!(err.to_string().contains("invalid remote propagation payload hex"));
+    assert_eq!(
+        daemon
+            .store
+            .list_peer_unhandled_propagation(peer)
+            .expect("pending propagation"),
+        vec![pending.clone()]
+    );
+
+    let peers = daemon.peers.lock().expect("peers mutex poisoned");
+    let record = peers.get(peer).expect("stored peer");
+    let serialized = serde_json::to_value(record).expect("serialize peer record");
+    assert_eq!(
+        serialized["handled_ids"].as_array().expect("serialized handled ids"),
+        &[] as &[JsonValue]
+    );
+    assert_eq!(
+        serialized["unhandled_ids"].as_array().expect("serialized unhandled ids"),
+        &[json!(pending.transient_id.as_str())]
+    );
+}
+
+#[test]
+fn failed_propagation_remote_fetch_records_existing_queue_snapshot_like_python() {
+    let daemon = RpcDaemon::test_instance();
+    daemon.set_remote_control_bridge(Arc::new(TestRemoteControlBridge {
+        result: Err(std::io::ErrorKind::TimedOut),
+    }));
+    let peer = "peer-remote-fetch-fail-snapshot";
+    daemon
+        .handle_rpc(rpc_request(80, "peer_sync", json!({ "peer": peer })))
+        .expect("initial peer sync");
+    {
+        let mut peers = daemon.peers.lock().expect("peers mutex poisoned");
+        let record = peers.get_mut(peer).expect("peer record");
+        record.restored_handled_ids.clear();
+        record.restored_unhandled_ids.clear();
+    }
+    let pending = PropagationEntryRecord {
+        transient_id: "b9".repeat(32),
+        destination: "12".repeat(16),
+        payload_hex: "12".repeat(24),
+        received_at: 1_700_000_620,
+        size_bytes: 24,
+        stamp_value: None,
+    };
+    daemon.store.upsert_propagation_entry(&pending).expect("store propagation entry");
+    daemon
+        .store
+        .mark_peer_unhandled_propagation(peer, pending.transient_id.as_str())
+        .expect("mark unhandled");
+
+    let err = daemon
+        .handle_rpc(rpc_request(
+            81,
+            "propagation_remote_fetch",
+            json!({
+                "remote": "remote-node",
+            }),
+        ))
+        .expect_err("remote fetch bridge failure should be returned");
+    assert_eq!(err.kind(), std::io::ErrorKind::TimedOut);
+    assert_eq!(
+        daemon
+            .store
+            .list_peer_unhandled_propagation(peer)
+            .expect("pending propagation"),
+        vec![pending.clone()]
+    );
+
+    let peers = daemon.peers.lock().expect("peers mutex poisoned");
+    let record = peers.get(peer).expect("stored peer");
+    let serialized = serde_json::to_value(record).expect("serialize peer record");
+    assert_eq!(
+        serialized["handled_ids"].as_array().expect("serialized handled ids"),
+        &[] as &[JsonValue]
+    );
+    assert_eq!(
+        serialized["unhandled_ids"].as_array().expect("serialized unhandled ids"),
+        &[json!(pending.transient_id.as_str())]
+    );
+}
+
+#[test]
+fn failed_propagation_remote_fetch_prunes_stale_queue_snapshot_ids_like_python() {
+    let daemon = RpcDaemon::test_instance();
+    daemon.set_remote_control_bridge(Arc::new(TestRemoteControlBridge {
+        result: Err(std::io::ErrorKind::TimedOut),
+    }));
+    let peer = "peer-remote-fetch-fail-stale-snapshot";
+    let stale_handled_id = "f6".repeat(32);
+    let stale_unhandled_id = "f7".repeat(32);
+    daemon
+        .handle_rpc(rpc_request(80, "peer_sync", json!({ "peer": peer })))
+        .expect("initial peer sync");
+    {
+        let mut peers = daemon.peers.lock().expect("peers mutex poisoned");
+        let record = peers.get_mut(peer).expect("peer record");
+        record.restored_handled_ids.clear();
+        record.restored_unhandled_ids.clear();
+        record.restored_handled_ids.push(stale_handled_id);
+        record.restored_unhandled_ids.push(stale_unhandled_id);
+    }
+    let pending = PropagationEntryRecord {
+        transient_id: "ba".repeat(32),
+        destination: "12".repeat(16),
+        payload_hex: "12".repeat(24),
+        received_at: 1_700_000_621,
+        size_bytes: 24,
+        stamp_value: None,
+    };
+    daemon.store.upsert_propagation_entry(&pending).expect("store propagation entry");
+    daemon
+        .store
+        .mark_peer_unhandled_propagation(peer, pending.transient_id.as_str())
+        .expect("mark unhandled");
+
+    let err = daemon
+        .handle_rpc(rpc_request(
+            81,
+            "propagation_remote_fetch",
+            json!({
+                "remote": "remote-node",
+            }),
+        ))
+        .expect_err("remote fetch bridge failure should be returned");
+    assert_eq!(err.kind(), std::io::ErrorKind::TimedOut);
+
+    let peers = daemon.peers.lock().expect("peers mutex poisoned");
+    let record = peers.get(peer).expect("stored peer");
+    let serialized = serde_json::to_value(record).expect("serialize peer record");
+    assert_eq!(
+        serialized["handled_ids"].as_array().expect("serialized handled ids"),
+        &[] as &[JsonValue]
+    );
+    assert_eq!(
+        serialized["unhandled_ids"].as_array().expect("serialized unhandled ids"),
+        &[json!(pending.transient_id.as_str())]
+    );
 }
 
 #[test]
@@ -13559,6 +14784,68 @@ fn failed_propagation_remote_sync_updates_peer_backoff() {
 }
 
 #[test]
+fn failed_propagation_remote_sync_records_existing_queue_snapshot_like_python() {
+    let daemon = RpcDaemon::test_instance();
+    daemon.set_remote_control_bridge(Arc::new(TestRemoteControlBridge {
+        result: Err(std::io::ErrorKind::TimedOut),
+    }));
+    let peer = "peer-remote-fail-snapshot";
+    daemon
+        .handle_rpc(rpc_request(75, "peer_sync", json!({ "peer": peer })))
+        .expect("initial peer sync");
+    {
+        let mut peers = daemon.peers.lock().expect("peers mutex poisoned");
+        let record = peers.get_mut(peer).expect("peer record");
+        record.restored_handled_ids.clear();
+        record.restored_unhandled_ids.clear();
+    }
+    let pending = PropagationEntryRecord {
+        transient_id: "b4".repeat(32),
+        destination: "12".repeat(16),
+        payload_hex: "12".repeat(24),
+        received_at: 1_700_000_615,
+        size_bytes: 24,
+        stamp_value: None,
+    };
+    daemon.store.upsert_propagation_entry(&pending).expect("store propagation entry");
+    daemon
+        .store
+        .mark_peer_unhandled_propagation(peer, pending.transient_id.as_str())
+        .expect("mark unhandled");
+
+    let err = daemon
+        .handle_rpc(rpc_request(
+            76,
+            "propagation_remote_sync",
+            json!({
+                "remote": "remote-node",
+                "peer": peer,
+            }),
+        ))
+        .expect_err("remote sync failure should be returned");
+    assert_eq!(err.kind(), std::io::ErrorKind::TimedOut);
+    assert_eq!(
+        daemon
+            .store
+            .list_peer_unhandled_propagation(peer)
+            .expect("pending propagation"),
+        vec![pending.clone()]
+    );
+
+    let peers = daemon.peers.lock().expect("peers mutex poisoned");
+    let record = peers.get(peer).expect("stored peer");
+    let serialized = serde_json::to_value(record).expect("serialize peer record");
+    assert_eq!(
+        serialized["handled_ids"].as_array().expect("serialized handled ids"),
+        &[] as &[JsonValue]
+    );
+    assert_eq!(
+        serialized["unhandled_ids"].as_array().expect("serialized unhandled ids"),
+        &[json!(pending.transient_id.as_str())]
+    );
+}
+
+#[test]
 fn throttled_propagation_remote_sync_uses_python_retry_window_without_breaking_liveness() {
     let daemon = RpcDaemon::test_instance();
     daemon.set_remote_control_bridge(Arc::new(TestRemoteControlBridge {
@@ -13627,6 +14914,68 @@ fn throttled_propagation_remote_sync_uses_python_retry_window_without_breaking_l
     assert_eq!(
         event.payload["next_sync_attempt"].as_i64(),
         Some(last_sync_attempt + 180)
+    );
+}
+
+#[test]
+fn throttled_propagation_remote_sync_records_existing_queue_snapshot_like_python() {
+    let daemon = RpcDaemon::test_instance();
+    daemon.set_remote_control_bridge(Arc::new(TestRemoteControlBridge {
+        result: Err(std::io::ErrorKind::WouldBlock),
+    }));
+    let peer = "peer-remote-throttle-snapshot";
+    daemon
+        .handle_rpc(rpc_request(75, "peer_sync", json!({ "peer": peer })))
+        .expect("initial peer sync");
+    {
+        let mut peers = daemon.peers.lock().expect("peers mutex poisoned");
+        let record = peers.get_mut(peer).expect("peer record");
+        record.restored_handled_ids.clear();
+        record.restored_unhandled_ids.clear();
+    }
+    let pending = PropagationEntryRecord {
+        transient_id: "b3".repeat(32),
+        destination: "12".repeat(16),
+        payload_hex: "12".repeat(24),
+        received_at: 1_700_000_614,
+        size_bytes: 24,
+        stamp_value: None,
+    };
+    daemon.store.upsert_propagation_entry(&pending).expect("store propagation entry");
+    daemon
+        .store
+        .mark_peer_unhandled_propagation(peer, pending.transient_id.as_str())
+        .expect("mark unhandled");
+
+    let err = daemon
+        .handle_rpc(rpc_request(
+            76,
+            "propagation_remote_sync",
+            json!({
+                "remote": "remote-node",
+                "peer": peer,
+            }),
+        ))
+        .expect_err("remote sync throttling should be returned");
+    assert_eq!(err.kind(), std::io::ErrorKind::WouldBlock);
+    assert_eq!(
+        daemon
+            .store
+            .list_peer_unhandled_propagation(peer)
+            .expect("pending propagation"),
+        vec![pending.clone()]
+    );
+
+    let peers = daemon.peers.lock().expect("peers mutex poisoned");
+    let record = peers.get(peer).expect("stored peer");
+    let serialized = serde_json::to_value(record).expect("serialize peer record");
+    assert_eq!(
+        serialized["handled_ids"].as_array().expect("serialized handled ids"),
+        &[] as &[JsonValue]
+    );
+    assert_eq!(
+        serialized["unhandled_ids"].as_array().expect("serialized unhandled ids"),
+        &[json!(pending.transient_id.as_str())]
     );
 }
 
@@ -14230,6 +15579,70 @@ fn invalid_stamp_propagation_remote_sync_preserves_peer_queue_without_backoff() 
 }
 
 #[test]
+fn retryable_propagation_remote_sync_records_existing_queue_snapshot_like_python() {
+    let daemon = RpcDaemon::test_instance();
+    daemon.set_remote_control_bridge(Arc::new(RemoteSyncErrorBridge {
+        kind: std::io::ErrorKind::PermissionDenied,
+        message: "propagation peer invalid stamp",
+    }));
+    let peer = "peer-remote-retry-snapshot";
+    daemon
+        .handle_rpc(rpc_request(96, "peer_sync", json!({ "peer": peer })))
+        .expect("initial peer sync");
+    {
+        let mut peers = daemon.peers.lock().expect("peers mutex poisoned");
+        let record = peers.get_mut(peer).expect("peer record");
+        record.restored_handled_ids.clear();
+        record.restored_unhandled_ids.clear();
+    }
+    let pending = PropagationEntryRecord {
+        transient_id: "b2".repeat(32),
+        destination: "12".repeat(16),
+        payload_hex: "12".repeat(24),
+        received_at: 1_700_000_613,
+        size_bytes: 24,
+        stamp_value: None,
+    };
+    daemon.store.upsert_propagation_entry(&pending).expect("store propagation entry");
+    daemon
+        .store
+        .mark_peer_unhandled_propagation(peer, pending.transient_id.as_str())
+        .expect("mark unhandled");
+
+    let err = daemon
+        .handle_rpc(rpc_request(
+            97,
+            "propagation_remote_sync",
+            json!({
+                "remote": "remote-node",
+                "peer": peer,
+            }),
+        ))
+        .expect_err("retryable remote sync should return the bridge error");
+    assert_eq!(err.kind(), std::io::ErrorKind::PermissionDenied);
+    assert_eq!(err.to_string(), "propagation peer invalid stamp");
+    assert_eq!(
+        daemon
+            .store
+            .list_peer_unhandled_propagation(peer)
+            .expect("pending propagation"),
+        vec![pending.clone()]
+    );
+
+    let peers = daemon.peers.lock().expect("peers mutex poisoned");
+    let record = peers.get(peer).expect("stored peer");
+    let serialized = serde_json::to_value(record).expect("serialize peer record");
+    assert_eq!(
+        serialized["handled_ids"].as_array().expect("serialized handled ids"),
+        &[] as &[JsonValue]
+    );
+    assert_eq!(
+        serialized["unhandled_ids"].as_array().expect("serialized unhandled ids"),
+        &[json!(pending.transient_id.as_str())]
+    );
+}
+
+#[test]
 fn unknown_numeric_propagation_remote_sync_preserves_peer_queue_like_python() {
     let daemon = RpcDaemon::test_instance();
     daemon.set_remote_control_bridge(Arc::new(RemoteSyncErrorBridge {
@@ -14440,6 +15853,74 @@ fn failed_propagation_remote_sync_import_updates_peer_backoff() {
 }
 
 #[test]
+fn failed_propagation_remote_sync_import_records_existing_queue_snapshot_like_python() {
+    let daemon = RpcDaemon::test_instance();
+    daemon.set_remote_control_bridge(Arc::new(TestRemoteControlBridge {
+        result: Ok(json!({
+            "synced": true,
+            "messages": [{
+                "payload_hex": "not-hex",
+            }],
+        })),
+    }));
+    let peer = "peer-remote-import-fail-snapshot";
+    daemon
+        .handle_rpc(rpc_request(75, "peer_sync", json!({ "peer": peer })))
+        .expect("initial peer sync");
+    {
+        let mut peers = daemon.peers.lock().expect("peers mutex poisoned");
+        let record = peers.get_mut(peer).expect("peer record");
+        record.restored_handled_ids.clear();
+        record.restored_unhandled_ids.clear();
+    }
+    let pending = PropagationEntryRecord {
+        transient_id: "b5".repeat(32),
+        destination: "12".repeat(16),
+        payload_hex: "12".repeat(24),
+        received_at: 1_700_000_616,
+        size_bytes: 24,
+        stamp_value: None,
+    };
+    daemon.store.upsert_propagation_entry(&pending).expect("store propagation entry");
+    daemon
+        .store
+        .mark_peer_unhandled_propagation(peer, pending.transient_id.as_str())
+        .expect("mark unhandled");
+
+    let err = daemon
+        .handle_rpc(rpc_request(
+            76,
+            "propagation_remote_sync",
+            json!({
+                "remote": "remote-node",
+                "peer": peer,
+            }),
+        ))
+        .expect_err("remote sync import failure should be returned");
+    assert_eq!(err.kind(), std::io::ErrorKind::InvalidInput);
+    assert!(err.to_string().contains("invalid remote propagation payload hex"));
+    assert_eq!(
+        daemon
+            .store
+            .list_peer_unhandled_propagation(peer)
+            .expect("pending propagation"),
+        vec![pending.clone()]
+    );
+
+    let peers = daemon.peers.lock().expect("peers mutex poisoned");
+    let record = peers.get(peer).expect("stored peer");
+    let serialized = serde_json::to_value(record).expect("serialize peer record");
+    assert_eq!(
+        serialized["handled_ids"].as_array().expect("serialized handled ids"),
+        &[] as &[JsonValue]
+    );
+    assert_eq!(
+        serialized["unhandled_ids"].as_array().expect("serialized unhandled ids"),
+        &[json!(pending.transient_id.as_str())]
+    );
+}
+
+#[test]
 fn propagation_remote_unpeer_clears_local_peer_and_queue_state() {
     let daemon = RpcDaemon::test_instance();
     daemon.set_remote_control_bridge(Arc::new(TestRemoteControlBridge {
@@ -14637,6 +16118,7 @@ fn propagation_remote_unpeer_reports_existing_peer_case_insensitively_like_pytho
         .result
         .expect("remote unpeer result");
     assert_eq!(result["peer"].as_str(), Some(stored_peer));
+    assert_eq!(result["result"]["peer"].as_str(), Some(stored_peer));
     assert_eq!(result["removed"].as_bool(), Some(true));
     assert_eq!(result["propagation_cleared"].as_u64(), Some(1));
     assert!(
@@ -14657,6 +16139,7 @@ fn propagation_remote_unpeer_reports_existing_peer_case_insensitively_like_pytho
         .cloned()
         .expect("peer unpeer event");
     assert_eq!(event.payload["peer"].as_str(), Some(stored_peer));
+    assert_eq!(event.payload["result"]["peer"].as_str(), Some(stored_peer));
     assert_eq!(event.payload["propagation_cleared"].as_u64(), Some(1));
 }
 
@@ -14798,6 +16281,219 @@ fn failed_propagation_remote_unpeer_preserves_local_peer_and_queue_state() {
             .list_peer_unhandled_propagation("peer-remote-unpeer-fail")
             .expect("list unhandled"),
         vec![entry]
+    );
+}
+
+#[test]
+fn failed_propagation_remote_unpeer_records_existing_queue_snapshot_like_python() {
+    let daemon = RpcDaemon::test_instance();
+    daemon.set_remote_control_bridge(Arc::new(TestRemoteControlBridge {
+        result: Err(std::io::ErrorKind::TimedOut),
+    }));
+    let peer = "peer-remote-unpeer-fail-snapshot";
+    daemon
+        .handle_rpc(rpc_request(79, "peer_sync", json!({ "peer": peer })))
+        .expect("peer sync");
+    {
+        let mut peers = daemon.peers.lock().expect("peers mutex poisoned");
+        let record = peers.get_mut(peer).expect("peer record");
+        record.restored_handled_ids.clear();
+        record.restored_unhandled_ids.clear();
+    }
+
+    let entry = PropagationEntryRecord {
+        transient_id: "e3".repeat(32),
+        destination: "1b".repeat(16),
+        payload_hex: "1b".repeat(20),
+        received_at: 1_700_000_803,
+        size_bytes: 20,
+        stamp_value: None,
+    };
+    daemon.store.upsert_propagation_entry(&entry).expect("store propagation entry");
+    daemon
+        .store
+        .mark_peer_unhandled_propagation(peer, entry.transient_id.as_str())
+        .expect("mark unhandled");
+
+    let err = daemon
+        .handle_rpc(rpc_request(
+            80,
+            "propagation_remote_unpeer",
+            json!({
+                "remote": "remote-node",
+                "peer": peer,
+            }),
+        ))
+        .expect_err("remote unpeer failure should be returned");
+    assert_eq!(err.kind(), std::io::ErrorKind::TimedOut);
+
+    let peers = daemon.peers.lock().expect("peers mutex poisoned");
+    let record = peers.get(peer).expect("stored peer");
+    let serialized = serde_json::to_value(record).expect("serialize peer record");
+    assert_eq!(
+        serialized["handled_ids"].as_array().expect("serialized handled ids"),
+        &[] as &[JsonValue]
+    );
+    assert_eq!(
+        serialized["unhandled_ids"].as_array().expect("serialized unhandled ids"),
+        &[json!(entry.transient_id.as_str())]
+    );
+}
+
+#[test]
+fn failed_propagation_remote_unpeer_records_case_insensitive_queue_snapshot_like_python() {
+    let daemon = RpcDaemon::test_instance();
+    daemon.set_remote_control_bridge(Arc::new(TestRemoteControlBridge {
+        result: Err(std::io::ErrorKind::TimedOut),
+    }));
+    let stored_peer = "Peer-Remote-Unpeer-Fail-Snapshot-Case";
+    let request_peer = stored_peer.to_ascii_lowercase();
+    daemon
+        .handle_rpc(rpc_request(79, "peer_sync", json!({ "peer": stored_peer })))
+        .expect("peer sync");
+    {
+        let mut peers = daemon.peers.lock().expect("peers mutex poisoned");
+        let record = peers.get_mut(stored_peer).expect("peer record");
+        record.restored_handled_ids.clear();
+        record.restored_unhandled_ids.clear();
+    }
+
+    let entry = PropagationEntryRecord {
+        transient_id: "ed".repeat(32),
+        destination: "24".repeat(16),
+        payload_hex: "24".repeat(20),
+        received_at: 1_700_000_809,
+        size_bytes: 20,
+        stamp_value: None,
+    };
+    daemon.store.upsert_propagation_entry(&entry).expect("store propagation entry");
+    daemon
+        .store
+        .mark_peer_unhandled_propagation(stored_peer, entry.transient_id.as_str())
+        .expect("mark unhandled");
+
+    let err = daemon
+        .handle_rpc(rpc_request(
+            80,
+            "propagation_remote_unpeer",
+            json!({
+                "remote": "remote-node",
+                "peer": request_peer,
+            }),
+        ))
+        .expect_err("remote unpeer failure should be returned");
+    assert_eq!(err.kind(), std::io::ErrorKind::TimedOut);
+
+    let peers = daemon.peers.lock().expect("peers mutex poisoned");
+    let record = peers.get(stored_peer).expect("stored peer");
+    let serialized = serde_json::to_value(record).expect("serialize peer record");
+    assert_eq!(
+        serialized["handled_ids"].as_array().expect("serialized handled ids"),
+        &[] as &[JsonValue]
+    );
+    assert_eq!(
+        serialized["unhandled_ids"].as_array().expect("serialized unhandled ids"),
+        &[json!(entry.transient_id.as_str())]
+    );
+}
+
+#[test]
+fn payload_backed_peer_queue_snapshot_uses_stored_peer_case_like_python() {
+    let daemon = RpcDaemon::test_instance();
+    let stored_peer = "Peer-Snapshot-Mixed-Case";
+    let request_peer = stored_peer.to_ascii_lowercase();
+    daemon
+        .handle_rpc(rpc_request(79, "peer_sync", json!({ "peer": stored_peer })))
+        .expect("peer sync");
+    {
+        let mut peers = daemon.peers.lock().expect("peers mutex poisoned");
+        let record = peers.get_mut(stored_peer).expect("peer record");
+        record.restored_handled_ids.clear();
+        record.restored_unhandled_ids.clear();
+    }
+
+    let entry = PropagationEntryRecord {
+        transient_id: "ef".repeat(32),
+        destination: "25".repeat(16),
+        payload_hex: "25".repeat(20),
+        received_at: 1_700_000_810,
+        size_bytes: 20,
+        stamp_value: None,
+    };
+    daemon.store.upsert_propagation_entry(&entry).expect("store propagation entry");
+    daemon
+        .store
+        .mark_peer_unhandled_propagation(stored_peer, entry.transient_id.as_str())
+        .expect("mark unhandled");
+
+    daemon
+        .record_payload_backed_peer_queue_snapshot(request_peer.as_str())
+        .expect("record queue snapshot");
+
+    let peers = daemon.peers.lock().expect("peers mutex poisoned");
+    let record = peers.get(stored_peer).expect("stored peer");
+    let serialized = serde_json::to_value(record).expect("serialize peer record");
+    assert_eq!(
+        serialized["handled_ids"].as_array().expect("serialized handled ids"),
+        &[] as &[JsonValue]
+    );
+    assert_eq!(
+        serialized["unhandled_ids"].as_array().expect("serialized unhandled ids"),
+        &[json!(entry.transient_id.as_str())]
+    );
+}
+
+#[test]
+fn unavailable_propagation_remote_unpeer_records_existing_queue_snapshot_like_python() {
+    let daemon = RpcDaemon::test_instance();
+    let peer = "peer-remote-unpeer-unavailable-snapshot";
+    daemon
+        .handle_rpc(rpc_request(79, "peer_sync", json!({ "peer": peer })))
+        .expect("peer sync");
+    {
+        let mut peers = daemon.peers.lock().expect("peers mutex poisoned");
+        let record = peers.get_mut(peer).expect("peer record");
+        record.restored_handled_ids.clear();
+        record.restored_unhandled_ids.clear();
+    }
+
+    let entry = PropagationEntryRecord {
+        transient_id: "e4".repeat(32),
+        destination: "1c".repeat(16),
+        payload_hex: "1c".repeat(20),
+        received_at: 1_700_000_804,
+        size_bytes: 20,
+        stamp_value: None,
+    };
+    daemon.store.upsert_propagation_entry(&entry).expect("store propagation entry");
+    daemon
+        .store
+        .mark_peer_unhandled_propagation(peer, entry.transient_id.as_str())
+        .expect("mark unhandled");
+
+    let err = daemon
+        .handle_rpc(rpc_request(
+            80,
+            "propagation_remote_unpeer",
+            json!({
+                "remote": "remote-node",
+                "peer": peer,
+            }),
+        ))
+        .expect_err("missing bridge should be returned");
+    assert_eq!(err.kind(), std::io::ErrorKind::Other);
+    assert_eq!(err.to_string(), "remote control bridge unavailable");
+
+    let peers = daemon.peers.lock().expect("peers mutex poisoned");
+    let record = peers.get(peer).expect("stored peer");
+    let serialized = serde_json::to_value(record).expect("serialize peer record");
+    assert_eq!(
+        serialized["handled_ids"].as_array().expect("serialized handled ids"),
+        &[] as &[JsonValue]
+    );
+    assert_eq!(
+        serialized["unhandled_ids"].as_array().expect("serialized unhandled ids"),
+        &[json!(entry.transient_id.as_str())]
     );
 }
 
@@ -15252,6 +16948,180 @@ fn peer_sync_matches_existing_peer_queue_case_insensitively_like_python() {
     assert_eq!(rows[0]["messages"]["handled_ids"].as_array().expect("handled ids"), &[
         json!(entry.transient_id.as_str()),
     ]);
+}
+
+#[test]
+fn peer_queue_unhandled_snapshot_preserves_case_insensitive_completed_mark_like_python() {
+    let daemon = RpcDaemon::test_instance();
+    let stored_peer = "Peer-Completed-Mixed-Case";
+    let request_peer = stored_peer.to_ascii_lowercase();
+    daemon
+        .handle_rpc(rpc_request(91, "peer_sync", json!({ "peer": stored_peer })))
+        .expect("peer sync");
+    {
+        let mut peers = daemon.peers.lock().expect("peers mutex poisoned");
+        let record = peers.get_mut(stored_peer).expect("peer record");
+        record.restored_handled_ids.clear();
+        record.restored_unhandled_ids.clear();
+    }
+
+    let entry = PropagationEntryRecord {
+        transient_id: "de".repeat(32),
+        destination: "24".repeat(16),
+        payload_hex: "24".repeat(24),
+        received_at: 1_700_000_940,
+        size_bytes: 24,
+        stamp_value: None,
+    };
+    daemon.store.upsert_propagation_entry(&entry).expect("store propagation entry");
+    daemon
+        .store
+        .mark_peer_transfer_limited_propagation(stored_peer, entry.transient_id.as_str())
+        .expect("mark transfer limited");
+
+    daemon.record_peer_queue_unhandled_id(request_peer.as_str(), entry.transient_id.as_str());
+
+    let peers = daemon.peers.lock().expect("peers mutex poisoned");
+    let record = peers.get(stored_peer).expect("stored peer");
+    let serialized = serde_json::to_value(record).expect("serialize peer record");
+    assert_eq!(
+        serialized["handled_ids"].as_array().expect("serialized handled ids"),
+        &[json!(entry.transient_id.as_str())]
+    );
+    assert_eq!(
+        serialized["unhandled_ids"].as_array().expect("serialized unhandled ids"),
+        &[] as &[JsonValue]
+    );
+}
+
+#[test]
+fn peer_queue_snapshot_helpers_canonicalize_transient_ids_like_python() {
+    let daemon = RpcDaemon::test_instance();
+    let stored_peer = "Peer-Snapshot-Canonical-Ids";
+    let request_peer = stored_peer.to_ascii_lowercase();
+    daemon
+        .handle_rpc(rpc_request(91, "peer_sync", json!({ "peer": stored_peer })))
+        .expect("peer sync");
+    {
+        let mut peers = daemon.peers.lock().expect("peers mutex poisoned");
+        let record = peers.get_mut(stored_peer).expect("peer record");
+        record.restored_handled_ids.clear();
+        record.restored_unhandled_ids.clear();
+    }
+
+    let entry = PropagationEntryRecord {
+        transient_id: "df".repeat(32),
+        destination: "25".repeat(16),
+        payload_hex: "25".repeat(24),
+        received_at: 1_700_000_945,
+        size_bytes: 24,
+        stamp_value: None,
+    };
+    daemon.store.upsert_propagation_entry(&entry).expect("store propagation entry");
+    let request_transient_id = format!("  {}  ", entry.transient_id.to_ascii_uppercase());
+
+    daemon.record_peer_queue_unhandled_id(request_peer.as_str(), request_transient_id.as_str());
+    {
+        let peers = daemon.peers.lock().expect("peers mutex poisoned");
+        let record = peers.get(stored_peer).expect("stored peer");
+        let serialized = serde_json::to_value(record).expect("serialize peer record");
+        assert_eq!(
+            serialized["handled_ids"].as_array().expect("serialized handled ids"),
+            &[] as &[JsonValue]
+        );
+        assert_eq!(
+            serialized["unhandled_ids"].as_array().expect("serialized unhandled ids"),
+            &[json!(entry.transient_id.as_str())]
+        );
+    }
+
+    daemon.record_peer_queue_handled_id(request_peer.as_str(), request_transient_id.as_str());
+    let peers = daemon.peers.lock().expect("peers mutex poisoned");
+    let record = peers.get(stored_peer).expect("stored peer");
+    let serialized = serde_json::to_value(record).expect("serialize peer record");
+    assert_eq!(
+        serialized["handled_ids"].as_array().expect("serialized handled ids"),
+        &[json!(entry.transient_id.as_str())]
+    );
+    assert_eq!(
+        serialized["unhandled_ids"].as_array().expect("serialized unhandled ids"),
+        &[] as &[JsonValue]
+    );
+}
+
+#[test]
+fn peer_completed_mark_helpers_write_stored_peer_case_like_python() {
+    let daemon = RpcDaemon::test_instance();
+    let stored_peer = "Peer-Mark-Mixed-Case";
+    let request_peer = stored_peer.to_ascii_lowercase();
+    daemon
+        .handle_rpc(rpc_request(92, "peer_sync", json!({ "peer": stored_peer })))
+        .expect("peer sync");
+    {
+        let mut peers = daemon.peers.lock().expect("peers mutex poisoned");
+        let record = peers.get_mut(stored_peer).expect("peer record");
+        record.restored_handled_ids.clear();
+        record.restored_unhandled_ids.clear();
+    }
+
+    let transferred = PropagationEntryRecord {
+        transient_id: "e1".repeat(32),
+        destination: "26".repeat(16),
+        payload_hex: "26".repeat(24),
+        received_at: 1_700_000_950,
+        size_bytes: 24,
+        stamp_value: None,
+    };
+    let received = PropagationEntryRecord {
+        transient_id: "e2".repeat(32),
+        destination: "27".repeat(16),
+        payload_hex: "27".repeat(28),
+        received_at: 1_700_000_951,
+        size_bytes: 28,
+        stamp_value: None,
+    };
+    for entry in [&transferred, &received] {
+        daemon.store.upsert_propagation_entry(entry).expect("store propagation entry");
+    }
+
+    daemon
+        .record_peer_transferred_propagation(request_peer.as_str(), transferred.transient_id.as_str())
+        .expect("record transferred");
+    daemon
+        .record_peer_received_propagation(request_peer.as_str(), received.transient_id.as_str())
+        .expect("record received");
+
+    assert!(
+        daemon
+            .has_peer_completed_propagation_mark(stored_peer, transferred.transient_id.as_str())
+            .expect("transferred mark"),
+        "transferred mark should be visible under stored peer case"
+    );
+    assert!(
+        daemon
+            .has_peer_completed_propagation_mark(stored_peer, received.transient_id.as_str())
+            .expect("received mark"),
+        "received mark should be visible under stored peer case"
+    );
+    assert_eq!(
+        daemon
+            .store
+            .list_peer_handled_propagation_ids(stored_peer)
+            .expect("stored peer handled ids"),
+        vec![transferred.transient_id.clone(), received.transient_id.clone()]
+    );
+
+    let peers = daemon.peers.lock().expect("peers mutex poisoned");
+    let record = peers.get(stored_peer).expect("stored peer");
+    let serialized = serde_json::to_value(record).expect("serialize peer record");
+    assert_eq!(
+        serialized["handled_ids"].as_array().expect("serialized handled ids"),
+        &[json!(transferred.transient_id.as_str()), json!(received.transient_id.as_str())]
+    );
+    assert_eq!(
+        serialized["unhandled_ids"].as_array().expect("serialized unhandled ids"),
+        &[] as &[JsonValue]
+    );
 }
 
 #[test]

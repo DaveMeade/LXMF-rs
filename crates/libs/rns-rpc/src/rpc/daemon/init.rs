@@ -58,28 +58,51 @@ impl RpcDaemon {
     }
 
     pub(super) fn record_peer_queue_unhandled_id(&self, peer: &str, transient_id: &str) {
-        if self.store.peer_completed_propagation_mark_exists(peer, transient_id).unwrap_or(false) {
-            self.record_peer_queue_handled_id(peer, transient_id);
+        let transient_id = transient_id.trim().to_ascii_lowercase();
+        if transient_id.is_empty() {
             return;
         }
-        let mut guard = self.peers.lock().expect("peers mutex poisoned");
-        let existing_peer_key =
-            guard.keys().find(|existing| existing.eq_ignore_ascii_case(peer)).cloned();
+        let existing_peer_key = {
+            let guard = self.peers.lock().expect("peers mutex poisoned");
+            guard.keys().find(|existing| existing.eq_ignore_ascii_case(peer)).cloned()
+        };
         let Some(existing_peer_key) = existing_peer_key else {
             return;
         };
+        if self
+            .store
+            .peer_completed_propagation_mark_exists(
+                existing_peer_key.as_str(),
+                transient_id.as_str(),
+            )
+            .unwrap_or(false)
+        {
+            self.record_peer_queue_handled_id(existing_peer_key.as_str(), transient_id.as_str());
+            return;
+        }
+        let mut guard = self.peers.lock().expect("peers mutex poisoned");
         let Some(record) = guard.get_mut(&existing_peer_key) else {
             return;
         };
-        if record.restored_handled_ids.iter().any(|id| id.eq_ignore_ascii_case(transient_id))
-            || record.restored_unhandled_ids.iter().any(|id| id.eq_ignore_ascii_case(transient_id))
+        if record
+            .restored_handled_ids
+            .iter()
+            .any(|id| id.eq_ignore_ascii_case(transient_id.as_str()))
+            || record
+                .restored_unhandled_ids
+                .iter()
+                .any(|id| id.eq_ignore_ascii_case(transient_id.as_str()))
         {
             return;
         }
-        record.restored_unhandled_ids.push(transient_id.to_string());
+        record.restored_unhandled_ids.push(transient_id);
     }
 
     pub(super) fn record_peer_queue_handled_id(&self, peer: &str, transient_id: &str) {
+        let transient_id = transient_id.trim().to_ascii_lowercase();
+        if transient_id.is_empty() {
+            return;
+        }
         let mut guard = self.peers.lock().expect("peers mutex poisoned");
         let existing_peer_key =
             guard.keys().find(|existing| existing.eq_ignore_ascii_case(peer)).cloned();
@@ -89,10 +112,77 @@ impl RpcDaemon {
         let Some(record) = guard.get_mut(&existing_peer_key) else {
             return;
         };
-        record.restored_unhandled_ids.retain(|id| !id.eq_ignore_ascii_case(transient_id));
-        if !record.restored_handled_ids.iter().any(|id| id.eq_ignore_ascii_case(transient_id)) {
-            record.restored_handled_ids.push(transient_id.to_string());
+        record.restored_unhandled_ids.retain(|id| !id.eq_ignore_ascii_case(transient_id.as_str()));
+        if !record
+            .restored_handled_ids
+            .iter()
+            .any(|id| id.eq_ignore_ascii_case(transient_id.as_str()))
+        {
+            record.restored_handled_ids.push(transient_id);
         }
+    }
+
+    pub(super) fn record_payload_backed_peer_queue_snapshot(
+        &self,
+        peer: &str,
+    ) -> Result<(), std::io::Error> {
+        fn push_unique(ids: &mut Vec<String>, transient_id: String) {
+            if !ids.iter().any(|id| id.eq_ignore_ascii_case(transient_id.as_str())) {
+                ids.push(transient_id);
+            }
+        }
+
+        let peer_key = {
+            let guard = self.peers.lock().expect("peers mutex poisoned");
+            guard.keys().find(|existing| existing.eq_ignore_ascii_case(peer)).cloned()
+        };
+        let Some(peer_key) = peer_key else {
+            return Ok(());
+        };
+
+        let mut unhandled_ids = Vec::new();
+        let mut handled_ids = Vec::new();
+        for entry in self
+            .store
+            .list_peer_unhandled_propagation(peer_key.as_str())
+            .map_err(std::io::Error::other)?
+        {
+            let transient_id = entry.transient_id.trim().to_ascii_lowercase();
+            if self
+                .store
+                .peer_completed_propagation_mark_exists(peer_key.as_str(), transient_id.as_str())
+                .map_err(std::io::Error::other)?
+            {
+                push_unique(&mut handled_ids, transient_id);
+            } else {
+                push_unique(&mut unhandled_ids, transient_id);
+            }
+        }
+        for transient_id in self
+            .store
+            .list_peer_handled_propagation_ids(peer_key.as_str())
+            .map_err(std::io::Error::other)?
+        {
+            let transient_id = transient_id.trim().to_ascii_lowercase();
+            if self
+                .store
+                .get_propagation_entry(transient_id.as_str())
+                .map_err(std::io::Error::other)?
+                .is_some()
+            {
+                push_unique(&mut handled_ids, transient_id);
+            }
+        }
+        unhandled_ids.retain(|transient_id| {
+            !handled_ids.iter().any(|handled_id| handled_id.eq_ignore_ascii_case(transient_id))
+        });
+
+        let mut guard = self.peers.lock().expect("peers mutex poisoned");
+        if let Some(record) = guard.get_mut(&peer_key) {
+            record.restored_handled_ids = handled_ids;
+            record.restored_unhandled_ids = unhandled_ids;
+        }
+        Ok(())
     }
 
     pub(super) fn remove_peer_queue_snapshot_id(&self, transient_id: &str) {
@@ -1259,10 +1349,6 @@ impl RpcDaemon {
                 }
             }
         }
-        for peer in &removed_static_peers {
-            guard.remove(peer);
-        }
-
         let mut static_peers_to_queue = Vec::new();
         for peer in &configured_static_peers {
             let existing_peer_key =
@@ -1317,62 +1403,18 @@ impl RpcDaemon {
         self.update_daemon_status_snapshot(|snapshot| {
             snapshot.peer_count = peer_count;
         });
-        let mut cleared_selected_node = false;
         for peer in removed_static_peers {
-            let propagation_stats = self
-                .store
-                .peer_propagation_message_stats(peer.as_str())
-                .map_err(std::io::Error::other)?;
-            let handled_ids = self
-                .store
-                .list_peer_handled_propagation_ids(peer.as_str())
-                .map_err(std::io::Error::other)?;
-            let unhandled_ids = self
-                .store
-                .list_peer_unhandled_propagation_ids(peer.as_str())
-                .map_err(std::io::Error::other)?;
-            self.store
-                .clear_peer_propagation_marks(peer.as_str())
-                .map_err(std::io::Error::other)?;
-            let messages = json!({
-                "offered": propagation_stats.offered,
-                "unhandled": propagation_stats.unhandled,
-                "offered_bytes": propagation_stats.offered_bytes,
-                "unhandled_bytes": propagation_stats.unhandled_bytes,
-                "handled_ids": handled_ids,
-                "unhandled_ids": unhandled_ids,
-            });
-            self.publish_event(RpcEvent {
-                event_type: "peer_unpeer".into(),
-                payload: json!({
-                    "peer": peer.as_str(),
-                    "removed": true,
-                    "reason": "static_only_policy",
-                    "propagation_cleared": propagation_stats
-                        .offered
-                        .saturating_add(propagation_stats.unhandled),
-                    "propagation_cleared_bytes": propagation_stats
-                        .offered_bytes
-                        .saturating_add(propagation_stats.unhandled_bytes),
-                    "messages": messages,
-                }),
-            });
-            let mut selected =
-                self.outbound_propagation_node.lock().expect("propagation node mutex poisoned");
-            if selected.as_deref() == Some(peer.as_str()) {
-                *selected = None;
-                cleared_selected_node = true;
+            let cleanup = self.unpeer_local_state(peer.as_str())?;
+            if cleanup.removed {
+                self.publish_event(RpcEvent {
+                    event_type: "peer_unpeer".into(),
+                    payload: policy_unpeer_event_payload(
+                        cleanup.peer.as_str(),
+                        "static_only_policy",
+                        &cleanup,
+                    ),
+                });
             }
-        }
-        if cleared_selected_node {
-            let state = {
-                let mut guard = self.propagation_state.lock().expect("propagation mutex poisoned");
-                guard.selected_node = None;
-                guard.clone()
-            };
-            self.update_daemon_status_snapshot(|snapshot| {
-                snapshot.propagation = state;
-            });
         }
         for peer in static_peers_to_queue {
             self.queue_existing_propagation_for_peer(peer.as_str())?;

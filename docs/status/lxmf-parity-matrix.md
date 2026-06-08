@@ -102,11 +102,81 @@ Workspace paths are used for navigation. `crates/libs/lxmf-core` publishes as
   unhandled queue marks into active peer record snapshots before returning,
   preserving restart/export retry state even when the serialized snapshot was
   previously empty.
+- Retryable, throttled, generic failed, and malformed-import remote peer-sync
+  paths mirror the same payload-backed queue marks into active peer record
+  snapshots before publishing the failed sync event, so local and remote
+  retry/export behavior stays aligned.
+- Payload-backed remote failure snapshots replace stale serialized peer queue
+  IDs with live payload-backed marks, so bridge failures do not preserve
+  obsolete restart/export work after the underlying payload is gone.
+- Zero-cost peer stamp policies transfer unstamped queued offers immediately
+  without waiting for absent peering metadata, matching the Python no-stamp
+  path and avoiding repeated peer-sync postponement.
+- Malformed remote fetch and download imports mirror existing payload-backed
+  queue marks into active peer record snapshots before returning the import
+  failure, so already queued relay work remains visible after restart/export.
+- Remote fetch and download bridge failures mirror existing payload-backed
+  queue marks into active peer record snapshots before returning the failure,
+  so already queued relay work remains visible after restart/export.
+- Remote fetch and download bridge-unavailable errors mirror existing
+  payload-backed queue marks into active peer record snapshots before
+  returning, so queued relay work remains visible after restart/export even
+  when no bridge is configured.
+- Successful remote fetch and download mirror existing payload-backed queue
+  marks into active peer record snapshots after applying imports, preserving
+  queued retry work across restart/export even when the remote transfer succeeds
+  without consuming those local queued offers.
+- Remote peer-sync backoff postponements mirror existing payload-backed queue
+  marks into active peer record snapshots before returning, so deferred syncs
+  preserve queued retry work across restart/export.
+- Remote peer-sync bridge-unavailable errors mirror existing payload-backed
+  queue marks into active peer record snapshots for already known peers before
+  returning, including case-insensitive requests, without creating new peers
+  when the bridge is absent.
+- Remote peer-sync bridge-unavailable errors for already known peers also
+  publish the failed peer-sync event and mark the propagation sync lifecycle
+  failed, keeping queued retry state observable without creating new peers.
+- Successful remote peer-sync mirrors existing payload-backed live queue marks
+  into active peer record snapshots after applying imports, preserving queued
+  retry work across restart/export even when the remote sync succeeds without
+  transferring those local queued offers.
+- Remote peer-sync uses the stored peer ID case for the bridge call, import
+  source accounting, state updates, and response envelope when callers supply a
+  case-variant peer request.
+- Failed remote unpeer attempts mirror existing payload-backed queue marks into
+  active peer record snapshots before returning bridge-unavailable or
+  bridge-execution errors, including case-insensitive peer requests, so failed
+  peering teardown preserves queued retry work across restart/export.
+- Successful remote unpeer uses the stored peer ID case for the bridge call and
+  nested bridge result when callers supply a case-variant peer request, keeping
+  remote teardown identity aligned with local queue cleanup.
+- Payload-backed peer queue snapshot mirroring resolves stored peer IDs
+  case-insensitively before reading live queue marks, preserving queued
+  restart/export work when callers use Python-style peer case variants.
+- Incremental peer queue snapshot updates resolve stored peer IDs before
+  checking completed live marks, so transfer-limited or handled work is not
+  serialized as retryable unhandled queue state through peer case variants.
+- Incremental peer queue snapshot helpers canonicalize transient IDs before
+  serializing handled or unhandled queue state, so padded or upper-case caller
+  IDs do not leak into restart/export snapshots.
+- Transfer-limited peer marks remain terminal when a later generic handled
+  report arrives, so transfer-limit retry decisions are not reclassified as
+  offered/handled work in peer queue accounting.
+- Static-only propagation peer replacement routes removed static peers through
+  the same local unpeer cleanup as explicit unpeer, so handled, received,
+  transfer-limited, and unhandled queue marks are cleared and accounted
+  consistently.
+- Completed peer mark helpers write and read received/transferred live marks
+  under the stored peer ID case when a peer record already exists, keeping live
+  queue state and serialized restart/export snapshots aligned.
 - Restored peer record queue IDs are replayed into the live store, newly queued
   existing and inbound/imported propagation IDs are reflected in the serialized
   peer snapshot, source-peer handled IDs are preserved for restart/export, and
   offer-response handling keeps IDs in sync when queued messages become handled,
   transferred, or transfer-limited.
+- Remote import batches deduplicate accepted transient IDs before peer queue
+  and incoming-message side effects are applied, so duplicate payloads in one
+  fetch/download/sync response do not inflate peer queue accounting.
 - Purging local propagation payloads removes matching deleted IDs from active
   peer record snapshots, preventing restart/export drift after queue cleanup.
 - Duplicate or replayed propagation queue attempts preserve completed peer
