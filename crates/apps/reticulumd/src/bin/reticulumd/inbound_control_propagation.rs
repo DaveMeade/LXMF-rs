@@ -125,7 +125,7 @@ pub(super) fn handle_offer_request(
         return ControlResponse::Code(error_invalid_data);
     };
     if entries.len() < 2 {
-        return ControlResponse::Code(error_invalid_data);
+        return ControlResponse::Rmpv(rmpv::Value::Nil);
     }
     let peering_key = match entries.first() {
         Some(rmpv::Value::Binary(bytes)) => bytes.as_slice(),
@@ -531,6 +531,69 @@ mod tests {
         );
 
         assert!(matches!(response, ControlResponse::Code(0xF6)));
+    }
+
+    #[test]
+    fn offer_request_short_array_returns_nil_without_recording_peer_like_python() {
+        let daemon = RpcDaemon::test_instance();
+        daemon
+            .handle_rpc(RpcRequest {
+                id: 10,
+                method: "propagation_enable".to_string(),
+                params: Some(json!({
+                    "enabled": true,
+                    "peering_cost": 1,
+                })),
+            })
+            .expect("enable propagation");
+        let local_identity_hash = [0x11; 16];
+        let remote_private =
+            rns_transport::identity::PrivateIdentity::new_from_rand(rand_core::OsRng);
+        let remote_identity = *remote_private.as_identity();
+        let remote_propagation_hash =
+            hex::encode(propagation_destination_hash_for_identity(&remote_identity));
+        let link_id = test_link_id();
+        let control = PropagationControlContext {
+            enabled: true,
+            local_identity_hash,
+            propagation_destination_hash_hex: Some("propagation".to_string()),
+            control_destination_hash_hex: Some("control".to_string()),
+            delivery_destination: None,
+            allowed_control_identities: Vec::new(),
+            validated_peer_links: test_validated_peer_links(),
+        };
+
+        let response = handle_offer_request(
+            &daemon,
+            &control,
+            &link_id,
+            &remote_identity,
+            Some(rmpv::Value::Array(vec![rmpv::Value::Binary(vec![0xAA; 32])])),
+            0xF1,
+            0xF3,
+            0xF4,
+            0xF6,
+        );
+
+        assert!(matches!(response, ControlResponse::Rmpv(rmpv::Value::Nil)));
+        assert!(!control
+            .validated_peer_links
+            .lock()
+            .expect("validated peer links")
+            .contains(&link_id));
+        let peers = daemon
+            .handle_rpc(RpcRequest { id: 11, method: "list_peers".to_string(), params: None })
+            .expect("list peers")
+            .result
+            .expect("list peers result");
+        assert!(
+            peers["peers"]
+                .as_array()
+                .expect("peer rows")
+                .iter()
+                .all(|row| row["peer"].as_str() != Some(remote_propagation_hash.as_str())),
+            "short offer request must not create a peer record"
+        );
     }
 
     #[test]
