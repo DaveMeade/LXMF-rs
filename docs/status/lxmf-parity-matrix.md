@@ -171,6 +171,9 @@ Workspace paths are used for navigation. `crates/libs/lxmf-core` publishes as
 - Transfer-limited peer marks also remain terminal when a later received
   report arrives, so completed transfer-limit decisions are not reclassified as
   incoming work by subsequent propagation imports.
+- Terminal peer marks clear case-variant unhandled rows for the same transient
+  ID, so handled, transferred, received, and transfer-limited work cannot
+  remain retryable under an alternate caller-case peer key.
 - Static-only propagation peer replacement routes removed static peers through
   the same local unpeer cleanup as explicit unpeer, so handled, received,
   transfer-limited, and unhandled queue marks are cleared and accounted

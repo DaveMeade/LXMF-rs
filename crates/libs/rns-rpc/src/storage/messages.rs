@@ -168,6 +168,21 @@ fn normalize_hex_key(value: &str) -> String {
     value.trim().to_ascii_lowercase()
 }
 
+fn remove_case_variant_unhandled_peer_mark(
+    conn: &Connection,
+    peer: &str,
+    transient_id: &str,
+) -> rusqlite::Result<()> {
+    conn.execute(
+        "DELETE FROM propagation_peer_entries
+         WHERE LOWER(peer) = LOWER(?1)
+           AND transient_id = ?2
+           AND state = 'unhandled'",
+        params![peer, transient_id],
+    )?;
+    Ok(())
+}
+
 fn now_unix_secs() -> i64 {
     std::time::SystemTime::now()
         .duration_since(std::time::UNIX_EPOCH)
@@ -915,6 +930,7 @@ impl MessagesStore {
         transient_id: &str,
     ) -> rusqlite::Result<()> {
         self.with_write_conn(|conn| {
+            let transient_id = normalize_hex_key(transient_id);
             conn.execute(
                 "INSERT INTO propagation_peer_entries (peer, transient_id, state, updated_at)
                  VALUES (?1, ?2, 'handled', ?3)
@@ -922,8 +938,9 @@ impl MessagesStore {
                     state = 'handled',
                     updated_at = excluded.updated_at
                  WHERE propagation_peer_entries.state NOT IN ('transferred', 'received', 'transfer_limited')",
-                params![peer, normalize_hex_key(transient_id), now_unix_secs()],
+                params![peer, transient_id, now_unix_secs()],
             )?;
+            remove_case_variant_unhandled_peer_mark(conn, peer, transient_id.as_str())?;
             Ok(())
         })
     }
@@ -934,6 +951,7 @@ impl MessagesStore {
         transient_id: &str,
     ) -> rusqlite::Result<()> {
         self.with_write_conn(|conn| {
+            let transient_id = normalize_hex_key(transient_id);
             conn.execute(
                 "INSERT INTO propagation_peer_entries (peer, transient_id, state, updated_at)
              VALUES (?1, ?2, 'transferred', ?3)
@@ -941,8 +959,9 @@ impl MessagesStore {
                     state = 'transferred',
                     updated_at = excluded.updated_at
                  WHERE propagation_peer_entries.state NOT IN ('received', 'transfer_limited')",
-                params![peer, normalize_hex_key(transient_id), now_unix_secs()],
+                params![peer, transient_id, now_unix_secs()],
             )?;
+            remove_case_variant_unhandled_peer_mark(conn, peer, transient_id.as_str())?;
             Ok(())
         })
     }
@@ -953,6 +972,7 @@ impl MessagesStore {
         transient_id: &str,
     ) -> rusqlite::Result<()> {
         self.with_write_conn(|conn| {
+            let transient_id = normalize_hex_key(transient_id);
             conn.execute(
                 "INSERT INTO propagation_peer_entries (peer, transient_id, state, updated_at)
                  VALUES (?1, ?2, 'received', ?3)
@@ -960,8 +980,9 @@ impl MessagesStore {
                     state = 'received',
                     updated_at = excluded.updated_at
                  WHERE propagation_peer_entries.state NOT IN ('transferred', 'transfer_limited')",
-                params![peer, normalize_hex_key(transient_id), now_unix_secs()],
+                params![peer, transient_id, now_unix_secs()],
             )?;
+            remove_case_variant_unhandled_peer_mark(conn, peer, transient_id.as_str())?;
             Ok(())
         })
     }
@@ -972,6 +993,7 @@ impl MessagesStore {
         transient_id: &str,
     ) -> rusqlite::Result<()> {
         self.with_write_conn(|conn| {
+            let transient_id = normalize_hex_key(transient_id);
             conn.execute(
                 "INSERT INTO propagation_peer_entries (peer, transient_id, state, updated_at)
                  VALUES (?1, ?2, 'transfer_limited', ?3)
@@ -979,8 +1001,9 @@ impl MessagesStore {
                     state = 'transfer_limited',
                     updated_at = excluded.updated_at
                  WHERE propagation_peer_entries.state IN ('unhandled', 'transfer_limited')",
-                params![peer, normalize_hex_key(transient_id), now_unix_secs()],
+                params![peer, transient_id, now_unix_secs()],
             )?;
+            remove_case_variant_unhandled_peer_mark(conn, peer, transient_id.as_str())?;
             Ok(())
         })
     }
@@ -2588,6 +2611,55 @@ mod tests {
         assert_eq!(
             store.list_peer_unhandled_propagation_ids(stored_peer).expect("unhandled ids"),
             vec![unhandled.transient_id]
+        );
+    }
+
+    #[test]
+    fn terminal_peer_marks_clear_case_variant_unhandled_rows_like_python() {
+        let store = MessagesStore::in_memory().expect("in-memory store");
+        let stored_peer = "Peer-Terminal-Mixed";
+        let request_peer = stored_peer.to_ascii_lowercase();
+        let transferred = PropagationEntryRecord {
+            transient_id: "b3".repeat(32),
+            destination: "55".repeat(16),
+            payload_hex: "55".repeat(10),
+            received_at: 100,
+            size_bytes: 10,
+            stamp_value: None,
+        };
+        let transfer_limited = PropagationEntryRecord {
+            transient_id: "b4".repeat(32),
+            destination: "66".repeat(16),
+            payload_hex: "66".repeat(20),
+            received_at: 101,
+            size_bytes: 20,
+            stamp_value: None,
+        };
+        store.upsert_propagation_entry(&transferred).expect("transferred entry");
+        store.upsert_propagation_entry(&transfer_limited).expect("transfer-limited entry");
+        for entry in [&transferred, &transfer_limited] {
+            store
+                .mark_peer_unhandled_propagation(request_peer.as_str(), entry.transient_id.as_str())
+                .expect("mark case-variant unhandled");
+        }
+
+        store
+            .mark_peer_transferred_propagation(stored_peer, transferred.transient_id.as_str())
+            .expect("mark stored transferred");
+        store
+            .mark_peer_transfer_limited_propagation(
+                stored_peer,
+                transfer_limited.transient_id.as_str(),
+            )
+            .expect("mark stored transfer limited");
+
+        assert!(store
+            .list_peer_unhandled_propagation(request_peer.as_str())
+            .expect("case-variant unhandled rows")
+            .is_empty());
+        assert_eq!(
+            store.list_peer_handled_propagation_ids(stored_peer).expect("handled ids"),
+            vec![transferred.transient_id, transfer_limited.transient_id]
         );
     }
 
