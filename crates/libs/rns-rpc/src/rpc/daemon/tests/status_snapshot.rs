@@ -8542,7 +8542,7 @@ fn persistent_peer_sync_continues_after_completed_batch_like_python() {
 }
 
 #[test]
-fn persistent_peer_sync_continues_after_selected_response_batch_like_python() {
+fn persistent_peer_sync_keeps_selected_response_skips_for_next_offer_like_python() {
     let (daemon, peer) = ready_propagation_peer_daemon(0x52);
     {
         let mut peers = daemon.peers.lock().expect("peers mutex poisoned");
@@ -8588,19 +8588,24 @@ fn persistent_peer_sync_continues_after_selected_response_batch_like_python() {
         .result
         .expect("peer sync result");
     assert_eq!(result["sync_strategy"].as_u64(), Some(2));
-    assert_eq!(result["propagation"]["transferred"].as_u64(), Some(2));
-    assert_eq!(result["propagation"]["handled"].as_u64(), Some(2));
-    assert_eq!(result["messages"]["unhandled"].as_u64(), Some(0));
+    assert_eq!(result["propagation"]["transferred"].as_u64(), Some(1));
+    assert_eq!(result["propagation"]["handled"].as_u64(), Some(1));
+    assert_eq!(result["propagation"]["skipped"].as_u64(), Some(1));
+    assert_eq!(result["messages"]["unhandled"].as_u64(), Some(1));
     assert_eq!(
         result["propagation"]["transferred_ids"].as_array().expect("transferred ids"),
-        &[json!(second.transient_id.as_str()), json!(first.transient_id.as_str())]
+        &[json!(second.transient_id.as_str())]
+    );
+    assert_eq!(
+        result["propagation"]["skipped_ids"].as_array().expect("skipped ids"),
+        &[json!(first.transient_id.as_str())]
     );
 
     let pending = daemon
         .store
         .list_peer_unhandled_propagation(peer.as_str())
         .expect("pending propagation");
-    assert!(pending.is_empty());
+    assert_eq!(pending, vec![first]);
 }
 
 #[test]

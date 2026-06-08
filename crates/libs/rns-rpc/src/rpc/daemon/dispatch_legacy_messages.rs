@@ -1151,7 +1151,8 @@ impl RpcDaemon {
                 let mut propagation_last_resource_bytes = propagation_resource_bytes;
                 let persistent_followup_sync = record.sync_strategy == 2
                     && propagation_transferred > 0
-                    && propagation_skipped > 0;
+                    && propagation_skipped > 0
+                    && selected_response_ids.is_none();
                 if persistent_followup_sync {
                     propagation_skipped = 0;
                     propagation_remaining_bytes = 0;
