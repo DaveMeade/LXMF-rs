@@ -136,6 +136,9 @@ The project is best described by capability level:
 - Terminal peer marks now clear case-variant unhandled rows for the same
   transient ID, so handled, transferred, received, and transfer-limited work
   cannot remain retryable under an alternate caller-case peer key.
+- Peer sync unhandled transfer selection and retry cleanup now read and remove
+  caller-case peer variants as one effective peer, so queued transfer work
+  cannot be missed or left retryable under alternate peer casing.
 - Static-only propagation peer replacement now routes removed static peers
   through the same local unpeer cleanup as explicit unpeer, so handled,
   received, transfer-limited, and unhandled queue marks are cleared and

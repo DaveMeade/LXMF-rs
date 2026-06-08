@@ -1016,7 +1016,7 @@ impl MessagesStore {
         self.with_write_conn(|conn| {
             let affected = conn.execute(
                 "DELETE FROM propagation_peer_entries
-                 WHERE peer = ?1 AND transient_id = ?2 AND state = 'unhandled'",
+                 WHERE LOWER(peer) = LOWER(?1) AND transient_id = ?2 AND state = 'unhandled'",
                 params![peer, normalize_hex_key(transient_id)],
             )?;
             Ok(affected > 0)
@@ -1107,9 +1107,21 @@ impl MessagesStore {
             let mut stmt = conn.prepare(
                 "SELECT e.transient_id, e.destination, e.payload_hex, e.received_at, e.size_bytes, e.stamp_value
                  FROM propagation_entries e
-                 INNER JOIN propagation_peer_entries p
+                 INNER JOIN (
+                    SELECT transient_id,
+                           CASE
+                               WHEN SUM(CASE WHEN state = 'transfer_limited' THEN 1 ELSE 0 END) > 0 THEN 'transfer_limited'
+                               WHEN SUM(CASE WHEN state = 'received' THEN 1 ELSE 0 END) > 0 THEN 'received'
+                               WHEN SUM(CASE WHEN state = 'transferred' THEN 1 ELSE 0 END) > 0 THEN 'transferred'
+                               WHEN SUM(CASE WHEN state = 'handled' THEN 1 ELSE 0 END) > 0 THEN 'handled'
+                               ELSE 'unhandled'
+                           END AS state
+                    FROM propagation_peer_entries
+                    WHERE LOWER(peer) = LOWER(?1)
+                    GROUP BY transient_id
+                 ) p
                     ON p.transient_id = e.transient_id
-                 WHERE p.peer = ?1 AND p.state = 'unhandled'
+                 WHERE p.state = 'unhandled'
                  ORDER BY e.received_at ASC, e.transient_id ASC",
             )?;
             let rows = stmt.query_map(params![peer], propagation_entry_from_row)?;
@@ -2612,6 +2624,52 @@ mod tests {
             store.list_peer_unhandled_propagation_ids(stored_peer).expect("unhandled ids"),
             vec![unhandled.transient_id]
         );
+    }
+
+    #[test]
+    fn unhandled_peer_queue_selection_matches_peer_case_insensitively_like_python() {
+        let store = MessagesStore::in_memory().expect("in-memory store");
+        let stored_peer = "Peer-Select-Mixed";
+        let request_peer = stored_peer.to_ascii_lowercase();
+        let completed = PropagationEntryRecord {
+            transient_id: "b1".repeat(32),
+            destination: "55".repeat(16),
+            payload_hex: "55".repeat(10),
+            received_at: 100,
+            size_bytes: 10,
+            stamp_value: None,
+        };
+        let pending = PropagationEntryRecord {
+            transient_id: "b2".repeat(32),
+            destination: "66".repeat(16),
+            payload_hex: "66".repeat(20),
+            received_at: 101,
+            size_bytes: 20,
+            stamp_value: None,
+        };
+        store.upsert_propagation_entry(&completed).expect("completed entry");
+        store.upsert_propagation_entry(&pending).expect("pending entry");
+        store
+            .mark_peer_handled_propagation(stored_peer, completed.transient_id.as_str())
+            .expect("mark stored handled");
+        store
+            .mark_peer_unhandled_propagation(request_peer.as_str(), completed.transient_id.as_str())
+            .expect("mark case-variant duplicate unhandled");
+        store
+            .mark_peer_unhandled_propagation(request_peer.as_str(), pending.transient_id.as_str())
+            .expect("mark case-variant unhandled");
+
+        assert_eq!(
+            store.list_peer_unhandled_propagation(stored_peer).expect("unhandled entries"),
+            vec![pending.clone()]
+        );
+        assert!(store
+            .remove_peer_unhandled_propagation(stored_peer, pending.transient_id.as_str())
+            .expect("remove case-variant unhandled"));
+        assert!(store
+            .list_peer_unhandled_propagation(request_peer.as_str())
+            .expect("case-variant unhandled entries")
+            .is_empty());
     }
 
     #[test]

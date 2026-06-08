@@ -174,6 +174,9 @@ Workspace paths are used for navigation. `crates/libs/lxmf-core` publishes as
 - Terminal peer marks clear case-variant unhandled rows for the same transient
   ID, so handled, transferred, received, and transfer-limited work cannot
   remain retryable under an alternate caller-case peer key.
+- Peer sync unhandled transfer selection and retry cleanup read and remove
+  caller-case peer variants as one effective peer, so queued transfer work is
+  not skipped or left retryable under alternate peer casing.
 - Static-only propagation peer replacement routes removed static peers through
   the same local unpeer cleanup as explicit unpeer, so handled, received,
   transfer-limited, and unhandled queue marks are cleared and accounted
