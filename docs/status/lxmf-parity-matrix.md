@@ -202,6 +202,9 @@ Workspace paths are used for navigation. `crates/libs/lxmf-core` publishes as
 - Peer unpeer cleanup clears case-variant propagation marks as one peer, so
   completed marks merged during activation cannot survive teardown and reappear
   as handled work when that peer is later reactivated.
+- Peer unpeer cleanup accounting reads case-variant live queue marks as one
+  effective peer before clearing them, so the response and event report the
+  handled/unhandled IDs and byte totals that teardown actually removes.
 - Rejoining from a persisted `unpeered` peer record clears stale serialized
   queue snapshots before the peer is active again, preventing pre-unpeer work
   from being restored on export/restart.

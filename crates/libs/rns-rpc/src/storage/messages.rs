@@ -1116,13 +1116,24 @@ impl MessagesStore {
     pub fn list_peer_handled_propagation_ids(&self, peer: &str) -> rusqlite::Result<Vec<String>> {
         self.with_read_conn(|conn| {
             let mut stmt = conn.prepare(
-                "SELECT p.transient_id
-                 FROM propagation_peer_entries p
+                "SELECT marks.transient_id
+                 FROM (
+                    SELECT transient_id,
+                           CASE
+                               WHEN SUM(CASE WHEN state = 'transfer_limited' THEN 1 ELSE 0 END) > 0 THEN 'transfer_limited'
+                               WHEN SUM(CASE WHEN state = 'received' THEN 1 ELSE 0 END) > 0 THEN 'received'
+                               WHEN SUM(CASE WHEN state = 'transferred' THEN 1 ELSE 0 END) > 0 THEN 'transferred'
+                               WHEN SUM(CASE WHEN state = 'handled' THEN 1 ELSE 0 END) > 0 THEN 'handled'
+                               ELSE 'unhandled'
+                           END AS state
+                    FROM propagation_peer_entries
+                    WHERE LOWER(peer) = LOWER(?1)
+                    GROUP BY transient_id
+                 ) marks
                  INNER JOIN propagation_entries e
-                    ON e.transient_id = p.transient_id
-                 WHERE p.peer = ?1
-                   AND p.state IN ('handled', 'transferred', 'received', 'transfer_limited')
-                 ORDER BY p.transient_id ASC",
+                    ON e.transient_id = marks.transient_id
+                 WHERE marks.state IN ('handled', 'transferred', 'received', 'transfer_limited')
+                 ORDER BY marks.transient_id ASC",
             )?;
             let rows = stmt.query_map(params![peer], |row| row.get(0))?;
             rows.collect()
@@ -1153,12 +1164,24 @@ impl MessagesStore {
     pub fn list_peer_unhandled_propagation_ids(&self, peer: &str) -> rusqlite::Result<Vec<String>> {
         self.with_read_conn(|conn| {
             let mut stmt = conn.prepare(
-                "SELECT p.transient_id
-                 FROM propagation_peer_entries p
+                "SELECT marks.transient_id
+                 FROM (
+                    SELECT transient_id,
+                           CASE
+                               WHEN SUM(CASE WHEN state = 'transfer_limited' THEN 1 ELSE 0 END) > 0 THEN 'transfer_limited'
+                               WHEN SUM(CASE WHEN state = 'received' THEN 1 ELSE 0 END) > 0 THEN 'received'
+                               WHEN SUM(CASE WHEN state = 'transferred' THEN 1 ELSE 0 END) > 0 THEN 'transferred'
+                               WHEN SUM(CASE WHEN state = 'handled' THEN 1 ELSE 0 END) > 0 THEN 'handled'
+                               ELSE 'unhandled'
+                           END AS state
+                    FROM propagation_peer_entries
+                    WHERE LOWER(peer) = LOWER(?1)
+                    GROUP BY transient_id
+                 ) marks
                  INNER JOIN propagation_entries e
-                    ON e.transient_id = p.transient_id
-                 WHERE p.peer = ?1 AND p.state = 'unhandled'
-                 ORDER BY p.transient_id ASC",
+                    ON e.transient_id = marks.transient_id
+                 WHERE marks.state = 'unhandled'
+                 ORDER BY marks.transient_id ASC",
             )?;
             let rows = stmt.query_map(params![peer], |row| row.get(0))?;
             rows.collect()
@@ -1191,10 +1214,14 @@ impl MessagesStore {
                 "SELECT
                     COALESCE(SUM(CASE WHEN e.transient_id IS NOT NULL THEN 1 ELSE 0 END), 0),
                     COALESCE(SUM(CASE WHEN e.transient_id IS NOT NULL THEN e.size_bytes ELSE 0 END), 0)
-                 FROM propagation_peer_entries p
+                 FROM (
+                    SELECT transient_id
+                    FROM propagation_peer_entries
+                    WHERE LOWER(peer) = LOWER(?1)
+                    GROUP BY transient_id
+                 ) marks
                  LEFT JOIN propagation_entries e
-                    ON e.transient_id = p.transient_id
-                 WHERE p.peer = ?1",
+                    ON e.transient_id = marks.transient_id",
                 params![peer],
                 |row| Ok((row.get(0)?, row.get(1)?)),
             )?;
@@ -1225,10 +1252,21 @@ impl MessagesStore {
                     COALESCE(SUM(CASE WHEN e.transient_id IS NOT NULL AND state = 'unhandled' THEN 1 ELSE 0 END), 0),
                     COALESCE(SUM(CASE WHEN e.transient_id IS NOT NULL AND state IN ('handled', 'transferred') THEN e.size_bytes ELSE 0 END), 0),
                     COALESCE(SUM(CASE WHEN e.transient_id IS NOT NULL AND state = 'unhandled' THEN e.size_bytes ELSE 0 END), 0)
-                 FROM propagation_peer_entries p
+                 FROM (
+                    SELECT transient_id,
+                           CASE
+                               WHEN SUM(CASE WHEN state = 'transfer_limited' THEN 1 ELSE 0 END) > 0 THEN 'transfer_limited'
+                               WHEN SUM(CASE WHEN state = 'received' THEN 1 ELSE 0 END) > 0 THEN 'received'
+                               WHEN SUM(CASE WHEN state = 'transferred' THEN 1 ELSE 0 END) > 0 THEN 'transferred'
+                               WHEN SUM(CASE WHEN state = 'handled' THEN 1 ELSE 0 END) > 0 THEN 'handled'
+                               ELSE 'unhandled'
+                           END AS state
+                    FROM propagation_peer_entries
+                    WHERE LOWER(peer) = LOWER(?1)
+                    GROUP BY transient_id
+                 ) marks
                  LEFT JOIN propagation_entries e
-                    ON e.transient_id = p.transient_id
-                 WHERE p.peer = ?1",
+                    ON e.transient_id = marks.transient_id",
                 params![peer],
                 |row| {
                     Ok((
@@ -2490,6 +2528,67 @@ mod tests {
             .remove_stale_peer_completed_propagation_ids(stored_peer)
             .expect("stored-case stale completed")
             .is_empty());
+    }
+
+    #[test]
+    fn peer_queue_stats_merge_case_variant_marks_without_duplicate_counts_like_python() {
+        let store = MessagesStore::in_memory().expect("in-memory store");
+        let stored_peer = "Peer-Stats-Mixed";
+        let request_peer = stored_peer.to_ascii_lowercase();
+        let duplicated = PropagationEntryRecord {
+            transient_id: "ae".repeat(32),
+            destination: "33".repeat(16),
+            payload_hex: "33".repeat(10),
+            received_at: 100,
+            size_bytes: 10,
+            stamp_value: None,
+        };
+        let unhandled = PropagationEntryRecord {
+            transient_id: "af".repeat(32),
+            destination: "44".repeat(16),
+            payload_hex: "44".repeat(20),
+            received_at: 101,
+            size_bytes: 20,
+            stamp_value: None,
+        };
+        store.upsert_propagation_entry(&duplicated).expect("duplicated entry");
+        store.upsert_propagation_entry(&unhandled).expect("unhandled entry");
+        store
+            .mark_peer_handled_propagation(stored_peer, duplicated.transient_id.as_str())
+            .expect("mark stored handled");
+        store
+            .mark_peer_unhandled_propagation(
+                request_peer.as_str(),
+                duplicated.transient_id.as_str(),
+            )
+            .expect("mark case-variant duplicate unhandled");
+        store
+            .mark_peer_unhandled_propagation(request_peer.as_str(), unhandled.transient_id.as_str())
+            .expect("mark case-variant unhandled");
+
+        assert_eq!(
+            store.peer_propagation_mark_stats(stored_peer).expect("mark stats"),
+            PropagationEntryStats { entries: 2, bytes: 30 }
+        );
+        assert_eq!(
+            store.peer_propagation_message_stats(stored_peer).expect("message stats"),
+            PeerPropagationMessageStats {
+                outgoing: 0,
+                incoming: 0,
+                offered: 1,
+                unhandled: 1,
+                offered_bytes: 10,
+                unhandled_bytes: 20,
+            }
+        );
+        assert_eq!(
+            store.list_peer_handled_propagation_ids(stored_peer).expect("handled ids"),
+            vec![duplicated.transient_id]
+        );
+        assert_eq!(
+            store.list_peer_unhandled_propagation_ids(stored_peer).expect("unhandled ids"),
+            vec![unhandled.transient_id]
+        );
     }
 
     #[test]
