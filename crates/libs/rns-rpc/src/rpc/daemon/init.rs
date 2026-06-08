@@ -1234,10 +1234,14 @@ impl RpcDaemon {
         let existing_peer_key =
             guard.keys().find(|existing| existing.eq_ignore_ascii_case(peer.as_str())).cloned();
         if let Some(existing_peer_key) = existing_peer_key {
+            let active_peer_count = Self::active_peer_count_from_guard(&guard);
             let existing = guard.get_mut(&existing_peer_key).expect("peer record disappeared");
             let is_newer = timestamp >= existing.last_seen;
             let reactivating_unpeered = existing.peer_type.as_deref() == Some("unpeered")
                 && peer_type.as_deref() != Some("unpeered");
+            if reactivating_unpeered {
+                self.ensure_peer_admission_allowed(&existing_peer_key, active_peer_count)?;
+            }
             existing.last_seen = existing.last_seen.max(timestamp);
             existing.seen_count = existing.seen_count.saturating_add(1);
             if is_newer && !cleaned_capabilities.is_empty() {

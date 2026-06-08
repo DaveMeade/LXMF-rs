@@ -17507,6 +17507,67 @@ fn peer_sync_reactivates_persisted_unpeered_record() {
 }
 
 #[test]
+fn peer_sync_does_not_reactivate_unpeered_non_static_when_static_only() {
+    let daemon = RpcDaemon::test_instance();
+    {
+        let mut guard = daemon.peers.lock().expect("peers mutex poisoned");
+        guard.insert(
+            "peer-static-only-rejoin".to_string(),
+            daemon.transient_peer_record(
+                "peer-static-only-rejoin".to_string(),
+                1_700_000_901,
+                Vec::new(),
+                None,
+                None,
+                Some("unpeered".to_string()),
+            ),
+        );
+    }
+    daemon
+        .handle_rpc(rpc_request(
+            89,
+            "propagation_enable",
+            json!({
+                "enabled": true,
+                "from_static_only": true,
+                "static_peers": ["peer-static-allowed"],
+            }),
+        ))
+        .expect("enable static-only propagation");
+
+    let blocked = daemon
+        .handle_rpc(rpc_request(90, "peer_sync", json!({ "peer": "peer-static-only-rejoin" })))
+        .expect_err("static-only policy should reject unpeered non-static reactivation");
+    assert_eq!(blocked.kind(), std::io::ErrorKind::PermissionDenied);
+    assert!(
+        blocked.to_string().contains("from_static_only"),
+        "unexpected rejection error: {blocked}"
+    );
+
+    let peers = daemon
+        .handle_rpc(RpcRequest { id: 91, method: "list_peers".to_string(), params: None })
+        .expect("list peers")
+        .result
+        .expect("list peers result");
+    let rows = peers["peers"].as_array().expect("peer rows");
+    let rejoin = rows
+        .iter()
+        .find(|row| row["peer"].as_str() == Some("peer-static-only-rejoin"))
+        .expect("persisted unpeered row");
+    assert_eq!(rejoin["peer_type"].as_str(), Some("unpeered"));
+    assert!(rows.iter().any(|row| {
+        row["peer"].as_str() == Some("peer-static-allowed")
+            && row["peer_type"].as_str() == Some("static")
+    }));
+    let status = daemon
+        .handle_rpc(RpcRequest { id: 92, method: "daemon_status_ex".to_string(), params: None })
+        .expect("daemon status")
+        .result
+        .expect("daemon status result");
+    assert_eq!(status["peer_count"].as_u64(), Some(1));
+}
+
+#[test]
 fn peer_sync_reactivation_clears_unpeered_queue_snapshot() {
     let daemon = RpcDaemon::test_instance();
     let peer = "peer-rejoin-clears-queue";
