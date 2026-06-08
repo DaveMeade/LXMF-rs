@@ -165,6 +165,9 @@ The project is best described by capability level:
 - Inbound propagation message-get serving now admits or refreshes the remote
   propagation peer before marking served payloads transferred, so peer transfer
   accounting is preserved even when the peer fetches before a prior offer row.
+- Inbound propagation message-get serving now previews fetchable payloads and
+  passes peer admission before mutating served counters, so peers rejected by
+  static-only or capacity policy do not look like successful transfers.
 - Remote fetch and download imports now mark inactive source peers as received
   before later activation, so a propagation node is not offered back payloads it
   previously supplied just because it was not yet an active peer record.

@@ -869,6 +869,46 @@ impl RpcDaemon {
         wanted: &[Vec<u8>],
         transfer_limit_bytes: Option<usize>,
     ) -> Vec<(String, Vec<u8>)> {
+        let messages = self.select_propagation_payloads_for_destination_with_ids(
+            destination,
+            wanted,
+            transfer_limit_bytes,
+        );
+
+        if !messages.is_empty() {
+            let state = {
+                let mut guard = self.propagation_state.lock().expect("propagation mutex poisoned");
+                guard.client_propagation_messages_served =
+                    guard.client_propagation_messages_served.saturating_add(messages.len());
+                guard.clone()
+            };
+            self.update_daemon_status_snapshot(|snapshot| {
+                snapshot.propagation = state;
+            });
+        }
+
+        messages
+    }
+
+    pub fn preview_propagation_payloads_for_destination_with_ids(
+        &self,
+        destination: &[u8; 16],
+        wanted: &[Vec<u8>],
+        transfer_limit_bytes: Option<usize>,
+    ) -> Vec<(String, Vec<u8>)> {
+        self.select_propagation_payloads_for_destination_with_ids(
+            destination,
+            wanted,
+            transfer_limit_bytes,
+        )
+    }
+
+    fn select_propagation_payloads_for_destination_with_ids(
+        &self,
+        destination: &[u8; 16],
+        wanted: &[Vec<u8>],
+        transfer_limit_bytes: Option<usize>,
+    ) -> Vec<(String, Vec<u8>)> {
         let destination_hex = hex::encode(destination);
         let per_message_overhead = 16usize;
         let mut cumulative_size = 24usize;
@@ -918,18 +958,6 @@ impl RpcDaemon {
             }
             cumulative_size = next_size;
             messages.push((transient_hex, payload));
-        }
-
-        if !messages.is_empty() {
-            let state = {
-                let mut guard = self.propagation_state.lock().expect("propagation mutex poisoned");
-                guard.client_propagation_messages_served =
-                    guard.client_propagation_messages_served.saturating_add(messages.len());
-                guard.clone()
-            };
-            self.update_daemon_status_snapshot(|snapshot| {
-                snapshot.propagation = state;
-            });
         }
 
         messages
