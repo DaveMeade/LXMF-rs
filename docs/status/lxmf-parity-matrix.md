@@ -192,6 +192,9 @@ Workspace paths are used for navigation. `crates/libs/lxmf-core` publishes as
 - Duplicate inbound peer propagation payloads still fan out to active relay
   peers while keeping the source peer handled, so a known local payload does
   not bypass relay queue creation.
+- Remote fetch and download imports mark inactive source peers as received
+  before later activation, so source-accounting survives even when the
+  propagation node was not yet an active peer record.
 - Remote import batches deduplicate accepted transient IDs before peer queue
   and incoming-message side effects are applied, so duplicate payloads in one
   fetch/download/sync response do not inflate peer queue accounting.

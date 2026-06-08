@@ -13489,6 +13489,57 @@ fn propagation_remote_fetch_marks_source_received_and_queues_other_peers() {
 }
 
 #[test]
+fn propagation_remote_fetch_marks_inactive_source_received_for_later_activation_like_python() {
+    let payload = b"remote-fetch-inactive-source-payload";
+    let payload_hex = hex::encode(payload);
+    let transient_id = hex::encode(Sha256::digest(payload));
+    let source_peer = "remote-fetch-late-source";
+    let daemon = RpcDaemon::test_instance();
+    daemon.set_remote_control_bridge(Arc::new(TestRemoteControlBridge {
+        result: Ok(json!({
+            "available_count": 1,
+            "fetched_count": 1,
+            "messages": [{
+                "transient_id": transient_id,
+                "payload_hex": payload_hex,
+            }],
+        })),
+    }));
+
+    daemon
+        .handle_rpc(rpc_request(
+            74,
+            "propagation_remote_fetch",
+            json!({ "remote": source_peer }),
+        ))
+        .expect("remote fetch from inactive source");
+
+    assert_eq!(
+        daemon
+            .store
+            .list_peer_handled_propagation_ids(source_peer)
+            .expect("inactive source handled ids"),
+        vec![transient_id.clone()],
+        "inactive source should be marked received before later peer activation"
+    );
+
+    let sync = daemon
+        .handle_rpc(rpc_request(75, "peer_sync", json!({ "peer": source_peer })))
+        .expect("activate source peer")
+        .result
+        .expect("peer sync result");
+    assert_eq!(sync["propagation"]["transferred"].as_u64(), Some(0));
+    assert!(
+        sync["propagation"]["messages"].as_array().expect("transferred messages").is_empty()
+    );
+    assert_eq!(sync["messages"]["incoming"].as_u64(), Some(1));
+    assert_eq!(
+        sync["messages"]["handled_ids"].as_array().expect("handled ids"),
+        &[json!(transient_id.as_str())]
+    );
+}
+
+#[test]
 fn propagation_remote_imports_match_source_peer_case_insensitively_like_python() {
     let sync_payload = b"remote-sync-case-source-payload";
     let sync_payload_hex = hex::encode(sync_payload);

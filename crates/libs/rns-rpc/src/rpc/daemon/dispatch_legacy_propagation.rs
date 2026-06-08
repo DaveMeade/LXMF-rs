@@ -429,24 +429,25 @@ impl RpcDaemon {
         let active_peers = self.active_peer_ids();
         let source_active_peer =
             active_peers.iter().find(|peer| peer.eq_ignore_ascii_case(source_peer)).cloned();
+        let source_peer_key = source_active_peer.as_deref().unwrap_or(source_peer);
         self.record_inbound_propagation_peer_activity_count(
-            source_active_peer.as_deref().unwrap_or(source_peer),
+            source_peer_key,
             transferred_bytes,
             imported_ids.len(),
         );
         for transient_id in imported_ids {
+            self.store
+                .mark_peer_received_propagation(source_peer_key, transient_id.as_str())
+                .map_err(std::io::Error::other)?;
+            self.record_peer_queue_handled_id(source_peer_key, transient_id.as_str());
             for peer in &active_peers {
                 if peer.eq_ignore_ascii_case(source_peer) {
-                    self.store
-                        .mark_peer_received_propagation(peer.as_str(), transient_id.as_str())
-                        .map_err(std::io::Error::other)?;
-                    self.record_peer_queue_handled_id(peer.as_str(), transient_id.as_str());
-                } else {
-                    self.store
-                        .mark_peer_unhandled_propagation(peer.as_str(), transient_id.as_str())
-                        .map_err(std::io::Error::other)?;
-                    self.record_peer_queue_unhandled_id(peer.as_str(), transient_id.as_str());
+                    continue;
                 }
+                self.store
+                    .mark_peer_unhandled_propagation(peer.as_str(), transient_id.as_str())
+                    .map_err(std::io::Error::other)?;
+                self.record_peer_queue_unhandled_id(peer.as_str(), transient_id.as_str());
             }
         }
         Ok(())
