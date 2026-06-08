@@ -196,6 +196,9 @@ Workspace paths are used for navigation. `crates/libs/lxmf-core` publishes as
 - Peer activation also mirrors preexisting live completed marks into active
   peer record snapshots, so transfers recorded before the peer record exists
   survive restart/export as handled IDs once the propagation peer is active.
+- Peer activation also merges case-variant preexisting completed marks into
+  the activated peer key before queue replay, keeping restart/export state
+  aligned when transfer accounting arrives before the peer record case is known.
 - Rejoining from a persisted `unpeered` peer record clears stale serialized
   queue snapshots before the peer is active again, preventing pre-unpeer work
   from being restored on export/restart.

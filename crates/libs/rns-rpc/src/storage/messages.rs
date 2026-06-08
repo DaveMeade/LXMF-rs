@@ -876,6 +876,39 @@ impl MessagesStore {
         })
     }
 
+    pub fn merge_case_insensitive_peer_propagation_marks(
+        &self,
+        peer: &str,
+    ) -> rusqlite::Result<()> {
+        self.with_write_conn(|conn| {
+            conn.execute(
+                "INSERT INTO propagation_peer_entries (peer, transient_id, state, updated_at)
+                 SELECT ?1,
+                        transient_id,
+                        CASE
+                            WHEN SUM(CASE WHEN state = 'transfer_limited' THEN 1 ELSE 0 END) > 0 THEN 'transfer_limited'
+                            WHEN SUM(CASE WHEN state = 'received' THEN 1 ELSE 0 END) > 0 THEN 'received'
+                            WHEN SUM(CASE WHEN state = 'transferred' THEN 1 ELSE 0 END) > 0 THEN 'transferred'
+                            WHEN SUM(CASE WHEN state = 'handled' THEN 1 ELSE 0 END) > 0 THEN 'handled'
+                            ELSE 'unhandled'
+                        END,
+                        MAX(updated_at)
+                 FROM propagation_peer_entries
+                 WHERE LOWER(peer) = LOWER(?1)
+                 GROUP BY transient_id
+                 ON CONFLICT(peer, transient_id) DO UPDATE SET
+                    state = CASE
+                        WHEN propagation_peer_entries.state IN ('transfer_limited', 'received', 'transferred', 'handled') THEN propagation_peer_entries.state
+                        WHEN excluded.state IN ('transfer_limited', 'received', 'transferred', 'handled') THEN excluded.state
+                        ELSE excluded.state
+                    END,
+                    updated_at = MAX(propagation_peer_entries.updated_at, excluded.updated_at)",
+                params![peer],
+            )?;
+            Ok(())
+        })
+    }
+
     pub fn mark_peer_handled_propagation(
         &self,
         peer: &str,

@@ -44,6 +44,9 @@ impl RpcDaemon {
         &self,
         peer: &str,
     ) -> Result<(), std::io::Error> {
+        self.store
+            .merge_case_insensitive_peer_propagation_marks(peer)
+            .map_err(std::io::Error::other)?;
         self.store.mark_all_propagation_unhandled_for_peer(peer).map_err(std::io::Error::other)?;
         let unhandled_ids =
             self.store.list_peer_unhandled_propagation_ids(peer).map_err(std::io::Error::other)?;

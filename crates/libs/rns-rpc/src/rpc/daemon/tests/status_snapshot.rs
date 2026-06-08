@@ -17380,6 +17380,50 @@ fn peer_activation_snapshots_preexisting_completed_marks_like_python() {
 }
 
 #[test]
+fn peer_activation_snapshots_case_insensitive_preexisting_completed_marks_like_python() {
+    let daemon = RpcDaemon::test_instance();
+    let stored_peer = "Peer-Late-Completed-Case";
+    let request_peer = stored_peer.to_ascii_lowercase();
+    let entry = PropagationEntryRecord {
+        transient_id: "e5".repeat(32),
+        destination: "29".repeat(16),
+        payload_hex: "29".repeat(24),
+        received_at: 1_700_000_953,
+        size_bytes: 24,
+        stamp_value: None,
+    };
+    daemon.store.upsert_propagation_entry(&entry).expect("store propagation entry");
+    daemon
+        .record_peer_transferred_propagation(request_peer.as_str(), entry.transient_id.as_str())
+        .expect("record transfer before peer activation");
+
+    daemon.record_propagation_offer_peer(stored_peer).expect("activate propagation peer");
+
+    assert_eq!(
+        daemon.store.list_peer_handled_propagation_ids(stored_peer).expect("handled ids"),
+        vec![entry.transient_id.clone()]
+    );
+    assert!(
+        daemon
+            .store
+            .list_peer_unhandled_propagation(stored_peer)
+            .expect("unhandled propagation")
+            .is_empty()
+    );
+    let peers = daemon.peers.lock().expect("peers mutex poisoned");
+    let record = peers.get(stored_peer).expect("peer record");
+    let serialized = serde_json::to_value(record).expect("serialize peer record");
+    assert_eq!(
+        serialized["handled_ids"].as_array().expect("serialized handled ids"),
+        &[json!(entry.transient_id.as_str())]
+    );
+    assert_eq!(
+        serialized["unhandled_ids"].as_array().expect("serialized unhandled ids"),
+        &[] as &[JsonValue]
+    );
+}
+
+#[test]
 fn peer_unpeer_clears_persisted_propagation_queue_marks() {
     let (daemon, peer) = ready_propagation_peer_daemon(0x52);
     daemon
