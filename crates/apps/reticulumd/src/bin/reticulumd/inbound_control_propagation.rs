@@ -158,17 +158,17 @@ pub(super) fn handle_offer_request(
             wanted.push(bytes.clone());
         }
     }
-    let remote_propagation_hash = hex::encode(remote_propagation_hash);
-    if daemon.record_propagation_offer_peer(remote_propagation_hash.as_str()).is_err() {
-        return ControlResponse::Code(error_no_access);
+    if wanted.is_empty() {
+        if let Ok(mut guard) = control.validated_peer_links.lock() {
+            guard.insert(*link_id);
+        }
+        return ControlResponse::Bool(false);
     }
     if let Ok(mut guard) = control.validated_peer_links.lock() {
         guard.insert(*link_id);
     }
 
-    if wanted.is_empty() {
-        ControlResponse::Bool(false)
-    } else if wanted.len() == transient_ids.len() {
+    if wanted.len() == transient_ids.len() {
         ControlResponse::Bool(true)
     } else {
         ControlResponse::Rmpv(rmpv::Value::Array(
@@ -284,6 +284,8 @@ mod tests {
         let remote_private =
             rns_transport::identity::PrivateIdentity::new_from_rand(rand_core::OsRng);
         let remote_identity = *remote_private.as_identity();
+        let remote_propagation_hash =
+            hex::encode(propagation_destination_hash_for_identity(&remote_identity));
         let mut peering_id = Vec::with_capacity(32);
         peering_id.extend_from_slice(local_identity_hash.as_slice());
         peering_id.extend_from_slice(remote_identity.address_hash.as_slice());
@@ -326,10 +328,23 @@ mod tests {
             .lock()
             .expect("validated peer links")
             .contains(&link_id));
+        let peers = daemon
+            .handle_rpc(RpcRequest { id: 11, method: "list_peers".to_string(), params: None })
+            .expect("list peers")
+            .result
+            .expect("list peers result");
+        assert!(
+            peers["peers"]
+                .as_array()
+                .expect("peer rows")
+                .iter()
+                .all(|row| row["peer"].as_str() != Some(remote_propagation_hash.as_str())),
+            "wanted offers should validate the link without admitting or queueing the peer"
+        );
     }
 
     #[test]
-    fn offer_request_records_authenticated_peer_for_status_and_queueing() {
+    fn offer_request_empty_offer_does_not_queue_peer_like_python() {
         let daemon = RpcDaemon::test_instance();
         daemon
             .handle_rpc(RpcRequest {
@@ -370,10 +385,11 @@ mod tests {
             validated_peer_links: test_validated_peer_links(),
         };
 
+        let link_id = test_link_id();
         let response = handle_offer_request(
             &daemon,
             &control,
-            &test_link_id(),
+            &link_id,
             &remote_identity,
             Some(rmpv::Value::Array(vec![
                 rmpv::Value::Binary(peering_key),
@@ -386,25 +402,25 @@ mod tests {
         );
 
         assert!(matches!(response, ControlResponse::Bool(false)));
+        assert!(control
+            .validated_peer_links
+            .lock()
+            .expect("validated peer links")
+            .contains(&link_id));
         let peers = daemon
             .handle_rpc(RpcRequest { id: 11, method: "list_peers".to_string(), params: None })
             .expect("list peers")
             .result
             .expect("list peers result");
-        let row = peers["peers"]
+        assert!(peers["peers"]
             .as_array()
             .expect("peer rows")
             .iter()
-            .find(|row| row["peer"].as_str() == Some(remote_propagation_hash.as_str()))
-            .expect("authenticated offer peer row");
-        assert_eq!(row["peer_type"].as_str(), Some("manual"));
-        assert_eq!(row["type"].as_str(), Some("discovered"));
-        assert_eq!(row["messages"]["unhandled"].as_u64(), Some(1));
-        assert_eq!(row["messages"]["unhandled_ids"], json!([existing_transient_id]));
+            .all(|row| row["peer"].as_str() != Some(remote_propagation_hash.as_str())));
     }
 
     #[test]
-    fn offer_request_does_not_mark_known_offers_received_like_python() {
+    fn offer_request_all_known_offer_does_not_queue_peer_like_python() {
         let daemon = RpcDaemon::test_instance();
         daemon
             .handle_rpc(RpcRequest {
@@ -445,10 +461,11 @@ mod tests {
             validated_peer_links: test_validated_peer_links(),
         };
 
+        let link_id = test_link_id();
         let response = handle_offer_request(
             &daemon,
             &control,
-            &test_link_id(),
+            &link_id,
             &remote_identity,
             Some(rmpv::Value::Array(vec![
                 rmpv::Value::Binary(peering_key),
@@ -463,21 +480,21 @@ mod tests {
         );
 
         assert!(matches!(response, ControlResponse::Bool(false)));
+        assert!(control
+            .validated_peer_links
+            .lock()
+            .expect("validated peer links")
+            .contains(&link_id));
         let peers = daemon
             .handle_rpc(RpcRequest { id: 11, method: "list_peers".to_string(), params: None })
             .expect("list peers")
             .result
             .expect("list peers result");
-        let row = peers["peers"]
+        assert!(peers["peers"]
             .as_array()
             .expect("peer rows")
             .iter()
-            .find(|row| row["peer"].as_str() == Some(remote_propagation_hash.as_str()))
-            .expect("authenticated offer peer row");
-        assert_eq!(row["messages"]["incoming"].as_u64(), Some(0));
-        assert_eq!(row["messages"]["unhandled"].as_u64(), Some(1));
-        assert_eq!(row["messages"]["handled_ids"], json!([]));
-        assert_eq!(row["messages"]["unhandled_ids"], json!([known_transient_id]));
+            .all(|row| row["peer"].as_str() != Some(remote_propagation_hash.as_str())));
     }
 
     #[test]
@@ -661,7 +678,7 @@ mod tests {
     }
 
     #[test]
-    fn offer_request_rejects_capacity_limited_peer_admission() {
+    fn offer_request_defers_capacity_limited_peer_admission_like_python() {
         let daemon = RpcDaemon::test_instance();
         daemon
             .handle_rpc(RpcRequest {
@@ -719,7 +736,7 @@ mod tests {
             0xF6,
         );
 
-        assert!(matches!(response, ControlResponse::Code(0xF1)));
+        assert!(matches!(response, ControlResponse::Bool(true)));
         let peers = daemon
             .handle_rpc(RpcRequest { id: 12, method: "list_peers".to_string(), params: None })
             .expect("list peers")
@@ -731,11 +748,11 @@ mod tests {
                 .expect("peer rows")
                 .iter()
                 .all(|row| row["peer"].as_str() != Some(remote_propagation_hash.as_str())),
-            "capacity-limited offer must not create a peer record"
+            "wanted offer response should not consume peer capacity before transfer admission"
         );
         assert!(
-            !control.validated_peer_links.lock().expect("validated peer links").contains(&link_id),
-            "capacity-limited offer must not validate the peering link"
+            control.validated_peer_links.lock().expect("validated peer links").contains(&link_id),
+            "valid wanted offer should still validate the peering link"
         );
     }
 

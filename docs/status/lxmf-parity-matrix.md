@@ -201,6 +201,18 @@ Workspace paths are used for navigation. `crates/libs/lxmf-core` publishes as
   through Python's integer-kilobyte restore path before peer-sync queue
   selection, so restored fractional sync limits leave the same queued work
   pending as Python.
+- Restored Python peer records coerce numeric stamp, stamp-flexibility, and
+  peering costs through Python's integer restore path before peering checks, so
+  float-valued snapshots can still transfer queued stamped offers.
+- Restored Python peer records also coerce numeric `sync_strategy` through
+  Python's integer restore path, so float-valued persistent-peer snapshots keep
+  draining queued offers across sync-limit batches.
+- Restored Python peer records accept Python `time.time()` float timestamps for
+  heard/sync/backoff fields, so restart-loaded peers can still reach queued
+  transfer instead of failing restore before sync.
+- Restored Python peer records coerce numeric message and byte counters before
+  peer-sync accounting, so restart-loaded peers preserve cumulative
+  offered/outgoing/incoming totals while transferring newly queued work.
 - Duplicate inbound peer propagation payloads still fan out to active relay
   peers while keeping the source peer handled, so a known local payload does
   not bypass relay queue creation.
@@ -222,6 +234,10 @@ Workspace paths are used for navigation. `crates/libs/lxmf-core` publishes as
 - Inbound propagation offer requests with too-short list payloads return the
   Python-compatible nil response without validating the link or admitting the
   remote propagation peer.
+- Valid inbound propagation offers answer Python's `False`, `True`, or
+  wanted-ID list responses after peering-key validation without admitting the
+  remote propagation peer or queuing local payloads before a real transfer or
+  message-get admission point.
 - Remote fetch and download imports mark inactive source peers as received
   before later activation, so source-accounting survives even when the
   propagation node was not yet an active peer record.
@@ -255,6 +271,9 @@ Workspace paths are used for navigation. `crates/libs/lxmf-core` publishes as
 - Peer activation also merges case-variant preexisting completed marks into
   the activated peer key before queue replay, keeping restart/export state
   aligned when transfer accounting arrives before the peer record case is known.
+- Selected propagation node activation reuses the existing peer record case
+  before queue replay and canonicalizes merged live marks, preventing
+  caller-case variants from leaving duplicate peer queue rows.
 - Peer unpeer cleanup clears case-variant propagation marks as one peer, so
   completed marks merged during activation cannot survive teardown and reappear
   as handled work when that peer is later reactivated.
