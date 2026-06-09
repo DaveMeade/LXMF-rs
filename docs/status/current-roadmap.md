@@ -143,6 +143,10 @@ The project is best described by capability level:
 - Peer sync unhandled transfer selection and retry cleanup now read and remove
   caller-case peer variants as one effective peer, so queued transfer work
   cannot be missed or left retryable under alternate peer casing.
+- Prospective peer queue selection now also reads case-variant completed marks
+  before returning unhandled work, so helper-level queue selection cannot reopen
+  received, transferred, handled, or transfer-limited payloads under alternate
+  peer casing.
 - Static-only propagation peer replacement now routes removed static peers
   through the same local unpeer cleanup as explicit unpeer, so handled,
   received, transfer-limited, and unhandled queue marks are cleared and
@@ -169,6 +173,12 @@ The project is best described by capability level:
 - Restored Python peer records now coerce numeric message and byte counters
   before peer-sync accounting, so restart-loaded peers keep cumulative
   offered/outgoing/incoming totals while transferring newly queued work.
+- Restored Python peer records now preserve serialized LXMPeer metadata through
+  Rust peer record round trips, so restart/export snapshots do not drop
+  peer-specific metadata before later queue work resumes.
+- Live propagation announces now retain Python PN metadata on active peer
+  records, so announce-derived peer metadata survives into later peering and
+  queue restart/export snapshots.
 - Peer sync queue creation also records newly queued existing propagation IDs in
   the peer record snapshot, so postponed syncs can restart/export with the same
   unhandled queue visible in live status.
@@ -179,6 +189,10 @@ The project is best described by capability level:
 - Duplicate inbound peer propagation payloads now still apply source-aware
   fan-out to active relay peers while keeping the source peer handled, so a
   known local payload does not skip relay queue creation.
+- Locally delivered inbound peer propagation payloads now also store the
+  accepted transient and apply source-aware relay fan-out without double
+  counting source peer activity, so local delivery does not bypass relay queue
+  creation.
 - Inbound peer propagation ingest now also marks inactive identified sources
   as received before later activation, so newly peered sources are not offered
   payloads they supplied while still unpeered.
@@ -194,6 +208,13 @@ The project is best described by capability level:
 - Inbound propagation message-get `haves` handling now applies peer admission
   before purging matching local payloads, so rejected peers cannot delete queued
   transfers they are not allowed to acknowledge.
+- Inbound propagation message-get requests now mark wanted payloads skipped by
+  the peer's transfer budget as transfer-limited completed work after peer
+  admission, so oversized fetch attempts do not remain retryable queue entries.
+- Inbound propagation message-get transfer-budget handling now leaves payloads
+  skipped only by the cumulative response budget retryable for a later request,
+  while still completing individually oversized wanted payloads as
+  transfer-limited.
 - Inbound propagation offer requests with too-short list payloads now follow
   Python's caught-exception nil response path without validating the link or
   admitting a propagation peer.
@@ -201,6 +222,12 @@ The project is best described by capability level:
   wanted-ID list responses after peering-key validation without admitting the
   remote peer or queuing local propagation payloads before a real transfer or
   message-get admission point.
+- Inbound propagation offers now validate every offered transient ID before
+  applying any source-accounting marks, so malformed mixed offers cannot leave
+  partial received/completed queue state behind.
+- Inbound propagation offers now deduplicate validated offered transient IDs
+  before building wanted-ID responses or applying source-accounting marks, so a
+  duplicate offer cannot request or account the same payload more than once.
 - Remote fetch and download imports now mark inactive source peers as received
   before later activation, so a propagation node is not offered back payloads it
   previously supplied just because it was not yet an active peer record.
@@ -214,6 +241,10 @@ The project is best described by capability level:
   incoming counts and receive bytes only for payload IDs not already marked
   received from that source, while still replaying known payloads into relay
   queues when their live marks were cleared.
+- Repeated peer-origin propagation ingests now also avoid double-counting
+  source peer incoming counts and receive bytes for already received payload
+  IDs, while still refreshing relay queue marks for peers that need the
+  payload.
 - Remote peer-sync imports now accept transferred payload arrays from full
   Python-style responses where top-level `messages` is a peer counter object
   and payloads live under `propagation.messages`/`propagation.payloads`, as
@@ -250,12 +281,24 @@ The project is best described by capability level:
 - Reactivating a persisted `unpeered` record clears stale serialized peer queue
   snapshots before the peer becomes active again, avoiding restart/export
   resurrection of pre-unpeer propagation work.
+- Reactivating a persisted `unpeered` record also clears stale live completed
+  propagation marks before queue replay, so still-local payloads are offered
+  again after the peer rejoins as manual or configured static.
 - Persisted `unpeered` non-static records now re-run peer admission before
   reactivation, so static-only propagation policy cannot be bypassed by a
   stale teardown record.
 - Static peer activation now clears stale serialized queue snapshots when it
   revives a persisted `unpeered` record, so configured static peering cannot
   resurrect pre-unpeer propagation work on restart/export.
+- Reactivating a persisted `unpeered` record now also clears stale sync
+  backoff postponement fields, so rejoined manual or configured static peers
+  are not blocked by pre-unpeer retry scheduling.
+- Peer sync reactivation now bypasses stale pre-unpeer backoff postponements
+  before admission and queue replay, so manual rejoins are not returned as
+  postponed `unpeered` peers.
+- Peer sync reactivation now also applies the active peer type even when a
+  restored `unpeered` record has a future `last_seen` timestamp, so clock-skewed
+  restart state cannot leave a successfully rejoined peer marked unpeered.
 - Peer sync stale queue cleanup now removes matching unhandled and completed
   IDs from active peer record snapshots when the underlying propagation payload
   no longer exists, keeping export/restart state aligned with live queue
@@ -277,6 +320,15 @@ The project is best described by capability level:
 - Persistent peer sync now preserves explicit offer-response boundaries by
   leaving sync-limit-skipped IDs queued for the next offer instead of
   auto-transferring messages outside the peer's current response.
+- Peer maintenance now replays payload-backed restored unhandled queue
+  snapshots before choosing a sync candidate, so restart-loaded peers can be
+  selected and transferred without waiting for a manual `peer_sync`.
+- Peer maintenance rotation now also replays restored queue snapshots before
+  low-acceptance drop decisions, so restart-loaded peers with pending transfer
+  work are not rotated out as if their queues were empty.
+- Inbound propagation offers now mark already-known offered payload IDs as
+  received from the offering peer after peering-key validation, so later peer
+  admission does not queue those source payloads back to the sender.
 
 ## Remaining Release Blockers
 

@@ -827,7 +827,9 @@ impl RpcDaemon {
                         };
                     let sync_limit_bytes =
                         record.propagation_sync_limit.map(|limit| limit as usize);
-                    if peer_sync_backoff_active(timestamp, record.next_sync_attempt) {
+                    if record.peer_type.as_deref() != Some("unpeered")
+                        && peer_sync_backoff_active(timestamp, record.next_sync_attempt)
+                    {
                         return Ok(self.postponed_peer_sync_response(
                             request.id,
                             record,
@@ -1950,7 +1952,10 @@ impl RpcDaemon {
         }
     }
 
-    fn restore_peer_record_queue_marks(&self, record: &PeerRecord) -> Result<(), std::io::Error> {
+    pub(super) fn restore_peer_record_queue_marks(
+        &self,
+        record: &PeerRecord,
+    ) -> Result<(), std::io::Error> {
         fn push_unique(ids: &mut Vec<String>, transient_id: String) {
             if !ids.iter().any(|id| id.eq_ignore_ascii_case(transient_id.as_str())) {
                 ids.push(transient_id);

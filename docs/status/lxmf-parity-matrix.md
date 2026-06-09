@@ -185,6 +185,10 @@ Workspace paths are used for navigation. `crates/libs/lxmf-core` publishes as
 - Peer sync unhandled transfer selection and retry cleanup read and remove
   caller-case peer variants as one effective peer, so queued transfer work is
   not skipped or left retryable under alternate peer casing.
+- Prospective peer queue selection also reads case-variant completed marks
+  before returning unhandled work, so helper-level queue selection cannot reopen
+  received, transferred, handled, or transfer-limited payloads under alternate
+  peer casing.
 - Static-only propagation peer replacement routes removed static peers through
   the same local unpeer cleanup as explicit unpeer, so handled, received,
   transfer-limited, and unhandled queue marks are cleared and accounted
@@ -213,9 +217,18 @@ Workspace paths are used for navigation. `crates/libs/lxmf-core` publishes as
 - Restored Python peer records coerce numeric message and byte counters before
   peer-sync accounting, so restart-loaded peers preserve cumulative
   offered/outgoing/incoming totals while transferring newly queued work.
+- Restored Python peer records preserve serialized LXMPeer metadata through
+  Rust peer record round trips, so restart/export snapshots keep peer-specific
+  metadata before later queue work resumes.
+- Live propagation announces retain Python PN metadata on active peer records,
+  so announce-derived peer metadata survives into later peering and queue
+  restart/export snapshots.
 - Duplicate inbound peer propagation payloads still fan out to active relay
   peers while keeping the source peer handled, so a known local payload does
   not bypass relay queue creation.
+- Locally delivered inbound peer propagation payloads are stored and fanned out
+  to active relay peers while keeping source peer activity counted once, so
+  local delivery does not bypass propagation queue creation.
 - Inbound peer propagation ingest marks inactive identified sources as
   received before later activation, so source-accounting survives when a sender
   becomes a propagation peer after supplying payloads.
@@ -231,6 +244,13 @@ Workspace paths are used for navigation. `crates/libs/lxmf-core` publishes as
 - Inbound propagation message-get `haves` handling applies peer admission
   before purging matching local payloads, so rejected peers cannot delete queued
   transfers they are not allowed to acknowledge.
+- Inbound propagation message-get requests mark wanted payloads skipped by the
+  peer's transfer budget as transfer-limited completed work after peer
+  admission, so oversized fetch attempts do not remain retryable queue entries.
+- Inbound propagation message-get transfer-budget handling keeps payloads
+  skipped only by the cumulative response budget retryable for a later request,
+  while individually oversized wanted payloads still complete as
+  transfer-limited.
 - Inbound propagation offer requests with too-short list payloads return the
   Python-compatible nil response without validating the link or admitting the
   remote propagation peer.
@@ -238,6 +258,12 @@ Workspace paths are used for navigation. `crates/libs/lxmf-core` publishes as
   wanted-ID list responses after peering-key validation without admitting the
   remote propagation peer or queuing local payloads before a real transfer or
   message-get admission point.
+- Inbound propagation offers validate every offered transient ID before
+  applying source-accounting marks, so malformed mixed offers cannot leave
+  partial received/completed queue state behind.
+- Inbound propagation offers deduplicate validated offered transient IDs before
+  building wanted-ID responses or applying source-accounting marks, so duplicate
+  offers cannot request or account the same payload more than once.
 - Remote fetch and download imports mark inactive source peers as received
   before later activation, so source-accounting survives even when the
   propagation node was not yet an active peer record.
@@ -251,6 +277,9 @@ Workspace paths are used for navigation. `crates/libs/lxmf-core` publishes as
   counts and receive bytes only for payload IDs not already marked received
   from that source, while still replaying known payloads into relay queues when
   their live marks were cleared.
+- Repeated peer-origin propagation ingests also avoid double-counting source
+  peer incoming counts and receive bytes for already received payload IDs,
+  while still refreshing relay queue marks for peers that need the payload.
 - Remote peer-sync imports accept transferred payload arrays from full
   Python-style responses where top-level `messages` is a peer counter object
   and payloads live under `propagation.messages`/`propagation.payloads`, as
@@ -283,12 +312,24 @@ Workspace paths are used for navigation. `crates/libs/lxmf-core` publishes as
 - Rejoining from a persisted `unpeered` peer record clears stale serialized
   queue snapshots before the peer is active again, preventing pre-unpeer work
   from being restored on export/restart.
+- Rejoining from a persisted `unpeered` peer record also clears stale live
+  completed propagation marks before queue replay, so still-local payloads are
+  offered again when the peer rejoins as manual or configured static.
 - Rejoining from a persisted `unpeered` non-static record re-runs admission
   before activation, so static-only policy cannot be bypassed by stale teardown
   state.
 - Static peer activation clears stale serialized queue snapshots when it
   revives a persisted `unpeered` record, preventing configured static peering
   from restoring pre-unpeer propagation work on export/restart.
+- Rejoining from a persisted `unpeered` peer record clears stale sync backoff
+  postponement fields, preventing pre-unpeer retry scheduling from blocking
+  manual or configured static peering.
+- Peer sync reactivation bypasses stale pre-unpeer backoff postponements
+  before admission and queue replay, preventing manual rejoins from returning
+  as postponed `unpeered` peers.
+- Peer sync reactivation applies the active peer type even when a restored
+  `unpeered` record has a future `last_seen` timestamp, preventing clock-skewed
+  restart state from leaving a rejoined peer marked unpeered.
 - Peer sync stale queue cleanup prunes matching active peer record snapshot IDs
   for unhandled and completed marks when the propagation payload has already
   been removed, keeping serialized restart/export state aligned with live queue
@@ -309,6 +350,15 @@ Workspace paths are used for navigation. `crates/libs/lxmf-core` publishes as
 - Persistent peer sync preserves explicit offer-response boundaries by keeping
   sync-limit-skipped IDs queued for the next offer instead of auto-transferring
   messages outside the peer's current response.
+- Peer maintenance replays payload-backed restored unhandled queue snapshots
+  before selecting a sync candidate, so restart-loaded queue work can be
+  transferred by automatic maintenance without a manual peer sync first.
+- Peer maintenance rotation also replays restored queue snapshots before
+  low-acceptance drop decisions, so restart-loaded peers with pending transfer
+  work are not rotated out as empty.
+- Inbound propagation offers mark already-known offered payload IDs as received
+  for the offering peer after peering-key validation, preventing later peer
+  admission from offering the sender its own known payloads.
 - Inbound propagation distinguishes clients, validated peers, unpeered
   identified senders, and local delivery; source peers are accounted and not
   re-offered their own payloads.

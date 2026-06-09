@@ -1121,6 +1121,10 @@ fn duplicate_peer_propagation_ingest_still_queues_relay_peers_like_python() {
         .ingest_peer_propagation_payload_bytes_at_cost(payload, None, 0, source_peer)
         .expect("duplicate peer propagation ingest");
     assert_eq!(duplicate, transient_id);
+    let repeated_duplicate = daemon
+        .ingest_peer_propagation_payload_bytes_at_cost(payload, None, 0, source_peer)
+        .expect("repeated duplicate peer propagation ingest");
+    assert_eq!(repeated_duplicate, transient_id);
 
     assert_eq!(
         daemon
@@ -1144,6 +1148,21 @@ fn duplicate_peer_propagation_ingest_still_queues_relay_peers_like_python() {
         .expect("relay unhandled");
     assert_eq!(relay_pending.len(), 1);
     assert_eq!(relay_pending[0].transient_id, transient_id);
+
+    let peers = daemon
+        .handle_rpc(RpcRequest { id: 31, method: "list_peers".to_string(), params: None })
+        .expect("list peers")
+        .result
+        .expect("list peers result");
+    let source_row = peers["peers"]
+        .as_array()
+        .expect("peer rows")
+        .iter()
+        .find(|row| row["peer"].as_str() == Some(source_peer))
+        .expect("source peer row");
+    assert_eq!(source_row["messages"]["incoming"].as_u64(), Some(1));
+    assert_eq!(source_row["incoming"].as_u64(), Some(1));
+    assert_eq!(source_row["rx_bytes"].as_u64(), Some(payload.len() as u64));
 }
 
 #[test]
@@ -2710,6 +2729,7 @@ fn announce_received_parses_propagation_peer_name_from_python_metadata() {
     assert_eq!(row["peer"].as_str(), Some("peer-pn-name"));
     assert_eq!(row["name"].as_str(), Some("PN Alpha"));
     assert_eq!(row["name_source"].as_str(), Some("pn_meta"));
+    assert_eq!(row["metadata"]["name"].as_str(), Some("PN Alpha"));
 }
 
 #[test]
@@ -3562,6 +3582,109 @@ fn propagation_peer_maintenance_rotates_low_acceptance_autopeers_like_python() {
 }
 
 #[test]
+fn propagation_peer_maintenance_rotation_replays_restored_queue_before_drop_like_python() {
+    let daemon = RpcDaemon::test_instance();
+    daemon
+        .handle_rpc(rpc_request(
+            45,
+            "propagation_enable",
+            json!({
+                "enabled": true,
+                "autopeer": true,
+                "max_peers": 3,
+            }),
+        ))
+        .expect("enable propagation");
+
+    for (peer, timestamp) in [
+        ("peer-rotation-restored-low", 1_700_000_610),
+        ("peer-rotation-restored-keep-a", 1_700_000_611),
+        ("peer-rotation-restored-keep-b", 1_700_000_612),
+    ] {
+        daemon
+            .accept_announce_with_metadata(
+                peer.to_string(),
+                timestamp,
+                Some(peer.to_string()),
+                Some("announce".to_string()),
+                None,
+                Some(vec!["propagation".to_string()]),
+                None,
+                None,
+                None,
+                Some(1),
+                Some(Some(0)),
+                Some(Some(1)),
+                None,
+                Some(1),
+                None,
+                None,
+                None,
+                None,
+            )
+            .expect("accept autopeer announce");
+    }
+
+    let entry = PropagationEntryRecord {
+        transient_id: "ab".repeat(32),
+        destination: "12".repeat(16),
+        payload_hex: "12".repeat(24),
+        received_at: 1_700_000_613,
+        size_bytes: 24,
+        stamp_value: None,
+    };
+    daemon.store.upsert_propagation_entry(&entry).expect("store propagation entry");
+
+    let recent = now_i64();
+    {
+        let mut peers = daemon.peers.lock().expect("peers mutex poisoned");
+        for peer in [
+            "peer-rotation-restored-low",
+            "peer-rotation-restored-keep-a",
+            "peer-rotation-restored-keep-b",
+        ] {
+            let record = peers.get_mut(peer).expect("peer record");
+            record.last_seen = recent;
+            record.alive = true;
+            record.last_sync_attempt = recent - 1;
+            record.offered = 10;
+            record.outgoing = 10;
+        }
+        let low = peers.get_mut("peer-rotation-restored-low").expect("low-rate peer");
+        low.outgoing = 0;
+        low.restored_unhandled_ids.push(entry.transient_id.clone());
+    }
+    daemon.event_queue.lock().expect("event_queue mutex poisoned").clear();
+
+    let result = daemon
+        .handle_rpc(rpc_request(46, "propagation_peer_maintenance", json!({})))
+        .expect("peer maintenance")
+        .result
+        .expect("peer maintenance result");
+
+    assert_eq!(result["rotated"].as_u64(), Some(0));
+    assert_eq!(result["rotated_peers"].as_array().expect("rotated peers"), &[] as &[JsonValue]);
+    assert_eq!(
+        daemon
+            .store
+            .list_peer_unhandled_propagation("peer-rotation-restored-low")
+            .expect("pending propagation"),
+        vec![entry]
+    );
+
+    let peers = daemon
+        .handle_rpc(RpcRequest { id: 47, method: "list_peers".to_string(), params: None })
+        .expect("list peers")
+        .result
+        .expect("list peers result");
+    let rows = peers["peers"].as_array().expect("peer rows");
+    assert!(rows.iter().any(|row| {
+        row["peer"].as_str() == Some("peer-rotation-restored-low")
+            && row["peer_type"].as_str() == Some("auto")
+    }));
+}
+
+#[test]
 fn propagation_peer_maintenance_rotates_low_acceptance_non_static_peers_like_python() {
     let daemon = RpcDaemon::test_instance();
     daemon
@@ -3721,6 +3844,59 @@ fn propagation_peer_maintenance_syncs_one_waiting_peer_like_python() {
         .expect("maintenance peer sync event");
     assert_eq!(event.payload["peer"].as_str(), Some(peer.as_str()));
     assert_eq!(event.payload["propagation"]["transferred"].as_u64(), Some(1));
+}
+
+#[test]
+fn propagation_peer_maintenance_replays_restored_unhandled_queue_like_python() {
+    let (daemon, peer) = ready_propagation_peer_daemon(0x63);
+    let entry = PropagationEntryRecord {
+        transient_id: "df".repeat(32),
+        destination: "1f".repeat(16),
+        payload_hex: "2b".repeat(32),
+        received_at: 1_700_000_628,
+        size_bytes: 32,
+        stamp_value: Some(12),
+    };
+    daemon.store.upsert_propagation_entry(&entry).expect("store propagation entry");
+    {
+        let timestamp = now_i64();
+        let mut peers = daemon.peers.lock().expect("peers mutex poisoned");
+        let record = peers.get_mut(peer.as_str()).expect("peer record");
+        record.alive = true;
+        record.last_seen = timestamp;
+        record.last_sync_attempt = timestamp.saturating_sub(1);
+        record.next_sync_attempt = 0;
+        record.sync_transfer_rate = 1024.0;
+        record.restored_unhandled_ids.push(entry.transient_id.clone());
+    }
+    daemon.event_queue.lock().expect("event_queue mutex poisoned").clear();
+
+    let result = daemon
+        .handle_rpc(rpc_request(53, "propagation_peer_maintenance", json!({})))
+        .expect("peer maintenance")
+        .result
+        .expect("peer maintenance result");
+
+    assert_eq!(result["synced_peer"].as_str(), Some(peer.as_str()));
+    assert_eq!(result["peer_sync"]["propagation"]["transferred"].as_u64(), Some(1));
+    assert_eq!(
+        result["peer_sync"]["propagation"]["transferred_ids"]
+            .as_array()
+            .expect("transferred ids"),
+        &[json!(entry.transient_id.as_str())]
+    );
+    assert!(daemon
+        .store
+        .list_peer_unhandled_propagation(peer.as_str())
+        .expect("list unhandled")
+        .is_empty());
+    assert_eq!(
+        daemon
+            .store
+            .list_peer_handled_propagation_ids(peer.as_str())
+            .expect("handled ids"),
+        vec![entry.transient_id]
+    );
 }
 
 #[test]
@@ -17978,7 +18154,7 @@ fn peer_sync_reactivates_persisted_unpeered_record() {
             "peer-rejoin".to_string(),
             daemon.transient_peer_record(
                 "peer-rejoin".to_string(),
-                1_700_000_901,
+                i64::MAX,
                 Vec::new(),
                 None,
                 None,
@@ -18088,6 +18264,9 @@ fn peer_sync_reactivation_clears_unpeered_queue_snapshot() {
         );
         record.restored_handled_ids.push("aa".repeat(32));
         record.restored_unhandled_ids.push("bb".repeat(32));
+        record.last_sync_attempt = now_i64();
+        record.next_sync_attempt = now_i64().saturating_add(12 * 60);
+        record.sync_backoff = 12 * 60;
         guard.insert(peer.to_string(), record);
     }
 
@@ -18106,15 +18285,88 @@ fn peer_sync_reactivation_clears_unpeered_queue_snapshot() {
             .expect("result unhandled ids")
             .is_empty()
     );
+    assert_eq!(result["sync_backoff"].as_u64(), Some(0));
+    assert_eq!(result["next_sync_attempt"].as_i64(), Some(0));
 
     let peers = daemon.peers.lock().expect("peers mutex poisoned");
     let record = peers.get(peer).expect("stored peer");
+    assert_eq!(record.sync_backoff, 0);
+    assert_eq!(record.next_sync_attempt, 0);
     let serialized = serde_json::to_value(record).expect("serialize peer record");
     assert!(
         serialized["handled_ids"].as_array().expect("serialized handled ids").is_empty()
     );
     assert!(
         serialized["unhandled_ids"].as_array().expect("serialized unhandled ids").is_empty()
+    );
+}
+
+#[test]
+fn peer_sync_reactivation_clears_unpeered_live_completed_marks_like_python() {
+    let daemon = RpcDaemon::test_instance();
+    let peer = "peer-rejoin-clears-live-completed";
+    let entry = PropagationEntryRecord {
+        transient_id: "bd".repeat(32),
+        destination: "34".repeat(16),
+        payload_hex: "34".repeat(24),
+        received_at: 1_700_000_903,
+        size_bytes: 24,
+        stamp_value: None,
+    };
+    daemon.store.upsert_propagation_entry(&entry).expect("store propagation entry");
+    daemon
+        .store
+        .mark_peer_handled_propagation(peer, entry.transient_id.as_str())
+        .expect("seed stale completed mark");
+    {
+        let mut guard = daemon.peers.lock().expect("peers mutex poisoned");
+        let record = daemon.transient_peer_record(
+            peer.to_string(),
+            1_700_000_902,
+            Vec::new(),
+            None,
+            None,
+            Some("unpeered".to_string()),
+        );
+        guard.insert(peer.to_string(), record);
+    }
+
+    let result = daemon
+        .handle_rpc(rpc_request(90, "peer_sync", json!({ "peer": peer })))
+        .expect("peer sync")
+        .result
+        .expect("peer sync result");
+    assert_eq!(result["peer_type"].as_str(), Some("manual"));
+    assert_eq!(
+        result["messages"]["handled_ids"].as_array().expect("result handled ids"),
+        &[] as &[JsonValue]
+    );
+    assert_eq!(
+        result["messages"]["unhandled_ids"].as_array().expect("result unhandled ids"),
+        &[json!(entry.transient_id.as_str())]
+    );
+    assert_eq!(
+        daemon.store.list_peer_handled_propagation_ids(peer).expect("handled ids"),
+        Vec::<String>::new()
+    );
+    assert_eq!(
+        daemon
+            .store
+            .list_peer_unhandled_propagation_ids(peer)
+            .expect("unhandled ids"),
+        vec![entry.transient_id.clone()]
+    );
+
+    let peers = daemon.peers.lock().expect("peers mutex poisoned");
+    let record = peers.get(peer).expect("stored peer");
+    let serialized = serde_json::to_value(record).expect("serialize peer record");
+    assert_eq!(
+        serialized["handled_ids"].as_array().expect("serialized handled ids"),
+        &[] as &[JsonValue]
+    );
+    assert_eq!(
+        serialized["unhandled_ids"].as_array().expect("serialized unhandled ids"),
+        &[json!(entry.transient_id.as_str())]
     );
 }
 
@@ -18142,6 +18394,9 @@ fn static_peer_activation_clears_unpeered_queue_snapshot() {
         );
         record.restored_handled_ids.push("aa".repeat(32));
         record.restored_unhandled_ids.push("bb".repeat(32));
+        record.last_sync_attempt = 1_700_000_900;
+        record.next_sync_attempt = 1_700_001_720;
+        record.sync_backoff = 720;
         daemon
             .peers
             .lock()
@@ -18181,6 +18436,8 @@ fn static_peer_activation_clears_unpeered_queue_snapshot() {
         .find(|row| row["peer"].as_str() == Some(peer))
         .expect("reactivated static peer row");
     assert_eq!(row["peer_type"].as_str(), Some("static"));
+    assert_eq!(row["sync_backoff"].as_u64(), Some(0));
+    assert_eq!(row["next_sync_attempt"].as_i64(), Some(0));
     assert_eq!(row["messages"]["handled_ids"].as_array().expect("handled ids"), &[] as &[JsonValue]);
     assert_eq!(
         row["messages"]["unhandled_ids"].as_array().expect("unhandled ids"),
@@ -18196,6 +18453,84 @@ fn static_peer_activation_clears_unpeered_queue_snapshot() {
     );
     assert_eq!(
         serialized["unhandled_ids"].as_array().expect("serialized unhandled ids"),
+        &[json!(entry.transient_id.as_str())]
+    );
+}
+
+#[test]
+fn static_peer_activation_clears_unpeered_live_completed_marks_like_python() {
+    let daemon = RpcDaemon::test_instance();
+    let peer = "peer-static-rejoin-clears-live-completed";
+    let entry = PropagationEntryRecord {
+        transient_id: "be".repeat(32),
+        destination: "35".repeat(16),
+        payload_hex: "35".repeat(24),
+        received_at: 1_700_000_904,
+        size_bytes: 24,
+        stamp_value: None,
+    };
+    daemon.store.upsert_propagation_entry(&entry).expect("store propagation entry");
+    daemon
+        .store
+        .mark_peer_handled_propagation(peer, entry.transient_id.as_str())
+        .expect("seed stale completed mark");
+    {
+        let mut record = daemon.transient_peer_record(
+            peer.to_string(),
+            1_700_000_903,
+            Vec::new(),
+            None,
+            None,
+            Some("unpeered".to_string()),
+        );
+        record.restored_handled_ids.push(entry.transient_id.clone());
+        daemon
+            .peers
+            .lock()
+            .expect("peers mutex poisoned")
+            .insert(peer.to_string(), record);
+    }
+
+    daemon
+        .handle_rpc(rpc_request(
+            90,
+            "propagation_enable",
+            json!({
+                "enabled": true,
+                "static_peers": [peer],
+            }),
+        ))
+        .expect("activate static peer");
+
+    assert_eq!(
+        daemon.store.list_peer_handled_propagation_ids(peer).expect("handled ids"),
+        Vec::<String>::new()
+    );
+    assert_eq!(
+        daemon
+            .store
+            .list_peer_unhandled_propagation_ids(peer)
+            .expect("unhandled ids"),
+        vec![entry.transient_id.clone()]
+    );
+    let peers = daemon
+        .handle_rpc(RpcRequest { id: 91, method: "list_peers".to_string(), params: None })
+        .expect("list peers")
+        .result
+        .expect("list peers result");
+    let row = peers["peers"]
+        .as_array()
+        .expect("peer rows")
+        .iter()
+        .find(|row| row["peer"].as_str() == Some(peer))
+        .expect("reactivated static peer row");
+    assert_eq!(row["peer_type"].as_str(), Some("static"));
+    assert_eq!(
+        row["messages"]["handled_ids"].as_array().expect("handled ids"),
+        &[] as &[JsonValue]
+    );
+    assert_eq!(
+        row["messages"]["unhandled_ids"].as_array().expect("unhandled ids"),
         &[json!(entry.transient_id.as_str())]
     );
 }

@@ -753,15 +753,63 @@ impl RpcDaemon {
             .active_peer_ids()
             .into_iter()
             .find(|peer| peer.eq_ignore_ascii_case(source_peer.as_str()));
+        let source_peer_key = source_active_peer.as_deref().unwrap_or(source_peer.as_str());
+        let already_received = self
+            .store
+            .peer_received_propagation_mark_exists(source_peer_key, transient_id.as_str())
+            .map_err(std::io::Error::other)?;
         self.queue_propagation_entry_from_source_for_active_peers(
             source_peer.as_str(),
             transient_id.as_str(),
         )?;
-        if let Some(peer) = source_active_peer {
-            self.record_inbound_peer_activity(peer.as_str(), normalized_payload.len());
-        } else {
-            self.record_unpeered_propagation_attempt(normalized_payload.len());
+        if !already_received {
+            if let Some(peer) = source_active_peer {
+                self.record_inbound_peer_activity(peer.as_str(), normalized_payload.len());
+            } else {
+                self.record_unpeered_propagation_attempt(normalized_payload.len());
+            }
         }
+        self.propagation_payloads
+            .lock()
+            .expect("propagation payload mutex poisoned")
+            .insert(transient_id.clone(), payload_hex);
+        Ok(transient_id)
+    }
+
+    pub fn relay_accepted_peer_propagation_payload_bytes_at_cost(
+        &self,
+        payload: &[u8],
+        transient_id: Option<&str>,
+        stamp_cost: u32,
+        source_peer: &str,
+    ) -> Result<String, std::io::Error> {
+        let source_peer = source_peer.trim().to_ascii_lowercase();
+        if source_peer.is_empty() {
+            return self.ingest_propagation_payload_bytes_at_cost(
+                payload,
+                transient_id,
+                stamp_cost,
+            );
+        }
+        let (canonical_transient_id, normalized_payload) =
+            normalize_propagation_payload_bytes(payload, stamp_cost)?;
+        let canonical_transient_id = hex::encode(canonical_transient_id);
+        if let Some(provided_transient_id) = transient_id {
+            if !provided_transient_id.eq_ignore_ascii_case(canonical_transient_id.as_str()) {
+                return Err(std::io::Error::new(
+                    std::io::ErrorKind::InvalidInput,
+                    "transient_id does not match propagation payload",
+                ));
+            }
+        }
+        let transient_id =
+            transient_id.map(normalize_propagation_transient_key).unwrap_or(canonical_transient_id);
+        let payload_hex = hex::encode(normalized_payload);
+        self.store_propagation_payload_hex(transient_id.as_str(), payload_hex.as_str())?;
+        self.queue_propagation_entry_from_source_for_active_peers(
+            source_peer.as_str(),
+            transient_id.as_str(),
+        )?;
         self.propagation_payloads
             .lock()
             .expect("propagation payload mutex poisoned")
@@ -832,6 +880,20 @@ impl RpcDaemon {
         let peer_key = self.peer_store_key_or_input(peer);
         self.store
             .mark_peer_transferred_propagation(peer_key.as_str(), transient_id.as_str())
+            .map_err(std::io::Error::other)?;
+        self.record_peer_queue_handled_id(peer_key.as_str(), transient_id.as_str());
+        Ok(())
+    }
+
+    pub fn record_peer_transfer_limited_propagation(
+        &self,
+        peer: &str,
+        transient_id: &str,
+    ) -> Result<(), std::io::Error> {
+        let transient_id = normalize_propagation_transient_key(transient_id);
+        let peer_key = self.peer_store_key_or_input(peer);
+        self.store
+            .mark_peer_transfer_limited_propagation(peer_key.as_str(), transient_id.as_str())
             .map_err(std::io::Error::other)?;
         self.record_peer_queue_handled_id(peer_key.as_str(), transient_id.as_str());
         Ok(())
@@ -934,16 +996,45 @@ impl RpcDaemon {
         )
     }
 
+    pub fn transfer_limited_propagation_payload_ids_for_destination(
+        &self,
+        destination: &[u8; 16],
+        wanted: &[Vec<u8>],
+        transfer_limit_bytes: Option<usize>,
+    ) -> Vec<String> {
+        self.select_propagation_payloads_for_destination_with_budget_outcome(
+            destination,
+            wanted,
+            transfer_limit_bytes,
+        )
+        .1
+    }
+
     fn select_propagation_payloads_for_destination_with_ids(
         &self,
         destination: &[u8; 16],
         wanted: &[Vec<u8>],
         transfer_limit_bytes: Option<usize>,
     ) -> Vec<(String, Vec<u8>)> {
+        self.select_propagation_payloads_for_destination_with_budget_outcome(
+            destination,
+            wanted,
+            transfer_limit_bytes,
+        )
+        .0
+    }
+
+    fn select_propagation_payloads_for_destination_with_budget_outcome(
+        &self,
+        destination: &[u8; 16],
+        wanted: &[Vec<u8>],
+        transfer_limit_bytes: Option<usize>,
+    ) -> (Vec<(String, Vec<u8>)>, Vec<String>) {
         let destination_hex = hex::encode(destination);
         let per_message_overhead = 16usize;
         let mut cumulative_size = 24usize;
         let mut messages = Vec::new();
+        let mut transfer_limited_ids = Vec::new();
         let mut served_ids = HashSet::new();
         for transient_id in wanted {
             if transient_id.len() != 32 {
@@ -983,7 +1074,12 @@ impl RpcDaemon {
                 }
             };
             let stored_size = payload.len().saturating_add(PROPAGATION_STAMP_SIZE);
-            let next_size = cumulative_size.saturating_add(stored_size + per_message_overhead);
+            let transfer_size = stored_size.saturating_add(per_message_overhead);
+            if transfer_limit_bytes.is_some_and(|limit| transfer_size > limit) {
+                transfer_limited_ids.push(transient_hex);
+                continue;
+            }
+            let next_size = cumulative_size.saturating_add(transfer_size);
             if transfer_limit_bytes.is_some_and(|limit| next_size > limit) {
                 continue;
             }
@@ -991,7 +1087,7 @@ impl RpcDaemon {
             messages.push((transient_hex, payload));
         }
 
-        messages
+        (messages, transfer_limited_ids)
     }
 
     pub fn purge_propagation_payloads_for_destination(

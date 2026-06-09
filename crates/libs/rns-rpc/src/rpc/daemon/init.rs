@@ -18,6 +18,16 @@ pub(super) struct PeerPropagationState {
     pub(super) peering_timebase: Option<i64>,
 }
 
+pub(super) struct PeerUpsertRequest {
+    pub(super) peer: String,
+    pub(super) timestamp: i64,
+    pub(super) capabilities: Vec<String>,
+    pub(super) name: Option<String>,
+    pub(super) name_source: Option<String>,
+    pub(super) metadata: Option<JsonValue>,
+    pub(super) peer_type: Option<String>,
+}
+
 impl RpcDaemon {
     pub(super) const DEFAULT_TICKET_EXPIRY_SECS: u64 = 21 * 24 * 60 * 60;
     pub(super) const TICKET_GRACE_SECS: i64 = 5 * 24 * 60 * 60;
@@ -1081,6 +1091,7 @@ impl RpcDaemon {
             parse_propagation_enabled_from_app_data_hex(app_data_hex.as_deref());
         let peering_timebase =
             parse_propagation_timebase_from_app_data_hex(app_data_hex.as_deref());
+        let metadata = parse_propagation_metadata_from_app_data_hex(app_data_hex.as_deref());
         let propagation_peer_state = PeerPropagationState {
             transfer_limit: propagation_transfer_limit,
             sync_limit: propagation_sync_limit,
@@ -1128,14 +1139,15 @@ impl RpcDaemon {
             parse_capabilities_from_app_data_hex(app_data_hex.as_deref())
         };
         let record = if should_peer {
-            let record = match self.upsert_peer(
-                peer.clone(),
+            let record = match self.upsert_peer_with_metadata(PeerUpsertRequest {
+                peer: peer.clone(),
                 timestamp,
-                capability_list.clone(),
-                name.clone(),
-                name_source.clone(),
+                capabilities: capability_list.clone(),
+                name: name.clone(),
+                name_source: name_source.clone(),
+                metadata: Some(metadata.clone()),
                 peer_type,
-            ) {
+            }) {
                 Ok(record) => {
                     self.refresh_peer_propagation_state(
                         record.peer.as_str(),
@@ -1152,6 +1164,7 @@ impl RpcDaemon {
                         capability_list.clone(),
                         name,
                         name_source,
+                        metadata,
                         Some("discovered".to_string()),
                         propagation_peer_state,
                     ),
@@ -1165,6 +1178,7 @@ impl RpcDaemon {
                 capability_list.clone(),
                 name,
                 name_source,
+                metadata,
                 peer_type,
                 propagation_peer_state,
             )
@@ -1228,6 +1242,30 @@ impl RpcDaemon {
         name_source: Option<String>,
         peer_type: Option<String>,
     ) -> Result<PeerRecord, std::io::Error> {
+        self.upsert_peer_with_metadata(PeerUpsertRequest {
+            peer,
+            timestamp,
+            capabilities,
+            name,
+            name_source,
+            metadata: None,
+            peer_type,
+        })
+    }
+
+    pub(super) fn upsert_peer_with_metadata(
+        &self,
+        request: PeerUpsertRequest,
+    ) -> Result<PeerRecord, std::io::Error> {
+        let PeerUpsertRequest {
+            peer,
+            timestamp,
+            capabilities,
+            name,
+            name_source,
+            metadata,
+            peer_type,
+        } = request;
         let cleaned_name = clean_optional_text(name);
         let cleaned_name_source = clean_optional_text(name_source);
         let cleaned_capabilities = normalize_capabilities(capabilities);
@@ -1254,17 +1292,28 @@ impl RpcDaemon {
                     existing.name = Some(name);
                     existing.name_source = cleaned_name_source;
                 }
-                if let Some(peer_type) = peer_type {
-                    existing.peer_type = Some(peer_type);
+                if let Some(metadata) = metadata.filter(|value| !value.is_null()) {
+                    existing.metadata = metadata;
                 }
+            }
+            if let Some(peer_type) = peer_type.filter(|_| is_newer || reactivating_unpeered) {
+                existing.peer_type = Some(peer_type);
             }
             if reactivating_unpeered {
                 existing.restored_handled_ids.clear();
                 existing.restored_unhandled_ids.clear();
+                existing.sync_backoff = 0;
+                existing.next_sync_attempt = 0;
             }
             let record = existing.clone();
+            let reactivated_peer_key = reactivating_unpeered.then(|| existing.peer.clone());
             let peer_count = Self::active_peer_count_from_guard(&guard);
             drop(guard);
+            if let Some(peer) = reactivated_peer_key {
+                self.store
+                    .clear_peer_propagation_marks(peer.as_str())
+                    .map_err(std::io::Error::other)?;
+            }
             self.update_daemon_status_snapshot(|snapshot| {
                 snapshot.peer_count = peer_count;
             });
@@ -1278,6 +1327,7 @@ impl RpcDaemon {
             capabilities: cleaned_capabilities,
             name: cleaned_name,
             name_source: cleaned_name_source,
+            metadata: metadata.unwrap_or(JsonValue::Null),
             peer_type,
             alive: true,
             last_sync_attempt: 0,
@@ -1354,6 +1404,7 @@ impl RpcDaemon {
         let from_static_only =
             self.propagation_state.lock().expect("propagation mutex poisoned").from_static_only;
         let mut removed_static_peers = Vec::new();
+        let mut reactivated_unpeered_static_peers = Vec::new();
         let mut guard = self.peers.lock().expect("peers mutex poisoned");
         for existing in guard.values_mut() {
             let is_configured_static = configured_static_peers
@@ -1363,6 +1414,9 @@ impl RpcDaemon {
                 if existing.peer_type.as_deref() == Some("unpeered") {
                     existing.restored_handled_ids.clear();
                     existing.restored_unhandled_ids.clear();
+                    existing.sync_backoff = 0;
+                    existing.next_sync_attempt = 0;
+                    reactivated_unpeered_static_peers.push(existing.peer.clone());
                 }
                 existing.peer_type = Some("static".to_string());
             } else if existing.peer_type.as_deref() == Some("static") {
@@ -1392,6 +1446,7 @@ impl RpcDaemon {
                     capabilities: Vec::new(),
                     name: None,
                     name_source: None,
+                    metadata: JsonValue::Null,
                     peer_type: Some("static".to_string()),
                     alive: false,
                     last_sync_attempt: 0,
@@ -1427,6 +1482,11 @@ impl RpcDaemon {
         self.update_daemon_status_snapshot(|snapshot| {
             snapshot.peer_count = peer_count;
         });
+        for peer in reactivated_unpeered_static_peers {
+            self.store
+                .clear_peer_propagation_marks(peer.as_str())
+                .map_err(std::io::Error::other)?;
+        }
         for peer in removed_static_peers {
             let cleanup = self.unpeer_local_state(peer.as_str())?;
             if cleanup.removed {
@@ -1616,6 +1676,7 @@ impl RpcDaemon {
 
         let mut peer_stats = Vec::with_capacity(active_peers.len());
         for record in active_peers {
+            self.restore_peer_record_queue_marks(&record)?;
             let stats = self
                 .store
                 .peer_propagation_message_stats(record.peer.as_str())
@@ -1697,6 +1758,7 @@ impl RpcDaemon {
             if timestamp > record.last_seen.saturating_add(LXMF_PEER_MAX_UNREACHABLE_SECS) {
                 continue;
             }
+            self.restore_peer_record_queue_marks(&record)?;
             let stats = self
                 .store
                 .peer_propagation_message_stats(record.peer.as_str())
@@ -1963,6 +2025,7 @@ impl RpcDaemon {
             capabilities,
             name,
             name_source,
+            JsonValue::Null,
             peer_type,
             PeerPropagationState {
                 transfer_limit: None,
@@ -1984,6 +2047,7 @@ impl RpcDaemon {
         capabilities: Vec<String>,
         name: Option<String>,
         name_source: Option<String>,
+        metadata: JsonValue,
         peer_type: Option<String>,
         state: PeerPropagationState,
     ) -> PeerRecord {
@@ -1994,6 +2058,7 @@ impl RpcDaemon {
             capabilities: normalize_capabilities(capabilities),
             name: clean_optional_text(name),
             name_source: clean_optional_text(name_source),
+            metadata,
             peer_type,
             alive: true,
             last_sync_attempt: 0,
