@@ -302,6 +302,7 @@ impl RpcDaemon {
         let mut imported_ids = Vec::new();
         let mut accepted_ids: Vec<String> = Vec::new();
         let mut transferred_bytes = 0usize;
+        let mut validated = Vec::new();
         for message in messages {
             let Some((payload, payload_hex)) = remote_propagation_message_payload(message)? else {
                 continue;
@@ -348,26 +349,31 @@ impl RpcDaemon {
                 size_bytes: payload.len() as u64,
                 stamp_value,
             };
-            let already_known = self
+            let already_known_store = self
                 .store
                 .get_propagation_entry(transient_id.as_str())
                 .map_err(std::io::Error::other)?
                 .is_some();
+            let already_accepted =
+                accepted_ids.iter().any(|id| id.eq_ignore_ascii_case(transient_id.as_str()));
+            if !already_accepted {
+                transferred_bytes = transferred_bytes.saturating_add(payload.len());
+                accepted_ids.push(transient_id.clone());
+            }
+            if already_known_store || already_accepted {
+                duplicate_count = duplicate_count.saturating_add(1);
+            } else {
+                imported_count = imported_count.saturating_add(1);
+                imported_ids.push(transient_id.clone());
+            }
+            validated.push(record);
+        }
+        for record in validated {
             self.store.upsert_propagation_entry(&record).map_err(std::io::Error::other)?;
             self.propagation_payloads
                 .lock()
                 .expect("propagation payload mutex poisoned")
-                .insert(transient_id.clone(), record.payload_hex);
-            if !accepted_ids.iter().any(|id| id.eq_ignore_ascii_case(transient_id.as_str())) {
-                transferred_bytes = transferred_bytes.saturating_add(payload.len());
-                accepted_ids.push(transient_id.clone());
-            }
-            if already_known {
-                duplicate_count = duplicate_count.saturating_add(1);
-            } else {
-                imported_count = imported_count.saturating_add(1);
-                imported_ids.push(transient_id);
-            }
+                .insert(record.transient_id, record.payload_hex);
         }
         if !messages.is_empty() {
             self.note_client_propagation_messages_received(imported_count);
@@ -563,8 +569,8 @@ impl RpcDaemon {
             .insert(peer, now_i64().saturating_add(PN_STAMP_THROTTLE_SECS));
     }
 
-    pub fn throttle_propagation_peer_offer(&self, peer: &str, offered_ids: &[Vec<u8>]) {
-        if let Some(key) = propagation_offer_throttle_key(peer, offered_ids) {
+    pub fn throttle_propagation_peer_offer(&self, peer: &str) {
+        if let Some(key) = propagation_offer_throttle_key(peer) {
             self.throttle_propagation_peer_key(key.as_str());
         }
     }
@@ -589,8 +595,8 @@ impl RpcDaemon {
         }
     }
 
-    pub fn propagation_peer_offer_is_throttled(&self, peer: &str, offered_ids: &[Vec<u8>]) -> bool {
-        propagation_offer_throttle_key(peer, offered_ids)
+    pub fn propagation_peer_offer_is_throttled(&self, peer: &str) -> bool {
+        propagation_offer_throttle_key(peer)
             .is_some_and(|key| self.propagation_peer_is_throttled(key.as_str()))
     }
 
@@ -1227,7 +1233,7 @@ impl RpcDaemon {
                     self.handle_rpc(RpcRequest {
                         id: request.id,
                         method: "peer_sync".to_string(),
-                        params: Some(json!({ "peer": peer })),
+                        params: Some(json!({ "peer": peer, "maintenance_claimed": true })),
                     })?
                     .result
                     .unwrap_or(JsonValue::Null)
@@ -1841,7 +1847,9 @@ impl RpcDaemon {
                             imported.accepted_ids.as_slice(),
                             imported.transferred_bytes,
                         )?;
-                        self.record_payload_backed_peer_queue_snapshot(peer_key.as_str())?;
+                        for active_peer in self.active_peer_ids() {
+                            self.record_payload_backed_peer_queue_snapshot(active_peer.as_str())?;
+                        }
                         self.update_propagation_sync_state(|state| {
                             state.sync_state = PR_COMPLETE;
                             state.state_name = "completed".to_string();
@@ -2646,18 +2654,12 @@ pub(super) fn propagation_payload_hash_input(
     Ok(lxm_data)
 }
 
-fn propagation_offer_throttle_key(peer: &str, offered_ids: &[Vec<u8>]) -> Option<String> {
+fn propagation_offer_throttle_key(peer: &str) -> Option<String> {
     let peer = peer.trim().to_ascii_lowercase();
     if peer.is_empty() {
         return None;
     }
-    let mut offered_ids = offered_ids.to_vec();
-    offered_ids.sort();
-    let mut hasher = Sha256::new();
-    for offered_id in offered_ids {
-        hasher.update(offered_id);
-    }
-    Some(format!("offer:{peer}:{}", hex::encode(hasher.finalize())))
+    Some(format!("offer:{peer}"))
 }
 
 pub(super) fn split_propagation_stamp(transient_data: &[u8]) -> Option<(&[u8], &[u8])> {

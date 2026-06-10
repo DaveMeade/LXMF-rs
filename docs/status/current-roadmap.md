@@ -41,6 +41,12 @@ The project is best described by capability level:
 - AutoInterface has a live daemon runtime, including discovery, peer lifecycle,
   peer-data sockets, transport ingress, outbound routing, and multicast proof
   fallback.
+- Known but unsupported Python interface families now fail config parsing with
+  deterministic unsupported-family diagnostics instead of silently becoming
+  inert unknown interface entries.
+- `rnstatus-rs` now provides a local daemon status utility over the existing
+  RPC status surface, including JSON output and human interface runtime
+  startup state.
 
 ### LXMF
 
@@ -63,10 +69,10 @@ The project is best described by capability level:
 - Retryable numeric local offer responses now mirror payload-backed live queue
   marks into the active peer record snapshot before returning, so restart/export
   state preserves the retry queue even when the serialized snapshot was empty.
-- Retryable, throttled, generic failed, and malformed-import remote peer-sync
-  paths now perform the same payload-backed live queue snapshot mirroring
-  before reporting the failed sync, keeping local and remote retry/export
-  behavior aligned.
+- Retryable, throttled, generic failed, malformed-import, and
+  bridge-unavailable remote peer-sync paths now perform the same payload-backed
+  live and restored queue snapshot mirroring before reporting the failed sync,
+  keeping local and remote retry/export behavior aligned.
 - Payload-backed remote failure snapshots now replace stale serialized peer
   queue IDs with live payload-backed marks, so bridge failures do not preserve
   obsolete restart/export work after the underlying payload is gone.
@@ -77,6 +83,17 @@ The project is best described by capability level:
   advertised integer or fractional kilobytes into the byte limits used by
   peer-sync queue selection, so valid queued payloads are not misclassified as
   transfer-limited.
+- Propagation peer maintenance selection now claims the chosen peer before
+  invoking sync by recording the sync attempt and next backoff window, while
+  allowing the internal maintenance-triggered sync to consume that claim, so
+  concurrent scheduler passes cannot double-select the same peer.
+- Manual `/pn/peer/sync` control requests now force an immediate peer sync
+  through ordinary backoff windows, while scheduled maintenance and remote
+  syncs still respect retry postponement, matching the operator-triggered
+  retry path.
+- Remote fetch/download/sync imports now validate the full returned propagation
+  payload batch before mutating the local store or in-memory payload cache, so a
+  mixed valid/invalid remote response fails without leaving partial relay state.
 - Malformed remote fetch and download imports now mirror existing
   payload-backed live queue marks into active peer record snapshots before
   failing, preserving restart/export retry state for already queued relay work.
@@ -96,9 +113,10 @@ The project is best described by capability level:
   queue marks into active peer record snapshots before returning, so
   restart/export state preserves queued retry work even when sync is deferred.
 - Remote peer-sync bridge-unavailable errors now mirror existing payload-backed
-  live queue marks into active peer record snapshots for already known peers
-  before returning, including case-insensitive requests, while still avoiding
-  peer creation when the bridge is absent.
+  live marks and restored peer-record queue IDs into active peer record
+  snapshots for already known peers before returning, including
+  case-insensitive requests, while still avoiding peer creation when the bridge
+  is absent.
 - Remote peer-sync bridge-unavailable errors for already known peers now also
   publish the failed peer-sync event and mark the propagation sync lifecycle
   failed, keeping queue retry state observable without creating new peers.
@@ -106,18 +124,26 @@ The project is best described by capability level:
   queue marks into active peer record snapshots after applying imports, so
   restart/export state preserves queued retry work even when the remote sync
   itself succeeds without transferring those local queued offers.
+- Successful remote peer-sync imports now also refresh payload-backed queue
+  snapshots for all active peers affected by imported payloads, so relay peers
+  preserve complete restart/export-visible unhandled queues instead of only the
+  newly imported IDs.
 - Remote peer-sync now uses the stored peer ID case for the bridge call, import
   source accounting, state updates, and response envelope when callers use a
   case-variant peer request.
 - Failed remote unpeer attempts now mirror existing payload-backed live queue
-  marks into active peer record snapshots before returning bridge-unavailable
-  or bridge-execution errors, including case-insensitive peer requests, so
-  restart/export state preserves queued retry work when peering teardown fails;
-  these failed attempts also mark the propagation lifecycle failed instead of
-  leaving stale idle/completed state.
+  marks and restored peer-record queue IDs into active peer record snapshots
+  before returning bridge-unavailable or bridge-execution errors, including
+  case-insensitive peer requests, so restart/export state preserves queued retry
+  work when peering teardown fails; these failed attempts also mark the
+  propagation lifecycle failed instead of leaving stale idle/completed state.
 - Successful remote unpeer now also uses the stored peer ID case for the bridge
   call and nested bridge result when callers use a case-variant peer request,
   keeping remote teardown identity aligned with local queue cleanup.
+- Inbound reticulumd `/pn/peer/sync` and `/pn/peer/unpeer` control commands now
+  resolve stored peer IDs case-insensitively before dispatching to daemon RPCs,
+  so binary peer-control requests do not report not-found for restored or
+  configured peers whose status rows preserve a different hex presentation.
 - Payload-backed peer queue snapshot mirroring resolves stored peer IDs
   case-insensitively before reading live queue marks, so restart/export state
   preserves queued work when callers use Python-style peer case variants.
@@ -179,6 +205,12 @@ The project is best described by capability level:
 - Live propagation announces now retain Python PN metadata on active peer
   records, so announce-derived peer metadata survives into later peering and
   queue restart/export snapshots.
+- Python-style `lxmd` `[lxmf] announce_interval` now drives peer/delivery
+  announce cadence separately from `[propagation] announce_interval`, which
+  remains the propagation-node announce cadence.
+- Outbound propagated delivery now resolves selected propagation-node
+  `propagation_stamp_cost` case-insensitively, so Python-style hash casing does
+  not fall back to the default propagation stamp cost.
 - Peer sync queue creation also records newly queued existing propagation IDs in
   the peer record snapshot, so postponed syncs can restart/export with the same
   unhandled queue visible in live status.
@@ -208,6 +240,15 @@ The project is best described by capability level:
 - Inbound propagation message-get `haves` handling now applies peer admission
   before purging matching local payloads, so rejected peers cannot delete queued
   transfers they are not allowed to acknowledge.
+- Inbound propagation message-get `haves` handling now also records matched
+  haves as received/completed work for the requesting propagation peer after
+  purge, so reintroduced payloads are not queued back to peers that already
+  declared them.
+- Inbound propagation message-get purge-only requests now return the
+  Python-style boolean success response after haves are applied, and payload
+  purge cleanup preserves completed peer accounting for other peers while
+  removing stale unhandled marks, so reintroduced payloads are not offered back
+  to peers that already completed them.
 - Inbound propagation message-get requests now mark wanted payloads skipped by
   the peer's transfer budget as transfer-limited completed work after peer
   admission, so oversized fetch attempts do not remain retryable queue entries.
@@ -274,6 +315,9 @@ The project is best described by capability level:
 - Peer unpeer cleanup now clears case-variant propagation marks as one peer,
   so completed marks merged during activation cannot survive teardown and
   reappear as handled work when that peer is later reactivated.
+- Peer unpeer cleanup now also removes the peer from configured static
+  propagation membership, so an explicit unpeer cannot be undone by the next
+  static-peer activation pass.
 - Peer unpeer cleanup accounting now also reads case-variant live queue marks
   as one effective peer before clearing them, so the response and event report
   the same handled/unhandled IDs and byte totals that teardown actually
@@ -332,6 +376,10 @@ The project is best described by capability level:
 - Inbound propagation offers now mark already-known offered payload IDs as
   received from the offering peer after peering-key validation, so later peer
   admission does not queue those source payloads back to the sender.
+- Valid inbound propagation offers now start the peer offer throttle window
+  after peering-key and transient-ID validation, so repeated replication offers
+  from the same peer take the throttled response path even when the peer changes
+  the offered transient-ID set.
 
 ## Remaining Release Blockers
 

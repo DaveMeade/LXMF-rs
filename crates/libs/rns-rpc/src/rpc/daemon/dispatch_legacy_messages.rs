@@ -827,7 +827,9 @@ impl RpcDaemon {
                         };
                     let sync_limit_bytes =
                         record.propagation_sync_limit.map(|limit| limit as usize);
-                    if record.peer_type.as_deref() != Some("unpeered")
+                    if !parsed.maintenance_claimed
+                        && !parsed.force_sync
+                        && record.peer_type.as_deref() != Some("unpeered")
                         && peer_sync_backoff_active(timestamp, record.next_sync_attempt)
                     {
                         return Ok(self.postponed_peer_sync_response(
@@ -874,7 +876,10 @@ impl RpcDaemon {
                         (None, None) => None,
                     };
                 let sync_limit_bytes = record.propagation_sync_limit.map(|limit| limit as usize);
-                if peer_sync_backoff_active(timestamp, record.next_sync_attempt) {
+                if !parsed.maintenance_claimed
+                    && !parsed.force_sync
+                    && peer_sync_backoff_active(timestamp, record.next_sync_attempt)
+                {
                     return Ok(self.postponed_peer_sync_response(
                         request.id,
                         &record,
@@ -2224,6 +2229,17 @@ impl RpcDaemon {
                 guard.selected_node = None;
                 guard.clone()
             };
+            self.update_daemon_status_snapshot(|snapshot| {
+                snapshot.propagation = state;
+            });
+        }
+        let static_peer_state = {
+            let mut guard = self.propagation_state.lock().expect("propagation mutex poisoned");
+            let before = guard.static_peers.len();
+            guard.static_peers.retain(|peer| !peer.eq_ignore_ascii_case(peer_key.as_str()));
+            (guard.static_peers.len() != before).then(|| guard.clone())
+        };
+        if let Some(state) = static_peer_state {
             self.update_daemon_status_snapshot(|snapshot| {
                 snapshot.propagation = state;
             });

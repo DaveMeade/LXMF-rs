@@ -157,6 +157,13 @@ impl RpcDaemon {
         let Some(peer_key) = peer_key else {
             return Ok(());
         };
+        let record = {
+            let guard = self.peers.lock().expect("peers mutex poisoned");
+            guard.get(&peer_key).cloned()
+        };
+        if let Some(record) = record {
+            self.restore_peer_record_queue_marks(&record)?;
+        }
 
         let mut unhandled_ids = Vec::new();
         let mut handled_ids = Vec::new();
@@ -533,6 +540,17 @@ impl RpcDaemon {
 
     pub fn current_propagation_state(&self) -> PropagationState {
         self.propagation_state.lock().expect("propagation mutex poisoned").clone()
+    }
+
+    pub fn propagation_peer_admission_allowed(&self, peer: &str) -> bool {
+        let guard = self.peers.lock().expect("peers mutex poisoned");
+        if guard.values().any(|record| {
+            record.peer.eq_ignore_ascii_case(peer)
+                && record.peer_type.as_deref() != Some("unpeered")
+        }) {
+            return true;
+        }
+        self.ensure_peer_admission_allowed(peer, Self::active_peer_count_from_guard(&guard)).is_ok()
     }
 
     pub fn valid_issued_tickets_for(&self, destination: &str) -> Vec<Vec<u8>> {
@@ -1793,15 +1811,33 @@ impl RpcDaemon {
                     .cloned(),
             );
             let selected_index = timestamp.rem_euclid(peer_pool.len() as i64) as usize;
-            return Ok(peer_pool.into_iter().nth(selected_index).map(|record| record.peer));
+            let selected = peer_pool.into_iter().nth(selected_index).map(|record| record.peer);
+            self.claim_peer_for_maintenance_sync(selected.as_deref(), timestamp);
+            return Ok(selected);
         }
 
         if !unresponsive.is_empty() {
             unresponsive.sort_by(|left, right| left.peer.cmp(&right.peer));
             let selected_index = timestamp.rem_euclid(unresponsive.len() as i64) as usize;
-            return Ok(unresponsive.into_iter().nth(selected_index).map(|record| record.peer));
+            let selected = unresponsive.into_iter().nth(selected_index).map(|record| record.peer);
+            self.claim_peer_for_maintenance_sync(selected.as_deref(), timestamp);
+            return Ok(selected);
         }
         Ok(None)
+    }
+
+    fn claim_peer_for_maintenance_sync(&self, peer: Option<&str>, timestamp: i64) {
+        let Some(peer) = peer else {
+            return;
+        };
+        let mut peers = self.peers.lock().expect("peers mutex poisoned");
+        let Some(record) = peers.values_mut().find(|record| record.peer.eq_ignore_ascii_case(peer))
+        else {
+            return;
+        };
+        record.last_sync_attempt = timestamp;
+        record.sync_backoff = record.sync_backoff.saturating_add(LXMF_PEER_SYNC_BACKOFF_STEP_SECS);
+        record.next_sync_attempt = timestamp.saturating_add(i64::from(record.sync_backoff));
     }
 
     pub(super) fn ensure_peer_admission_allowed(
