@@ -1669,17 +1669,19 @@ mod tests {
         let remote_delivery_hash = delivery_destination_hash_for_identity(&remote_identity);
         let remote_propagation_hash =
             hex::encode(propagation_destination_hash_for_identity(&remote_identity));
+        let other_peer = "ba".repeat(16);
         let have = [0x38; 32];
         let have_hex = hex::encode(have);
         let mut have_payload = remote_delivery_hash.to_vec();
-        have_payload.extend_from_slice(b" retained propagation lxm");
+        have_payload.extend_from_slice(b" retained synced propagation payload");
+        daemon.record_propagation_offer_peer(other_peer.as_str()).expect("activate other peer");
         daemon
             .ingest_propagation_payload_bytes_with_aliases(
                 have_payload.as_slice(),
                 have_hex.as_str(),
                 &[],
             )
-            .expect("store have payload");
+            .expect("store retained have payload");
 
         let response = handle_message_get_request(
             &daemon,
@@ -1695,7 +1697,7 @@ mod tests {
         assert!(matches!(response, ControlResponse::Bool(true)));
         assert!(
             daemon.has_propagation_payload(have_hex.as_str()),
-            "retain-synced propagation nodes should keep local payloads after haves"
+            "retain-synced propagation nodes should keep payloads after haves"
         );
         assert!(
             daemon
@@ -1706,6 +1708,34 @@ mod tests {
                 .expect("requesting peer completed mark"),
             "retained haves should still complete the requesting peer"
         );
+        let peers = daemon
+            .handle_rpc(RpcRequest { id: 15, method: "list_peers".to_string(), params: None })
+            .expect("list peers")
+            .result
+            .expect("list peers result");
+        let other_row = peers["peers"]
+            .as_array()
+            .expect("peer rows")
+            .iter()
+            .find(|row| row["peer"].as_str() == Some(other_peer.as_str()))
+            .expect("other peer row");
+        assert_eq!(
+            other_row["messages"]["unhandled_ids"],
+            json!([have_hex.as_str()]),
+            "retained payload should remain queued for peers that have not completed it"
+        );
+
+        let list_response = handle_message_get_request(
+            &daemon,
+            &remote_identity,
+            Some(rmpv::Value::Array(vec![rmpv::Value::Nil, rmpv::Value::Nil])),
+            0xF1,
+            0xF4,
+        );
+        let ControlResponse::Rmpv(rmpv::Value::Array(available)) = list_response else {
+            panic!("expected retained available transient id list");
+        };
+        assert_eq!(available, vec![rmpv::Value::Binary(have.to_vec())]);
     }
 
     #[test]
