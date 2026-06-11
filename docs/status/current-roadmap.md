@@ -278,6 +278,10 @@ The project is best described by capability level:
 - Remote import batch byte accounting now uses the same deduplicated accepted
   IDs, so duplicate payloads in one fetch/download/sync response do not inflate
   transferred byte totals or source peer receive byte counters.
+- Local propagation ingest now persists processed transient IDs separately
+  from retained payload entries, so reintroduced payloads after purge or peer
+  acknowledgement can refresh relay state without inflating local received or
+  ingested counters.
 - Link-based remote downloads now wait for the propagation node's `/get` haves
   acknowledgement and surface peer/control errors, so failed remote cleanup does
   not look like a completed replication drain.
