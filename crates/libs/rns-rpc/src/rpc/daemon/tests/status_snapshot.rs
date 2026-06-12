@@ -12610,6 +12610,66 @@ impl RemoteControlBridge for TestRemoteControlBridge {
     }
 }
 
+struct RemoteAccessDeniedBridge;
+
+impl RemoteAccessDeniedBridge {
+    fn denied() -> std::io::Error {
+        std::io::Error::new(std::io::ErrorKind::PermissionDenied, "propagation node denied access")
+    }
+}
+
+impl RemoteControlBridge for RemoteAccessDeniedBridge {
+    fn propagation_remote_status(
+        &self,
+        _remote: &str,
+        _identity_private_key_hex: Option<&str>,
+        _timeout_secs: f64,
+    ) -> Result<JsonValue, std::io::Error> {
+        Err(Self::denied())
+    }
+
+    fn propagation_remote_sync(
+        &self,
+        _remote: &str,
+        _peer: &str,
+        _identity_private_key_hex: Option<&str>,
+        _timeout_secs: f64,
+        _transfer_limit_kb: Option<f64>,
+    ) -> Result<JsonValue, std::io::Error> {
+        Err(Self::denied())
+    }
+
+    fn propagation_remote_download(
+        &self,
+        _remote: &str,
+        _identity_private_key_hex: Option<&str>,
+        _timeout_secs: f64,
+        _transfer_limit_kb: Option<f64>,
+    ) -> Result<JsonValue, std::io::Error> {
+        Err(Self::denied())
+    }
+
+    fn propagation_remote_unpeer(
+        &self,
+        _remote: &str,
+        _peer: &str,
+        _identity_private_key_hex: Option<&str>,
+        _timeout_secs: f64,
+    ) -> Result<JsonValue, std::io::Error> {
+        Err(Self::denied())
+    }
+
+    fn propagation_remote_fetch(
+        &self,
+        _remote: &str,
+        _identity_private_key_hex: Option<&str>,
+        _timeout_secs: f64,
+        _transfer_limit_kb: Option<f64>,
+    ) -> Result<JsonValue, std::io::Error> {
+        Err(Self::denied())
+    }
+}
+
 impl RemoteControlBridge for CountingRemoteControlBridge {
     fn propagation_remote_status(
         &self,
@@ -15619,6 +15679,31 @@ fn failed_propagation_remote_fetch_import_updates_lifecycle_error() {
 }
 
 #[test]
+fn denied_access_propagation_remote_fetch_sets_no_access_lifecycle_like_python() {
+    let daemon = RpcDaemon::test_instance();
+    daemon.set_remote_control_bridge(Arc::new(RemoteAccessDeniedBridge));
+
+    let err = daemon
+        .handle_rpc(rpc_request(77, "propagation_remote_fetch", json!({ "remote": "remote-node" })))
+        .expect_err("remote fetch access denial should be returned");
+    assert_eq!(err.kind(), std::io::ErrorKind::PermissionDenied);
+    assert_eq!(err.to_string(), "propagation node denied access");
+
+    let status = daemon
+        .handle_rpc(RpcRequest { id: 78, method: "propagation_status".to_string(), params: None })
+        .expect("propagation status")
+        .result
+        .expect("propagation status result");
+    let propagation = &status["propagation"];
+    assert_eq!(propagation["sync_state"].as_u64(), Some(0xf4));
+    assert_eq!(propagation["state_name"].as_str(), Some("no_access"));
+    assert_eq!(propagation["sync_progress"].as_f64(), Some(0.0));
+    assert!(propagation["last_sync_started"].as_i64().is_some());
+    assert!(propagation["last_sync_completed"].is_null());
+    assert_eq!(propagation["last_sync_error"].as_str(), Some("propagation node denied access"));
+}
+
+#[test]
 fn propagation_remote_download_imports_payloads_into_local_store() {
     let payload = b"remote-download-propagation-payload";
     let payload_hex = hex::encode(payload);
@@ -16233,6 +16318,35 @@ fn failed_propagation_remote_download_import_updates_lifecycle_error() {
 }
 
 #[test]
+fn denied_access_propagation_remote_download_sets_no_access_lifecycle_like_python() {
+    let daemon = RpcDaemon::test_instance();
+    daemon.set_remote_control_bridge(Arc::new(RemoteAccessDeniedBridge));
+
+    let err = daemon
+        .handle_rpc(rpc_request(
+            77,
+            "propagation_remote_download",
+            json!({ "remote": "remote-node" }),
+        ))
+        .expect_err("remote download access denial should be returned");
+    assert_eq!(err.kind(), std::io::ErrorKind::PermissionDenied);
+    assert_eq!(err.to_string(), "propagation node denied access");
+
+    let status = daemon
+        .handle_rpc(RpcRequest { id: 78, method: "propagation_status".to_string(), params: None })
+        .expect("propagation status")
+        .result
+        .expect("propagation status result");
+    let propagation = &status["propagation"];
+    assert_eq!(propagation["sync_state"].as_u64(), Some(0xf4));
+    assert_eq!(propagation["state_name"].as_str(), Some("no_access"));
+    assert_eq!(propagation["sync_progress"].as_f64(), Some(0.0));
+    assert!(propagation["last_sync_started"].as_i64().is_some());
+    assert!(propagation["last_sync_completed"].is_null());
+    assert_eq!(propagation["last_sync_error"].as_str(), Some("propagation node denied access"));
+}
+
+#[test]
 fn failed_propagation_remote_download_import_records_existing_queue_snapshot_like_python() {
     let daemon = RpcDaemon::test_instance();
     daemon.set_remote_control_bridge(Arc::new(TestRemoteControlBridge {
@@ -16617,8 +16731,8 @@ fn assert_denied_remote_transfer_breaks_source_peering(method: &str, peer: &str)
         .expect("propagation status")
         .result
         .expect("propagation status result");
-    assert_eq!(status["propagation"]["sync_state"].as_u64(), Some(0xfe));
-    assert_eq!(status["propagation"]["state_name"].as_str(), Some("failed"));
+    assert_eq!(status["propagation"]["sync_state"].as_u64(), Some(0xf4));
+    assert_eq!(status["propagation"]["state_name"].as_str(), Some("no_access"));
     assert_eq!(
         status["propagation"]["last_sync_error"].as_str(),
         Some("propagation node denied access")
