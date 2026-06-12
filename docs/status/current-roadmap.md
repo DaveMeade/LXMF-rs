@@ -445,6 +445,9 @@ The project is best described by capability level:
   after peering-key and transient-ID validation, so repeated replication offers
   from the same peer take the throttled response path even when the peer changes
   the offered transient-ID set.
+- Propagation ingest now rejects payloads for ignored destinations before
+  storing or queueing them, enforcing local replication policy before relay
+  state is created.
 - Inbound propagation message-get `haves` completion now applies only to
   locally known payloads or existing peer queue marks, preventing unknown haves
   from suppressing future propagation work for the declaring peer.
