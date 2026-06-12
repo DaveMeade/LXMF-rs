@@ -72,6 +72,10 @@ struct PeerOpParams {
     transfer_limit_kb: Option<f64>,
     #[serde(default)]
     wanted_ids: Option<JsonValue>,
+    #[serde(default)]
+    maintenance_claimed: bool,
+    #[serde(default)]
+    force_sync: bool,
 }
 
 #[derive(Debug, Deserialize)]
@@ -91,6 +95,8 @@ struct DeliveryPolicyParams {
 #[derive(Debug, Deserialize)]
 struct PropagationEnableParams {
     enabled: bool,
+    #[serde(default)]
+    auth_required: Option<bool>,
     #[serde(default)]
     store_root: Option<String>,
     #[serde(default)]
@@ -115,6 +121,8 @@ struct PropagationEnableParams {
     max_peers: Option<u32>,
     #[serde(default)]
     from_static_only: Option<bool>,
+    #[serde(default)]
+    retain_synced_on_node: Option<bool>,
     #[serde(default)]
     peering_cost: Option<u32>,
     #[serde(default)]
