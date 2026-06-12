@@ -630,7 +630,7 @@ impl RpcDaemon {
             }
         }
         if source_received_count > 0 {
-            self.record_inbound_propagation_peer_activity_count(
+            self.record_successful_remote_propagation_peer_activity_count(
                 source_peer_key,
                 source_received_bytes.min(transferred_bytes),
                 source_received_count,

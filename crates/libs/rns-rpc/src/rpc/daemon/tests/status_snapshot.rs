@@ -4812,6 +4812,34 @@ fn peer_activity_updates_runtime_counters() {
 }
 
 #[test]
+fn successful_remote_peer_activity_keeps_newer_failure_backoff() {
+    let daemon = RpcDaemon::test_instance();
+    let peer = "peer-remote-activity-order";
+    daemon
+        .handle_rpc(rpc_request(51, "peer_sync", json!({ "peer": peer })))
+        .expect("peer sync");
+    {
+        let mut peers = daemon.peers.lock().expect("peers mutex poisoned");
+        let record = peers.get_mut(peer).expect("peer record");
+        record.alive = false;
+        record.sync_backoff = 12 * 60;
+        record.next_sync_attempt = now_i64().saturating_add(12 * 60);
+    }
+
+    assert!(daemon.record_successful_remote_propagation_peer_activity_count(peer, 120, 2));
+    daemon.record_outbound_peer_activity(peer, 40, false);
+
+    let peers = daemon.peers.lock().expect("peers mutex poisoned");
+    let record = peers.get(peer).expect("peer record");
+    assert_eq!(record.incoming, 2);
+    assert_eq!(record.rx_bytes, 120);
+    assert_eq!(record.tx_bytes, 40);
+    assert!(!record.alive);
+    assert_eq!(record.sync_backoff, 12 * 60);
+    assert_eq!(record.next_sync_attempt, record.last_sync_attempt.saturating_add(12 * 60));
+}
+
+#[test]
 fn inbound_peer_activity_matches_existing_peer_case_insensitively_like_python() {
     let daemon = RpcDaemon::test_instance();
     let stored_peer = "Peer-Inbound-Case";
@@ -15074,6 +15102,63 @@ fn propagation_remote_fetch_marks_source_received_and_queues_other_peers() {
 }
 
 #[test]
+fn propagation_remote_fetch_success_clears_source_peer_retry_backoff() {
+    let payload = b"remote-fetch-source-peer-recovery-payload";
+    let payload_hex = hex::encode(payload);
+    let transient_id = hex::encode(Sha256::digest(payload));
+    let source_peer = "remote-fetch-source-recovery";
+    let daemon = RpcDaemon::test_instance();
+    daemon
+        .handle_rpc(rpc_request(72, "peer_sync", json!({ "peer": source_peer })))
+        .expect("seed source peer");
+    {
+        let mut peers = daemon.peers.lock().expect("peers mutex poisoned");
+        let peer = peers.get_mut(source_peer).expect("source peer record");
+        peer.alive = false;
+        peer.sync_backoff = 12 * 60;
+        peer.next_sync_attempt = now_i64().saturating_add(12 * 60);
+    }
+    daemon.set_remote_control_bridge(Arc::new(TestRemoteControlBridge {
+        result: Ok(json!({
+            "available_count": 1,
+            "fetched_count": 1,
+            "messages": [{
+                "transient_id": transient_id,
+                "payload_hex": payload_hex,
+            }],
+        })),
+    }));
+
+    daemon
+        .handle_rpc(rpc_request(
+            73,
+            "propagation_remote_fetch",
+            json!({ "remote": source_peer }),
+        ))
+        .expect("remote fetch from recovered source");
+
+    let peers = daemon
+        .handle_rpc(RpcRequest { id: 74, method: "list_peers".to_string(), params: None })
+        .expect("list peers")
+        .result
+        .expect("list peers result");
+    let source_row = peers["peers"]
+        .as_array()
+        .expect("peer rows")
+        .iter()
+        .find(|row| row["peer"].as_str() == Some(source_peer))
+        .expect("source peer row");
+    assert_eq!(source_row["alive"].as_bool(), Some(true));
+    assert_eq!(source_row["rx_bytes"].as_u64(), Some(payload.len() as u64));
+    assert_eq!(source_row["sync_backoff"].as_u64(), Some(0));
+    assert_eq!(source_row["next_sync_attempt"].as_i64(), Some(0));
+    assert_eq!(
+        source_row["messages"]["handled_ids"].as_array().expect("handled ids"),
+        &[json!(transient_id.as_str())]
+    );
+}
+
+#[test]
 fn propagation_remote_fetch_marks_inactive_source_received_for_later_activation_like_python() {
     let payload = b"remote-fetch-inactive-source-payload";
     let payload_hex = hex::encode(payload);
@@ -15921,6 +16006,62 @@ fn propagation_remote_download_marks_source_received_and_queues_other_peers() {
         .expect("relay pending");
     assert_eq!(relay_pending.len(), 1);
     assert_eq!(relay_pending[0].transient_id, transient_id);
+}
+
+#[test]
+fn propagation_remote_download_success_clears_source_peer_retry_backoff() {
+    let payload = b"remote-download-source-peer-recovery-payload";
+    let payload_hex = hex::encode(payload);
+    let transient_id = hex::encode(Sha256::digest(payload));
+    let source_peer = "remote-download-source-recovery";
+    let daemon = RpcDaemon::test_instance();
+    daemon
+        .handle_rpc(rpc_request(78, "peer_sync", json!({ "peer": source_peer })))
+        .expect("seed source peer");
+    {
+        let mut peers = daemon.peers.lock().expect("peers mutex poisoned");
+        let peer = peers.get_mut(source_peer).expect("source peer record");
+        peer.alive = false;
+        peer.sync_backoff = 12 * 60;
+        peer.next_sync_attempt = now_i64().saturating_add(12 * 60);
+    }
+    daemon.set_remote_control_bridge(Arc::new(TestRemoteControlBridge {
+        result: Ok(json!({
+            "downloaded_count": 1,
+            "messages": [{
+                "transient_id": transient_id,
+                "payload_hex": payload_hex,
+            }],
+        })),
+    }));
+
+    daemon
+        .handle_rpc(rpc_request(
+            79,
+            "propagation_remote_download",
+            json!({ "remote": source_peer }),
+        ))
+        .expect("remote download from recovered source");
+
+    let peers = daemon
+        .handle_rpc(RpcRequest { id: 80, method: "list_peers".to_string(), params: None })
+        .expect("list peers")
+        .result
+        .expect("list peers result");
+    let source_row = peers["peers"]
+        .as_array()
+        .expect("peer rows")
+        .iter()
+        .find(|row| row["peer"].as_str() == Some(source_peer))
+        .expect("source peer row");
+    assert_eq!(source_row["alive"].as_bool(), Some(true));
+    assert_eq!(source_row["rx_bytes"].as_u64(), Some(payload.len() as u64));
+    assert_eq!(source_row["sync_backoff"].as_u64(), Some(0));
+    assert_eq!(source_row["next_sync_attempt"].as_i64(), Some(0));
+    assert_eq!(
+        source_row["messages"]["handled_ids"].as_array().expect("handled ids"),
+        &[json!(transient_id.as_str())]
+    );
 }
 
 #[test]
