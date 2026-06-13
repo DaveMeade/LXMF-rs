@@ -317,10 +317,20 @@ Workspace paths are used for navigation. `crates/libs/lxmf-core` publishes as
 - Live propagation announces retain Python PN metadata on active peer records,
   so announce-derived peer metadata survives into later peering and queue
   restart/export snapshots.
-- The typed ZeroMQ SDK backend exposes identity contact update/list alongside
-  identity announce and presence list, so peer-directory state needed by
-  REM/RCH can stay on the `ZmqPipelineBackendClient` path instead of requiring
-  raw RPC/HTTP contact calls.
+- The typed ZeroMQ SDK backend exposes identity list/activate/import/export,
+  identity announce, presence list, identity resolve, contact update/list, and
+  identity bootstrap, so peer-directory state, identity recovery, and
+  saved-peer setup needed by REM/RCH can stay on the `ZmqPipelineBackendClient`
+  path instead of requiring raw RPC/HTTP identity/contact calls.
+- The typed ZeroMQ SDK backend exposes the operation registry and envelope
+  execution path, including the `app.message.history.list` and
+  `app.delivery.destination_hash` operations used by direct-chat history and
+  runtime delivery-destination queries, so REM/RCH can keep those flows on the
+  `ZmqPipelineBackendClient` path instead of requiring raw RPC/HTTP envelopes.
+- The typed ZeroMQ SDK backend preserves negotiated receipt terminality when
+  mapping `sdk_status_v2` into `DeliverySnapshot`, so direct-chat delivery
+  status reports `sent` as terminal only until
+  `sdk.capability.receipt_terminality` is negotiated.
 - Python-style `lxmd` `[lxmf] announce_interval` drives peer/delivery announce
   cadence separately from `[propagation] announce_interval`, which remains the
   propagation-node announce cadence.

@@ -231,6 +231,146 @@ fn identity_announce_now_uses_zmq_sdk_method() {
 }
 
 #[test]
+fn identity_list_uses_zmq_sdk_method_and_decodes_identity_bundles() {
+    let command_endpoint = unused_loopback_endpoint();
+    let response_endpoint = unused_loopback_endpoint();
+    let captured = Arc::new(Mutex::new(None));
+    let server = spawn_single_response_zmq_server(
+        command_endpoint.clone(),
+        json!({
+            "identities": [{
+                "identity": "local-identity",
+                "public_key": "pubkey-base64",
+                "display_name": "Local Operator",
+                "capabilities": ["direct_chat", "identity_discovery"],
+                "extensions": { "source": "zmq" }
+            }]
+        }),
+        Arc::clone(&captured),
+    );
+    let mut config = ZmqPipelineBackendConfig::local_tcp(command_endpoint, response_endpoint);
+    config.request_timeout = std::time::Duration::from_secs(2);
+    let client = ZmqPipelineBackendClient::new(config).expect("zmq client");
+
+    let identities = client.identity_list().expect("identity list");
+
+    assert_eq!(identities.len(), 1);
+    assert_eq!(identities[0].identity.0, "local-identity");
+    assert_eq!(identities[0].display_name.as_deref(), Some("Local Operator"));
+    assert_eq!(identities[0].capabilities, vec!["direct_chat", "identity_discovery"]);
+    assert_eq!(identities[0].extensions["source"], json!("zmq"));
+    let captured = captured.lock().expect("captured request");
+    let request = captured.as_ref().expect("zmq request");
+    assert_eq!(request.method, "sdk_identity_list_v2");
+    assert_eq!(request.params.as_ref().expect("params"), &json!({}));
+    server.join().expect("server joined");
+}
+
+#[test]
+fn identity_activate_uses_zmq_sdk_method() {
+    let command_endpoint = unused_loopback_endpoint();
+    let response_endpoint = unused_loopback_endpoint();
+    let captured = Arc::new(Mutex::new(None));
+    let server = spawn_single_response_zmq_server(
+        command_endpoint.clone(),
+        json!({ "accepted": true, "revision": 7 }),
+        Arc::clone(&captured),
+    );
+    let mut config = ZmqPipelineBackendConfig::local_tcp(command_endpoint, response_endpoint);
+    config.request_timeout = std::time::Duration::from_secs(2);
+    let client = ZmqPipelineBackendClient::new(config).expect("zmq client");
+
+    let ack = client
+        .identity_activate(crate::domain::IdentityRef("local-identity".to_owned()))
+        .expect("identity activate");
+
+    assert!(ack.accepted);
+    assert_eq!(ack.revision, Some(7));
+    let captured = captured.lock().expect("captured request");
+    let request = captured.as_ref().expect("zmq request");
+    assert_eq!(request.method, "sdk_identity_activate_v2");
+    assert_eq!(request.params.as_ref().expect("params")["identity"], json!("local-identity"));
+    server.join().expect("server joined");
+}
+
+#[test]
+fn identity_import_uses_zmq_sdk_method_and_decodes_identity_bundle() {
+    let command_endpoint = unused_loopback_endpoint();
+    let response_endpoint = unused_loopback_endpoint();
+    let captured = Arc::new(Mutex::new(None));
+    let server = spawn_single_response_zmq_server(
+        command_endpoint.clone(),
+        json!({
+            "identity": {
+                "identity": "imported-identity",
+                "public_key": "imported-pubkey",
+                "display_name": "Imported Peer",
+                "capabilities": ["direct_chat"],
+                "extensions": { "source": "import" }
+            }
+        }),
+        Arc::clone(&captured),
+    );
+    let mut config = ZmqPipelineBackendConfig::local_tcp(command_endpoint, response_endpoint);
+    config.request_timeout = std::time::Duration::from_secs(2);
+    let client = ZmqPipelineBackendClient::new(config).expect("zmq client");
+
+    let identity = client
+        .identity_import(crate::domain::IdentityImportRequest {
+            bundle_base64: "aW1wb3J0ZWQ=".to_owned(),
+            passphrase: Some("secret".to_owned()),
+            extensions: BTreeMap::from([("source".to_owned(), json!("rem-recovery"))]),
+        })
+        .expect("identity import");
+
+    assert_eq!(identity.identity.0, "imported-identity");
+    assert_eq!(identity.public_key, "imported-pubkey");
+    assert_eq!(identity.display_name.as_deref(), Some("Imported Peer"));
+    let captured = captured.lock().expect("captured request");
+    let request = captured.as_ref().expect("zmq request");
+    assert_eq!(request.method, "sdk_identity_import_v2");
+    let params = request.params.as_ref().expect("params");
+    assert_eq!(params["bundle_base64"], json!("aW1wb3J0ZWQ="));
+    assert_eq!(params["passphrase"], json!("secret"));
+    assert_eq!(params["extensions"]["source"], json!("rem-recovery"));
+    server.join().expect("server joined");
+}
+
+#[test]
+fn identity_export_uses_zmq_sdk_method_and_decodes_bundle() {
+    let command_endpoint = unused_loopback_endpoint();
+    let response_endpoint = unused_loopback_endpoint();
+    let captured = Arc::new(Mutex::new(None));
+    let server = spawn_single_response_zmq_server(
+        command_endpoint.clone(),
+        json!({
+            "bundle": {
+                "bundle_base64": "ZXhwb3J0ZWQ=",
+                "passphrase": null,
+                "extensions": { "format": "portable" }
+            }
+        }),
+        Arc::clone(&captured),
+    );
+    let mut config = ZmqPipelineBackendConfig::local_tcp(command_endpoint, response_endpoint);
+    config.request_timeout = std::time::Duration::from_secs(2);
+    let client = ZmqPipelineBackendClient::new(config).expect("zmq client");
+
+    let bundle = client
+        .identity_export(crate::domain::IdentityRef("local-identity".to_owned()))
+        .expect("identity export");
+
+    assert_eq!(bundle.bundle_base64, "ZXhwb3J0ZWQ=");
+    assert_eq!(bundle.passphrase, None);
+    assert_eq!(bundle.extensions["format"], json!("portable"));
+    let captured = captured.lock().expect("captured request");
+    let request = captured.as_ref().expect("zmq request");
+    assert_eq!(request.method, "sdk_identity_export_v2");
+    assert_eq!(request.params.as_ref().expect("params")["identity"], json!("local-identity"));
+    server.join().expect("server joined");
+}
+
+#[test]
 fn identity_presence_list_uses_zmq_sdk_method_and_decodes_response() {
     let command_endpoint = unused_loopback_endpoint();
     let response_endpoint = unused_loopback_endpoint();
@@ -396,6 +536,99 @@ fn identity_contact_list_uses_zmq_sdk_method_and_decodes_response() {
 }
 
 #[test]
+fn identity_resolve_uses_zmq_sdk_method_and_decodes_identity_ref() {
+    let command_endpoint = unused_loopback_endpoint();
+    let response_endpoint = unused_loopback_endpoint();
+    let captured = Arc::new(Mutex::new(None));
+    let server = spawn_single_response_zmq_server(
+        command_endpoint.clone(),
+        json!({ "identity": "peer-destination-hash" }),
+        Arc::clone(&captured),
+    );
+    let mut config = ZmqPipelineBackendConfig::local_tcp(command_endpoint, response_endpoint);
+    config.request_timeout = std::time::Duration::from_secs(2);
+    let client = ZmqPipelineBackendClient::new(config).expect("zmq client");
+
+    let identity = client
+        .identity_resolve(crate::domain::IdentityResolveRequest {
+            hash: "peer-announced-hash".to_owned(),
+            extensions: BTreeMap::from([("requested_by".to_owned(), json!("rem-peer-discovery"))]),
+        })
+        .expect("identity resolve")
+        .expect("resolved identity");
+
+    assert_eq!(identity.0, "peer-destination-hash");
+    let captured = captured.lock().expect("captured request");
+    let request = captured.as_ref().expect("zmq request");
+    assert_eq!(request.method, "sdk_identity_resolve_v2");
+    let params = request.params.as_ref().expect("params");
+    assert_eq!(params["hash"], json!("peer-announced-hash"));
+    assert_eq!(params["extensions"]["requested_by"], json!("rem-peer-discovery"));
+    server.join().expect("server joined");
+}
+
+#[test]
+fn identity_bootstrap_uses_zmq_sdk_method_and_preserves_capability_metadata() {
+    let command_endpoint = unused_loopback_endpoint();
+    let response_endpoint = unused_loopback_endpoint();
+    let captured = Arc::new(Mutex::new(None));
+    let server = spawn_single_response_zmq_server(
+        command_endpoint.clone(),
+        json!({
+            "contact": {
+                "identity": "peer-destination-hash",
+                "display_name": "Field Team One",
+                "trust_level": "trusted",
+                "bootstrap": true,
+                "updated_ts_ms": 1700003000,
+                "metadata": {
+                    "callsign": "FT1",
+                    "rem_capabilities": ["direct_chat", "restart_recovery"],
+                    "rch_announce_slots": ["broadcast", "topics"]
+                },
+                "extensions": { "source": "bootstrap" }
+            }
+        }),
+        Arc::clone(&captured),
+    );
+    let mut config = ZmqPipelineBackendConfig::local_tcp(command_endpoint, response_endpoint);
+    config.request_timeout = std::time::Duration::from_secs(2);
+    let client = ZmqPipelineBackendClient::new(config).expect("zmq client");
+
+    let contact = client
+        .identity_bootstrap(crate::domain::IdentityBootstrapRequest {
+            identity: crate::domain::IdentityRef("peer-destination-hash".to_owned()),
+            auto_sync: true,
+            extensions: BTreeMap::from([(
+                "metadata".to_owned(),
+                json!({
+                    "callsign": "FT1",
+                    "rem_capabilities": ["direct_chat", "restart_recovery"],
+                    "rch_announce_slots": ["broadcast", "topics"]
+                }),
+            )]),
+        })
+        .expect("identity bootstrap");
+
+    assert_eq!(contact.identity.0, "peer-destination-hash");
+    assert_eq!(contact.display_name.as_deref(), Some("Field Team One"));
+    assert_eq!(contact.metadata["callsign"], json!("FT1"));
+    assert_eq!(contact.metadata["rem_capabilities"], json!(["direct_chat", "restart_recovery"]));
+    let captured = captured.lock().expect("captured request");
+    let request = captured.as_ref().expect("zmq request");
+    assert_eq!(request.method, "sdk_identity_bootstrap_v2");
+    let params = request.params.as_ref().expect("params");
+    assert_eq!(params["identity"], json!("peer-destination-hash"));
+    assert_eq!(params["auto_sync"], json!(true));
+    assert_eq!(params["extensions"]["metadata"]["callsign"], json!("FT1"));
+    assert_eq!(
+        params["extensions"]["metadata"]["rch_announce_slots"],
+        json!(["broadcast", "topics"])
+    );
+    server.join().expect("server joined");
+}
+
+#[test]
 fn send_uses_zmq_sdk_method_and_preserves_delivery_options() {
     let command_endpoint = unused_loopback_endpoint();
     let response_endpoint = unused_loopback_endpoint();
@@ -493,6 +726,192 @@ fn send_preserves_documented_lxmf_field_keys_over_zmq_sdk_method() {
     server.join().expect("server joined");
 }
 
+#[test]
+fn status_treats_sent_as_terminal_until_receipt_terminality_is_negotiated() {
+    let command_endpoint = unused_loopback_endpoint();
+    let response_endpoint = unused_loopback_endpoint();
+    let captured = Arc::new(Mutex::new(None));
+    let server = spawn_single_response_zmq_server(
+        command_endpoint.clone(),
+        json!({
+            "message": {
+                "message_id": "msg-sent",
+                "receipt_status": "sent",
+                "timestamp": 1710000000
+            }
+        }),
+        Arc::clone(&captured),
+    );
+    let mut config = ZmqPipelineBackendConfig::local_tcp(command_endpoint, response_endpoint);
+    config.request_timeout = std::time::Duration::from_secs(2);
+    let client = ZmqPipelineBackendClient::new(config).expect("zmq client");
+
+    let snapshot =
+        client.status(MessageId("msg-sent".to_owned())).expect("status").expect("message");
+
+    assert_eq!(snapshot.state, DeliveryState::Sent);
+    assert!(snapshot.terminal);
+    let captured = captured.lock().expect("captured request");
+    let request = captured.as_ref().expect("zmq request");
+    assert_eq!(request.method, "sdk_status_v2");
+    assert_eq!(request.params.as_ref().expect("params")["message_id"], json!("msg-sent"));
+    server.join().expect("server joined");
+}
+
+#[test]
+fn status_keeps_sent_nonterminal_after_receipt_terminality_is_negotiated() {
+    let command_endpoint = unused_loopback_endpoint();
+    let response_endpoint = unused_loopback_endpoint();
+    let captured = Arc::new(Mutex::new(Vec::new()));
+    let server = spawn_response_sequence_zmq_server(
+        command_endpoint.clone(),
+        vec![
+            json!({
+                "runtime_id": "runtime-zmq-receipts",
+                "active_contract_version": 2,
+                "effective_capabilities": ["sdk.capability.receipt_terminality"],
+                "effective_limits": {
+                    "max_poll_events": 64,
+                    "max_event_bytes": 32768,
+                    "max_batch_bytes": 1048576,
+                    "max_extension_keys": 32,
+                    "idempotency_ttl_ms": 60000
+                },
+                "contract_release": "v2",
+                "schema_namespace": "sdk.v2"
+            }),
+            json!({
+                "message": {
+                    "message_id": "msg-sent",
+                    "receipt_status": "sent",
+                    "timestamp": 1710000000
+                }
+            }),
+        ],
+        Arc::clone(&captured),
+    );
+    let mut config = ZmqPipelineBackendConfig::local_tcp(command_endpoint, response_endpoint);
+    config.request_timeout = std::time::Duration::from_secs(2);
+    let client = ZmqPipelineBackendClient::new(config).expect("zmq client");
+
+    client
+        .negotiate(crate::capability::NegotiationRequest {
+            supported_contract_versions: vec![2],
+            requested_capabilities: vec!["sdk.capability.receipt_terminality".to_owned()],
+            profile: crate::types::Profile::DesktopLocalRuntime,
+            bind_mode: crate::types::BindMode::LocalOnly,
+            auth_mode: crate::types::AuthMode::LocalTrusted,
+            overflow_policy: crate::types::OverflowPolicy::Reject,
+            block_timeout_ms: None,
+            rpc_backend: None,
+            extensions: Default::default(),
+        })
+        .expect("negotiate");
+    let snapshot =
+        client.status(MessageId("msg-sent".to_owned())).expect("status").expect("message");
+
+    assert_eq!(snapshot.state, DeliveryState::Sent);
+    assert!(!snapshot.terminal);
+    let captured = captured.lock().expect("captured requests");
+    assert_eq!(captured.len(), 2);
+    assert_eq!(captured[0].method, "sdk_negotiate_v2");
+    assert_eq!(captured[1].method, "sdk_status_v2");
+    server.join().expect("server joined");
+}
+
+#[test]
+fn operation_registry_uses_zmq_sdk_method_for_direct_chat_operations() {
+    let command_endpoint = unused_loopback_endpoint();
+    let response_endpoint = unused_loopback_endpoint();
+    let captured = Arc::new(Mutex::new(None));
+    let server = spawn_single_response_zmq_server(
+        command_endpoint.clone(),
+        json!({ "registry": crate::app::OperationRegistry::built_in() }),
+        Arc::clone(&captured),
+    );
+    let mut config = ZmqPipelineBackendConfig::local_tcp(command_endpoint, response_endpoint);
+    config.request_timeout = std::time::Duration::from_secs(2);
+    let client = ZmqPipelineBackendClient::new(config).expect("zmq client");
+
+    let registry = client.operation_registry().expect("operation registry");
+
+    assert!(registry.supports("app.message.history.list"));
+    assert!(registry.supports("app.delivery.destination_hash"));
+    let captured = captured.lock().expect("captured request");
+    let request = captured.as_ref().expect("zmq request");
+    assert_eq!(request.method, "sdk_operation_registry_v2");
+    assert_eq!(request.params, Some(json!({})));
+    server.join().expect("server joined");
+}
+
+#[test]
+fn envelope_execute_uses_zmq_sdk_method_and_preserves_direct_chat_history_query() {
+    let command_endpoint = unused_loopback_endpoint();
+    let response_endpoint = unused_loopback_endpoint();
+    let captured = Arc::new(Mutex::new(None));
+    let server = spawn_single_response_zmq_server(
+        command_endpoint.clone(),
+        json!({
+            "response": {
+                "operation_id": "app.message.history.list",
+                "kind": "result",
+                "accepted": true,
+                "correlation_id": "history-corr",
+                "payload": {
+                    "messages": [{
+                        "message_id": "msg-1",
+                        "peer_id": "peer-a",
+                        "body": "see https://example.invalid/status",
+                        "receipt_status": "delivered"
+                    }]
+                },
+                "extensions": {
+                    "durable": true,
+                    "restart_recovery": true
+                }
+            }
+        }),
+        Arc::clone(&captured),
+    );
+    let mut config = ZmqPipelineBackendConfig::local_tcp(command_endpoint, response_endpoint);
+    config.request_timeout = std::time::Duration::from_secs(2);
+    let client = ZmqPipelineBackendClient::new(config).expect("zmq client");
+
+    let response = client
+        .envelope_execute(
+            crate::app::Envelope::query(
+                "app.message.history.list",
+                json!({
+                    "peer_id": "peer-a",
+                    "limit": 25,
+                    "include_receipts": true
+                }),
+            )
+            .with_correlation_id("history-corr")
+            .with_timeout_ms(1500)
+            .with_extension("restart_recovery", json!(true)),
+        )
+        .expect("history envelope");
+
+    assert_eq!(response.operation_id.as_str(), "app.message.history.list");
+    assert!(response.accepted);
+    assert_eq!(response.correlation_id.as_deref(), Some("history-corr"));
+    assert_eq!(response.payload["messages"][0]["receipt_status"], json!("delivered"));
+    assert_eq!(response.extensions["durable"], json!(true));
+    let captured = captured.lock().expect("captured request");
+    let request = captured.as_ref().expect("zmq request");
+    assert_eq!(request.method, "sdk_envelope_execute_v2");
+    let params = request.params.as_ref().expect("params");
+    assert_eq!(params["operation_id"], json!("app.message.history.list"));
+    assert_eq!(params["kind"], json!("query"));
+    assert_eq!(params["correlation_id"], json!("history-corr"));
+    assert_eq!(params["timeout_ms"], json!(1500));
+    assert_eq!(params["payload"]["peer_id"], json!("peer-a"));
+    assert_eq!(params["payload"]["include_receipts"], json!(true));
+    assert_eq!(params["extensions"]["restart_recovery"], json!(true));
+    server.join().expect("server joined");
+}
+
 fn parse_claims(token: &str) -> BTreeMap<String, String> {
     token
         .split(';')
@@ -546,6 +965,53 @@ fn spawn_single_response_zmq_server(
                 ))
                 .await
                 .expect("send response");
+        });
+    })
+}
+
+fn spawn_response_sequence_zmq_server(
+    command_endpoint: String,
+    responses: Vec<JsonValue>,
+    captured: Arc<Mutex<Vec<CapturedZmqRequest>>>,
+) -> std::thread::JoinHandle<()> {
+    std::thread::spawn(move || {
+        let runtime = tokio::runtime::Runtime::new().expect("test runtime");
+        runtime.block_on(async move {
+            let mut commands = PullSocket::new();
+            commands.bind(command_endpoint.as_str()).await.expect("bind command endpoint");
+            for response in responses {
+                let Some(envelope) = recv_request_envelope(&mut commands).await else {
+                    return;
+                };
+                let request: RpcRequest = rns_rpc::rpc::codec::decode_frame(&envelope.payload)
+                    .expect("decode rpc request");
+                captured
+                    .lock()
+                    .expect("captured requests")
+                    .push(CapturedZmqRequest { method: request.method, params: request.params });
+                let rpc_response =
+                    RpcResponse { id: envelope.request_id, result: Some(response), error: None };
+                let response_payload =
+                    rns_rpc::rpc::codec::encode_frame(&rpc_response).expect("encode rpc response");
+                let response_endpoint = envelope.response_endpoint.expect("response endpoint");
+                let mut responses = PushSocket::new();
+                responses
+                    .connect(response_endpoint.as_str())
+                    .await
+                    .expect("connect response endpoint");
+                tokio::time::sleep(std::time::Duration::from_millis(50)).await;
+                responses
+                    .send(ZmqMessage::from(
+                        zmq::encode_envelope(&ZmqRpcEnvelope::response(
+                            envelope.session_id,
+                            envelope.request_id,
+                            response_payload,
+                        ))
+                        .expect("encode zmq response"),
+                    ))
+                    .await
+                    .expect("send response");
+            }
         });
     })
 }

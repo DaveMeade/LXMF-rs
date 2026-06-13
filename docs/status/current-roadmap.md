@@ -305,10 +305,20 @@ The project is best described by capability level:
 - Duplicate inbound peer propagation payloads now still apply source-aware
   fan-out to active relay peers while keeping the source peer handled, so a
   known local payload does not skip relay queue creation.
-- The typed ZeroMQ SDK backend now covers identity contact update/list in
-  addition to identity announce and presence list, so REM/RCH peer directory
-  work can use `ZmqPipelineBackendClient` instead of falling back to raw
-  RPC/HTTP contact calls.
+- The typed ZeroMQ SDK backend now covers identity list/activate/import/export,
+  identity announce, presence list, identity resolve, contact update/list, and
+  identity bootstrap, so REM/RCH peer discovery, identity recovery, and
+  saved-peer setup can use `ZmqPipelineBackendClient` instead of falling back
+  to raw RPC/HTTP identity/contact calls.
+- The typed ZeroMQ SDK backend now also covers the operation registry and SDK
+  envelope execution path, including `app.message.history.list` and
+  `app.delivery.destination_hash`, so REM/RCH direct-chat history and runtime
+  delivery-destination lookups can stay on `ZmqPipelineBackendClient` instead
+  of constructing raw RPC/HTTP envelopes.
+- The typed ZeroMQ SDK backend now tracks negotiated receipt terminality for
+  delivery status, so direct-chat status reports match the SDK contract:
+  `sent` is terminal until `sdk.capability.receipt_terminality` is negotiated,
+  after which `delivered` is the terminal receipt state.
 - Locally delivered inbound peer propagation payloads now also store the
   accepted transient and apply source-aware relay fan-out without double
   counting source peer activity, so local delivery does not bypass relay queue
