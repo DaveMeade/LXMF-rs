@@ -1,6 +1,6 @@
 # Current Roadmap Status
 
-Last reassessed: 2026-06-08
+Last reassessed: 2026-06-13
 
 This file is the repository-level source of truth for parity posture, release
 confidence, and execution order. Detailed row-level status lives in:
@@ -310,15 +310,37 @@ The project is best described by capability level:
   identity bootstrap, so REM/RCH peer discovery, identity recovery, and
   saved-peer setup can use `ZmqPipelineBackendClient` instead of falling back
   to raw RPC/HTTP identity/contact calls.
+- The typed ZeroMQ SDK backend now exposes
+  `ZmqPipelineBackendClient::workflow_peer_ready`, preserving display names,
+  callsigns, trust, bootstrap intent, and REM/RCH capability metadata while
+  optionally announcing before use, so saved-peer setup has a direct typed path.
 - The typed ZeroMQ SDK backend now also covers the operation registry and SDK
   envelope execution path, including `app.message.history.list` and
   `app.delivery.destination_hash`, so REM/RCH direct-chat history and runtime
   delivery-destination lookups can stay on `ZmqPipelineBackendClient` instead
   of constructing raw RPC/HTTP envelopes.
+- The typed ZeroMQ SDK backend now exposes durable direct-chat history through
+  `ZmqPipelineBackendClient::list_message_history`, preserving message bodies
+  with links, receipt status, basic LXMF fields, and restart pagination cursors
+  from the daemon `list_messages` store.
+- The typed ZeroMQ SDK backend now exposes the local runtime delivery
+  destination through `ZmqPipelineBackendClient::local_delivery_destination_hash`,
+  while still routing `app.delivery.destination_hash` through SDK envelope
+  execution, so REM/RCH direct-chat source selection does not need raw RPC/HTTP
+  status calls.
 - The typed ZeroMQ SDK backend now tracks negotiated receipt terminality for
   delivery status, so direct-chat status reports match the SDK contract:
   `sent` is terminal until `sdk.capability.receipt_terminality` is negotiated,
   after which `delivered` is the terminal receipt state.
+- The typed ZeroMQ SDK backend now exposes burst sends through
+  `ZmqPipelineBackendClient::send_batch` and still routes
+  `app.delivery.send_batch` envelope calls to `sdk_send_batch_v2`, preserving
+  ordered per-message acceptance and rejection results without raw RPC
+  envelopes.
+- The typed ZeroMQ SDK backend and operation registry now expose direct-chat
+  cancellation through both `ZmqPipelineBackendClient::cancel` and
+  `app.delivery.cancel` envelope execution, preserving daemon cancellation
+  outcomes without raw RPC envelopes.
 - Locally delivered inbound peer propagation payloads now also store the
   accepted transient and apply source-aware relay fan-out without double
   counting source peer activity, so local delivery does not bypass relay queue

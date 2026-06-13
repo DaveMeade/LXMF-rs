@@ -66,6 +66,7 @@ pub use domain::{
     TelemetryQuery, TopicCreateRequest, TopicId, TopicListRequest, TopicListResult, TopicPath,
     TopicPublishRequest, TopicRecord, TopicSubscriptionRequest, TrustLevel, VoiceSessionId,
     VoiceSessionOpenRequest, VoiceSessionState, VoiceSessionUpdateRequest,
+    WorkflowPeerReadyRequest, WorkflowPeerReadyResult,
 };
 pub use error::{code as error_code, ErrorCategory, ErrorDetails, SdkError};
 // Stability class: stable
@@ -76,9 +77,10 @@ pub use event::{
 pub use lifecycle::{Lifecycle, SdkMethod};
 #[cfg(feature = "std")]
 pub use messaging::{
-    AnnounceRecord, ConversationRecord, MessageDirection, MessageMethod, MessageRecord,
-    MessageState, MessagingStore, PeerRecord, PeerState, SendMessageRequest, StoredOutboundMessage,
-    SyncPhase, SyncStatus,
+    AnnounceRecord, ConversationRecord, MessageDirection, MessageHistoryListRequest,
+    MessageHistoryPage, MessageHistoryRecord, MessageMethod, MessageRecord, MessageState,
+    MessagingStore, PeerRecord, PeerState, SendMessageRequest, StoredOutboundMessage, SyncPhase,
+    SyncStatus,
 };
 pub use profiles::{
     default_effective_limits, default_memory_budget, required_capabilities, supports_capability,
@@ -86,7 +88,8 @@ pub use profiles::{
 };
 // Stability class: stable
 pub use types::{
-    Ack, AuthMode, BindMode, CancelResult, ClientHandle, ConfigPatch, DeliverySnapshot,
+    Ack, AuthMode, BatchSendItem, BatchSendItemError, BatchSendItemResult, BatchSendRequest,
+    BatchSendResult, BindMode, CancelResult, ClientHandle, ConfigPatch, DeliverySnapshot,
     DeliveryState, EventSinkConfig, EventSinkKind, EventSinkPatch, EventStreamConfig,
     GroupRecipientState, GroupSendOutcome, GroupSendRequest, GroupSendResult, MessageId,
     OverflowPolicy, Profile, RedactionConfig, RedactionTransform, RpcBackendConfig,

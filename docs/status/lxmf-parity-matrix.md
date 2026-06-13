@@ -1,6 +1,6 @@
 # LXMF Parity Matrix
 
-Last reassessed: 2026-06-08
+Last reassessed: 2026-06-13
 
 This is the maintained row-level status for Python LXMF compatibility.
 Repository-level posture and execution order live in
@@ -322,15 +322,35 @@ Workspace paths are used for navigation. `crates/libs/lxmf-core` publishes as
   identity bootstrap, so peer-directory state, identity recovery, and
   saved-peer setup needed by REM/RCH can stay on the `ZmqPipelineBackendClient`
   path instead of requiring raw RPC/HTTP identity/contact calls.
+- The typed ZeroMQ SDK backend exposes
+  `ZmqPipelineBackendClient::workflow_peer_ready` for saved-peer setup,
+  preserving display names, callsigns, trust, bootstrap intent, and REM/RCH
+  capability metadata while optionally announcing before use.
 - The typed ZeroMQ SDK backend exposes the operation registry and envelope
   execution path, including the `app.message.history.list` and
   `app.delivery.destination_hash` operations used by direct-chat history and
   runtime delivery-destination queries, so REM/RCH can keep those flows on the
   `ZmqPipelineBackendClient` path instead of requiring raw RPC/HTTP envelopes.
+- The typed ZeroMQ SDK backend also exposes durable direct-chat history as
+  `ZmqPipelineBackendClient::list_message_history`, preserving link-bearing
+  message bodies, receipt status, basic LXMF fields, and daemon pagination
+  cursors for restart recovery.
+- The typed ZeroMQ SDK backend exposes the local runtime delivery destination
+  through `ZmqPipelineBackendClient::local_delivery_destination_hash` while
+  retaining `app.delivery.destination_hash` envelope execution, so direct-chat
+  source selection can stay on the typed ZeroMQ SDK path.
 - The typed ZeroMQ SDK backend preserves negotiated receipt terminality when
   mapping `sdk_status_v2` into `DeliverySnapshot`, so direct-chat delivery
   status reports `sent` as terminal only until
   `sdk.capability.receipt_terminality` is negotiated.
+- The typed ZeroMQ SDK backend exposes burst sends through
+  `ZmqPipelineBackendClient::send_batch` and also supports
+  `app.delivery.send_batch` envelope execution, preserving ordered per-message
+  acceptance and rejection results without raw RPC envelopes.
+- The typed ZeroMQ SDK backend and operation registry expose direct-chat
+  cancellation through both `ZmqPipelineBackendClient::cancel` and
+  `app.delivery.cancel` envelope execution, preserving daemon cancellation
+  outcomes for REM/RCH without raw RPC envelopes.
 - Python-style `lxmd` `[lxmf] announce_interval` drives peer/delivery announce
   cadence separately from `[propagation] announce_interval`, which remains the
   propagation-node announce cadence.
