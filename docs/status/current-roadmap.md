@@ -56,6 +56,9 @@ The project is best described by capability level:
 - Documented basic LXMF field IDs are exported through `lxmf-wire`, and the
   typed ZeroMQ SDK send path preserves those field keys plus
   `_lxmf_fields_msgpack_b64` for REM/RCH payload compatibility.
+- The typed ZeroMQ SDK send and batch-send paths now treat payload `body` as
+  message content when `content` is absent, while still preserving `body` in
+  fields, so direct-chat links/body text do not get JSON-stringified.
 - Delivery modes are honored by the daemon; the old claim that requested modes
   are ignored is obsolete.
 - Direct and propagated resource sends support receipt-state separation,
@@ -327,6 +330,11 @@ The project is best described by capability level:
   `ZmqPipelineBackendClient::peer_directory_since` and a
   `min_last_seen_ts_ms` presence-list filter, so REM/RCH can suppress stale
   announce rows over the SDK path while keeping saved contacts visible offline.
+- The typed ZeroMQ SDK backend now exposes saved-peer lifecycle calls through
+  `ZmqPipelineBackendClient::peer_connect`, `peer_disconnect`, and
+  `peer_reconnect`, routing `sdk_peer_*_v2` methods while preserving identity,
+  display name, correlation ID, callsign, REM capability flags, RCH
+  announce-slot metadata, and per-call extensions.
 - The typed ZeroMQ SDK backend now also covers the operation registry and SDK
   envelope execution path, including `app.message.history.list` and
   `app.delivery.destination_hash`, so REM/RCH direct-chat history and runtime
@@ -338,6 +346,10 @@ The project is best described by capability level:
   `peer_id`/`conversation_id` filters, `include_receipts`, and restart
   pagination cursors through the daemon `app.message.history.list` SDK envelope
   path.
+- `ZmqPipelineBackendClient::list_message_history` now accepts both canonical
+  `id`/`content` records and legacy direct-chat `message_id`/`body` records
+  from `app.message.history.list`, keeping restart-recovered conversation
+  history readable without raw envelope decoding.
 - The typed ZeroMQ SDK backend now exposes the local runtime delivery
   destination through `ZmqPipelineBackendClient::local_delivery_destination_hash`,
   while still routing `app.delivery.destination_hash` through SDK envelope
@@ -352,6 +364,9 @@ The project is best described by capability level:
   `app.delivery.send_batch` envelope calls to `sdk_send_batch_v2`, preserving
   ordered per-message acceptance and rejection results without raw RPC
   envelopes.
+- `BatchSendItem` now carries per-message idempotency keys, TTL, correlation
+  IDs, and SDK extensions into each batch message's `_sdk` field metadata, so
+  burst direct-chat retries can remain stable across client restarts.
 - The typed ZeroMQ SDK backend and operation registry now expose direct-chat
   cancellation through both `ZmqPipelineBackendClient::cancel` and
   `app.delivery.cancel` envelope execution, preserving daemon cancellation

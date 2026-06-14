@@ -45,11 +45,15 @@ fn send_batch_uses_zmq_sdk_method_and_decodes_ordered_results() {
                     "peer-a",
                     json!({
                         "title": "hello a",
-                        "content": "payload a",
+                        "body": "payload a https://example.invalid/a",
                         "FIELD_THREAD": "thread-a"
                     }),
                 )
                 .with_delivery_method("direct")
+                .with_idempotency_key("batch-msg-1-send-once")
+                .with_ttl_ms(30_000)
+                .with_correlation_id("batch-msg-1-corr")
+                .with_extension("burst_slot", json!(0))
                 .with_include_ticket(false),
                 crate::BatchSendItem::new(
                     "batch-msg-2",
@@ -84,8 +88,22 @@ fn send_batch_uses_zmq_sdk_method_and_decodes_ordered_results() {
     assert_eq!(params["messages"][0]["id"], json!("batch-msg-1"));
     assert_eq!(params["messages"][0]["destination"], json!("peer-a"));
     assert_eq!(params["messages"][0]["title"], json!("hello a"));
-    assert_eq!(params["messages"][0]["content"], json!("payload a"));
+    assert_eq!(params["messages"][0]["content"], json!("payload a https://example.invalid/a"));
+    assert_eq!(
+        params["messages"][0]["fields"]["body"],
+        json!("payload a https://example.invalid/a")
+    );
     assert_eq!(params["messages"][0]["fields"]["FIELD_THREAD"], json!("thread-a"));
+    assert_eq!(
+        params["messages"][0]["fields"]["_sdk"]["idempotency_key"],
+        json!("batch-msg-1-send-once")
+    );
+    assert_eq!(params["messages"][0]["fields"]["_sdk"]["ttl_ms"], json!(30_000));
+    assert_eq!(
+        params["messages"][0]["fields"]["_sdk"]["correlation_id"],
+        json!("batch-msg-1-corr")
+    );
+    assert_eq!(params["messages"][0]["fields"]["_sdk"]["extensions"]["burst_slot"], json!(0));
     assert_eq!(params["messages"][0]["method"], json!("direct"));
     assert_eq!(params["messages"][0]["include_ticket"], json!(false));
     assert_eq!(params["messages"][1]["fields"]["FIELD_GROUP"], json!("group-b"));

@@ -72,6 +72,9 @@ Workspace paths are used for navigation. `crates/libs/lxmf-core` publishes as
   non-UTF8 title/content bytes retain client-visible fidelity.
 - Documented basic field IDs are exported from `lxmf-wire`, and the typed
   ZeroMQ SDK send path preserves those keys plus `_lxmf_fields_msgpack_b64`.
+- The typed ZeroMQ SDK send and batch-send paths map payload `body` into the
+  LXMF message content when `content` is absent, while retaining the original
+  `body` field for clients that store or render direct-chat bodies.
 
 ### Delivery and receipts
 
@@ -335,6 +338,12 @@ Workspace paths are used for navigation. `crates/libs/lxmf-core` publishes as
   `ZmqPipelineBackendClient::peer_directory_since` plus
   `min_last_seen_ts_ms` filtering on `sdk_identity_presence_list_v2`, allowing
   stale announce rows to be hidden without dropping saved offline contacts.
+- The typed ZeroMQ SDK backend exposes saved-peer lifecycle calls through
+  `ZmqPipelineBackendClient::peer_connect`, `peer_disconnect`, and
+  `peer_reconnect`, preserving identity, display name, correlation ID,
+  callsign, REM capability flags, RCH announce-slot metadata, and extensions
+  over `sdk_peer_connect_v2`, `sdk_peer_disconnect_v2`, and
+  `sdk_peer_reconnect_v2`.
 - The typed ZeroMQ SDK backend exposes the operation registry and envelope
   execution path, including the `app.message.history.list` and
   `app.delivery.destination_hash` operations used by direct-chat history and
@@ -346,6 +355,10 @@ Workspace paths are used for navigation. `crates/libs/lxmf-core` publishes as
   `peer_id`/`conversation_id` filters, `include_receipts`, and daemon
   pagination cursors for restart recovery through the
   `app.message.history.list` SDK envelope path.
+- `ZmqPipelineBackendClient::list_message_history` accepts canonical
+  `id`/`content` history rows and legacy direct-chat `message_id`/`body` rows,
+  so recovered history remains typed even when the daemon returns the older app
+  chat field names.
 - The typed ZeroMQ SDK backend exposes the local runtime delivery destination
   through `ZmqPipelineBackendClient::local_delivery_destination_hash` while
   retaining `app.delivery.destination_hash` envelope execution, so direct-chat
@@ -362,6 +375,9 @@ Workspace paths are used for navigation. `crates/libs/lxmf-core` publishes as
   `ZmqPipelineBackendClient::send_batch` and also supports
   `app.delivery.send_batch` envelope execution, preserving ordered per-message
   acceptance and rejection results without raw RPC envelopes.
+- `BatchSendItem` preserves per-message idempotency keys, TTL, correlation IDs,
+  and SDK extensions in each batch message's `_sdk` field metadata, keeping
+  burst direct-chat retry and restart recovery state on the typed SDK path.
 - The typed ZeroMQ SDK backend and operation registry expose direct-chat
   cancellation through both `ZmqPipelineBackendClient::cancel` and
   `app.delivery.cancel` envelope execution, preserving daemon cancellation
