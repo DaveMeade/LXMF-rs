@@ -32,8 +32,8 @@ Use loopback TCP only for local development.
 ## ZeroMQ Backend
 
 The ZeroMQ backend is parallel and opt-in. It is the preferred SDK transport
-for high-throughput local integrations and the REM/RCH 0.4.0 compatibility
-track:
+for high-throughput local integrations and the REM/RCH 0.4.x compatibility
+track. The current GitHub release train for that track is 0.4.1:
 
 ```toml
 lxmf-sdk = { path = "crates/libs/lxmf-sdk", features = ["zmq-pipeline-backend"] }
