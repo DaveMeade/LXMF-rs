@@ -304,6 +304,9 @@ Workspace paths are used for navigation. `crates/libs/lxmf-core` publishes as
   any offered payload transferred, handled, or transfer-limited, so malformed
   response batches cannot partially mutate live marks or serialized
   restart/export queue snapshots.
+- Peer sync wanted-ID list responses canonicalize and deduplicate repeated
+  transient IDs before transfer selection and accounting, so duplicate response
+  entries cannot inflate transfer counts, byte totals, or acceptance rate.
 - Restored Python peer records parse fractional `propagation_sync_limit` values
   through Python's integer-kilobyte restore path before peer-sync queue
   selection, so restored fractional sync limits leave the same queued work
@@ -553,10 +556,11 @@ Workspace paths are used for navigation. `crates/libs/lxmf-core` publishes as
   propagation destination as the Rust outbound propagation node, covering mixed
   propagation-node discovery and selection before broader store-and-forward
   claims are made.
-- The live Rust/Python propagation-control gate now also exercises a
-  Python-origin `/offer` against Rust `reticulumd`, proving partial wanted-ID
-  responses, repeated-offer throttling, and source-peer completed marks across
-  the live link request path.
+- The live Rust/Python propagation-control gate now also exercises
+  Python-origin `/offer` requests against Rust `reticulumd`, proving partial
+  wanted-ID responses, duplicate wanted-ID response canonicalization,
+  repeated-offer throttling, and source-peer completed marks across the live
+  link request path.
 - The live Rust/Python propagation-control gate now also splits out a
   Python-origin `/offer` peer-queue lifecycle case, proving post-sync handled
   IDs, no retryable missing-ID queue state, and cleared sync backoff after
@@ -814,7 +818,10 @@ Workspace paths are used for navigation. `crates/libs/lxmf-core` publishes as
   discovery of the Rust propagation-control path, Rust-to-Python
   propagation-node status, and Python-origin haves-only `/get` side effects when
   the Python harness environment is available, plus
-  `propagation_offer_python_to_rust` for Python-origin offer side effects.
+  `propagation_offer_python_to_rust`, `propagation_offer_queue_python_to_rust`,
+  and `propagation_offer_duplicate_wanted_source_completed_python_to_rust` for
+  Python-origin offer side effects, duplicate wanted-ID handling, and peer
+  queue lifecycle evidence.
 - Focused daemon/RPC tests cover delivery modes, propagation offers, peer
   maintenance, queue policy, source accounting, stamps, tickets, receipts, and
   cancellation.
