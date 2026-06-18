@@ -57,6 +57,7 @@ pub struct PropagationNodeConfig {
     #[serde(default)]
     pub enabled: Option<bool>,
     #[serde(default)]
+    pub control_allowed: Vec<String>,
     pub node_announce_at_start: Option<bool>,
     #[serde(default)]
     pub node_announce_interval_secs: Option<u64>,

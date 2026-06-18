@@ -1,5 +1,5 @@
 use super::{
-    encode_default_propagation_node_app_data, mark_interface_runtime_managed,
+    encode_propagation_node_app_data, mark_interface_runtime_managed,
     mark_interface_startup_status, pretty_boot_line, pretty_daemon_line, pretty_warn_line,
     select_tcp_server_bind, InterfaceStartupFailure, TcpServerSelection,
 };
@@ -10,6 +10,7 @@ mod transport_destinations;
 use crate::bridge::PeerCrypto;
 use crate::interfaces::common::interface_label;
 use crate::Args;
+use reticulum_daemon::announce_names::PropagationNodeAnnounceConfig;
 use reticulum_daemon::config::DaemonConfig;
 use reticulum_daemon::receipt_bridge::ReceiptBridge;
 use rns_core::identity::PrivateIdentity;
@@ -51,6 +52,7 @@ pub(super) struct TransportStartupInput<'a> {
     pub(super) receipt_tx:
         tokio::sync::mpsc::Sender<reticulum_daemon::receipt_bridge::ReceiptEvent>,
     pub(super) propagation_control_enabled: bool,
+    pub(super) propagation_announce_config: PropagationNodeAnnounceConfig,
 }
 
 pub(super) async fn start_transport_and_interfaces(
@@ -68,6 +70,7 @@ pub(super) async fn start_transport_and_interfaces(
         receipt_map,
         receipt_tx,
         propagation_control_enabled,
+        propagation_announce_config,
     } = input;
 
     for record in &mut configured_interfaces {
@@ -190,6 +193,7 @@ pub(super) async fn start_transport_and_interfaces(
             local_announce_capabilities,
             propagation_announce_app_data,
             propagation_control_enabled,
+            propagation_announce_config,
         )
         .await;
         announce_destination = Some(destinations.delivery);
