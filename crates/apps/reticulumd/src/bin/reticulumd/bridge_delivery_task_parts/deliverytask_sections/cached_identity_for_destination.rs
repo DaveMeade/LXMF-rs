@@ -277,11 +277,15 @@ impl DeliveryTask {
                 return;
             }
         };
+        let (link_id, link_status) = {
+            let guard = propagation_link.lock().await;
+            (*guard.id(), guard.status())
+        };
         log_delivery_trace(
             &self.message_id,
             &self.destination_hex,
             "propagation",
-            "propagation link ready",
+            format!("propagation link ready link={link_id} status={link_status:?}").as_str(),
         );
         if self.abort_if_cancelled("propagation") {
             return;
@@ -321,6 +325,21 @@ impl DeliveryTask {
         // without the destination prefix. Receivers prepend the
         // packet destination hash before unpacking.
         let opportunistic_payload = opportunistic_payload(&payload, &self.destination);
+        if opportunistic_payload.len() > rns_transport::packet::PACKET_MDU {
+            log_delivery_trace(
+                &self.message_id,
+                &self.destination_hex,
+                "opportunistic",
+                "payload too large for single packet",
+            );
+            self.run_opportunistic_link_fallback(
+                payload,
+                identity,
+                "payload too large for single packet",
+            )
+            .await;
+            return;
+        }
         let mut data = PacketDataBuffer::new();
         if data.write(opportunistic_payload).is_err() {
             log_delivery_trace(
