@@ -69,11 +69,17 @@ pub(super) fn spawn_inbound_worker(
                                         &event.link_id,
                                     )
                                     .await;
-                                    let peer_link_validated = resource_control
-                                        .validated_peer_links
-                                        .lock()
-                                        .ok()
-                                        .is_some_and(|guard| guard.contains(&event.link_id));
+                                    let peer_link_validated =
+                                        match resource_control.validated_peer_links.lock() {
+                                            Ok(guard) => guard.contains(&event.link_id),
+                                            Err(err) => {
+                                                log::warn!(
+                                                    "[daemon-rx] failed to read validated peer links for link={}: {err}",
+                                                    hex::encode(event.link_id.as_slice())
+                                                );
+                                                false
+                                            }
+                                        };
                                     if let Err(error) =
                                         propagation::ingest_propagation_resource_from_peer(
                                             daemon.as_ref(),
@@ -116,6 +122,16 @@ pub(super) fn spawn_inbound_worker(
                         let _ = take_outbound_resource_tracking(
                             &outbound_resource_map,
                             resource_hash_hex.as_str(),
+                        );
+                    }
+                    ResourceEventKind::InboundFailed(failure) => {
+                        log::warn!(
+                            "[daemon-rx] inbound resource failed link={} hash={} reason={} received={}/{}",
+                            event.link_id,
+                            event.hash,
+                            failure.reason,
+                            failure.progress.received_parts,
+                            failure.progress.total_parts
                         );
                     }
                     ResourceEventKind::Progress(_) => {}
