@@ -128,6 +128,30 @@
     }
 
     #[test]
+    fn announce_identity_keys_survive_store_restart() {
+        let temp = tempfile::tempdir().expect("tempdir");
+        let db_path = temp.path().join("announce-identity.sqlite");
+        {
+            let store = MessagesStore::open(db_path.as_path()).expect("open store");
+            store
+                .upsert_announce_identity(
+                    "AA".repeat(16).as_str(),
+                    "BB".repeat(32).as_str(),
+                    "CC".repeat(32).as_str(),
+                    1_781_964_554,
+                )
+                .expect("upsert announce identity");
+        }
+
+        let reopened = MessagesStore::open(db_path.as_path()).expect("reopen store");
+        let keys = reopened
+            .announce_identity_keys("aa".repeat(16).as_str())
+            .expect("load announce identity");
+
+        assert_eq!(keys, Some(("bb".repeat(32), "cc".repeat(32))));
+    }
+
+    #[test]
     fn inbound_tickets_keep_multiple_generated_tickets_per_destination() {
         let store = MessagesStore::in_memory().expect("in-memory store");
         store.upsert_ticket("peer", "22", 200).expect("insert first ticket");
