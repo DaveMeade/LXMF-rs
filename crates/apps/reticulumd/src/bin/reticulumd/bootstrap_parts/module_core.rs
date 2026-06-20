@@ -9,7 +9,8 @@ use reticulum_daemon::config::{DaemonConfig, InterfaceConfig};
 use reticulum_daemon::identity_store::load_or_create_identity;
 
 use rns_rpc::{
-    AnnounceBridge, InterfaceRecord, MessagesStore, OutboundBridge, RemoteControlBridge, RpcDaemon,
+    AnnounceBridge, InterfaceRecord, MessagesStore, OutboundBridge, RemoteControlBridge,
+    RpcDaemon, RpcRequest,
 };
 
 use rns_transport::destination::SingleInputDestination;
@@ -20,7 +21,7 @@ use rns_transport::identity::Identity;
 
 use rns_transport::transport::Transport;
 
-use serde_json::{Map as JsonMap, Value as JsonValue};
+use serde_json::{json, Map as JsonMap, Value as JsonValue};
 
 use std::collections::{HashMap, HashSet};
 
@@ -282,6 +283,15 @@ pub(super) async fn bootstrap(args: Args) -> BootstrapContext {
         propagation_node_config.announce_config.peering_cost,
         propagation_node_config.allowed_control_identities.clone(),
     );
+    if propagation_node_config.enabled {
+        if let Some(peer) = propagation_destination_hash_hex.as_deref() {
+            let _ = daemon.handle_rpc(RpcRequest {
+                id: 0,
+                method: "set_outbound_propagation_node".to_string(),
+                params: Some(json!({ "peer": peer })),
+            });
+        }
+    }
 
     // Make the local delivery destination visible on startup when configured.
     if propagation_node_config.peer_announce_at_start {
