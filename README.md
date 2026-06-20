@@ -3,7 +3,7 @@
 [![Ask DeepWiki](https://deepwiki.com/badge.svg)](https://deepwiki.com/FreeTAKTeam/LXMF-rs)
 
 Rust monorepo for LXMF and Reticulum with strict library/app boundaries and
-enterprise quality gates. The `0.5.0` line is a usable sub-1.0
+enterprise quality gates. The `0.5.x` line is a usable sub-1.0
 daemon/product release with strong core protocol coverage, published crates,
 GitHub tool bundles, and a typed ZeroMQ SDK integration foundation for
 REM/RCH clients; it is not a complete drop-in replacement for every Python
@@ -13,23 +13,23 @@ Reticulum/LXMF behavior.
 
 - Contributor workflow: `CONTRIBUTING.md`
 - Current status and execution order: `docs/status/current-roadmap.md`
-- Release notes: `docs/release-notes-v0.5.0.md`
+- Release notes: `docs/release-notes-v0.5.1.md`
 - Docs map and retention rules: `docs/README.md`
 - SDK guide: `docs/sdk/README.md`
 - Support policy: `docs/contracts/support-policy.md`
 
 ## Release Status
 
-Current release train: `0.5.0`.
+Current release train: `0.5.1`.
 
-Use `docs/release-notes-v0.5.0.md` for the release summary and
+Use `docs/release-notes-v0.5.1.md` for the release summary and
 `docs/runbooks/release-readiness.md` for the release gate record. The
 repository-level parity source of truth remains
 `docs/status/current-roadmap.md`; the detailed parity supplements are
 `docs/status/reticulum-parity-matrix.md` and
 `docs/status/lxmf-parity-matrix.md`.
 
-The `0.5.0` release scope covers the Rust libraries, SDK entry points, `lxmd`,
+The `0.5.x` release scope covers the Rust libraries, SDK entry points, `lxmd`,
 `reticulumd`, and `rns-tools`, plus host-native GitHub bundles for all
 implemented user-facing tools. Its main release-train addition is the
 communication parity milestone across propagation router lifecycle, peer
@@ -361,9 +361,9 @@ Release artifacts are published on the GitHub releases page:
 
 [https://github.com/FreeTAKTeam/LXMF-rs/releases](https://github.com/FreeTAKTeam/LXMF-rs/releases)
 
-For `v0.5.0`, use the release at:
+For `v0.5.1`, use the release at:
 
-[https://github.com/FreeTAKTeam/LXMF-rs/releases/tag/v0.5.0](https://github.com/FreeTAKTeam/LXMF-rs/releases/tag/v0.5.0)
+[https://github.com/FreeTAKTeam/LXMF-rs/releases/tag/v0.5.1](https://github.com/FreeTAKTeam/LXMF-rs/releases/tag/v0.5.1)
 
 1. Open the release page and download the package and matching `.sha256` file
    for your platform.
@@ -371,19 +371,19 @@ For `v0.5.0`, use the release at:
 2. Linux/macOS
 
 ```bash
-sha256sum -c lxmf-rs-tools-v0.5.0-linux-x64.tar.gz.sha256
-tar -xzf lxmf-rs-tools-v0.5.0-linux-x64.tar.gz
+sha256sum -c lxmf-rs-tools-v0.5.1-linux-x64.tar.gz.sha256
+tar -xzf lxmf-rs-tools-v0.5.1-linux-x64.tar.gz
 
-sha256sum -c lxmf-rs-tools-v0.5.0-macos-arm64.tar.gz.sha256
-tar -xzf lxmf-rs-tools-v0.5.0-macos-arm64.tar.gz
+sha256sum -c lxmf-rs-tools-v0.5.1-macos-arm64.tar.gz.sha256
+tar -xzf lxmf-rs-tools-v0.5.1-macos-arm64.tar.gz
 ```
 
 3. Windows
 
 ```powershell
-Get-FileHash .\lxmf-rs-tools-v0.5.0-windows-x64.zip -Algorithm SHA256
-Get-Content .\lxmf-rs-tools-v0.5.0-windows-x64.zip.sha256
-Expand-Archive .\lxmf-rs-tools-v0.5.0-windows-x64.zip .
+Get-FileHash .\lxmf-rs-tools-v0.5.1-windows-x64.zip -Algorithm SHA256
+Get-Content .\lxmf-rs-tools-v0.5.1-windows-x64.zip.sha256
+Expand-Archive .\lxmf-rs-tools-v0.5.1-windows-x64.zip .
 ```
 
 4. Run directly for validation
