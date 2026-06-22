@@ -80,7 +80,11 @@ jobs:
             local manifest="$1"
             local field="$2"
             cargo metadata --no-deps --format-version 1 --manifest-path "$manifest" \
-              | jq -r ".packages[0].$field"
+              | jq -r --arg manifest "$manifest" --arg field "$field" '
+                .packages[]
+                | select((.manifest_path | gsub("\\\\"; "/")) | endswith($manifest))
+                | .[$field]
+              '
           }
 
           crate_version_exists() {
