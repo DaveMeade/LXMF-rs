@@ -413,4 +413,4 @@ If you are using Linux and the Linux daemon guide above, point `--config` at the
 
 ## License
 
-EPL
+Eclipse Public License 2.0 (`EPL-2.0`). See [LICENSE](LICENSE).
