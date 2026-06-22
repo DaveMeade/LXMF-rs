@@ -5,7 +5,7 @@ edition.workspace = true
 rust-version.workspace = true
 license.workspace = true
 repository.workspace = true
-publish = false
+description = "Reticulum daemon and interchange binaries for LXMF-rs deployments."
 
 [lib]
 name = "reticulum_daemon"
