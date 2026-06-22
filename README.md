@@ -97,10 +97,18 @@ Published crates.io entry points:
 - `lxmf`
 - `lxmf-sdk`
 - `lxmf-wire`
+- `lxmf-embedded-mini`
 - `reticulum-rs`
 - `reticulum-rs-core`
 - `reticulum-rs-transport`
 - `reticulum-rs-rpc`
+- `rns-embedded-core`
+- `rns-embedded-runtime`
+- `rns-embedded-ffi`
+- `rns-embedded-mininode`
+- `lxmf-cli`
+- `reticulumd`
+- `rns-tools`
 
 ## Published Crates
 
@@ -116,6 +124,20 @@ Component crates:
 - [`reticulum-rs-core`](https://crates.io/crates/reticulum-rs-core) ![Crates.io Version](https://img.shields.io/crates/v/reticulum-rs-core) ([docs.rs](https://docs.rs/reticulum-rs-core)): core Reticulum cryptographic and packet primitives.
 - [`reticulum-rs-transport`](https://crates.io/crates/reticulum-rs-transport) ![Crates.io Version](https://img.shields.io/crates/v/reticulum-rs-transport) ([docs.rs](https://docs.rs/reticulum-rs-transport)): transport, interface, receipt, and resource layers.
 - [`reticulum-rs-rpc`](https://crates.io/crates/reticulum-rs-rpc) ![Crates.io Version](https://img.shields.io/crates/v/reticulum-rs-rpc) ([docs.rs](https://docs.rs/reticulum-rs-rpc)): JSON-RPC request, response, event, and daemon bridge contracts.
+
+Embedded crates:
+
+- [`lxmf-embedded-mini`](https://crates.io/crates/lxmf-embedded-mini) ![Crates.io Version](https://img.shields.io/crates/v/lxmf-embedded-mini) ([docs.rs](https://docs.rs/lxmf-embedded-mini)): no-alloc mini LXMF runtime for embedded targets.
+- [`rns-embedded-core`](https://crates.io/crates/rns-embedded-core) ![Crates.io Version](https://img.shields.io/crates/v/rns-embedded-core) ([docs.rs](https://docs.rs/rns-embedded-core)): embedded-friendly Reticulum core primitives.
+- [`rns-embedded-runtime`](https://crates.io/crates/rns-embedded-runtime) ![Crates.io Version](https://img.shields.io/crates/v/rns-embedded-runtime) ([docs.rs](https://docs.rs/rns-embedded-runtime)): runtime support for embedded Reticulum targets.
+- [`rns-embedded-ffi`](https://crates.io/crates/rns-embedded-ffi) ![Crates.io Version](https://img.shields.io/crates/v/rns-embedded-ffi) ([docs.rs](https://docs.rs/rns-embedded-ffi)): FFI and static-library surface for embedded runtimes.
+- [`rns-embedded-mininode`](https://crates.io/crates/rns-embedded-mininode) ![Crates.io Version](https://img.shields.io/crates/v/rns-embedded-mininode) ([docs.rs](https://docs.rs/rns-embedded-mininode)): minimal embedded Reticulum node helpers.
+
+Command crates:
+
+- [`lxmf-cli`](https://crates.io/crates/lxmf-cli) ![Crates.io Version](https://img.shields.io/crates/v/lxmf-cli): command-line LXMF client tools.
+- [`reticulumd`](https://crates.io/crates/reticulumd) ![Crates.io Version](https://img.shields.io/crates/v/reticulumd): Reticulum daemon and interchange binaries.
+- [`rns-tools`](https://crates.io/crates/rns-tools) ![Crates.io Version](https://img.shields.io/crates/v/rns-tools): Reticulum diagnostic and embedded tooling binaries.
 
 ## Active Applications
 
@@ -221,16 +243,16 @@ workspace directory names:
 
 ```toml
 [dependencies]
-lxmf = "0.3.0"
-reticulum-rs = "0.2.0"
+lxmf = "0.5.1"
+reticulum-rs = "0.5.1"
 ```
 
 Or depend on the component crates directly:
 
 ```toml
 [dependencies]
-lxmf-sdk = "0.2.1"
-reticulum-rs-rpc = "0.3.0"
+lxmf-sdk = "0.5.1"
+reticulum-rs-rpc = "0.5.1"
 ```
 
 ## SDK Guide
