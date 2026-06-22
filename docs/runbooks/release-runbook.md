@@ -31,3 +31,16 @@
 - [ ] Signed tag created
 - [ ] GitHub release notes list any crates.io versions shipped from the same release train
 - [ ] Post-release smoke check completed
+
+## crates.io Automation
+
+Publishing a GitHub Release now triggers `.github/workflows/crates-io-publish.yml`.
+The workflow publishes the public library crates listed in
+`docs/runbooks/crates-io-publish-plan.md` in dependency order.
+
+Repository setup required before the first automated publish:
+
+- add a `CARGO_REGISTRY_TOKEN` repository secret with permission to publish the
+  project-owned crates
+- optionally protect the `crates-io` GitHub Actions environment if releases
+  should require manual approval before crates go live
