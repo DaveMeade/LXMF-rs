@@ -92,6 +92,7 @@ jobs:
             local version="$2"
             local status
             status="$(curl --silent --output /dev/null --write-out "%{http_code}" \
+              --header "User-Agent: FreeTAKTeam-LXMF-rs-release-publish" \
               "https://crates.io/api/v1/crates/${package}/${version}")"
             [[ "$status" == "200" ]]
           }
