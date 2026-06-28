@@ -274,7 +274,6 @@ impl TransportHandler {
                     | PacketContext::ResourceHashUpdate
                     | PacketContext::ResourceProof
             )
-            && diag::enabled()
         {
             log::debug!(
                 "[resource-diag] duplicate_drop_candidate node={} link={} ctx={:02x}",

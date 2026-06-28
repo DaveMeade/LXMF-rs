@@ -102,22 +102,13 @@ impl Transport {
                     match link_rx.recv().await {
                         Ok(event) => {
                             if let LinkEvent::Data(payload) = event.event {
-                                if std::env::var("RETICULUMD_DIAGNOSTICS").ok().is_some_and(
-                                    |value| {
-                                        matches!(
-                                            value.trim().to_ascii_lowercase().as_str(),
-                                            "1" | "true" | "yes" | "on" | "debug"
-                                        )
-                                    },
-                                ) {
-                                    log::trace!(
-                                        "[tp-diag] received_data_forward link_id=/{}// peer=/{}// ctx={:02x} len={}",
-                                        event.id,
-                                        event.address_hash,
-                                        payload.context() as u8,
-                                        payload.len()
-                                    );
-                                }
+                                log::trace!(
+                                    "[tp-diag] received_data_forward link_id=/{}// peer=/{}// ctx={:02x} len={}",
+                                    event.id,
+                                    event.address_hash,
+                                    payload.context() as u8,
+                                    payload.len()
+                                );
                                 let _ = received_data_tx.send(ReceivedData {
                                     destination: event.id,
                                     data: PacketDataBuffer::new_from_slice(payload.as_slice()),
@@ -340,9 +331,13 @@ impl Transport {
     pub async fn handle_inbound_for_test(&self, packet: Packet) {
         let (receipt, receipt_handler) = {
             let handler = self.handler.lock().await;
-            let receipt = super::wire::validated_receipt_hash(&packet, &handler)
-                .await
-                .map(DeliveryReceipt::new);
+            let receipt = match super::wire::validated_receipt_hash(&packet, &handler).await {
+                Ok(receipt_hash) => receipt_hash.map(DeliveryReceipt::new),
+                Err(err) => {
+                    log::warn!("[transport] failed to validate inbound test receipt: {err:?}");
+                    None
+                }
+            };
             let receipt_handler = handler.receipt_handler.clone();
             (receipt, receipt_handler)
         };

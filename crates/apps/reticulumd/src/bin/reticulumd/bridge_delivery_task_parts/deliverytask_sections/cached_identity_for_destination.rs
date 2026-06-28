@@ -75,8 +75,16 @@ impl DeliveryTask {
         if self.abort_if_cancelled("link") {
             return;
         }
-        let Some(identity) = self.resolve_destination_identity().await else {
-            return;
+        let identity = match self.resolve_destination_identity().await {
+            Ok(Some(id)) => id,
+            Ok(None) => return,
+            Err(err) => {
+                log::warn!(
+                    "[daemon] {} resolve destination identity failed: {err}",
+                    self.message_id
+                );
+                return;
+            }
         };
         if self.abort_if_cancelled("link") {
             return;
@@ -318,8 +326,16 @@ impl DeliveryTask {
         if self.abort_if_cancelled("opportunistic") {
             return;
         }
-        let Some(identity) = self.resolve_destination_identity().await else {
-            return;
+        let identity = match self.resolve_destination_identity().await {
+            Ok(Some(id)) => id,
+            Ok(None) => return,
+            Err(err) => {
+                log::warn!(
+                    "[daemon] {} resolve destination identity failed: {err}",
+                    self.message_id
+                );
+                return;
+            }
         };
         // Opportunistic SINGLE packets must carry LXMF wire bytes
         // without the destination prefix. Receivers prepend the
@@ -403,7 +419,7 @@ impl DeliveryTask {
         packet.data = encrypted_data;
         let packet_hash = hex::encode(packet.hash().to_bytes());
         track_receipt_mapping(&self.receipt_map, &packet_hash, &self.message_id);
-        if diagnostics_enabled() {
+        if log::log_enabled!(log::Level::Trace) {
             let detail = format!(
                 "sending packet_hash={} payload_len={} payload_prefix={}",
                 packet_hash,
@@ -476,8 +492,10 @@ impl DeliveryTask {
         }
     }
 
-    pub(super) async fn resolve_destination_identity(&self) -> Option<Identity> {
-        let identity = self
+    pub(super) async fn resolve_destination_identity(
+        &self,
+    ) -> Result<Option<Identity>, &'static str> {
+        let Some(identity) = self
             .resolve_identity(
                 Some(self.destination_hex.as_str()),
                 self.destination_hash,
@@ -485,11 +503,14 @@ impl DeliveryTask {
                 "identity",
                 "failed: peer not announced",
             )
-            .await?;
+            .await?
+        else {
+            return Ok(None);
+        };
 
         if let Ok(mut peers) = self.peer_crypto.lock() {
             peers.insert(self.destination_hex.clone(), PeerCrypto { identity });
         }
-        Some(identity)
+        Ok(Some(identity))
     }
 }

@@ -14,13 +14,11 @@ impl InterfaceManager {
             Ok(()) => TxIfaceSendResult::Sent,
             Err(mpsc::error::TrySendError::Full(message)) => {
                 if matches!(tx_type, TxMessageType::Broadcast(_)) {
-                    if tx_diag_enabled() {
-                        log::warn!(
-                            "tx queue full dropping broadcast on {} for {:?}",
-                            iface.address,
-                            tx_type
-                        );
-                    }
+                    log::warn!(
+                        "tx queue full dropping broadcast on {} for {:?}",
+                        iface.address,
+                        tx_type
+                    );
                     return TxIfaceSendResult::Failed;
                 }
                 match tokio::time::timeout(
@@ -30,13 +28,11 @@ impl InterfaceManager {
                 .await
                 {
                     Ok(Ok(())) => {
-                        if tx_diag_enabled() {
-                            log::warn!(
-                                "recovered from full tx queue on {} for {:?}",
-                                iface.address,
-                                tx_type
-                            );
-                        }
+                        log::warn!(
+                            "recovered from full tx queue on {} for {:?}",
+                            iface.address,
+                            tx_type
+                        );
                         TxIfaceSendResult::Sent
                     }
                     Ok(Err(_)) => {

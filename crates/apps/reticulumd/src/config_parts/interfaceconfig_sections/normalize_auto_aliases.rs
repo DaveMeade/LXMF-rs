@@ -16,8 +16,8 @@ impl InterfaceConfig {
         if self
             .multicast_address_type
             .as_deref()
-            .and_then(rns_transport::iface::auto::MulticastAddressType::parse)
-            .is_none()
+            .map(rns_transport::iface::auto::MulticastAddressType::parse)
+            .is_none_or(|parsed| parsed.ok().flatten().is_none())
         {
             self.multicast_address_type = Some("temporary".to_string());
         }
@@ -630,6 +630,8 @@ impl InterfaceConfig {
         if rns_transport::iface::auto::AutoDiscoveryScope::parse(
             self.discovery_scope.as_deref().unwrap_or_default(),
         )
+        .ok()
+        .flatten()
         .is_none()
         {
             return Err(format!(
@@ -639,6 +641,8 @@ impl InterfaceConfig {
         if rns_transport::iface::auto::MulticastAddressType::parse(
             self.multicast_address_type.as_deref().unwrap_or_default(),
         )
+        .ok()
+        .flatten()
         .is_none()
         {
             return Err(format!(

@@ -52,7 +52,7 @@ fn outbound_wire_fields_strip_private_metadata_and_preserve_lxmf_numeric_fields(
         "12": [170, 187],
     });
 
-    let wire = outbound_wire_fields(Some(fields)).expect("wire fields");
+    let wire = outbound_wire_fields(Some(fields)).expect("no error").expect("wire fields");
 
     assert_eq!(wire["9"][0]["command_type"], json!("status.request"));
     assert_eq!(wire["12"], json!([170, 187]));
@@ -74,7 +74,7 @@ fn outbound_wire_fields_returns_none_when_only_private_metadata_remains() {
         "_lxmf": { "method": "direct" },
     });
 
-    assert_eq!(outbound_wire_fields(Some(fields)), None);
+    assert_eq!(outbound_wire_fields(Some(fields)).expect("no error"), None);
 }
 
 #[test]
@@ -138,7 +138,7 @@ fn parses_delivery_stamp_cost_from_python_peer_data_slot() {
 
     assert_eq!(
         parse_delivery_stamp_cost_from_app_data_hex(Some(hex::encode(app_data).as_str())),
-        Some(23)
+        Ok(Some(23))
     );
 }
 
@@ -152,8 +152,100 @@ fn rejects_python_invalid_delivery_stamp_costs_from_peer_data() {
         .expect("encode app data");
 
         assert_eq!(
-            parse_delivery_stamp_cost_from_app_data_hex(Some(hex::encode(app_data).as_str())),
+            parse_delivery_stamp_cost_from_app_data_hex(Some(hex::encode(app_data).as_str()))
+                .expect("valid stamp cost encoding"),
             None
         );
     }
+}
+
+#[test]
+fn treats_nil_delivery_stamp_cost_as_absent_not_malformed() {
+    // A no-cost announce encodes Nil in the stamp-cost slot; this must decode as Ok(None),
+    // not Err (which the legacy announce path logs as a spurious decode failure).
+    let app_data = rmp_serde::to_vec_named(&MsgPackValue::Array(vec![
+        MsgPackValue::Binary(b"Peer Name".to_vec()),
+        MsgPackValue::Nil,
+    ]))
+    .expect("encode app data");
+
+    assert_eq!(
+        parse_delivery_stamp_cost_from_app_data_hex(Some(hex::encode(app_data).as_str())),
+        Ok(None)
+    );
+}
+
+#[test]
+fn announce_costs_keep_valid_siblings_when_one_slot_is_bad() {
+    // entries[5] holds the cost array [stamp, flexibility, peering]; a bad stamp slot must
+    // not erase the valid flexibility/peering costs (the caller collapses Err to all-None).
+    let costs = rmpv::Value::Array(vec![
+        rmpv::Value::String("not-a-number".into()),
+        rmpv::Value::from(7),
+        rmpv::Value::from(9),
+    ]);
+    let announce = rmp_serde::to_vec_named(&rmpv::Value::Array(vec![
+        rmpv::Value::Nil,
+        rmpv::Value::Nil,
+        rmpv::Value::Nil,
+        rmpv::Value::Nil,
+        rmpv::Value::Nil,
+        costs,
+    ]))
+    .expect("encode announce");
+    assert_eq!(
+        parse_announce_costs_from_app_data_hex(Some(hex::encode(announce).as_str()))
+            .expect("structural decode succeeds"),
+        (None, Some(7), Some(9))
+    );
+}
+
+#[test]
+fn parse_fuzzy_u32_rejects_negative_integer() {
+    // A negative advertised cost must be rejected, not clamped to 0 (which would be stored
+    // as a real zero cost and confuse None-vs-Some(0) policy checks).
+    assert!(parse_fuzzy_u32(&MsgPackValue::Integer((-1_i64).into())).is_err());
+    assert!(parse_fuzzy_u32(&MsgPackValue::Integer(i64::MIN.into())).is_err());
+}
+
+#[test]
+fn parse_fuzzy_u32_accepts_nonnegative_integer() {
+    assert_eq!(parse_fuzzy_u32(&MsgPackValue::Integer(0_i64.into())).expect("zero"), 0);
+    assert_eq!(parse_fuzzy_u32(&MsgPackValue::Integer(42_i64.into())).expect("value"), 42);
+}
+
+#[test]
+fn parse_propagation_limits_keep_transfer_when_sync_slot_malformed() {
+    // index 3 = transfer limit (valid), index 4 = sync limit (malformed). A bad sync slot
+    // must not erase the valid transfer limit (the caller collapses any Err to (None, None)).
+    let announce = rmp_serde::to_vec_named(&rmpv::Value::Array(vec![
+        rmpv::Value::Nil,
+        rmpv::Value::Nil,
+        rmpv::Value::Nil,
+        rmpv::Value::F64(50.0),
+        rmpv::Value::String("not-a-number".into()),
+    ]))
+    .expect("encode announce");
+    let (transfer, sync) =
+        parse_propagation_limits_from_app_data_hex(Some(hex::encode(announce).as_str()))
+            .expect("structural decode succeeds");
+    assert_eq!(transfer, Some(50_000));
+    assert_eq!(sync, None);
+}
+
+#[test]
+fn parse_propagation_enabled_preserved_for_minimal_array() {
+    // A minimal `[flag, timebase, enabled]` announce still carries the enabled flag at
+    // index 2; it must not be discarded for lacking later cost/metadata slots.
+    let announce = rmp_serde::to_vec_named(&rmpv::Value::Array(vec![
+        rmpv::Value::Boolean(true),
+        rmpv::Value::from(0),
+        rmpv::Value::Boolean(true),
+    ]))
+    .expect("encode announce");
+    assert_eq!(
+        parse_propagation_enabled_from_app_data_hex(Some(hex::encode(announce).as_str()))
+            .expect("decode succeeds"),
+        Some(true)
+    );
 }

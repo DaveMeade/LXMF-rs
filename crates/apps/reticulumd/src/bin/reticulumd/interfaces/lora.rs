@@ -235,6 +235,8 @@ fn build_lora_config_with_validation(
         .filter(|value| !value.is_empty())
         .ok_or_else(|| "lora.region is required".to_string())?;
     let mut config = LoraConfig::for_region(region)
+        .ok()
+        .flatten()
         .ok_or_else(|| format!("unsupported lora.region {region}"))?;
 
     if let Some(frequency_hz) = iface.frequency_hz {

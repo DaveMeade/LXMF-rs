@@ -190,7 +190,7 @@ fn apply_record_runtime_config(
 fn interface_record_mode(record: &InterfaceRecord) -> InterfaceMode {
     setting_str(record, "interface_mode")
         .or_else(|| setting_str(record, "mode"))
-        .and_then(InterfaceMode::parse)
+        .and_then(|value| InterfaceMode::parse(value).ok().flatten())
         .unwrap_or(InterfaceMode::Full)
 }
 

@@ -1,4 +1,3 @@
-use super::diag;
 use super::path::send_to_next_hop;
 use super::resource_wire;
 use super::wire_encryption::should_encrypt_packet;
@@ -44,9 +43,9 @@ fn validate_destination_receipt_signature(
 pub(super) async fn validated_receipt_hash(
     packet: &Packet,
     handler: &TransportHandler,
-) -> Option<[u8; HASH_SIZE]> {
+) -> Result<Option<[u8; HASH_SIZE]>, RnsError> {
     if packet.header.packet_type != PacketType::Proof {
-        return None;
+        return Ok(None);
     }
 
     if packet.header.destination_type == DestinationType::Link
@@ -67,11 +66,12 @@ pub(super) async fn validated_receipt_hash(
         }
         if let Some(link) = link {
             let link = link.lock().await;
-            if let Ok(hash) = link.validate_packet_proof(packet) {
-                return Some(hash.to_bytes());
-            }
+            return match link.validate_packet_proof(packet) {
+                Ok(hash) => Ok(Some(hash.to_bytes())),
+                Err(_) => Err(RnsError::CryptoError),
+            };
         }
-        return None;
+        return Ok(None);
     }
 
     if packet.data.len() == SIGNATURE_LENGTH {
@@ -80,49 +80,62 @@ pub(super) async fn validated_receipt_hash(
             packet_cache.proof_context_for_destination(&packet.destination)
         };
         if let Some((receipt_hash, proved_destination, _)) = proof_context {
+            let mut destination_checked = false;
             if let Some(destination) =
                 handler.single_out_destinations.get(&proved_destination).cloned()
             {
+                destination_checked = true;
                 let destination = destination.lock().await;
                 if let Ok(hash) = validate_destination_receipt_signature(
                     &destination.identity,
                     &receipt_hash,
                     packet.data.as_slice(),
                 ) {
-                    return Some(hash.to_bytes());
+                    return Ok(Some(hash.to_bytes()));
                 }
             }
             if let Some(destination) =
                 handler.single_in_destinations.get(&proved_destination).cloned()
             {
+                destination_checked = true;
                 let destination = destination.lock().await;
                 if let Ok(hash) = validate_destination_receipt_signature(
                     destination.identity.as_identity(),
                     &receipt_hash,
                     packet.data.as_slice(),
                 ) {
-                    return Some(hash.to_bytes());
+                    return Ok(Some(hash.to_bytes()));
                 }
+            }
+            if destination_checked {
+                return Err(RnsError::CryptoError);
             }
         }
     }
 
+    let mut found_destination = false;
     if let Some(destination) = handler.single_out_destinations.get(&packet.destination).cloned() {
+        found_destination = true;
         let destination = destination.lock().await;
         if let Ok(hash) = validate_destination_receipt_proof(&destination.identity, packet) {
-            return Some(hash.to_bytes());
+            return Ok(Some(hash.to_bytes()));
         }
     }
     if let Some(destination) = handler.single_in_destinations.get(&packet.destination).cloned() {
+        found_destination = true;
         let destination = destination.lock().await;
         if let Ok(hash) =
             validate_destination_receipt_proof(destination.identity.as_identity(), packet)
         {
-            return Some(hash.to_bytes());
+            return Ok(Some(hash.to_bytes()));
         }
     }
 
-    None
+    if found_destination {
+        Err(RnsError::CryptoError)
+    } else {
+        Ok(None)
+    }
 }
 
 async fn should_forward_link_request_proof(
@@ -137,39 +150,33 @@ async fn should_forward_link_request_proof(
     let Some((original_destination, expected_iface)) =
         handler.link_table.proof_validation_context(&packet.destination)
     else {
-        if diag::enabled() {
-            log::debug!(
-                "[tp-diag] lrproof_forward_skip node={} reason=no_link_table_entry link={} iface={}",
-                handler.config.name,
-                packet.destination,
-                iface
-            );
-        }
+        log::debug!(
+            "[tp-diag] lrproof_forward_skip node={} reason=no_link_table_entry link={} iface={}",
+            handler.config.name,
+            packet.destination,
+            iface
+        );
         return false;
     };
     if expected_iface != iface {
-        if diag::enabled() {
-            log::debug!(
-                "[tp-diag] lrproof_forward_skip node={} reason=wrong_iface link={} expected={} got={}",
-                handler.config.name,
-                packet.destination,
-                expected_iface,
-                iface
-            );
-        }
+        log::debug!(
+            "[tp-diag] lrproof_forward_skip node={} reason=wrong_iface link={} expected={} got={}",
+            handler.config.name,
+            packet.destination,
+            expected_iface,
+            iface
+        );
         return false;
     }
 
     let Some(destination) = handler.single_out_destinations.get(&original_destination).cloned()
     else {
-        if diag::enabled() {
-            log::debug!(
-                "[tp-diag] lrproof_forward_skip node={} reason=missing_destination_identity link={} dst={}",
-                handler.config.name,
-                packet.destination,
-                original_destination
-            );
-        }
+        log::debug!(
+            "[tp-diag] lrproof_forward_skip node={} reason=missing_destination_identity link={} dst={}",
+            handler.config.name,
+            packet.destination,
+            original_destination
+        );
         return false;
     };
     let destination = destination.lock().await;
@@ -180,16 +187,14 @@ async fn should_forward_link_request_proof(
         packet,
     )
     .is_ok();
-    if diag::enabled() {
-        log::debug!(
-            "[tp-diag] lrproof_forward_validate node={} link={} dst={} iface={} valid={}",
-            handler.config.name,
-            packet.destination,
-            original_destination,
-            iface,
-            valid
-        );
-    }
+    log::debug!(
+        "[tp-diag] lrproof_forward_validate node={} link={} dst={} iface={} valid={}",
+        handler.config.name,
+        packet.destination,
+        original_destination,
+        iface,
+        valid
+    );
     valid
 }
 
@@ -207,6 +212,10 @@ pub(super) async fn handle_proof(
         let handler = handler.lock().await;
         validated_receipt_hash(&packet, &handler).await
     };
+    let receipt_hash = receipt_hash.unwrap_or_else(|err| {
+        log::warn!("[tp] proof crypto validation failed dst={}: {:?}", packet.destination, err);
+        None
+    });
     if let Some(receipt_hash) = receipt_hash {
         let receipt = DeliveryReceipt::new(receipt_hash);
         let receipt_handler = {
@@ -239,15 +248,13 @@ pub(super) async fn handle_proof(
         };
         if let Some(source_iface) = source_iface {
             if source_iface != iface {
-                if diag::enabled() {
-                    log::debug!(
-                        "[tp-diag] destination_proof_reverse_forward node={} proof_dst={} source_iface={} ingress_iface={}",
-                        handler.config.name,
-                        packet.destination,
-                        source_iface,
-                        iface
-                    );
-                }
+                log::debug!(
+                    "[tp-diag] destination_proof_reverse_forward node={} proof_dst={} source_iface={} ingress_iface={}",
+                    handler.config.name,
+                    packet.destination,
+                    source_iface,
+                    iface
+                );
                 handler
                     .send(TxMessage { tx_type: TxMessageType::Direct(source_iface), packet })
                     .await;
@@ -285,16 +292,14 @@ pub(super) async fn handle_proof(
     };
 
     if let Some((packet, iface)) = maybe_packet {
-        if diag::enabled() {
-            log::debug!(
-                "[tp-diag] lrproof_forward node={} link={} iface={}",
-                handler.config.name,
-                packet.destination,
-                iface
-            );
-        }
+        log::debug!(
+            "[tp-diag] lrproof_forward node={} link={} iface={}",
+            handler.config.name,
+            packet.destination,
+            iface
+        );
         handler.send(TxMessage { tx_type: TxMessageType::Direct(iface), packet }).await;
-    } else if packet.context == PacketContext::LinkRequestProof && diag::enabled() {
+    } else if packet.context == PacketContext::LinkRequestProof {
         log::debug!(
             "[tp-diag] lrproof_not_forwarded node={} link={} ingress_iface={}",
             handler.config.name,
@@ -380,14 +385,12 @@ pub(super) async fn handle_data<'a>(
 
         if let Some((packet, iface)) = handler.link_table.handle_reverse_link_packet(packet, iface)
         {
-            if diag::enabled() {
-                log::debug!(
-                    "[resource-diag] wire_resource_reverse_forward node={} link={} iface={}",
-                    handler.config.name,
-                    packet.destination,
-                    iface
-                );
-            }
+            log::debug!(
+                "[resource-diag] wire_resource_reverse_forward node={} link={} iface={}",
+                handler.config.name,
+                packet.destination,
+                iface
+            );
             handler.send(TxMessage { tx_type: TxMessageType::Direct(iface), packet }).await;
             return;
         }
