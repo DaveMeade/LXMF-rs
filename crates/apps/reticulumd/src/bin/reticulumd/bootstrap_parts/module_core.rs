@@ -8,6 +8,7 @@ use reticulum_daemon::config::{DaemonConfig, InterfaceConfig};
 
 use reticulum_daemon::identity_store::load_or_create_identity;
 
+use crate::bridge_path_lookup::DaemonPathLookupBridge;
 use crate::bridge_rnode_management::{
     DaemonRNodeManagementBinding, DaemonRNodeManagementBridge,
 };
@@ -24,7 +25,7 @@ use rns_transport::hash::AddressHash;
 
 use rns_transport::identity::Identity;
 
-use rns_transport::transport::Transport;
+use rns_transport::transport::{RestoredReticulumPathIdentity, Transport};
 
 use serde_json::{json, Map as JsonMap, Value as JsonValue};
 
@@ -37,6 +38,7 @@ use std::net::SocketAddr;
 use std::path::PathBuf;
 
 use std::sync::{Arc, Mutex};
+use std::time::{SystemTime, UNIX_EPOCH};
 
 use tokio::net::TcpStream;
 
@@ -180,7 +182,7 @@ pub(super) async fn bootstrap(args: Args) -> BootstrapContext {
     configured_interfaces = startup.configured_interfaces;
     let startup_successes = startup.startup_successes;
     let startup_failures = startup.startup_failures;
-    let seeded_tcp_interfaces = startup.seeded_tcp_interfaces;
+    let seeded_hot_apply_interfaces = startup.seeded_hot_apply_interfaces;
     let auto_runtime_refreshes = startup.auto_runtime_refreshes;
     let pipe_runtime_refreshes = startup.pipe_runtime_refreshes;
     let udp_runtime_refreshes = startup.udp_runtime_refreshes;
@@ -197,6 +199,7 @@ pub(super) async fn bootstrap(args: Args) -> BootstrapContext {
     let rnode_management_bindings = startup.rnode_management_bindings;
     let weave_control_bindings = startup.weave_control_bindings;
     let selected_tcp_server = startup.selected_tcp_server;
+    let restored_path_identities = startup.restored_path_identities;
 
     if !startup_failures.is_empty() {
         log::warn!(
@@ -280,13 +283,18 @@ pub(super) async fn bootstrap(args: Args) -> BootstrapContext {
         outbound_bridge,
         announce_bridge,
     ));
+    record_restored_path_identities(daemon.as_ref(), &restored_path_identities);
     configure_startup_rpc_token_auth(&args, daemon.as_ref());
     enforce_rpc_bind_security(rpc_addr.as_ref(), rpc_tls.as_ref(), daemon.as_ref());
     if let Some(transport) = transport.as_ref() {
-        daemon.set_interface_mutation_bridge(Arc::new(TcpInterfaceMutationBridge::spawn(
-            transport.iface_manager(),
-            seeded_tcp_interfaces,
-        )));
+        daemon.set_path_lookup_bridge(Arc::new(DaemonPathLookupBridge::new(transport.clone())));
+        daemon.set_interface_mutation_bridge(Arc::new(
+            InterfaceHotApplyBridge::spawn_with_transport_and_daemon(
+                transport.clone(),
+                seeded_hot_apply_interfaces,
+                Arc::downgrade(&daemon),
+            ),
+        ));
     }
     if !rnode_management_bindings.is_empty() {
         let bindings = rnode_management_bindings
@@ -451,6 +459,36 @@ pub(super) async fn bootstrap(args: Args) -> BootstrapContext {
     }
 
     BootstrapContext { rpc_addr, rpc_unix, daemon, rpc_tls }
+}
+
+fn record_restored_path_identities(
+    daemon: &RpcDaemon,
+    restored_path_identities: &[RestoredReticulumPathIdentity],
+) {
+    if restored_path_identities.is_empty() {
+        return;
+    }
+    let updated_at = i64::try_from(
+        SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .unwrap_or_default()
+            .as_secs(),
+    )
+    .unwrap_or(i64::MAX);
+    for identity in restored_path_identities {
+        if let Err(err) = daemon.record_announce_identity(
+            hex::encode(identity.destination.as_slice()).as_str(),
+            hex::encode(identity.public_key).as_str(),
+            hex::encode(identity.verifying_key).as_str(),
+            updated_at,
+        ) {
+            log::warn!(
+                "[daemon] failed to persist restored path identity destination={}: {}",
+                identity.destination,
+                err
+            );
+        }
+    }
 }
 
 fn spawn_auto_runtime_status_refresher(
@@ -996,11 +1034,18 @@ mod tests {
             initial_peering_wait: core::time::Duration::ZERO,
         };
         let status = crate::interfaces::auto::AutoRuntimeStatusHandle::from_startup_plan(&plan);
-        status.record_carrier_events(&[
-            rns_transport::iface::auto::AutoMulticastCarrierEvent::CarrierLost {
-                ifname: "eth0".to_string(),
-            },
-        ]);
+        let carrier_events = vec![rns_transport::iface::auto::AutoMulticastCarrierEvent::CarrierLost {
+            ifname: "eth0".to_string(),
+        }];
+        status.record_peer_job_summary(&crate::interfaces::auto::AutoPeerJobRuntimeSummary {
+            expired_peer_count: 2,
+            reverse_peer_announce_count: 1,
+            missing_initial_echo_count: 3,
+            carrier_changed: true,
+            carrier_event_count: carrier_events.len(),
+            carrier_events,
+            peer_count_after: 4,
+        });
         let refresh = transport_startup::AutoRuntimeRefresh { runtime_iface, status };
 
         assert_eq!(refresh_auto_runtime_status_once(&daemon, &[refresh]), 1);
@@ -1017,6 +1062,22 @@ mod tests {
         assert_eq!(carrier_runtime["carrier_changed"].as_bool(), Some(true));
         assert_eq!(carrier_runtime["carrier_event_count"].as_u64(), Some(1));
         assert_eq!(carrier_runtime["carrier_events"][0]["event"].as_str(), Some("carrier_lost"));
+        assert_eq!(carrier_runtime["last_peer_job"]["expired_peer_count"].as_u64(), Some(2));
+        assert_eq!(
+            carrier_runtime["last_peer_job"]["reverse_peer_announce_count"].as_u64(),
+            Some(1)
+        );
+        assert_eq!(
+            carrier_runtime["last_peer_job"]["missing_initial_echo_count"].as_u64(),
+            Some(3)
+        );
+        assert_eq!(carrier_runtime["last_peer_job"]["carrier_changed"].as_bool(), Some(true));
+        assert_eq!(carrier_runtime["last_peer_job"]["carrier_event_count"].as_u64(), Some(1));
+        assert_eq!(
+            carrier_runtime["last_peer_job"]["carrier_events"][0]["event"].as_str(),
+            Some("carrier_lost")
+        );
+        assert_eq!(carrier_runtime["last_peer_job"]["peer_count_after"].as_u64(), Some(4));
     }
 
     #[test]

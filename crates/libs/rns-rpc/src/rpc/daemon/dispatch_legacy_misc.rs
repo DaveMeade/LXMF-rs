@@ -124,6 +124,140 @@ impl RpcDaemon {
                     error: None,
                 })
             }
+            "path_status" => {
+                let params = request.params.ok_or_else(|| {
+                    std::io::Error::new(std::io::ErrorKind::InvalidInput, "missing params")
+                })?;
+                let parsed: PathLookupParams = serde_json::from_value(params)
+                    .map_err(|err| std::io::Error::new(std::io::ErrorKind::InvalidInput, err))?;
+                let destination = normalize_destination_hash_param(&parsed.destination)?;
+                let Some(bridge) = self
+                    .path_lookup_bridge
+                    .lock()
+                    .expect("path_lookup_bridge mutex poisoned")
+                    .clone()
+                else {
+                    return Ok(RpcResponse {
+                        id: request.id,
+                        result: None,
+                        error: Some(RpcError::new(
+                            "PATH_LOOKUP_UNAVAILABLE",
+                            "path lookup bridge is not configured",
+                        )),
+                    });
+                };
+                match bridge.path_status(destination.as_str()) {
+                    Ok(status_fields) => Ok(RpcResponse {
+                        id: request.id,
+                        result: Some(path_lookup_result(
+                            destination,
+                            status_fields,
+                            None,
+                            "unknown",
+                        )),
+                        error: None,
+                    }),
+                    Err(err) => Ok(RpcResponse {
+                        id: request.id,
+                        result: None,
+                        error: Some(RpcError::new("PATH_LOOKUP_FAILED", err.to_string())),
+                    }),
+                }
+            }
+            "request_path" => {
+                let params = request.params.ok_or_else(|| {
+                    std::io::Error::new(std::io::ErrorKind::InvalidInput, "missing params")
+                })?;
+                let parsed: PathLookupParams = serde_json::from_value(params)
+                    .map_err(|err| std::io::Error::new(std::io::ErrorKind::InvalidInput, err))?;
+                let destination = normalize_destination_hash_param(&parsed.destination)?;
+                let on_iface = normalize_optional_iface_hash_param(parsed.on_iface.as_deref())?;
+                let tag = normalize_optional_tag_hex_param(parsed.tag_hex.as_deref())?;
+                let Some(bridge) = self
+                    .path_lookup_bridge
+                    .lock()
+                    .expect("path_lookup_bridge mutex poisoned")
+                    .clone()
+                else {
+                    return Ok(RpcResponse {
+                        id: request.id,
+                        result: None,
+                        error: Some(RpcError::new(
+                            "PATH_LOOKUP_UNAVAILABLE",
+                            "path lookup bridge is not configured",
+                        )),
+                    });
+                };
+                let mut status_fields = match bridge.path_status(destination.as_str()) {
+                    Ok(status_fields) => status_fields,
+                    Err(err) => {
+                        return Ok(RpcResponse {
+                            id: request.id,
+                            result: None,
+                            error: Some(RpcError::new("PATH_LOOKUP_FAILED", err.to_string())),
+                        });
+                    }
+                };
+                let mut path_found = path_found_from_status(&status_fields);
+                let mut requested = false;
+                let needs_scoped_refresh = on_iface.is_some() || tag.is_some();
+                if !path_found || needs_scoped_refresh {
+                    if let Err(err) = bridge.request_path_scoped(
+                        destination.as_str(),
+                        on_iface.as_deref(),
+                        tag.as_deref(),
+                    ) {
+                        return Ok(RpcResponse {
+                            id: request.id,
+                            result: None,
+                            error: Some(RpcError::new("PATH_REQUEST_FAILED", err.to_string())),
+                        });
+                    }
+                    requested = true;
+                    status_fields = match bridge.path_status(destination.as_str()) {
+                        Ok(status_fields) => status_fields,
+                        Err(err) => {
+                            return Ok(RpcResponse {
+                                id: request.id,
+                                result: None,
+                                error: Some(RpcError::new("PATH_LOOKUP_FAILED", err.to_string())),
+                            });
+                        }
+                    };
+                    path_found = path_found_from_status(&status_fields);
+                    let timeout_secs = parsed.timeout_secs.unwrap_or(0).min(3600);
+                    let deadline =
+                        std::time::Instant::now() + std::time::Duration::from_secs(timeout_secs);
+                    while !path_found && std::time::Instant::now() < deadline {
+                        std::thread::sleep(std::time::Duration::from_millis(250));
+                        status_fields = match bridge.path_status(destination.as_str()) {
+                            Ok(status_fields) => status_fields,
+                            Err(err) => {
+                                return Ok(RpcResponse {
+                                    id: request.id,
+                                    result: None,
+                                    error: Some(RpcError::new(
+                                        "PATH_LOOKUP_FAILED",
+                                        err.to_string(),
+                                    )),
+                                });
+                            }
+                        };
+                        path_found = path_found_from_status(&status_fields);
+                    }
+                }
+                let status = if path_found {
+                    "found"
+                } else if requested {
+                    "timeout"
+                } else {
+                    "unknown"
+                };
+                let mut result =
+                    path_lookup_result(destination, status_fields, Some(requested), status);
+                add_path_request_scope_fields(&mut result, on_iface.as_deref(), tag.as_deref());
+                Ok(RpcResponse { id: request.id, result: Some(result), error: None })
+            }
             "rnode_management" => {
                 let params = request.params.ok_or_else(|| {
                     std::io::Error::new(std::io::ErrorKind::InvalidInput, "missing params")
@@ -311,3 +445,5 @@ impl RpcDaemon {
         }
     }
 }
+
+include!("dispatch_legacy_misc_parts/path_lookup.rs");

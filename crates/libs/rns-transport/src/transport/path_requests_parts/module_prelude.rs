@@ -43,7 +43,7 @@ pub fn create_path_request_destination() -> PlainInputDestination {
 
 pub type TagBytes = Vec<u8>;
 
-type DuplicateKey = (AddressHash, TagBytes);
+type DuplicateKey = (AddressHash, Option<AddressHash>, TagBytes, AddressHash);
 
 type DiscoveryKey = (AddressHash, Option<AddressHash>);
 
@@ -79,8 +79,9 @@ impl PathRequest {
         let mut tag_end = data.len();
 
         if data.len() > ADDRESS_HASH_SIZE * 2 {
-            requesting_transport =
-                Some(AddressHash::new_from_slice(&data[ADDRESS_HASH_SIZE..2 * ADDRESS_HASH_SIZE]));
+            let mut raw_requester = [0u8; ADDRESS_HASH_SIZE];
+            raw_requester.copy_from_slice(&data[ADDRESS_HASH_SIZE..2 * ADDRESS_HASH_SIZE]);
+            requesting_transport = Some(AddressHash::new(raw_requester));
             tag_start = ADDRESS_HASH_SIZE * 2;
         }
 
@@ -106,6 +107,8 @@ pub struct PathRequests {
     announce_cap: usize,
     request_timeout: Duration,
     queue: VecDeque<(DiscoveryKey, Instant)>,
+    outgoing_requests: BTreeMap<AddressHash, Instant>,
+    outgoing_request_queue: VecDeque<(AddressHash, Instant)>,
     local_response_cache: BTreeMap<LocalResponseKey, Instant>,
     local_response_queue: VecDeque<(LocalResponseKey, Instant)>,
     local_response_cooldown: Duration,
@@ -131,6 +134,8 @@ impl PathRequests {
             announce_cap,
             request_timeout: Duration::from_secs(request_timeout_secs.max(1)),
             queue: alloc::collections::VecDeque::new(),
+            outgoing_requests: BTreeMap::new(),
+            outgoing_request_queue: VecDeque::new(),
             local_response_cache: BTreeMap::new(),
             local_response_queue: VecDeque::new(),
             local_response_cooldown: super::LOCAL_PATH_RESPONSE_COOLDOWN,
@@ -171,16 +176,55 @@ impl PathRequests {
         }
     }
 
-    pub fn decode(&mut self, data: &[u8]) -> Option<PathRequest> {
-        self.decode_at(data, Instant::now())
+    fn prune_outgoing_requests(&mut self, now: Instant, cooldown: Duration) {
+        while let Some((destination, requested_at)) = self.outgoing_request_queue.front().copied() {
+            if now.duration_since(requested_at) < cooldown {
+                break;
+            }
+            self.outgoing_request_queue.pop_front();
+            if self.outgoing_requests.get(&destination).copied() == Some(requested_at) {
+                self.outgoing_requests.remove(&destination);
+            }
+        }
     }
 
-    fn decode_at(&mut self, data: &[u8], now: Instant) -> Option<PathRequest> {
+    pub fn outgoing_request_recently_sent(
+        &mut self,
+        destination: &AddressHash,
+        now: Instant,
+        cooldown: Duration,
+    ) -> bool {
+        self.prune_outgoing_requests(now, cooldown);
+        self.outgoing_requests
+            .get(destination)
+            .map(|requested_at| now.duration_since(*requested_at) < cooldown)
+            .unwrap_or(false)
+    }
+
+    pub fn record_outgoing_request(&mut self, destination: &AddressHash) {
+        self.record_outgoing_request_at(destination, Instant::now());
+    }
+
+    fn record_outgoing_request_at(&mut self, destination: &AddressHash, now: Instant) {
+        self.outgoing_requests.insert(*destination, now);
+        self.outgoing_request_queue.push_back((*destination, now));
+    }
+
+    pub fn decode(&mut self, data: &[u8], on_iface: AddressHash) -> Option<PathRequest> {
+        self.decode_at(data, on_iface, Instant::now())
+    }
+
+    fn decode_at(&mut self, data: &[u8], on_iface: AddressHash, now: Instant) -> Option<PathRequest> {
         let path_request = PathRequest::decode(data, &self.name);
         self.prune_cache(now);
 
         if let Some(ref request) = path_request {
-            let key = (request.destination, request.tag_bytes.clone());
+            let key = (
+                request.destination,
+                request.requesting_transport,
+                request.tag_bytes.clone(),
+                on_iface,
+            );
             let expires_at = now + self.request_timeout;
             let is_new = self.cache.insert(key.clone(), expires_at).is_none();
 
@@ -364,5 +408,28 @@ impl PathRequests {
         } else {
             None
         }
+    }
+
+    pub fn take_discovery_requesters(&mut self, destination: &AddressHash) -> Vec<AddressHash> {
+        self.prune_discovery(Instant::now());
+
+        let keys: Vec<DiscoveryKey> = self
+            .discovery
+            .keys()
+            .copied()
+            .filter(|(queued_destination, _)| queued_destination == destination)
+            .collect();
+        let mut requesters = Vec::new();
+
+        for key in keys {
+            if self.discovery.remove(&key).is_some() {
+                self.decrement_pending_recursive_count(key.1);
+                if let Some(iface) = key.1 {
+                    requesters.push(iface);
+                }
+            }
+        }
+
+        requesters
     }
 }

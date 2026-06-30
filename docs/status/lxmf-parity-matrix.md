@@ -1,6 +1,6 @@
 # LXMF Parity Matrix
 
-Last reassessed: 2026-06-28
+Last reassessed: 2026-06-30
 
 This is the maintained row-level status for Python LXMF compatibility.
 Repository-level posture and execution order live in
@@ -23,8 +23,8 @@ Workspace paths are used for navigation. `crates/libs/lxmf-core` publishes as
 | `LXMF/LXMF.py` | `crates/libs/lxmf-core` | done | Pinned module constants, payload fields, message identity, inbound decoding, wire helpers, delivery app-data helpers, compression support detection, and propagation-node announce helper validation. | No confirmed `LXMF.py` blocker in the pinned Python reference. |
 | `LXMF/LXMessage.py` | `crates/libs/lxmf-core` | done | Wire, storage, propagation, paper, signatures, message IDs, binary fidelity, and timestamp precision metadata. | No confirmed base-message blocker. |
 | `LXMF/LXMPeer.py` | `crates/libs/rns-rpc`, `crates/apps/reticulumd` | done | Persistent peers, queue marks, offer selection, policy gates, peering keys, throttling, maintenance, source accounting, cumulative acceptance, serialized restored queue snapshots, boolean/list/numeric offer responses, transfer/retry/restart recovery, and unpeer cleanup. | No confirmed `LXMPeer.py` blocker in the pinned Python-only coverage. |
-| `LXMF/LXMRouter.py` | `crates/libs/rns-rpc`, `crates/apps/reticulumd` | partial | Outbound modes, selected propagation nodes, direct/propagated resources, cancellation, fetch/download/sync RPCs, receipts, persistence, propagation-node side effects, retry/failure handling, and Python live remote lifecycle coverage. | No confirmed propagation-router lifecycle blocker remains; broader non-propagation router convenience surface remains narrower than Python. |
-| `LXMF/Handlers.py` | `crates/apps/reticulumd`, `crates/libs/rns-rpc` | partial | Delivery, announce, propagation app-data, receipt, and inbound bridge handling. | Some router-coupled side effects and negative/drop observability remain narrower. |
+| `LXMF/LXMRouter.py` | `crates/libs/rns-rpc`, `crates/apps/reticulumd`, `crates/apps/lxmf-cli` | partial | Outbound modes, selected propagation nodes, direct/propagated resources, cancellation, fetch/download/sync RPCs, receipts, persistence, propagation-node side effects, retry/failure handling, delivery-announce wakeup for stored pending direct/opportunistic outbound work including reticulumd identity/path miss deferral, CLI paper encode/decode access to the SDK paper surface, and Python live remote lifecycle coverage. | No confirmed propagation-router lifecycle blocker remains; broader non-propagation router convenience surface remains narrower than Python. |
+| `LXMF/Handlers.py` | `crates/apps/reticulumd`, `crates/libs/rns-rpc` | partial | Delivery, announce, propagation app-data, receipt, inbound bridge handling, transport-origin delivery receipts publishing the same pollable SDK `receipt` event payload fields as RPC-origin receipts, successful direct packet/resource deliveries publishing SDK-pollable raw inbound events with LXMF bytes plus direct transport and signature metadata, direct and propagated local-delivery signature metadata including unknown-source, verified, and invalid-signature states, local propagated-delivery processed-transient markers for later duplicate ingest accounting, structured raw event-stream signals for direct packet/resource delivery drops, propagated local delivery-policy drops, RPC-layer ignored-destination propagation rejects including Python-served alias ingest, decryptable remote fetched/downloaded propagated local-delivery decode/stamp/policy drops, remote fetch/download/sync duplicate-import drop events, and propagated local-delivery pre-decode drops for local-addressed short/undecryptable envelopes plus strict remote fetch/download local-import rejects. | Some router-coupled side effects and broader propagated/drop observability remain narrower. |
 | `LXMF/LXStamper.py` | `crates/libs/lxmf-core`, `crates/libs/rns-rpc`, `crates/apps/reticulumd` | done | Validation, generation, ticket-derived stamps, cancellation-aware task work, background deferred worker queue ownership, retry state, cancellation, propagation-stamp pre-handoff preparation, and progress metadata. | No confirmed deferred-stamp lifecycle blocker. |
 
 ## Method Checklist
@@ -53,8 +53,8 @@ Workspace paths are used for navigation. `crates/libs/lxmf-core` publishes as
 - PARITY_ITEM id=router.outbound_queue status=partial
 - PARITY_ITEM id=router.handle_outbound_policy status=partial
 - PARITY_ITEM id=router.adapter_transport status=partial
-- PARITY_ITEM id=router.paper_uri_ingest status=partial
-- PARITY_ITEM id=router.cancel_outbound status=partial
+- PARITY_ITEM id=router.paper_uri_ingest status=done
+- PARITY_ITEM id=router.cancel_outbound status=done
 - PARITY_ITEM id=router.propagation_ingest_fetch status=done
 - PARITY_ITEM id=router.transfer_state_lifecycle status=done
 - PARITY_ITEM id=router.node_app_data status=done
@@ -98,6 +98,13 @@ Workspace paths are used for navigation. `crates/libs/lxmf-core` publishes as
   direct `delivered`, `sent: link resource`, and `sent: propagated resource`.
 - Resource advertisement failure, retry exhaustion, timeout, and explicit
   cancellation reach daemon message state.
+- RPC daemon `lxmf.delivery` announces reschedule stored pending direct,
+  default-direct, and opportunistic outbound messages for the announced
+  destination, without waking propagated, paper, terminal, already-sending, or
+  nonmatching records. Reticulumd direct/opportunistic identity/path misses now
+  persist as nonterminal `queued: waiting for announce`, preserving them for
+  the delivery-announce wakeup path while propagated/propagation-node misses
+  stay terminal.
 
 ### Tickets and stamps
 
@@ -374,6 +381,17 @@ Workspace paths are used for navigation. `crates/libs/lxmf-core` publishes as
   `app.delivery.destination_hash` operations used by direct-chat history and
   runtime delivery-destination queries, so REM/RCH can keep those flows on the
   `ZmqPipelineBackendClient` path instead of requiring raw RPC/HTTP envelopes.
+- Paper-message encode/decode now appears in both the daemon and SDK app
+  operation registries as `app.paper.encode`/`app.paper.decode`, preserving
+  the `sdk_paper_encode_v2`/`sdk_paper_decode_v2` aliases and typed envelope
+  payloads instead of falling through to generic remote-command dispatch.
+- The typed SDK paper decode surface now keeps the legacy `paper_decode` Ack
+  path while adding `paper_decode_with_metadata`, exposing daemon paper-ingest
+  metadata (`transient_id`, duplicate state, destination, destination hint, and
+  byte length) through the RPC and ZeroMQ backends.
+- The `lxmf`/`lxmf-cli` command surface now exposes the same paper operation
+  path with `paper-encode --message-id` and `paper-decode --uri`, keeping CLI
+  paper handling on the typed SDK calls instead of requiring raw RPC envelopes.
 - The typed ZeroMQ SDK backend also exposes durable direct-chat history as
   `ZmqPipelineBackendClient::list_message_history`, preserving link-bearing
   message bodies, receipt status, basic LXMF fields, one-to-one
@@ -412,6 +430,13 @@ Workspace paths are used for navigation. `crates/libs/lxmf-core` publishes as
   cancellation through both `ZmqPipelineBackendClient::cancel` and
   `app.delivery.cancel` envelope execution, preserving daemon cancellation
   outcomes for REM/RCH without raw RPC envelopes.
+- `app.delivery.cancel` now covers queued/pre-handoff outbound work: accepted
+  cancellation persists `receipt_status = cancelled`, records delivery trace
+  and event state, exposes cancel metadata through both delegated
+  `sdk_cancel_message_v2` and `sdk_envelope_execute_v2` lifecycle traces, and
+  prevents a later outbound bridge handoff after worker lanes resume. ZeroMQ
+  tests cover all cancel result variants plus non-accepted envelope payload and
+  extension preservation.
 - The typed ZeroMQ SDK backend starts the final propagation-first branch with
   `ZmqPipelineBackendClient::propagation_peer_sync`, routing
   `app.propagation.peer_sync` over `sdk_envelope_execute_v2` to the daemon's
@@ -801,8 +826,9 @@ Workspace paths are used for navigation. `crates/libs/lxmf-core` publishes as
   the same peer return the throttled response even when the peer changes the
   offered transient-ID set.
 - Propagation ingest rejects payloads for ignored destinations before storing
-  or queueing them, so local replication policy is enforced before relay state
-  is created.
+  or queueing them, emits a bounded `inbound_dropped` event through the RPC/SDK
+  event stream, and enforces local replication policy before relay state is
+  created.
 - Local peer offer-error responses now expose failed peer-sync state fields at
   both the top-level event/result and nested propagation result while keeping
   retryable queue marks intact.
@@ -843,11 +869,64 @@ Workspace paths are used for navigation. `crates/libs/lxmf-core` publishes as
   `propagation_offer_duplicate_wanted_source_completed_python_to_rust` cases
   for haves-only `/get` side effects, offer side effects, duplicate wanted-ID
   handling, and peer queue lifecycle evidence.
-- Focused daemon/RPC tests cover delivery modes, propagation offers, peer
-  maintenance, queue policy, source accounting, stamps, tickets, receipts, and
-  cancellation.
+- Focused daemon/RPC tests cover delivery modes, propagation offers, paper
+  operation registry/envelope dispatch, peer maintenance, queue policy, source
+  accounting, stamps, tickets, receipts, and cancellation.
 - Focused daemon bridge tests cover deferred normal-stamp queue ownership,
   cancellation, retry metadata, and propagation-stamp preparation before
   delivery handoff.
+- Focused direct packet/resource delivery tests cover successful inbound
+  `sdk_poll_events_v2` callback observability, including raw
+  `lxmf_bytes_hex`, stored/event identity, content, and metadata consistency,
+  direct transport metadata, and verified signature metadata for packet and
+  resource deliveries.
+- Focused direct packet/resource delivery tests cover structured raw
+  `inbound_dropped` event-stream entries for malformed direct LXMF payloads,
+  including default identifier redaction and `delivery_kind` classification,
+  without storing a message or updating peer activity. Direct stamp-policy and
+  delivery-policy rejections route through the same bounded drop-event helper.
+- Focused propagated local-delivery tests cover ignored-source delivery-policy
+  rejections emitting bounded raw `inbound_dropped` events with
+  `delivery_kind = "propagation"` while preserving Python-style no-store
+  behavior and default identifier redaction. Coverage includes local envelope
+  ingest plus decryptable remote fetched and remote downloaded propagation
+  payloads that reach local decode, stamp, or delivery-policy handling, so
+  those router-coupled local-delivery drops do not disappear into rejected
+  counters without observer-visible context.
+- Focused propagated pre-decode tests cover local-addressed too-short local
+  envelopes through `sdk_poll_events_v2` and strict remote fetch/download
+  local-import rejects for too-short payloads, destination mismatches, and
+  decrypt failures. Local propagation envelope destination mismatches remain
+  relay/store-forward candidates instead of local drop events.
+- Focused RPC propagation tests cover ignored-destination rejects from
+  `propagation_ingest`, Python-served alias ingest, and remote
+  fetch/download/sync imports, asserting no payload storage, `PermissionDenied`
+  preservation, bounded `inbound_dropped` events, default identifier redaction,
+  and SDK event-poll visibility where the event stream is part of the ingest
+  contract.
+- Focused propagated local-delivery tests also cover handler-facing `_lxmf`
+  signature metadata on stored messages and raw inbound events for local
+  envelope ingest, remote fetch imports, and remote-control download imports.
+  Production imports pass through the shared transport-aware signature
+  annotation path when available, while unknown source identities are recorded as
+  `source_identity_unknown` instead of leaving signature status absent.
+- Focused local propagated-delivery tests feed a real source announce through
+  the transport interface channel before delivery, proving known-source
+  signatures report `verified` and corrupted signatures report
+  `signature_invalid` on both stored records and raw inbound events.
+- Focused local propagated-delivery tests now also cover the Python-style
+  processed-transient side effect: accepted local propagated delivery marks the
+  transient in `propagation_local_entries`, and later `propagation_ingest` of
+  the same stamped transient reports duplicate accounting without incrementing
+  local receive counters again. Replayed local propagated delivery for an
+  already processed transient, or for an already stored message carried by a
+  fresh transient, emits one bounded `inbound_dropped` duplicate event while
+  preserving the same no-store/no-recount behavior.
+- Focused remote propagation import tests now cover duplicate observability for
+  same-response duplicate payloads across sync/fetch/download and already
+  processed remote fetch payloads: still-stored duplicates remain accepted for
+  peer queue side effects, processed-only duplicates avoid unservable peer
+  marks, and both emit bounded `inbound_dropped` duplicate events without
+  duplicate storage/upsert work.
 - `interop.python_live_gate` means the configured scenarios run successfully;
   it does not imply every partial row is complete.

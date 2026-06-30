@@ -1,4 +1,5 @@
 use super::*;
+use crate::destination::link::clamp_link_request_signalling_mtu;
 use crate::iface::InterfaceMode;
 use crate::packet::{DestinationType, Header, HeaderType, PacketType, PropagationType};
 
@@ -146,7 +147,7 @@ pub(super) async fn handle_path_request<'a>(
     handler: &mut MutexGuard<'a, TransportHandler>,
     iface: AddressHash,
 ) {
-    if let Some(request) = handler.path_requests.decode(packet.data.as_slice()) {
+    if let Some(request) = handler.path_requests.decode(packet.data.as_slice(), iface) {
         if let Some(dest) = handler.single_in_destinations.get(&request.destination).cloned() {
             let app_data =
                 handler.single_in_destination_app_data.get(&request.destination).cloned();
@@ -211,7 +212,16 @@ pub(super) async fn handle_path_request<'a>(
                     return;
                 }
 
-                handler.announce_table.add_response(request.destination, iface, hops);
+                if incoming_iface_mode == Some(InterfaceMode::Roaming) {
+                    handler.announce_table.add_response_with_extra_grace(
+                        request.destination,
+                        iface,
+                        hops,
+                        super::announce_table::PATH_RESPONSE_ROAMING_GRACE,
+                    );
+                } else {
+                    handler.announce_table.add_response(request.destination, iface, hops);
+                }
 
                 log::trace!(
                     "tp({}): scheduled remote path response to {} ({} hops) over {}",
@@ -226,6 +236,22 @@ pub(super) async fn handle_path_request<'a>(
         }
 
         if handler.config.retransmit {
+            let should_search_for_unknown = handler
+                .iface_manager
+                .lock()
+                .await
+                .mode(&iface)
+                .map(InterfaceMode::discovers_unknown_paths)
+                .unwrap_or(false);
+            if !should_search_for_unknown {
+                log::trace!(
+                    "tp({}): not searching for unknown path {} from non-discovery iface {}",
+                    handler.config.name,
+                    request.destination,
+                    iface
+                );
+                return;
+            }
             if let Some(packet) = handler.path_requests.generate_recursive(
                 &request.destination,
                 Some(iface),
@@ -325,9 +351,35 @@ pub(super) async fn handle_link_request_as_intermediate<'a>(
         next_hop_iface,
         packet
     );
-    handler.link_table.add(packet, packet.destination, received_from, next_hop, next_hop_iface);
+    let mut packet = packet.clone();
+    clamp_forwarded_link_request_mtu(&mut packet, &handler, received_from, next_hop_iface).await;
+    handler.link_table.add(&packet, packet.destination, received_from, next_hop, next_hop_iface);
 
-    send_to_next_hop(packet, &handler, None).await;
+    send_to_next_hop(&packet, &handler, None).await;
+}
+
+async fn clamp_forwarded_link_request_mtu<'a>(
+    packet: &mut Packet,
+    handler: &MutexGuard<'a, TransportHandler>,
+    received_from: AddressHash,
+    next_hop_iface: AddressHash,
+) {
+    if packet.header.packet_type != PacketType::LinkRequest {
+        return;
+    }
+
+    let mut max_mtu = usize::MAX;
+    {
+        let manager = handler.iface_manager.lock().await;
+        if let Some(mtu) = manager.mtu(&received_from) {
+            max_mtu = max_mtu.min(mtu);
+        }
+        if let Some(mtu) = manager.mtu(&next_hop_iface) {
+            max_mtu = max_mtu.min(mtu);
+        }
+    }
+
+    clamp_link_request_signalling_mtu(packet, max_mtu);
 }
 
 pub(super) async fn handle_link_request<'a>(

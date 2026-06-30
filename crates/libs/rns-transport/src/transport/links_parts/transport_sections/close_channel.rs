@@ -122,7 +122,7 @@ impl Transport {
         destination: &AddressHash,
         on_iface: Option<AddressHash>,
         tag: Option<TagBytes>,
-    ) {
+    ) -> TxDispatchTrace {
         let packet = {
             let mut handler = self.handler.lock().await;
             handler.path_requests.generate(destination, tag)
@@ -132,15 +132,18 @@ impl Transport {
             destination,
             on_iface.map(|iface| iface.to_string()).unwrap_or_else(|| "-".to_string())
         );
-        let dispatch = self
-            .iface_manager
-            .lock()
-            .await
-            .send_with_announce_policy(
-                TxMessage { tx_type: TxMessageType::Broadcast(on_iface), packet },
-                None,
-            )
-            .await;
+        let dispatch = if let Some(iface) = on_iface {
+            self.iface_manager.lock().await.send_broadcast_on_iface(iface, packet).await
+        } else {
+            self.iface_manager
+                .lock()
+                .await
+                .send_with_announce_policy(
+                    TxMessage { tx_type: TxMessageType::Broadcast(None), packet },
+                    None,
+                )
+                .await
+        };
         log::debug!(
             "[tp-diag] path_request_broadcast_done dst={} matched={} sent={} failed={}",
             destination,
@@ -148,6 +151,10 @@ impl Transport {
             dispatch.sent_ifaces,
             dispatch.failed_ifaces
         );
+        if dispatch.sent_ifaces > 0 || dispatch.queued_ifaces > 0 {
+            self.handler.lock().await.path_requests.record_outgoing_request(destination);
+        }
+        dispatch
     }
 
     pub fn out_link_events(&self) -> broadcast::Receiver<LinkEventData> {
@@ -189,6 +196,27 @@ impl Transport {
 
     pub async fn has_path(&self, address: &AddressHash) -> bool {
         self.handler.lock().await.path_table.get(address).is_some()
+    }
+
+    pub async fn path_status(&self, address: &AddressHash) -> crate::transport::TransportPathStatus {
+        let handler = self.handler.lock().await;
+        if let Some(entry) = handler.path_table.get(address) {
+            crate::transport::TransportPathStatus {
+                destination: *address,
+                path_found: true,
+                next_hop: Some(entry.received_from),
+                interface: Some(entry.iface),
+                hops: Some(entry.hops),
+            }
+        } else {
+            crate::transport::TransportPathStatus {
+                destination: *address,
+                path_found: false,
+                next_hop: None,
+                interface: None,
+                hops: None,
+            }
+        }
     }
 
     pub async fn destination_identity(&self, address: &AddressHash) -> Option<Identity> {

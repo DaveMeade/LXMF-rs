@@ -57,6 +57,243 @@ fn announce_received_ignores_python_invalid_delivery_stamp_cost_from_app_data() 
 }
 
 #[test]
+fn announce_received_wakes_pending_direct_and_opportunistic_outbound() {
+    struct RecordingOutboundBridge {
+        tx: mpsc::Sender<(String, Option<String>)>,
+    }
+
+    impl OutboundBridge for RecordingOutboundBridge {
+        fn deliver(
+            &self,
+            record: &MessageRecord,
+            options: &OutboundDeliveryOptions,
+        ) -> Result<(), std::io::Error> {
+            let _ = self.tx.send((record.id.clone(), options.method.clone()));
+            Ok(())
+        }
+    }
+
+    fn queued_outbound(
+        id: &str,
+        destination: &str,
+        method: Option<&str>,
+        receipt_status: Option<&str>,
+    ) -> MessageRecord {
+        let fields = method.map(|method| json!({ "_lxmf": { "method": method } }));
+        MessageRecord {
+            id: id.to_string(),
+            source: "source-peer".to_string(),
+            destination: destination.to_string(),
+            title: String::new(),
+            content: "pending outbound".to_string(),
+            timestamp: 1_700_000_000,
+            direction: "out".to_string(),
+            fields,
+            receipt_status: receipt_status.map(ToOwned::to_owned),
+        }
+    }
+
+    let store = MessagesStore::in_memory().expect("in-memory store");
+    for record in [
+        queued_outbound("pending-direct", "peer-delivery-wake", Some("direct"), Some("queued")),
+        queued_outbound(
+            "pending-deferred-direct",
+            "peer-delivery-wake",
+            Some("direct"),
+            Some("queued: waiting for announce"),
+        ),
+        queued_outbound(
+            "pending-opportunistic",
+            "peer-delivery-wake",
+            Some("opportunistic"),
+            Some("queued"),
+        ),
+        queued_outbound("pending-default-direct", "peer-delivery-wake", None, Some("queued")),
+        queued_outbound("pending-propagated", "peer-delivery-wake", Some("propagated"), Some("queued")),
+        queued_outbound("pending-paper", "peer-delivery-wake", Some("paper"), Some("queued")),
+        queued_outbound("terminal-cancelled", "peer-delivery-wake", Some("direct"), Some("cancelled")),
+        queued_outbound("terminal-expired-spaces", "peer-delivery-wake", Some("direct"), Some(" expired ")),
+        queued_outbound("already-sending", "peer-delivery-wake", Some("direct"), Some("sending")),
+        queued_outbound("other-destination", "peer-other", Some("direct"), Some("queued")),
+    ] {
+        store.insert_message(&record).expect("seed outbound message");
+    }
+
+    let (tx, rx) = mpsc::channel();
+    let daemon = RpcDaemon::with_store_and_bridges(
+        store,
+        "local-node".to_string(),
+        Some(Arc::new(RecordingOutboundBridge { tx })),
+        None,
+    );
+
+    let propagation_announce = daemon
+        .handle_rpc(rpc_request(
+            46,
+            "announce_received",
+            json!({
+                "peer": "peer-delivery-wake",
+                "timestamp": 1_700_000_011i64,
+                "aspect": "lxmf.propagation",
+            }),
+        ))
+        .expect("propagation announce received");
+    assert!(propagation_announce.error.is_none());
+    assert!(
+        rx.recv_timeout(std::time::Duration::from_millis(150)).is_err(),
+        "propagation announces must not wake direct/opportunistic delivery work"
+    );
+
+    let announce = daemon
+        .handle_rpc(rpc_request(
+            47,
+            "announce_received",
+            json!({
+                "peer": "peer-delivery-wake",
+                "timestamp": 1_700_000_012i64,
+                "aspect": "lxmf.delivery",
+            }),
+        ))
+        .expect("announce received");
+    assert!(announce.error.is_none());
+
+    let mut delivered = Vec::new();
+    for _ in 0..4 {
+        delivered.push(rx.recv_timeout(std::time::Duration::from_secs(1)).expect("woken delivery"));
+    }
+    assert!(
+        rx.recv_timeout(std::time::Duration::from_millis(150)).is_err(),
+        "only pending direct/opportunistic messages for the announced peer should wake"
+    );
+    delivered.sort();
+    assert_eq!(
+        delivered,
+        vec![
+            ("pending-default-direct".to_string(), None),
+            ("pending-deferred-direct".to_string(), Some("direct".to_string())),
+            ("pending-direct".to_string(), Some("direct".to_string())),
+            ("pending-opportunistic".to_string(), Some("opportunistic".to_string())),
+        ]
+    );
+
+    let duplicate_announce = daemon
+        .handle_rpc(rpc_request(
+            48,
+            "announce_received",
+            json!({
+                "peer": "peer-delivery-wake",
+                "timestamp": 1_700_000_013i64,
+                "aspect": "lxmf.delivery",
+            }),
+        ))
+        .expect("duplicate delivery announce received");
+    assert!(duplicate_announce.error.is_none());
+    assert!(
+        rx.recv_timeout(std::time::Duration::from_millis(150)).is_err(),
+        "messages already marked sending must not be woken again by duplicate delivery announces"
+    );
+
+    for (message_id, expected_status) in [
+        ("pending-direct", "sending"),
+        ("pending-deferred-direct", "sending"),
+        ("pending-opportunistic", "sending"),
+        ("pending-default-direct", "sending"),
+        ("pending-propagated", "queued"),
+        ("pending-paper", "queued"),
+        ("terminal-cancelled", "cancelled"),
+        ("terminal-expired-spaces", " expired "),
+        ("already-sending", "sending"),
+        ("other-destination", "queued"),
+    ] {
+        let status = daemon
+            .store
+            .get_message(message_id)
+            .expect("lookup message")
+            .expect("message exists")
+            .receipt_status
+            .expect("receipt status");
+        assert_eq!(status, expected_status, "{message_id}");
+    }
+}
+
+#[test]
+fn announce_received_does_not_wake_cancelled_deferred_outbound() {
+    struct RecordingOutboundBridge {
+        tx: mpsc::Sender<String>,
+    }
+
+    impl OutboundBridge for RecordingOutboundBridge {
+        fn deliver(
+            &self,
+            record: &MessageRecord,
+            _options: &OutboundDeliveryOptions,
+        ) -> Result<(), std::io::Error> {
+            let _ = self.tx.send(record.id.clone());
+            Ok(())
+        }
+    }
+
+    let store = MessagesStore::in_memory().expect("in-memory store");
+    store
+        .insert_message(&MessageRecord {
+            id: "cancelled-deferred-direct".to_string(),
+            source: "source-peer".to_string(),
+            destination: "peer-delivery-cancel".to_string(),
+            title: String::new(),
+            content: "pending outbound".to_string(),
+            timestamp: 1_700_000_000,
+            direction: "out".to_string(),
+            fields: Some(json!({ "_lxmf": { "method": "direct" } })),
+            receipt_status: Some("queued: waiting for announce".to_string()),
+        })
+        .expect("seed deferred message");
+
+    let (tx, rx) = mpsc::channel();
+    let daemon = RpcDaemon::with_store_and_bridges(
+        store,
+        "local-node".to_string(),
+        Some(Arc::new(RecordingOutboundBridge { tx })),
+        None,
+    );
+
+    let cancel = daemon
+        .handle_rpc(rpc_request(
+            49,
+            "sdk_cancel_message_v2",
+            json!({ "message_id": "cancelled-deferred-direct" }),
+        ))
+        .expect("cancel deferred");
+    assert!(cancel.error.is_none());
+    assert_eq!(cancel.result.expect("cancel result")["result"], json!("Accepted"));
+
+    let announce = daemon
+        .handle_rpc(rpc_request(
+            50,
+            "announce_received",
+            json!({
+                "peer": "peer-delivery-cancel",
+                "timestamp": 1_700_000_014i64,
+                "aspect": "lxmf.delivery",
+            }),
+        ))
+        .expect("delivery announce received");
+    assert!(announce.error.is_none());
+    assert!(
+        rx.recv_timeout(std::time::Duration::from_millis(150)).is_err(),
+        "cancelled deferred messages must not wake after delivery announce"
+    );
+
+    let status = daemon
+        .store
+        .get_message("cancelled-deferred-direct")
+        .expect("lookup message")
+        .expect("message exists")
+        .receipt_status
+        .expect("receipt status");
+    assert_eq!(status, "cancelled");
+}
+
+#[test]
 fn announce_received_parses_propagation_peer_limits_from_python_app_data() {
     let daemon = RpcDaemon::test_instance();
     daemon

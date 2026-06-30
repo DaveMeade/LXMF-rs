@@ -15,6 +15,7 @@ enum CompatibilityMode {
     LinkLifecycle,
     Resource,
     LxmInterchange,
+    PathDiscovery,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -24,7 +25,15 @@ struct CompatibilityCase {
     description: &'static str,
 }
 
-const COMPATIBILITY_CASES: [CompatibilityCase; 20] = [
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+struct LocalEvidenceCase {
+    id: &'static str,
+    test_target: &'static str,
+    harness_filter: &'static str,
+    description: &'static str,
+}
+
+const COMPATIBILITY_CASES: [CompatibilityCase; 23] = [
     CompatibilityCase {
         id: "direct_rust_to_python",
         mode: CompatibilityMode::Direct,
@@ -125,11 +134,65 @@ const COMPATIBILITY_CASES: [CompatibilityCase; 20] = [
         mode: CompatibilityMode::LxmInterchange,
         description: "Python .lxm storage payload round-trips through Rust decode/encode path",
     },
+    CompatibilityCase {
+        id: "rns_path_request_rust_to_python",
+        mode: CompatibilityMode::PathDiscovery,
+        description: "Rust daemon path RPC resolves a Python Reticulum destination over loopback TCP",
+    },
+    CompatibilityCase {
+        id: "rns_path_request_rust_to_python_scoped_refresh",
+        mode: CompatibilityMode::PathDiscovery,
+        description: "Rust rnpath-rs reissues a scoped tagged path request for a learned Python route",
+    },
+    CompatibilityCase {
+        id: "rns_path_request_python_to_rust",
+        mode: CompatibilityMode::PathDiscovery,
+        description: "Python Reticulum path request resolves a Rust daemon destination over loopback TCP",
+    },
+];
+
+const LOCAL_EVIDENCE_CASES: [LocalEvidenceCase; 6] = [
+    LocalEvidenceCase {
+        id: "rns_path_request_transport_policy",
+        test_target: "transport_policy_evidence",
+        harness_filter: "transport_policy_evidence",
+        description: "Deterministic local transport evidence for scoped path-request dispatch and known-path PATH_RESPONSE ordering",
+    },
+    LocalEvidenceCase {
+        id: "rns_path_request_roaming_transport_policy",
+        test_target: "transport_policy_evidence",
+        harness_filter: "roaming_same_iface_known_path_request_is_suppressed_at_transport_boundary",
+        description: "Deterministic local transport evidence for Transport.py roaming same-iface path-response suppression",
+    },
+    LocalEvidenceCase {
+        id: "rns_path_request_roaming_grace_transport_policy",
+        test_target: "transport_policy_evidence",
+        harness_filter: "roaming_diff_iface_known_path_response_waits_extra_grace_at_transport_boundary",
+        description: "Deterministic local transport evidence for Transport.py roaming different-iface path-response grace",
+    },
+    LocalEvidenceCase {
+        id: "rns_announce_rebroadcast_transport_policy",
+        test_target: "transport_policy_evidence",
+        harness_filter: "announce_rebroadcast_policy_uses_learned_next_hop_mode_at_transport_boundary",
+        description: "Deterministic local transport evidence for Transport.py announce rebroadcast interface-mode policy",
+    },
+    LocalEvidenceCase {
+        id: "rns_unknown_announce_ingress_policy",
+        test_target: "reticulum-rs-transport",
+        harness_filter: "held_announces_release_one_lowest_hop_entry_per_interface",
+        description: "Deterministic local transport evidence for Transport.py per-interface unknown-announce holding and lowest-hop release policy",
+    },
+    LocalEvidenceCase {
+        id: "rns_link_request_mtu_transport_policy",
+        test_target: "reticulum-rs-transport",
+        harness_filter: "mtu_signalling",
+        description: "Deterministic local transport evidence for Transport.py intermediate LINKREQUEST MTU signalling rewrite policy",
+    },
 ];
 
 pub(crate) fn assert_required_modes_covered() {
     assert!(
-        COMPATIBILITY_CASES.len() >= 20,
+        COMPATIBILITY_CASES.len() >= 23,
         "matrix should cover the documented required scenarios"
     );
     assert_case_present("direct_rust_to_python");
@@ -152,6 +215,9 @@ pub(crate) fn assert_required_modes_covered() {
     assert_case_present("link_teardown_python_to_rust");
     assert_case_present("resource_transfer");
     assert_case_present("lxm_interchange");
+    assert_case_present("rns_path_request_rust_to_python");
+    assert_case_present("rns_path_request_rust_to_python_scoped_refresh");
+    assert_case_present("rns_path_request_python_to_rust");
     assert!(COMPATIBILITY_CASES.iter().any(|case| case.mode == CompatibilityMode::Direct));
     assert!(COMPATIBILITY_CASES.iter().any(|case| case.mode == CompatibilityMode::Opportunistic));
     assert!(COMPATIBILITY_CASES.iter().any(|case| case.mode == CompatibilityMode::Propagated));
@@ -161,6 +227,45 @@ pub(crate) fn assert_required_modes_covered() {
     assert!(COMPATIBILITY_CASES.iter().any(|case| case.mode == CompatibilityMode::LinkLifecycle));
     assert!(COMPATIBILITY_CASES.iter().any(|case| case.mode == CompatibilityMode::Resource));
     assert!(COMPATIBILITY_CASES.iter().any(|case| case.mode == CompatibilityMode::LxmInterchange));
+    assert!(COMPATIBILITY_CASES.iter().any(|case| case.mode == CompatibilityMode::PathDiscovery));
+}
+
+pub(crate) fn assert_local_evidence_cases_are_dispatchable_by_harness() {
+    let repo_root = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../..");
+    let harness = fs::read_to_string(repo_root.join("tools/scripts/python_compat_harness.py"))
+        .expect("python harness should be readable");
+
+    for case in LOCAL_EVIDENCE_CASES {
+        let case_literal = format!("\"{}\"", case.id);
+        let test_target_literal = format!("\"{}\"", case.test_target);
+        let harness_filter_literal = format!("\"{}\"", case.harness_filter);
+        assert!(
+            !case.description.is_empty(),
+            "local evidence case '{}' should describe the deterministic evidence",
+            case.id
+        );
+        assert!(
+            harness.contains(&case_literal),
+            "python harness does not advertise local evidence case '{}'",
+            case.id
+        );
+        let case_start = harness.find(&case_literal).unwrap_or_else(|| {
+            panic!("python harness does not advertise local evidence case '{}'", case.id)
+        });
+        let case_block = &harness[case_start..harness.len().min(case_start + 512)];
+        assert!(
+            case_block.contains(&test_target_literal),
+            "python harness does not dispatch local evidence case '{}' to '{}'",
+            case.id,
+            case.test_target
+        );
+        assert!(
+            case_block.contains(&harness_filter_literal),
+            "python harness does not dispatch local evidence case '{}' with filter '{}'",
+            case.id,
+            case.harness_filter
+        );
+    }
 }
 
 pub(crate) fn run_case(case_id: &str) {

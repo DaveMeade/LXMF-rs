@@ -5,6 +5,8 @@ use super::{
 };
 #[path = "bootstrap_interface_startup.rs"]
 mod interface_startup;
+#[path = "bootstrap_transport_path_restore.rs"]
+mod path_restore;
 #[path = "bootstrap_transport_destinations.rs"]
 mod transport_destinations;
 use crate::bridge::PeerCrypto;
@@ -20,6 +22,10 @@ pub(super) use interface_startup::{
     SerialRuntimeRefresh, TcpRuntimeRefresh, TcpRuntimeStatusSource, UdpRuntimeRefresh,
     WeaveControlBinding, WeaveRuntimeRefresh,
 };
+use path_restore::{
+    mark_path_table_restore_status, mark_path_table_restore_status_on_enabled_interfaces,
+    PathTableRestoreStatus,
+};
 use reticulum_daemon::announce_names::PropagationNodeAnnounceConfig;
 use reticulum_daemon::config::DaemonConfig;
 use reticulum_daemon::receipt_bridge::ReceiptBridge;
@@ -29,7 +35,7 @@ use rns_transport::destination::SingleInputDestination;
 use rns_transport::hash::AddressHash;
 use rns_transport::iface::tcp_client::TcpSocketTuning;
 use rns_transport::iface::tcp_server::TcpServer;
-use rns_transport::transport::{Transport, TransportConfig};
+use rns_transport::transport::{RestoredReticulumPathIdentity, Transport, TransportConfig};
 use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
 
@@ -47,9 +53,10 @@ pub(super) struct TransportStartupArtifacts {
     pub(super) control_destination_hash_hex: Option<String>,
     pub(super) delivery_source_hash: [u8; 16],
     pub(super) configured_interfaces: Vec<InterfaceRecord>,
+    pub(super) restored_path_identities: Vec<RestoredReticulumPathIdentity>,
     pub(super) startup_successes: usize,
     pub(super) startup_failures: Vec<InterfaceStartupFailure>,
-    pub(super) seeded_tcp_interfaces: Vec<(String, InterfaceRecord, AddressHash)>,
+    pub(super) seeded_hot_apply_interfaces: Vec<(String, InterfaceRecord, AddressHash)>,
     pub(super) auto_runtime_refreshes: Vec<AutoRuntimeRefresh>,
     pub(super) pipe_runtime_refreshes: Vec<PipeRuntimeRefresh>,
     pub(super) udp_runtime_refreshes: Vec<UdpRuntimeRefresh>,
@@ -163,9 +170,10 @@ pub(super) async fn start_transport_and_interfaces(
     let mut propagation_destination_hash_hex: Option<String> = None;
     let mut control_destination_hash_hex: Option<String> = None;
     let mut delivery_source_hash = [0u8; 16];
+    let mut restored_path_identities = Vec::new();
     let mut startup_successes = 0usize;
     let mut startup_failures = Vec::new();
-    let mut seeded_tcp_interfaces = Vec::new();
+    let mut seeded_hot_apply_interfaces = Vec::new();
     let mut auto_runtime_refreshes = Vec::new();
     let mut pipe_runtime_refreshes = Vec::new();
     let mut udp_runtime_refreshes = Vec::new();
@@ -251,7 +259,7 @@ pub(super) async fn start_transport_and_interfaces(
             for iface in startup.tunnel_synth_ifaces {
                 transport_instance.synthesize_tunnel_on_interface(iface).await;
             }
-            seeded_tcp_interfaces.extend(startup.seeded_tcp_interfaces);
+            seeded_hot_apply_interfaces.extend(startup.seeded_hot_apply_interfaces);
             auto_runtime_refreshes.extend(startup.auto_runtime_refreshes);
             pipe_runtime_refreshes.extend(startup.pipe_runtime_refreshes);
             udp_runtime_refreshes.extend(startup.udp_runtime_refreshes);
@@ -269,15 +277,28 @@ pub(super) async fn start_transport_and_interfaces(
             weave_control_bindings.extend(startup.weave_control_bindings);
         }
 
-        match transport_instance.restore_reticulum_path_table(reticulum_storage_path).await {
-            Ok(restored) if restored > 0 => {
-                log::info!("[daemon] restored {} Reticulum path table entries", restored);
+        let path_table_restore_status = match transport_instance
+            .restore_reticulum_path_table_report(reticulum_storage_path)
+            .await
+        {
+            Ok(report) => {
+                let restored = report.restored_active_paths;
+                restored_path_identities = report.restored_identities;
+                if restored > 0 {
+                    log::info!("[daemon] restored {} Reticulum path table entries", restored);
+                }
+                PathTableRestoreStatus::Ok { restored_active_paths: restored }
             }
-            Ok(_) => {}
             Err(err) => {
-                log::error!("[daemon] failed to restore Reticulum path table: {}", err);
+                let message = err.to_string();
+                log::error!("[daemon] failed to restore Reticulum path table: {}", message);
+                PathTableRestoreStatus::Error { message }
             }
-        }
+        };
+        mark_path_table_restore_status_on_enabled_interfaces(
+            &mut configured_interfaces,
+            &path_table_restore_status,
+        );
 
         if selected_tcp_server.selected_index.is_none() {
             if let (Some(addr), Some(active_iface)) =
@@ -300,6 +321,7 @@ pub(super) async fn start_transport_and_interfaces(
                     Some(runtime_iface.as_str()),
                 );
                 mark_interface_runtime_managed(&mut server_record, "daemon_transport");
+                mark_path_table_restore_status(&mut server_record, &path_table_restore_status);
                 configured_interfaces.push(server_record);
             }
         }
@@ -366,9 +388,10 @@ pub(super) async fn start_transport_and_interfaces(
         control_destination_hash_hex,
         delivery_source_hash,
         configured_interfaces,
+        restored_path_identities,
         startup_successes,
         startup_failures,
-        seeded_tcp_interfaces,
+        seeded_hot_apply_interfaces,
         auto_runtime_refreshes,
         pipe_runtime_refreshes,
         udp_runtime_refreshes,

@@ -1,5 +1,6 @@
 use super::announce_limits::AnnounceLimitAction;
 use super::*;
+use crate::packet::{Header, HeaderType, PropagationType};
 
 async fn process_announce<'a>(
     packet: &Packet,
@@ -9,7 +10,8 @@ async fn process_announce<'a>(
     announce: crate::destination::AnnounceInfo<'_>,
     shared_config: crate::iface::InterfaceSharedConfig,
 ) -> MutexGuard<'a, TransportHandler> {
-    let destination_known = handler.has_destination(&packet.destination);
+    let local_destination_known = handler.has_destination(&packet.destination);
+    let remote_destination_known = handler.knows_destination(&packet.destination);
 
     if let Some(existing) = handler.single_out_destinations.get(&packet.destination).cloned() {
         let existing = existing.lock().await;
@@ -41,6 +43,15 @@ async fn process_announce<'a>(
     // not the bare identity hash, otherwise peers learn only identity routes
     // and cannot resolve application destinations like `lxmf.delivery`.
     let dest_hash = announce.destination.desc.address_hash;
+    if packet.transport.is_some()
+        && handler.announce_table.observe_passed_rebroadcast(&dest_hash, packet.header.hops)
+    {
+        log::trace!(
+            "tp({}): completed announce processing for {}, rebroadcast was passed onward",
+            handler.config.name,
+            dest_hash
+        );
+    }
     let destination = Arc::new(Mutex::new(announce.destination));
 
     // Auto-unicast: if this announce arrived over a multicast iface from a
@@ -49,7 +60,28 @@ async fn process_announce<'a>(
     // the multicast group. Otherwise keep the original iface.
     let route_iface = handler.unicast_iface_for_source(iface, source).await.unwrap_or(iface);
 
-    if !destination_known {
+    let path_accepted = if local_destination_known {
+        false
+    } else {
+        let existing_path_iface =
+            handler.path_table.get(&packet.destination).map(|entry| entry.iface);
+        let existing_path_mode = if let Some(existing_iface) = existing_path_iface {
+            handler.iface_manager.lock().await.mode(&existing_iface)
+        } else {
+            None
+        };
+        handler.path_table.handle_announce(
+            packet,
+            packet.transport,
+            route_iface,
+            announce.random_blob,
+            |iface: &AddressHash| {
+                (Some(*iface) == existing_path_iface).then_some(existing_path_mode).flatten()
+            },
+        )
+    };
+
+    if path_accepted {
         if !handler.single_out_destinations.contains_key(&packet.destination) {
             log::trace!("tp({}): new announce for {}", handler.config.name, packet.destination);
 
@@ -66,14 +98,21 @@ async fn process_announce<'a>(
             handler.announce_table.add(packet, dest_hash, route_iface);
         }
 
-        handler.path_table.handle_announce(packet, packet.transport, route_iface);
-        handler.tunnel_table.note_path(
-            route_iface,
-            packet.destination,
-            packet.transport.unwrap_or(packet.destination),
-            packet.header.hops,
-            packet.hash(),
-            std::time::Instant::now(),
+        let random_blobs = handler.path_table.random_blobs_for(&packet.destination);
+        handler.tunnel_table.note_path(super::tunnels::TunnelPathNote {
+            iface: route_iface,
+            destination: packet.destination,
+            received_from: packet.transport.unwrap_or(packet.destination),
+            hops: packet.header.hops,
+            random_blobs,
+            packet_hash: packet.hash(),
+            now: std::time::Instant::now(),
+        });
+    } else if remote_destination_known {
+        log::trace!(
+            "tp({}): ignored stale announce path refresh for {}",
+            handler.config.name,
+            packet.destination
         );
     }
 
@@ -86,20 +125,57 @@ async fn process_announce<'a>(
     };
     let interface = route_iface.as_slice().to_vec();
 
+    if path_accepted {
+        let waiting_discovery_requesters =
+            handler.path_requests.take_discovery_requesters(&dest_hash);
+        for requesting_iface in waiting_discovery_requesters {
+            log::debug!(
+                "tp({}): answering waiting discovery path request for {} on {}",
+                handler.config.name,
+                dest_hash,
+                requesting_iface
+            );
+            let response = Packet {
+                header: Header {
+                    ifac_flag: packet.header.ifac_flag,
+                    header_type: HeaderType::Type2,
+                    context_flag: packet.header.context_flag,
+                    propagation_type: PropagationType::Transport,
+                    destination_type: packet.header.destination_type,
+                    packet_type: packet.header.packet_type,
+                    hops: packet.header.hops,
+                },
+                ifac: None,
+                destination: packet.destination,
+                transport: Some(*handler.config.identity.address_hash()),
+                context: PacketContext::PathResponse,
+                data: packet.data.clone(),
+            };
+            handler
+                .send(TxMessage {
+                    tx_type: TxMessageType::Direct(requesting_iface),
+                    packet: response,
+                })
+                .await;
+        }
+    }
+
     log::debug!(
         "[announce-debug] accepted dst={} app_data_hex={}",
         packet.destination,
         hex::encode(announce.app_data)
     );
 
-    let _ = handler.announce_tx.send(AnnounceEvent {
-        destination,
-        app_data: PacketDataBuffer::new_from_slice(announce.app_data),
-        ratchet,
-        name_hash,
-        hops: packet.header.hops,
-        interface,
-    });
+    if path_accepted {
+        let _ = handler.announce_tx.send(AnnounceEvent {
+            destination,
+            app_data: PacketDataBuffer::new_from_slice(announce.app_data),
+            ratchet,
+            name_hash,
+            hops: packet.header.hops,
+            interface,
+        });
+    }
 
     handler
 }

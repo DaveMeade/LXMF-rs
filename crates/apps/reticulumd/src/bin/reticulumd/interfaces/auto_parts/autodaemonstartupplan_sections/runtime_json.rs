@@ -88,7 +88,11 @@ impl AutoDaemonStartupPlan {
         state: &mut AutoDiscoveryState,
         datagram: AutoDiscoveryDatagram,
         now: core::time::Duration,
-    ) -> Result<AutoProcessedDiscoveryDatagram, AutoDiscoveryRejectReason> {
+    ) -> Result<Option<AutoProcessedDiscoveryDatagram>, AutoDiscoveryRejectReason> {
+        if now < self.startup_plan.initial_peering_wait {
+            return Ok(None);
+        }
+
         let source_address = discovery_source_address(&datagram);
         let event = state.observe_authenticated_discovery_packet(
             &datagram.payload,
@@ -97,7 +101,7 @@ impl AutoDaemonStartupPlan {
             &datagram.ifname,
             now,
         )?;
-        Ok(AutoProcessedDiscoveryDatagram { datagram, source_address, event })
+        Ok(Some(AutoProcessedDiscoveryDatagram { datagram, source_address, event }))
     }
 
     #[allow(dead_code)]
@@ -107,11 +111,15 @@ impl AutoDaemonStartupPlan {
         dedupe: &mut AutoInboundPacketDeduplicator,
         datagram: AutoPeerDataDatagram,
         now: core::time::Duration,
-    ) -> AutoProcessedPeerDataDatagram {
+    ) -> Option<AutoProcessedPeerDataDatagram> {
+        if now < self.startup_plan.initial_peering_wait {
+            return None;
+        }
+
         let peer_address = peer_data_source_address(&datagram);
         let decision =
             state.handle_spawned_peer_inbound(dedupe, &peer_address, &datagram.payload, now);
-        AutoProcessedPeerDataDatagram { datagram, peer_address, decision }
+        Some(AutoProcessedPeerDataDatagram { datagram, peer_address, decision })
     }
 
     pub(crate) fn send_initial_peer_announces(
@@ -171,6 +179,7 @@ impl AutoDaemonStartupPlan {
                 carrier_changed: !run.carrier_events.is_empty(),
                 carrier_event_count: run.carrier_events.len(),
                 carrier_events: run.carrier_events,
+                peer_count_after: state.peer_count(),
             },
             datagrams,
         )
@@ -345,7 +354,8 @@ impl AutoDaemonStartupPlan {
                 dedupe,
                 transport_bridge.clone(),
                 shutdown_rx.clone(),
-            ),
+            )
+            .with_runtime_status(runtime_status.clone()),
         ));
         data_listener_supervisor.lock().await.spawn_sockets(data_sockets, &data_events_tx);
         let data_receive_loop_count = data_listener_supervisor.lock().await.len();

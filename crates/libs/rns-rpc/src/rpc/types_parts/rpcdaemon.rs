@@ -56,6 +56,7 @@ pub struct RpcDaemon {
     delivery_traces: Arc<Mutex<HashMap<String, Vec<DeliveryTraceEntry>>>>,
     daemon_status_snapshot: std::sync::RwLock<DaemonStatusSnapshot>,
     delivery_status_lock: Arc<Mutex<()>>,
+    outbound_delivery_handoffs: Arc<Mutex<HashSet<String>>>,
     sdk_metrics: Arc<Mutex<RpcMetrics>>,
     outbound_bridge: Option<Arc<dyn OutboundBridge>>,
     outbound_delivery_tx: Option<mpsc::SyncSender<OutboundDeliveryCommand>>,
@@ -63,6 +64,7 @@ pub struct RpcDaemon {
     event_sink_bridges: Vec<Arc<dyn EventSinkBridge>>,
     event_sink_tx: Option<mpsc::SyncSender<EventSinkCommand>>,
     interface_mutation_bridge: Mutex<Option<Arc<dyn InterfaceMutationBridge>>>,
+    path_lookup_bridge: Mutex<Option<Arc<dyn PathLookupBridge>>>,
     remote_control_bridge: Mutex<Option<Arc<dyn RemoteControlBridge>>>,
     rnode_management_bridge: Mutex<Option<Arc<dyn RNodeManagementBridge>>>,
     weave_display_control_bridge: Mutex<Option<Arc<dyn WeaveDisplayControlBridge>>>,
@@ -109,6 +111,28 @@ pub trait InterfaceMutationBridge: Send + Sync {
         &self,
         interfaces: Vec<InterfaceRecord>,
     ) -> Result<Vec<InterfaceRecord>, std::io::Error>;
+}
+
+pub trait PathLookupBridge: Send + Sync {
+    fn has_path(&self, destination: &str) -> Result<bool, std::io::Error>;
+
+    fn request_path(&self, destination: &str) -> Result<(), std::io::Error>;
+
+    fn request_path_scoped(
+        &self,
+        destination: &str,
+        _on_iface: Option<&str>,
+        _tag: Option<&[u8]>,
+    ) -> Result<(), std::io::Error> {
+        self.request_path(destination)
+    }
+
+    fn path_status(&self, destination: &str) -> Result<JsonValue, std::io::Error> {
+        let path_found = self.has_path(destination)?;
+        Ok(json!({
+            "path_found": path_found,
+        }))
+    }
 }
 
 pub trait RNodeManagementBridge: Send + Sync {

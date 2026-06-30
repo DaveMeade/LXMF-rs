@@ -7,9 +7,10 @@ mod tests {
         let mut testee = PathRequests::new("", None, 16, 16, 30);
 
         let dest = AddressHash::new_from_rand(OsRng);
+        let iface = AddressHash::new_from_rand(OsRng);
 
         let encoded = testee.generate(&dest, None);
-        let decoded = testee.decode(encoded.data.as_slice()).unwrap();
+        let decoded = testee.decode(encoded.data.as_slice(), iface).unwrap();
 
         assert_eq!(decoded.destination, dest);
     }
@@ -33,16 +34,65 @@ mod tests {
     fn duplicate_path_request_entries_expire() {
         let mut testee = PathRequests::new("", None, 16, 16, 1);
         let destination = AddressHash::new_from_rand(OsRng);
+        let iface = AddressHash::new_from_rand(OsRng);
         let tag = vec![0x55; ADDRESS_HASH_SIZE];
         let packet = testee.generate(&destination, Some(tag));
         let now = Instant::now();
 
-        assert!(testee.decode_at(packet.data.as_slice(), now).is_some());
-        assert!(testee.decode_at(packet.data.as_slice(), now).is_none());
+        assert!(testee.decode_at(packet.data.as_slice(), iface, now).is_some());
+        assert!(testee.decode_at(packet.data.as_slice(), iface, now).is_none());
 
         assert!(testee
-            .decode_at(packet.data.as_slice(), now + Duration::from_millis(1100))
+            .decode_at(packet.data.as_slice(), iface, now + Duration::from_millis(1100))
             .is_some());
+    }
+
+    #[test]
+    fn duplicate_path_requests_are_scoped_to_same_requester_and_interface() {
+        let mut receiver = PathRequests::new("", None, 16, 16, 30);
+        let requester = AddressHash::new_from_rand(OsRng);
+        let mut sender = PathRequests::new("", Some(requester), 16, 16, 30);
+        let destination = AddressHash::new_from_rand(OsRng);
+        let iface = AddressHash::new_from_rand(OsRng);
+        let tag = vec![0x56; ADDRESS_HASH_SIZE];
+        let packet = sender.generate(&destination, Some(tag));
+        let now = Instant::now();
+
+        let decoded = receiver
+            .decode_at(packet.data.as_slice(), iface, now)
+            .expect("first request should be accepted");
+        assert_eq!(decoded.requesting_transport, Some(requester));
+        assert!(receiver.decode_at(packet.data.as_slice(), iface, now).is_none());
+    }
+
+    #[test]
+    fn duplicate_path_requests_allow_distinct_requesters_and_interfaces() {
+        let mut receiver = PathRequests::new("", None, 16, 16, 30);
+        let requester_a = AddressHash::new_from_rand(OsRng);
+        let requester_b = AddressHash::new_from_rand(OsRng);
+        let mut sender_a = PathRequests::new("", Some(requester_a), 16, 16, 30);
+        let mut sender_b = PathRequests::new("", Some(requester_b), 16, 16, 30);
+        let destination = AddressHash::new_from_rand(OsRng);
+        let iface_a = AddressHash::new_from_rand(OsRng);
+        let iface_b = AddressHash::new_from_rand(OsRng);
+        let tag = vec![0x57; ADDRESS_HASH_SIZE];
+        let packet_a = sender_a.generate(&destination, Some(tag.clone()));
+        let packet_b = sender_b.generate(&destination, Some(tag));
+        let now = Instant::now();
+
+        assert!(receiver.decode_at(packet_a.data.as_slice(), iface_a, now).is_some());
+        assert!(
+            receiver.decode_at(packet_b.data.as_slice(), iface_a, now).is_some(),
+            "same destination/tag on the same iface should be accepted for a distinct requester"
+        );
+        assert!(
+            receiver.decode_at(packet_a.data.as_slice(), iface_b, now).is_some(),
+            "same destination/tag from the same requester should be accepted on a distinct iface"
+        );
+        assert!(
+            receiver.decode_at(packet_a.data.as_slice(), iface_a, now).is_none(),
+            "same destination/tag/requester/iface should still be suppressed"
+        );
     }
 
     #[test]
@@ -55,6 +105,26 @@ mod tests {
         assert!(testee.generate_recursive(&destination, Some(iface_a), None).is_some());
         assert!(testee.generate_recursive(&destination, Some(iface_a), None).is_none());
         assert!(testee.generate_recursive(&destination, Some(iface_b), None).is_some());
+    }
+
+    #[test]
+    fn matching_announce_consumes_waiting_discovery_requesters() {
+        let mut testee = PathRequests::new("", None, 1, 1, 30);
+        let destination = AddressHash::new_from_rand(OsRng);
+        let other_destination = AddressHash::new_from_rand(OsRng);
+        let iface_a = AddressHash::new_from_rand(OsRng);
+        let iface_b = AddressHash::new_from_rand(OsRng);
+
+        assert!(testee.generate_recursive(&destination, Some(iface_a), None).is_some());
+        assert!(testee.generate_recursive(&other_destination, Some(iface_a), None).is_none());
+
+        assert_eq!(testee.take_discovery_requesters(&destination), vec![iface_a]);
+        assert!(testee.generate_recursive(&other_destination, Some(iface_a), None).is_some());
+        assert_eq!(testee.take_discovery_requesters(&other_destination), vec![iface_a]);
+        assert!(testee.take_discovery_requesters(&destination).is_empty());
+
+        assert!(testee.generate_recursive(&destination, Some(iface_b), None).is_some());
+        assert_eq!(testee.take_discovery_requesters(&destination), vec![iface_b]);
     }
 
     #[test]
@@ -145,6 +215,45 @@ mod tests {
             ),
             "stale queue entries must not evict the refreshed cooldown"
         );
+    }
+
+    #[test]
+    fn outgoing_path_requests_are_throttled_like_python() {
+        let mut testee = PathRequests::new("", None, 16, 16, 30);
+        let destination = AddressHash::new_from_rand(OsRng);
+        let cooldown = Duration::from_secs(20);
+        let now = Instant::now();
+
+        assert!(!testee.outgoing_request_recently_sent(&destination, now, cooldown));
+        testee.record_outgoing_request_at(&destination, now);
+        assert!(testee.outgoing_request_recently_sent(
+            &destination,
+            now + Duration::from_secs(19),
+            cooldown
+        ));
+        assert!(!testee.outgoing_request_recently_sent(
+            &destination,
+            now + cooldown + Duration::from_millis(1),
+            cooldown
+        ));
+    }
+
+    #[test]
+    fn refreshing_outgoing_path_request_survives_stale_queue_entry() {
+        let mut testee = PathRequests::new("", None, 16, 16, 30);
+        let destination = AddressHash::new_from_rand(OsRng);
+        let cooldown = Duration::from_secs(20);
+        let now = Instant::now();
+        let refresh_at = now + cooldown + Duration::from_millis(1);
+
+        testee.record_outgoing_request_at(&destination, now);
+        testee.record_outgoing_request_at(&destination, refresh_at);
+
+        assert!(testee.outgoing_request_recently_sent(
+            &destination,
+            refresh_at + Duration::from_millis(1),
+            cooldown
+        ));
     }
 
     #[test]

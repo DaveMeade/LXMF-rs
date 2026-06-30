@@ -163,7 +163,7 @@ impl RpcDaemon {
                 method: method.to_owned(),
                 params: Some(params),
             })?,
-            "sdk_cancel_message_v2" => self.handle_sdk_cancel_message_v2(RpcRequest {
+            "sdk_cancel_message_v2" => self.handle_rpc(RpcRequest {
                 id: request_id,
                 method: method.to_owned(),
                 params: Some(params),
@@ -365,6 +365,16 @@ impl RpcDaemon {
                 method: method.to_owned(),
                 params: Some(params),
             })?,
+            "sdk_paper_encode_v2" => self.handle_sdk_paper_encode_v2(RpcRequest {
+                id: request_id,
+                method: method.to_owned(),
+                params: Some(params),
+            })?,
+            "sdk_paper_decode_v2" => self.handle_sdk_paper_decode_v2(RpcRequest {
+                id: request_id,
+                method: method.to_owned(),
+                params: Some(params),
+            })?,
             "sdk_voice_session_open_v2" => self.handle_sdk_voice_session_open_v2(RpcRequest {
                 id: request_id,
                 method: method.to_owned(),
@@ -389,11 +399,7 @@ impl RpcDaemon {
             })?,
             "status" => RpcResponse {
                 id: request_id,
-                result: Some(json!({
-                    "identity_hash": self.identity_hash,
-                    "delivery_destination_hash": self.local_delivery_hash(),
-                    "running": true,
-                })),
+                result: Some(self.daemon_status_result(false)?),
                 error: None,
             },
             "sdk_command_invoke_v2" => self.handle_sdk_command_invoke_v2(RpcRequest {
@@ -467,6 +473,8 @@ impl RpcDaemon {
                 raw.get("marker").cloned().unwrap_or(JsonValue::Null)
             }
             "sdk_marker_delete_v2" => raw,
+            "sdk_paper_encode_v2" => raw.get("envelope").cloned().unwrap_or(JsonValue::Null),
+            "sdk_paper_decode_v2" => raw,
             "sdk_voice_session_open_v2" => {
                 raw.get("session_id").cloned().unwrap_or(JsonValue::Null)
             }

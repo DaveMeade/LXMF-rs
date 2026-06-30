@@ -7,7 +7,7 @@ use super::{InterfaceStartupFailure, TcpServerSelection};
 
 use crate::bridge_rnode_management::DaemonRNodeManagementHandle;
 
-use crate::interface_hot_apply::tcp_interface_key;
+use crate::interface_hot_apply::hot_apply_interface_seed_key;
 
 use crate::interfaces::{
     auto, ble, common::interface_label, i2p, kiss, lora, pipe, rnode_multi, serial, udp,
@@ -38,7 +38,7 @@ use std::time::Duration;
 pub(super) struct InterfaceStartupBatch {
     pub(super) startup_successes: usize,
     pub(super) startup_failures: Vec<InterfaceStartupFailure>,
-    pub(super) seeded_tcp_interfaces: Vec<(String, InterfaceRecord, AddressHash)>,
+    pub(super) seeded_hot_apply_interfaces: Vec<(String, InterfaceRecord, AddressHash)>,
     pub(super) tunnel_synth_ifaces: Vec<AddressHash>,
     pub(super) connected_to_shared_instance: bool,
     pub(super) auto_runtime_refreshes: Vec<AutoRuntimeRefresh>,
@@ -98,6 +98,7 @@ pub(crate) struct BleGattRuntimeRefresh {
 struct UdpStartupSinks<'a> {
     startup_failures: &'a mut Vec<InterfaceStartupFailure>,
     runtime_refreshes: &'a mut Vec<UdpRuntimeRefresh>,
+    seeded_hot_apply_interfaces: &'a mut Vec<(String, InterfaceRecord, AddressHash)>,
 }
 
 #[derive(Clone)]
@@ -209,7 +210,7 @@ pub(super) async fn startup_configured_interfaces(
 ) -> InterfaceStartupBatch {
     let mut startup_successes = 0usize;
     let mut startup_failures = Vec::new();
-    let mut seeded_tcp_interfaces = Vec::new();
+    let mut seeded_hot_apply_interfaces = Vec::new();
     let mut tunnel_synth_ifaces = Vec::new();
     let mut connected_to_shared_instance = false;
     let mut auto_runtime_refreshes = Vec::new();
@@ -235,7 +236,7 @@ pub(super) async fn startup_configured_interfaces(
         let label = interface_label(iface, index);
         match iface.kind.as_str() {
             "tcp_server" | "backbone" => {
-                startup_tcp_server_record(
+                if let Some(seed) = startup_tcp_server_record(
                     index,
                     iface,
                     &label,
@@ -243,7 +244,9 @@ pub(super) async fn startup_configured_interfaces(
                     server_iface,
                     &mut configured_interfaces[index],
                     &mut startup_failures,
-                );
+                ) {
+                    seeded_hot_apply_interfaces.push(seed);
+                }
                 if selected_tcp_server.selected_index == Some(index) {
                     if let Some(active_iface) = server_iface {
                         let mode = iface.interface_mode().unwrap_or(InterfaceMode::Full);
@@ -335,7 +338,7 @@ pub(super) async fn startup_configured_interfaces(
                         LocalTcpSidecarStartup::Failed => {}
                     }
                 } else {
-                    startup_tcp_server_record(
+                    if let Some(seed) = startup_tcp_server_record(
                         index,
                         iface,
                         &label,
@@ -343,7 +346,9 @@ pub(super) async fn startup_configured_interfaces(
                         server_iface,
                         &mut configured_interfaces[index],
                         &mut startup_failures,
-                    );
+                    ) {
+                        seeded_hot_apply_interfaces.push(seed);
+                    }
                 }
                 if selected_tcp_server.selected_index == Some(index) {
                     if let Some(active_iface) = server_iface {
@@ -379,7 +384,7 @@ pub(super) async fn startup_configured_interfaces(
                     iface_manager,
                     &mut configured_interfaces[index],
                     &mut startup_failures,
-                    &mut seeded_tcp_interfaces,
+                    &mut seeded_hot_apply_interfaces,
                     &mut tcp_runtime_refreshes,
                     shared_reconnect_events.clone(),
                 )
@@ -393,6 +398,7 @@ pub(super) async fn startup_configured_interfaces(
                 let mut sinks = UdpStartupSinks {
                     startup_failures: &mut startup_failures,
                     runtime_refreshes: &mut udp_runtime_refreshes,
+                    seeded_hot_apply_interfaces: &mut seeded_hot_apply_interfaces,
                 };
                 if startup_udp(
                     args,
@@ -598,7 +604,7 @@ pub(super) async fn startup_configured_interfaces(
     InterfaceStartupBatch {
         startup_successes,
         startup_failures,
-        seeded_tcp_interfaces,
+        seeded_hot_apply_interfaces,
         tunnel_synth_ifaces,
         connected_to_shared_instance,
         auto_runtime_refreshes,
@@ -627,7 +633,7 @@ fn startup_tcp_server_record(
     server_iface: Option<&AddressHash>,
     record: &mut InterfaceRecord,
     startup_failures: &mut Vec<InterfaceStartupFailure>,
-) {
+) -> Option<(String, InterfaceRecord, AddressHash)> {
     let selected_for_startup = selected_tcp_server.selected_index == Some(index);
     if !selected_for_startup {
         mark_interface_startup_status(
@@ -658,7 +664,7 @@ fn startup_tcp_server_record(
             endpoint,
             selected_tcp_server.bind_addr.as_deref().unwrap_or("<none>")
         );
-        return;
+        return None;
     }
 
     if iface.port.is_none() {
@@ -669,10 +675,13 @@ fn startup_tcp_server_record(
             iface.kind.clone(),
             format!("{} requires port for startup", iface.kind),
         );
-        return;
+        return None;
     }
     let runtime_iface = server_iface.map(ToString::to_string);
     mark_interface_startup_status(record, "active", None, runtime_iface.as_deref());
+    server_iface.and_then(|active_iface| {
+        hot_apply_interface_seed_key(record).map(|key| (key, record.clone(), *active_iface))
+    })
 }
 
 enum LocalUnixStartup {
@@ -1440,7 +1449,7 @@ async fn startup_tcp_client(
     iface_manager: &Arc<tokio::sync::Mutex<rns_transport::iface::InterfaceManager>>,
     record: &mut InterfaceRecord,
     startup_failures: &mut Vec<InterfaceStartupFailure>,
-    seeded_tcp_interfaces: &mut Vec<(String, InterfaceRecord, AddressHash)>,
+    seeded_hot_apply_interfaces: &mut Vec<(String, InterfaceRecord, AddressHash)>,
     tcp_runtime_refreshes: &mut Vec<TcpRuntimeRefresh>,
     stream_reconnect_events: Option<tokio::sync::mpsc::Sender<AddressHash>>,
 ) -> Option<AddressHash> {
@@ -1496,8 +1505,8 @@ async fn startup_tcp_client(
         runtime_iface: client_iface,
         status: TcpRuntimeStatusSource::Stream(runtime_status),
     });
-    if let Some(key) = tcp_interface_key(record) {
-        seeded_tcp_interfaces.push((key, record.clone(), client_iface));
+    if let Some(key) = hot_apply_interface_seed_key(record) {
+        seeded_hot_apply_interfaces.push((key, record.clone(), client_iface));
     }
     Some(client_iface)
 }
@@ -1721,8 +1730,9 @@ async fn startup_local_unix_client_attach(
 mod tests {
     use super::{
         apply_interface_runtime_config, build_tcp_client_adapter, mark_ble_spawn_success,
-        startup_i2p, startup_kiss, startup_kiss_tcp_client, startup_pipe, startup_rnode_multi,
-        startup_configured_interfaces, startup_serial, startup_udp, startup_weave, UdpStartupSinks,
+        startup_configured_interfaces, startup_i2p, startup_kiss, startup_kiss_tcp_client,
+        startup_pipe, startup_rnode_multi, startup_serial, startup_tcp_server_record, startup_udp,
+        startup_weave, UdpStartupSinks,
     };
     use crate::Args;
     use crate::bridge_rnode_management::DaemonRNodeManagementHandle;
@@ -2080,9 +2090,11 @@ interfaces = [
         };
         let mut startup_failures = Vec::new();
         let mut udp_runtime_refreshes = Vec::new();
+        let mut seeded_hot_apply_interfaces = Vec::new();
         let mut sinks = UdpStartupSinks {
             startup_failures: &mut startup_failures,
             runtime_refreshes: &mut udp_runtime_refreshes,
+            seeded_hot_apply_interfaces: &mut seeded_hot_apply_interfaces,
         };
 
         let started = startup_udp(
@@ -2118,6 +2130,138 @@ interfaces = [
         assert!(udp_status["bind_addr"].as_str().expect("bind").ends_with(":0"));
         assert_eq!(udp_status["forward_addr"].as_str(), Some("239.255.0.1:4242"));
         assert_eq!(udp_status["iface"].as_str(), Some(runtime_iface.to_string().as_str()));
+        assert!(seeded_hot_apply_interfaces.is_empty());
+    }
+
+    #[tokio::test]
+    async fn udp_startup_seeds_unicast_config_for_hot_apply() {
+        let args = test_args();
+        let iface = InterfaceConfig {
+            kind: "udp".to_string(),
+            enabled: Some(true),
+            name: Some("udp-loopback".to_string()),
+            host: Some("127.0.0.1".to_string()),
+            port: Some(0),
+            target_host: Some("127.0.0.1".to_string()),
+            target_port: Some(4242),
+            ..InterfaceConfig::default()
+        };
+        let identity = rns_core::identity::PrivateIdentity::new_from_rand(rand_core::OsRng);
+        let transport_identity = to_transport_private_identity(&identity);
+        let transport = Transport::new(TransportConfig::new("test", &transport_identity, true));
+        let manager = transport.iface_manager();
+        let mut record = InterfaceRecord {
+            kind: iface.kind.clone(),
+            enabled: true,
+            host: iface.host.clone(),
+            port: iface.port,
+            name: iface.name.clone(),
+            settings: iface.settings_json(),
+        };
+        let mut startup_failures = Vec::new();
+        let mut udp_runtime_refreshes = Vec::new();
+        let mut seeded_hot_apply_interfaces = Vec::new();
+        let mut sinks = UdpStartupSinks {
+            startup_failures: &mut startup_failures,
+            runtime_refreshes: &mut udp_runtime_refreshes,
+            seeded_hot_apply_interfaces: &mut seeded_hot_apply_interfaces,
+        };
+
+        let started =
+            startup_udp(&args, &iface, "udp-loopback", &transport, &manager, &mut record, &mut sinks)
+                .await;
+
+        assert!(started);
+        assert!(startup_failures.is_empty());
+        assert_eq!(udp_runtime_refreshes.len(), 1);
+        assert_eq!(seeded_hot_apply_interfaces.len(), 1);
+        assert_eq!(seeded_hot_apply_interfaces[0].0, "udp-loopback");
+        assert_eq!(seeded_hot_apply_interfaces[0].1.name.as_deref(), Some("udp-loopback"));
+        assert_eq!(seeded_hot_apply_interfaces[0].1.kind, "udp");
+        assert_eq!(seeded_hot_apply_interfaces[0].2, udp_runtime_refreshes[0].runtime_iface);
+    }
+
+    #[test]
+    fn tcp_server_startup_seeds_selected_loopback_config_for_hot_apply() {
+        let iface = InterfaceConfig {
+            kind: "tcp_server".to_string(),
+            enabled: Some(true),
+            name: Some("tcp-loopback".to_string()),
+            host: Some("127.0.0.1".to_string()),
+            port: Some(4242),
+            ..InterfaceConfig::default()
+        };
+        let selected_tcp_server = super::super::TcpServerSelection {
+            bind_addr: Some("127.0.0.1:4242".to_string()),
+            selected_index: Some(2),
+            kind: "tcp_server".to_string(),
+            ..super::super::TcpServerSelection::default()
+        };
+        let runtime_iface = AddressHash::new([0x42; 16]);
+        let mut startup_failures = Vec::new();
+        let mut record = InterfaceRecord {
+            kind: iface.kind.clone(),
+            enabled: true,
+            host: iface.host.clone(),
+            port: iface.port,
+            name: iface.name.clone(),
+            settings: iface.settings_json(),
+        };
+
+        let seed = startup_tcp_server_record(
+            2,
+            &iface,
+            "tcp-loopback",
+            &selected_tcp_server,
+            Some(&runtime_iface),
+            &mut record,
+            &mut startup_failures,
+        )
+        .expect("selected loopback TCP server should seed hot apply");
+
+        assert!(startup_failures.is_empty());
+        assert_eq!(seed.0, "tcp-loopback");
+        assert_eq!(seed.1.name.as_deref(), Some("tcp-loopback"));
+        assert_eq!(seed.1.kind, "tcp_server");
+        assert_eq!(seed.2, runtime_iface);
+        assert_eq!(
+            record
+                .settings
+                .as_ref()
+                .and_then(|settings| settings.get("_runtime"))
+                .and_then(|runtime| runtime.get("startup_status"))
+                .and_then(serde_json::Value::as_str),
+            Some("active")
+        );
+
+        let mut shadowed_record = InterfaceRecord {
+            kind: iface.kind.clone(),
+            enabled: true,
+            host: iface.host.clone(),
+            port: iface.port,
+            name: Some("shadowed-tcp".to_string()),
+            settings: iface.settings_json(),
+        };
+        let shadowed_seed = startup_tcp_server_record(
+            3,
+            &iface,
+            "shadowed-tcp",
+            &selected_tcp_server,
+            Some(&runtime_iface),
+            &mut shadowed_record,
+            &mut startup_failures,
+        );
+
+        assert!(shadowed_seed.is_none());
+        assert_eq!(
+            shadowed_record
+                .settings
+                .as_ref()
+                .and_then(|settings| settings.get("_runtime"))
+                .and_then(|runtime| runtime.get("startup_status"))
+                .and_then(serde_json::Value::as_str),
+            Some("shadowed_by_transport_override")
+        );
     }
 
     #[tokio::test]

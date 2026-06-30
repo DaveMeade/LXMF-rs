@@ -68,6 +68,8 @@ mod reticulum_announce_cache;
 mod reticulum_path_store;
 mod tunnels;
 
+pub use reticulum_path_store::{RestoredReticulumPathIdentity, ReticulumPathTableRestoreReport};
+
 pub mod test_bridge {
     use std::cell::RefCell;
     use std::collections::HashMap;
@@ -292,6 +294,15 @@ pub struct SendPacketTrace {
     pub direct_iface: Option<AddressHash>,
     pub broadcast: bool,
     pub dispatch: TxDispatchTrace,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct TransportPathStatus {
+    pub destination: AddressHash,
+    pub path_found: bool,
+    pub next_hop: Option<AddressHash>,
+    pub interface: Option<AddressHash>,
+    pub hops: Option<u8>,
 }
 
 // Transport internals are decomposed by concern for testability and bounded change sets.

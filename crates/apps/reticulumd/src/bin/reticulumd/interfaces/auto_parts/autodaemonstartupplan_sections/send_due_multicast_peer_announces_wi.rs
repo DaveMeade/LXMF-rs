@@ -87,10 +87,10 @@ impl AutoDaemonStartupPlan {
             let mut state = state.lock().await;
             self.run_peer_job_datagrams(&mut state, now)
         };
-        if let Some(runtime_status) = runtime_status {
-            runtime_status.record_carrier_events(&summary.carrier_events);
-        }
         if datagrams.is_empty() {
+            if let Some(runtime_status) = runtime_status {
+                runtime_status.record_peer_job_summary(&summary);
+            }
             return Ok(summary);
         }
         let resolver = AutoInterfaceIndexResolver::from_system()?;
@@ -101,6 +101,9 @@ impl AutoDaemonStartupPlan {
             |ifname| resolver.resolve(ifname),
         )
         .await?;
+        if let Some(runtime_status) = runtime_status {
+            runtime_status.record_peer_job_summary(&summary);
+        }
         Ok(summary)
     }
 
@@ -222,6 +225,7 @@ impl AutoDaemonStartupPlan {
         runtime: &AutoInterfaceRuntimeLoopHandles,
         candidates: Vec<AutoInterfaceDeviceCandidate>,
         runtime_status: Option<&AutoRuntimeStatusHandle>,
+        now: core::time::Duration,
         mut scope_id_for_ifname: impl FnMut(&str) -> Result<u32, String>,
     ) -> Result<usize, String> {
         let desired = self.device_filter.adopt_devices(&candidates, self.platform);
@@ -258,7 +262,7 @@ impl AutoDaemonStartupPlan {
                         .lock()
                         .await
                         .spawn_bound_socket(data_socket, &runtime.data_events);
-                    state.lock().await.apply_adopted_interface_change(&change);
+                    state.lock().await.apply_adopted_interface_change_at(&change, now);
                     if let Some(runtime_status) = runtime_status {
                         runtime_status.record_adopted_interface_change(&change);
                     }
@@ -277,7 +281,7 @@ impl AutoDaemonStartupPlan {
                         .await
                         .remove_listener(&adopted.ifname)
                         .await;
-                    state.lock().await.apply_adopted_interface_change(&change);
+                    state.lock().await.apply_adopted_interface_change_at(&change, now);
                     if let Some(runtime_status) = runtime_status {
                         runtime_status.record_adopted_interface_change(&change);
                     }
@@ -302,6 +306,7 @@ impl AutoDaemonStartupPlan {
             if *shutdown.borrow() {
                 return;
             }
+            let started_at = Instant::now();
             let mut interval = tokio::time::interval(timing.peer_job_interval);
             interval.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Delay);
             loop {
@@ -332,6 +337,7 @@ impl AutoDaemonStartupPlan {
                                 &runtime,
                                 candidates.clone(),
                                 runtime_status.as_ref(),
+                                started_at.elapsed(),
                                 |ifname| resolver.resolve(ifname),
                             )
                             .await
@@ -549,6 +555,7 @@ impl AutoDaemonStartupPlan {
         events: tokio::sync::mpsc::Sender<AutoDiscoveryLoopEvent>,
         shutdown: tokio::sync::watch::Receiver<bool>,
     ) -> Vec<tokio::task::JoinHandle<()>> {
+        let started_at = Instant::now();
         sockets
             .into_iter()
             .map(|socket| {
@@ -557,6 +564,7 @@ impl AutoDaemonStartupPlan {
                     Arc::clone(&state),
                     events.clone(),
                     shutdown.clone(),
+                    started_at,
                 )
             })
             .collect()
@@ -569,13 +577,14 @@ impl AutoDaemonStartupPlan {
         state: Arc<tokio::sync::Mutex<AutoDiscoveryState>>,
         events: tokio::sync::mpsc::Sender<AutoDiscoveryLoopEvent>,
         mut shutdown: tokio::sync::watch::Receiver<bool>,
+        started_at: Instant,
     ) -> tokio::task::JoinHandle<()> {
         let group_id = self.config.group_id.clone();
+        let initial_peering_wait = self.startup_plan.initial_peering_wait;
         tokio::spawn(async move {
             if *shutdown.borrow() {
                 return;
             }
-            let started_at = Instant::now();
             loop {
                 tokio::select! {
                     changed = shutdown.changed() => {
@@ -598,6 +607,10 @@ impl AutoDaemonStartupPlan {
                                 break;
                             }
                         };
+                        let elapsed = started_at.elapsed();
+                        if elapsed < initial_peering_wait {
+                            continue;
+                        }
                         let source_address = discovery_source_address(&datagram);
                         let event = {
                             let mut state = state.lock().await;
@@ -606,7 +619,7 @@ impl AutoDaemonStartupPlan {
                                 group_id.as_bytes(),
                                 &source_address,
                                 &datagram.ifname,
-                                started_at.elapsed(),
+                                elapsed,
                             )
                         };
                         let loop_event = match event {
@@ -642,18 +655,19 @@ impl AutoDaemonStartupPlan {
         events: tokio::sync::mpsc::Sender<AutoPeerDataLoopEvent>,
         shutdown: tokio::sync::watch::Receiver<bool>,
     ) -> Vec<tokio::task::JoinHandle<()>> {
+        let started_at = Instant::now();
+        let runtime = AutoPeerDataReceiveLoopRuntime {
+            state,
+            dedupe,
+            transport,
+            runtime_status: None,
+            events,
+            shutdown,
+            started_at,
+        };
         sockets
             .into_iter()
-            .map(|socket| {
-                self.spawn_peer_data_receive_loop(
-                    socket,
-                    Arc::clone(&state),
-                    Arc::clone(&dedupe),
-                    transport.clone(),
-                    events.clone(),
-                    shutdown.clone(),
-                )
-            })
+            .map(|socket| self.spawn_peer_data_receive_loop(socket, runtime.clone()))
             .collect()
     }
 }
@@ -665,7 +679,14 @@ impl AutoDiscoveryListenerSupervisor {
         state: Arc<tokio::sync::Mutex<AutoDiscoveryState>>,
         shutdown: tokio::sync::watch::Receiver<bool>,
     ) -> Self {
-        Self { plan, state, shutdown, listeners: BTreeMap::new(), pending_stops: Vec::new() }
+        Self {
+            plan,
+            state,
+            shutdown,
+            started_at: Instant::now(),
+            listeners: BTreeMap::new(),
+            pending_stops: Vec::new(),
+        }
     }
 
     pub(crate) fn spawn_sockets(
@@ -696,6 +717,7 @@ impl AutoDiscoveryListenerSupervisor {
                     Arc::clone(&self.state),
                     events.clone(),
                     self.shutdown.clone(),
+                    self.started_at,
                 )
             })
             .collect();
@@ -799,10 +821,20 @@ impl AutoPeerDataListenerSupervisor {
             state,
             dedupe,
             transport,
+            runtime_status: None,
             shutdown,
+            started_at: Instant::now(),
             listeners: BTreeMap::new(),
             pending_stops: Vec::new(),
         }
+    }
+
+    pub(crate) fn with_runtime_status(
+        mut self,
+        runtime_status: Option<AutoRuntimeStatusHandle>,
+    ) -> Self {
+        self.runtime_status = runtime_status;
+        self
     }
 
     pub(crate) fn spawn_sockets(
@@ -822,14 +854,16 @@ impl AutoPeerDataListenerSupervisor {
     ) {
         let ifname = socket.ifname.clone();
         let socket_handle = Arc::clone(&socket.socket);
-        let join = self.plan.spawn_peer_data_receive_loop(
-            socket,
-            Arc::clone(&self.state),
-            Arc::clone(&self.dedupe),
-            self.transport.clone(),
-            events.clone(),
-            self.shutdown.clone(),
-        );
+        let runtime = AutoPeerDataReceiveLoopRuntime {
+            state: Arc::clone(&self.state),
+            dedupe: Arc::clone(&self.dedupe),
+            transport: self.transport.clone(),
+            runtime_status: self.runtime_status.clone(),
+            events: events.clone(),
+            shutdown: self.shutdown.clone(),
+            started_at: self.started_at,
+        };
+        let join = self.plan.spawn_peer_data_receive_loop(socket, runtime);
         if let Some(old) =
             self.listeners.insert(ifname, AutoPeerDataListenerHandle { socket: socket_handle, join })
         {

@@ -1,12 +1,17 @@
 # Current Roadmap Status
 
-Last reassessed: 2026-06-28
+Last reassessed: 2026-06-30
 
 This file is the repository-level source of truth for parity posture, release
 confidence, and execution order. Detailed row-level status lives in:
 
 - `docs/status/reticulum-parity-matrix.md`
 - `docs/status/lxmf-parity-matrix.md`
+- `docs/status/software-parity-ledger.md`
+
+The software parity ledger maps current software/protocol/runtime partial rows
+into implementation-ready work packets and explicitly defers hardware/HIL and
+external-client evidence.
 
 Historical plans and issue lists explain how work was approached; they do not
 override these status files.
@@ -39,16 +44,100 @@ The project is best described by capability level:
 - Cached remote path responses now keep the cached announce payload while
   stamping the direct response packet as `PATH_RESPONSE`, aligning another
   Python announce/path discovery edge policy.
+- Known-path `PATH_RESPONSE` work now preempts any due ordinary announce for
+  the same destination and then releases the ordinary announce on the next
+  retransmission drain, matching Python's `held_announces` edge ordering; this
+  is now covered by both a deterministic announce-table regression and a
+  harness-dispatchable local transport-policy evidence case.
+- Unknown path requests now retain the requesting interface while recursive
+  discovery runs, then send an immediate direct `PATH_RESPONSE` when a matching
+  announce arrives, matching Python's waiting discovery request behavior.
+- Matching announces now also consume waiting unknown-path discovery requesters
+  and release the requester interface's recursive discovery capacity for later
+  unknown-path requests.
+- Recursive path requests now obey Python's interface announce pacing gates:
+  queued announces or an active announce cap block the request, while a
+  recursive request admitted by the gate advances the next allowed
+  announce/path slot.
+- Path-request duplicate/throttle state now has bounded software coverage:
+  inbound duplicate request suppression is scoped by destination, requesting
+  transport, request tag, and ingress interface and expires after the request
+  timeout; local path-response suppression is scoped by destination, requesting
+  transport, request tag, and egress interface; and recursive discovery capacity
+  is tracked per source interface and released after the request timeout. This
+  is path-request policy evidence only, not a full transport-runtime parity
+  claim.
+- Unknown recursive path discovery now follows Python's `DISCOVER_PATHS_FOR`
+  interface-mode gate: only access-point, gateway, and roaming interfaces
+  forward unknown-path discovery, while full, point-to-point, and boundary
+  interfaces do not retain waiting discovery requesters.
+- Incoming announces now retain Python's random-blob emission time for path
+  replacement: duplicate/stale blobs are ignored, fresh same-hop or better
+  announces can refresh known routes, and expired or newer higher-hop announces
+  can replace the active path in software-only transport tests.
+- Never-activated outbound links now trigger Python-style path rediscovery:
+  the stale path is expired, rediscovery requests are throttled by the
+  `PATH_REQUEST_MI` window, and shared-instance clients leave rediscovery to
+  the shared instance.
+- Routed link-table proof timeouts now model Python's unresponsive-path
+  exception: one-hop or topology-change routes are marked unresponsive,
+  rediscovery requests avoid the ingress interface, and equal-timebase
+  higher-hop announces can replace the unresponsive path.
+- Intermediate-hop `LINKREQUEST` forwarding now rewrites existing configured
+  software link MTU signalling by preserving mode bits and clamping to the
+  software ingress/next-hop interface MTU ceiling, while Python-default
+  500-byte signalling and un-signalled requests remain unmodified; this now
+  has harness-dispatchable local transport-policy evidence.
 - Known-path requests on roaming interfaces also suppress direct path answers
   when the learned next-hop iface is the same roaming iface, matching Python's
-  loop-avoidance behavior.
+  loop-avoidance behavior; this now has harness-dispatchable local
+  transport-policy evidence alongside the focused transport regression.
+- Roaming-interface known-path responses that are not same-interface loops now
+  wait Python's extra roaming grace before answering, keeping opportunistic
+  path discovery from racing roaming peers too aggressively; this now has
+  harness-dispatchable local transport-policy evidence at the transport
+  boundary.
+- Pending ordinary announce rebroadcasts now complete early when a later
+  incoming transport announce proves the rebroadcast has already been passed
+  onward, while retaining cached announce material for known-path responses.
+- Transport announce rebroadcasts now have deterministic handler-boundary
+  and local transport-policy evidence that the learned next-hop interface mode
+  drives Python-style outgoing mode policy, including access-point suppression
+  and roaming/boundary loop avoidance.
+- Unknown-announce ingress limiting now has harness-dispatchable local
+  transport-policy evidence for Python-style per-interface holding and
+  lowest-hop release, so bursty unknown announce traffic on one ingress no
+  longer stands in for all interfaces in the parity matrix.
 - Restored Reticulum path-table announces are now cache-only lookup material at
   startup, not fresh rebroadcast work, while still serving known-path response
   requests from the restored cache.
+- `reticulumd` bootstrap now has software evidence that restored Python-format
+  path-cache material is visible through daemon `path_status` and already-known
+  `request_path` RPC after restart, that restored cached-announce identity keys
+  are persisted for daemon announce-identity lookup, and daemon status reports
+  `_runtime.reticulum.path_table_restore.status` as `ok` or `error` so corrupt
+  `destination_table` state remains observable without making startup fatal.
+- Reticulum path-table persistence now writes only routes with cached announce
+  material and restore hardens Python-format active and tunnel path-table rows
+  by ignoring stale/expired path rows, so restart bootstrap cannot revive
+  resolver routes without usable identity/cache material.
+- Reticulum path-table restore now treats active and tunnel path-table rows
+  with missing cached announce files, active and tunnel path-table rows with
+  malformed cached announce files, and active/tunnel rows whose cached announce
+  belongs to a different destination as unusable rows instead of aborting the
+  whole restore; `reticulumd` bootstrap/status tests now cover the missing
+  active/tunnel cached-announce rows alongside the existing malformed-cache
+  daemon evidence.
+  Malformed `destination_table` and `tunnels` files remain observable daemon
+  restore errors.
 - Shared-instance clients skip local Reticulum path-table save and restore
   work, matching Python's shared-instance bootstrap/persistence boundary.
 - Tunnel-only restored announces are retained as cache material so paths
-  restored on tunnel reappearance can answer later known-path requests.
+  restored on tunnel reappearance can answer later known-path requests, and
+  tunnel path restore now carries Python-format random-blob windows while
+  respecting active-path freshness, hop count, and expiry before replacing a
+  route, including explicit evidence for both preserving a fresher active route
+  and replacing it with fresher restored tunnel state.
 - `reticulumd` supports TCP client/server, including Python-style
   TCP-over-I2P `i2p_tunneled` socket tuning for outbound clients and accepted
   server streams and Python-style `fixed_mtu` falsey/default and Reticulum
@@ -266,6 +355,19 @@ The project is best described by capability level:
   drained during restart, removal, or runtime shutdown. Loopback peer-data
   tests now prove direct per-peer outbound routes stop emitting after
   listener removal/restart and refresh only after a new accepted peer datagram.
+  Discovery and peer-data datagrams processed before Python's final-init peering
+  wait has elapsed are now ignored, so packets handled before AutoInterface
+  comes online cannot create peers, peer-data routes, or rejection events.
+  Daemon `_runtime.auto.carrier_runtime` status now records the last
+  AutoInterface peer lifecycle job's expired-peer count, reverse peer announce
+  count, missing initial multicast echo count, carrier event summary, post-job
+  peer count, and peer-data admitted/delivered/decode-failed/RX-closed outcome
+  counters in focused software tests. A software-only smoke now records those
+  existing transport and daemon AutoInterface regressions under
+  `target/auto-interface-software-smoke/` with
+  `evidence_scope = "software_auto_interface_runtime"`. This is local runtime
+  observability evidence, not broader Wi-Fi/Ethernet/public-network discovery
+  parity.
   An opt-in Linux
   namespace prepared-host smoke now records zero-initial add, link-local
   replacement, and removal churn evidence through refreshed `_runtime.auto`
@@ -307,8 +409,21 @@ The project is best described by capability level:
   `rnstatus-rs`. A software loopback smoke now proves Python-style
   `UDPInterface` alias parsing, strict daemon startup, bound loopback status,
   and malformed-datagram `bytes_rx`/`decode_errors` telemetry without external
-  network services. Serial now refreshes live open/reconnect, HDLC frame, packet,
-  byte, EOF, queue, decode, serialize, read, and write-error counters.
+  network services. `set_interfaces` and `reload_config` now hot-apply explicit
+  loopback TCP server listeners, including the local `localhost` hostname,
+  alongside TCP clients and explicit UDP
+  listener, peer, and multicast-bind records, with tests proving
+  `device`-bound, non-local, and broader TCP server listener shapes stay
+  restart-required or invalid, UDP `device`-bound, partial-target,
+  out-of-range-target, and multicast-forward shapes remain restart-required or
+  invalid, and duplicate TCP server or UDP binds are rejected before mutation.
+  Hot-applied explicit TCP server records attach live daemon/RPC
+  `_runtime.tcp.listener_status` metadata, hot-applied explicit UDP records
+  attach the runtime iface and refresh live daemon/RPC `_runtime.udp.status`
+  counters under focused software tests, and multicast-bind hot-apply goes
+  through the transport peer-routing helper instead of a bare UDP spawn. Serial
+  now refreshes live open/reconnect, HDLC frame, packet, byte, EOF, queue,
+  decode, serialize, read, and write-error counters.
   KISS/AX.25 KISS and KISS TCP now refresh live packet, data-frame,
   command-frame, byte, flow-control, queue, AX.25 drop, and error counters. A
   software fake-PTY smoke now proves Python-style `KISSInterface` and
@@ -325,11 +440,43 @@ The project is best described by capability level:
   queue, decode, serialize, read/write, buffer-drop, cleanup, and last-error
   counters alongside configured BLE UUID and lifecycle timeout metadata.
 - `rnstatus-rs` now provides a local daemon status utility over the existing
-  RPC status surface, including JSON output plus human interface endpoint
-  details across configured interface families, runtime startup state, Auto
-  carrier/link-local state, TCP/Backbone listener state, plus UDP, serial,
-  KISS, BLE GATT, I2P, RNodeMulti, Weave, and VR-N76 status rows and
-  propagation peer state.
+  RPC status surface through TCP or Unix-domain sockets, including JSON output
+  plus human interface endpoint details across configured interface families,
+  runtime startup state, Auto carrier/link-local state, TCP/Backbone listener
+  state, plus UDP, serial, KISS, BLE GATT, I2P, RNodeMulti, Weave, and VR-N76
+  status rows and propagation peer state. The legacy `status` RPC projection
+  now exposes the same additive daemon/runtime snapshot fields as
+  `daemon_status_ex`, including interface, policy, propagation, stamp, delivery
+  pipeline, and capability metadata, while preserving the original identity and
+  running fields.
+- `rnsd` remains a compatibility shim for `reticulumd`, with CLI tests proving
+  `RETICULUMD_BIN` override, forwarded arguments/output, and delegated exit
+  success/failure status.
+- `rnpath-rs` now exercises daemon-backed path lookup through `rnx
+  rnpath-smoke`, and its CLI request-path path has mock-RPC coverage for both
+  the default TCP endpoint and Unix-domain transport. The smoke starts a local
+  four-node mesh and verifies a non-neighbor destination resolves with
+  next-hop/interface metadata over the software RPC path, then reissues the
+  lookup as a scoped/tagged path request on the learned outgoing interface and
+  verifies the daemon echoes the scope fields.
+- The pinned Python compatibility matrix now includes
+  `rns_path_request_rust_to_python`, a loopback TCP case where Rust
+  `reticulumd` starts with an unknown Python delivery path, resolves it through
+  `request_path`, reports route metadata through `path_status`, and confirms
+  the same path through `rnpath-rs --json`. The companion
+  `rns_path_request_python_to_rust` case suppresses Rust startup/periodic
+  announces, holds a quiet window where Python still has no Rust delivery path,
+  and then proves Python `RNS.Transport.request_path()` can discover the Rust
+  delivery destination over the same software loopback path.
+- Daemon-backed path requests now preserve optional interface scope and request
+  tag bytes from RPC through `reticulumd` into the transport path-request
+  generator. Scoped requests dispatch as broadcast path requests on exactly the
+  selected interface, and scoped/tagged refreshes still issue even when an
+  unscoped cached path already exists; a syntactically valid but non-matching
+  interface scope is surfaced as a request failure instead of a silent no-op.
+  `rnpath-rs` exposes matching `--on-iface` and `--tag-hex` flags, and `rnx
+  rnpath-smoke` now exercises them against the local daemon mesh after learning
+  the non-neighbor path's outgoing interface.
 
 ### LXMF
 
@@ -348,6 +495,13 @@ The project is best described by capability level:
   fields, so direct-chat links/body text do not get JSON-stringified.
 - Delivery modes are honored by the daemon; the old claim that requested modes
   are ignored is obsolete.
+- RPC daemon `lxmf.delivery` announce ingestion now wakes stored pending
+  direct/default-direct and opportunistic outbound messages for the announced
+  destination while leaving propagated, paper, terminal, already-sending, and
+  other-destination records untouched. Reticulumd direct/opportunistic peer
+  identity misses after delivery path-request timeout now enter nonterminal
+  `queued: waiting for announce` state, so later delivery announces can requeue
+  them instead of leaving a terminal `failed:*` receipt.
 - Direct and propagated resource sends support receipt-state separation,
   timeout/failure propagation, and active resource cancellation.
 - Link sends now register packet/resource receipt tracking before handoff and
@@ -649,6 +803,15 @@ The project is best described by capability level:
   `app.delivery.destination_hash`, so REM/RCH direct-chat history and runtime
   delivery-destination lookups can stay on `ZmqPipelineBackendClient` instead
   of constructing raw RPC/HTTP envelopes.
+- Paper-message encode/decode now ride the registered SDK envelope path as
+  `app.paper.encode` and `app.paper.decode` in both the daemon and SDK app
+  registries, with typed envelope payloads for `sdk_paper_encode_v2` and
+  `sdk_paper_decode_v2` aliases. The typed SDK also exposes
+  `paper_decode_with_metadata` while preserving legacy `paper_decode` Ack
+  compatibility, so paper-ingest duplicate/transient/destination/size metadata
+  is available over both RPC and ZeroMQ backend paths. The `lxmf`/`lxmf-cli`
+  command surface now exposes the same SDK-backed paper flow through
+  `paper-encode --message-id` and `paper-decode --uri`.
 - The typed ZeroMQ SDK backend now exposes durable direct-chat history through
   `ZmqPipelineBackendClient::list_message_history`, preserving message bodies
   with links, receipt status, basic LXMF fields, one-to-one
@@ -685,6 +848,11 @@ The project is best described by capability level:
   cancellation through both `ZmqPipelineBackendClient::cancel` and
   `app.delivery.cancel` envelope execution, preserving daemon cancellation
   outcomes without raw RPC envelopes.
+- `app.delivery.cancel` now cancels queued/pre-handoff outbound work before
+  bridge delivery, persists `receipt_status = cancelled`, records delivery
+  trace and event state, exposes cancel metadata through raw and envelope SDK
+  lifecycle traces, and keeps ZeroMQ direct/envelope cancellation result
+  variants typed without claiming hardware or external-client coverage.
 - The typed ZeroMQ SDK backend now starts the final propagation-first branch
   with `ZmqPipelineBackendClient::propagation_peer_sync`, routing
   `app.propagation.peer_sync` over `sdk_envelope_execute_v2` to the daemon's
@@ -822,6 +990,58 @@ The project is best described by capability level:
   typed `policy_state`, so propagation-first clients can inspect auth-required
   mode plus allowed, denied, ignored, and prioritised destination sets without
   parsing raw policy JSON.
+- Direct inbound LXMF packet/resource drops and propagated local delivery-policy
+  drops now emit bounded raw `inbound_dropped` RPC/SDK event-stream entries
+  without storing messages or updating peer activity; identifier fields use the
+  existing event redaction path by default and events distinguish `packet`,
+  `resource`, and `propagation` delivery kinds. The propagated local-delivery
+  coverage includes local envelope ingest plus decryptable remote fetched and
+  remote downloaded propagation payloads that reach local decode, stamp, or
+  delivery-policy handling, plus local-addressed pre-decode rejects for short
+  or undecryptable local envelopes and strict remote fetch/download local-import
+  rejects for short payloads, destination mismatches, and decrypt failures, so
+  those router-coupled drops remain observer-visible instead of only counted as
+  rejected imports.
+- RPC-layer propagation rejects for ignored destination hashes now emit bounded
+  `inbound_dropped` events before returning `PermissionDenied` from
+  `propagation_ingest` and remote fetch/download/sync imports. The events use
+  `delivery_kind = "propagation"`, preserve transient/operation context, and
+  rely on the default event redaction path for destination identifiers, keeping
+  ignored payloads observer-visible without storing or queueing them.
+- Locally delivered propagated LXMF payloads now store the same `_lxmf`
+  signature metadata as direct packet/resource delivery paths and include it in
+  the emitted raw inbound event. Local envelope ingest, remote fetch imports,
+  and remote-control download imports pass through the shared transport-aware
+  signature annotation path when available. Unknown source identities now record
+  `signature_checked = false`, `signature_valid = false`, and
+  `signature_status = "source_identity_unknown"` instead of omitting signature
+  status from handler-facing state.
+- Successful direct packet/resource LXMF deliveries now have focused
+  SDK-pollable inbound callback evidence: `sdk_poll_events_v2` returns raw
+  `lxmf_bytes_hex`, stored/event identity, content, and metadata consistency,
+  direct Curve25519 transport metadata, and verified signature metadata for
+  both packet and resource delivery paths.
+- Focused local propagated-delivery tests now also feed a real source announce
+  through a transport interface channel before delivery, covering known-source
+  propagated messages surface `signature_checked = true` with
+  `signature_status = "verified"` for valid LXMF signatures and
+  `signature_status = "signature_invalid"` for corrupted signatures in both
+  stored records and raw inbound events.
+- Local propagated-delivery accepts now also write the persistent processed
+  transient marker used by daemon propagation ingest, so replaying the same
+  stamped transient through `propagation_ingest` reports
+  `ingested_count = 0` / `duplicate_count = 1` and does not increment local
+  receive counters a second time. Replayed local propagated delivery of an
+  already processed transient, or of an already stored message carried by a
+  fresh transient, now also emits one bounded `inbound_dropped` duplicate event
+  with redacted destination identifiers and the transient ID, without storing a
+  second message or incrementing receive counters.
+- Remote propagation imports from fetch, download, and sync now keep duplicate
+  payloads observer-visible by emitting bounded `inbound_dropped` duplicate
+  events with operation, transient, byte-length, and optional peer context while
+  preserving peer queue side effects for still-stored duplicates, avoiding
+  unservable peer marks for processed-only duplicates, and avoiding duplicate
+  storage/upsert work.
 - The typed propagation branch now also exposes
   `ZmqPipelineBackendClient::propagation_recovery_state`, projecting
   `app.propagation.status` into structured sync state, selected-node,
@@ -1012,9 +1232,10 @@ The project is best described by capability level:
   after peering-key and transient-ID validation, so repeated replication offers
   from the same peer take the throttled response path even when the peer changes
   the offered transient-ID set.
-- Propagation ingest now rejects payloads for ignored destinations before
-  storing or queueing them, enforcing local replication policy before relay
-  state is created.
+- Propagation ingest and Python-served alias ingest now reject payloads for
+  ignored destinations before storing or queueing them, emit bounded
+  `inbound_dropped` events through the RPC/SDK event stream, and enforce local
+  replication policy before relay state is created.
 - Inbound propagation message-get `haves` completion now applies only to
   locally known payloads or existing peer queue marks, preventing unknown haves
   from suppressing future propagation work for the declaring peer.
@@ -1032,6 +1253,10 @@ The project is best described by capability level:
   `/offer` peer-queue lifecycle case, covering post-sync handled IDs,
   absence of retryable missing IDs, and cleared sync backoff after the Rust
   peer row is created by transfer.
+- Pinned Python path-discovery interop now includes a scoped/tagged
+  `rnpath-rs --on-iface --tag-hex` refresh over a learned Python delivery
+  route, extending scoped daemon path-request dispatch/result evidence beyond
+  local Rust-only mesh smokes.
 
 ## Remaining Release Blockers
 
@@ -1045,8 +1270,9 @@ the implemented subset.
    - Capture release evidence for Sideband, MeshChatX, and Columba before making
      client-specific compatibility claims.
 2. **Reticulum behavioral breadth**
-   - Finish resolver/bootstrap, announce/path edge behavior, and runtime
-     mutation parity.
+   - Finish resolver/bootstrap, announce/path edge behavior, and broader runtime
+     mutation parity beyond TCP clients, explicit loopback TCP server
+     listeners, and explicit UDP listener, peer, and multicast-bind records.
 3. **Operational breadth**
    - Add broader prepared-host hardware evidence across serial/TCP/BLE RNode
      device, firmware, management, and radio combinations; ordinary
