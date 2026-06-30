@@ -107,10 +107,8 @@ fn bootstrap_restores_python_path_table_for_path_lookup_rpc() {
     assert_eq!(result["known"].as_bool(), Some(true));
     assert_eq!(result["path_found"].as_bool(), Some(true));
     assert_eq!(result["status"].as_str(), Some("found"));
-    let expected_next_hop = format!("/{destination_hex}/");
-    let expected_iface = format!("/{expected_iface_hex}/");
-    assert_eq!(result["next_hop"].as_str(), Some(expected_next_hop.as_str()));
-    assert_eq!(result["interface"].as_str(), Some(expected_iface.as_str()));
+    assert_eq!(result["next_hop"].as_str(), Some(destination_hex.as_str()));
+    assert_eq!(result["interface"].as_str(), Some(expected_iface_hex.as_str()));
     assert_eq!(result["hops"].as_u64(), Some(0));
 
     let request = context

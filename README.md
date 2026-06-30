@@ -3,37 +3,39 @@
 [![Ask DeepWiki](https://deepwiki.com/badge.svg)](https://deepwiki.com/FreeTAKTeam/LXMF-rs)
 
 Rust monorepo for LXMF and Reticulum with strict library/app boundaries and
-enterprise quality gates. The `0.5.x` line is a usable sub-1.0
-daemon/product release with strong core protocol coverage, published crates,
-GitHub tool bundles, and a typed ZeroMQ SDK integration foundation for
-REM/RCH clients; it is not a complete drop-in replacement for every Python
-Reticulum/LXMF behavior.
+enterprise quality gates. The `0.6.x` line is a usable sub-1.0
+daemon/product release with substantially expanded RNS/LXMF software parity,
+published crates, GitHub tool bundles, and a typed ZeroMQ SDK integration
+foundation for REM/RCH clients; it is not a complete drop-in replacement for
+every Python Reticulum/LXMF behavior.
 
 ## Start Here
 
 - Contributor workflow: `CONTRIBUTING.md`
 - Current status and execution order: `docs/status/current-roadmap.md`
-- Release notes: `docs/release-notes-v0.5.2.md`
+- Release notes: `docs/release-notes-v0.6.0.md`
 - Docs map and retention rules: `docs/README.md`
 - SDK guide: `docs/sdk/README.md`
 - Support policy: `docs/contracts/support-policy.md`
 
 ## Release Status
 
-Current release train: `0.5.2`.
+Current release train: `0.6.0`.
 
-Use `docs/release-notes-v0.5.2.md` for the release summary and
+Use `docs/release-notes-v0.6.0.md` for the release summary and
 `docs/runbooks/release-readiness.md` for the release gate record. The
 repository-level parity source of truth remains
 `docs/status/current-roadmap.md`; the detailed parity supplements are
 `docs/status/reticulum-parity-matrix.md` and
 `docs/status/lxmf-parity-matrix.md`.
 
-The `0.5.x` release scope covers the Rust libraries, SDK entry points, `lxmd`,
+The `0.6.x` release scope covers the Rust libraries, SDK entry points, `lxmd`,
 `reticulumd`, and `rns-tools`, plus host-native GitHub bundles for all
-implemented user-facing tools. The `0.5.2` train focuses on improved Reticulum
-interface management, especially LoRa/RNode operator workflows for REM-style
-deployments. Operational substitutability is usable but still partial.
+implemented user-facing tools. The `0.6.0` train is an RNS/LXMF software parity
+milestone: it expands pinned Python interop evidence, Reticulum
+transport/resolver/runtime behavior, LXMF propagation and handler
+observability, SDK event metadata, and daemon/tooling coverage. Operational
+substitutability is materially stronger but still partial.
 External-client compatibility claims for REM, RCH, Sideband, MeshChatX,
 Columba, or other third-party clients require separate interop gate evidence.
 
@@ -182,7 +184,7 @@ cargo run -p xtask -- architecture-checks
 cargo run -p xtask -- sdk-docs-check
 cargo run -p xtask -- sdk-migration-check
 cargo xtask release-check
-cargo xtask package-daemon-bundle --version 0.5.2
+cargo xtask package-daemon-bundle --version 0.6.0
 cargo xtask api-diff
 cargo xtask python-impl-bench-compare
 cargo xtask python-impl-bench-compare --profile report
@@ -194,7 +196,7 @@ For fast local iteration on one binary, prefer narrow commands:
 ```bash
 make check-bin PKG=lxmf-cli BIN=lxmd
 make run-bin PKG=rns-tools BIN=rnsd ARGS="--help"
-make package-daemon-bundle VERSION=0.5.2
+make package-daemon-bundle VERSION=0.6.0
 make python-lxmd-smoke
 ```
 
@@ -242,16 +244,16 @@ workspace directory names:
 
 ```toml
 [dependencies]
-lxmf = "0.5.2"
-reticulum-rs = "0.5.2"
+lxmf = "0.6.0"
+reticulum-rs = "0.6.0"
 ```
 
 Or depend on the component crates directly:
 
 ```toml
 [dependencies]
-lxmf-sdk = "0.5.2"
-reticulum-rs-rpc = "0.5.2"
+lxmf-sdk = "0.6.0"
+reticulum-rs-rpc = "0.6.0"
 ```
 
 ## SDK Guide
@@ -382,9 +384,9 @@ Release artifacts are published on the GitHub releases page:
 
 [https://github.com/FreeTAKTeam/LXMF-rs/releases](https://github.com/FreeTAKTeam/LXMF-rs/releases)
 
-For `v0.5.2`, use the release at:
+For `v0.6.0`, use the release at:
 
-[https://github.com/FreeTAKTeam/LXMF-rs/releases/tag/v0.5.2](https://github.com/FreeTAKTeam/LXMF-rs/releases/tag/v0.5.2)
+[https://github.com/FreeTAKTeam/LXMF-rs/releases/tag/v0.6.0](https://github.com/FreeTAKTeam/LXMF-rs/releases/tag/v0.6.0)
 
 1. Open the release page and download the package and matching `.sha256` file
    for your platform.
@@ -392,19 +394,19 @@ For `v0.5.2`, use the release at:
 2. Linux/macOS
 
 ```bash
-sha256sum -c lxmf-rs-tools-v0.5.2-linux-x64.tar.gz.sha256
-tar -xzf lxmf-rs-tools-v0.5.2-linux-x64.tar.gz
+sha256sum -c lxmf-rs-tools-v0.6.0-linux-x64.tar.gz.sha256
+tar -xzf lxmf-rs-tools-v0.6.0-linux-x64.tar.gz
 
-sha256sum -c lxmf-rs-tools-v0.5.2-macos-arm64.tar.gz.sha256
-tar -xzf lxmf-rs-tools-v0.5.2-macos-arm64.tar.gz
+sha256sum -c lxmf-rs-tools-v0.6.0-macos-arm64.tar.gz.sha256
+tar -xzf lxmf-rs-tools-v0.6.0-macos-arm64.tar.gz
 ```
 
 3. Windows
 
 ```powershell
-Get-FileHash .\lxmf-rs-tools-v0.5.2-windows-x64.zip -Algorithm SHA256
-Get-Content .\lxmf-rs-tools-v0.5.2-windows-x64.zip.sha256
-Expand-Archive .\lxmf-rs-tools-v0.5.2-windows-x64.zip .
+Get-FileHash .\lxmf-rs-tools-v0.6.0-windows-x64.zip -Algorithm SHA256
+Get-Content .\lxmf-rs-tools-v0.6.0-windows-x64.zip.sha256
+Expand-Archive .\lxmf-rs-tools-v0.6.0-windows-x64.zip .
 ```
 
 4. Run directly for validation

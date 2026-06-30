@@ -1,7 +1,7 @@
 use crate::message::Message;
 use crate::LxmfError;
 use alloc::format;
-use alloc::string::String;
+use alloc::string::{String, ToString};
 use alloc::vec::Vec;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]

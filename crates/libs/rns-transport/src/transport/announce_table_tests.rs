@@ -1,7 +1,7 @@
 use super::*;
 use crate::packet::PacketContext;
 use rand_core::OsRng;
-use std::thread::sleep;
+use std::thread;
 use std::time::Duration as StdDuration;
 
 #[test]
@@ -64,7 +64,7 @@ fn path_response_entries_use_shorter_window_without_later_broadcast() {
         "path responses should stay on the shorter direct-response grace window"
     );
 
-    sleep(StdDuration::from_millis(450));
+    thread::park_timeout(StdDuration::from_millis(450));
 
     let messages = table.drain_retransmissions(&transport_id);
     assert_eq!(messages.len(), 1);
@@ -74,7 +74,7 @@ fn path_response_entries_use_shorter_window_without_later_broadcast() {
     assert!(table.map.contains_key(&destination));
     assert!(table.add_response(destination, to_iface, 4));
 
-    sleep(StdDuration::from_millis(450));
+    thread::park_timeout(StdDuration::from_millis(450));
 
     let messages = table.drain_retransmissions(&transport_id);
     assert_eq!(messages.len(), 1);
@@ -190,7 +190,7 @@ fn cached_path_response_entries_stamp_response_without_shadowing_cache() {
         PacketContext::None
     );
 
-    sleep(StdDuration::from_millis(450));
+    thread::park_timeout(StdDuration::from_millis(450));
 
     let messages = table.drain_retransmissions(&transport_id);
     assert_eq!(messages.len(), 1);

@@ -4,15 +4,19 @@ crates/apps/reticulumd/src/bin/reticulumd/bootstrap_interface_startup_parts/modu
 crates/apps/reticulumd/src/bin/reticulumd/bootstrap_interface_startup_parts/startup_udp.rs
 crates/apps/reticulumd/src/bin/reticulumd/bootstrap_parts/module_core.rs
 crates/apps/reticulumd/src/bin/reticulumd/bridge_rnode_management.rs
+crates/apps/reticulumd/src/bin/reticulumd/bridge_delivery_scheduler.rs
+crates/apps/reticulumd/src/bin/reticulumd/bridge_delivery_task_parts/deliverytask_sections/cached_identity_for_destination.rs
+crates/apps/reticulumd/src/bin/reticulumd/inbound_control_peer.rs
 crates/apps/reticulumd/src/bin/reticulumd/interfaces/auto_parts/auto_iface_sections/auto_multicast_discovery_bind_resolv.rs
 crates/apps/reticulumd/src/bin/reticulumd/interfaces/auto_parts/auto_iface_sections/auto_peer_data_transport_bridge_regi.rs
 crates/apps/reticulumd/src/bin/reticulumd/interfaces/auto_parts/auto_iface_sections/core_tests.rs
 crates/apps/reticulumd/src/bin/reticulumd/interfaces/auto_parts/autodaemonstartupplan_sections/send_due_multicast_peer_announces_wi.rs
-crates/apps/reticulumd/src/bin/reticulumd/interfaces/auto_parts/module_prelude.rs
 crates/apps/reticulumd/src/bin/reticulumd/tests_parts/bootstrap_best_effort_marks_vrn76_ki.rs
 crates/apps/reticulumd/src/bin/reticulumd/tests_parts/bootstrap_reports_auto_interface_as.rs
+crates/apps/reticulumd/src/bin/reticulumd/tests_parts/bootstrap_restores_path_cache.rs
 crates/apps/reticulumd/src/bin/reticulumd/tests_parts/propagation_link_cache_reuses_same_s.rs
 crates/apps/reticulumd/src/bin/reticulumd/tests_parts/vrn76_builder_rejects_missing_periph.rs
+crates/apps/reticulumd/src/announce_names.rs
 crates/apps/reticulumd/src/config_parts/interfaceconfig_sections/enabled.rs
 crates/apps/reticulumd/src/config_parts/interfaceconfig_sections/normalize_auto_aliases.rs
 crates/apps/reticulumd/src/config_parts/interfaceconfig_sections/validate_lora.rs
@@ -20,11 +24,14 @@ crates/apps/reticulumd/tests/config_parts/module_prelude.rs
 crates/apps/rns-tools/src/bin/rnstatus-rs.rs
 crates/libs/rns-rpc/src/rpc/daemon/dispatch_legacy_messages_parts/localunpeercleanup.rs
 crates/libs/rns-rpc/src/rpc/daemon/dispatch_legacy_messages_parts/rpcdaemon_sections/handle_rpc_legacy_peer_sync.rs
-# Baseline SDK backend exceptions present before issue #369 cleanup; split backend state/tests.
-crates/libs/lxmf-sdk/src/backend/zmq_pipeline.rs
-crates/libs/lxmf-sdk/src/backend/zmq_pipeline/tests/mod.rs
+# Baseline exceptions that remain above budget; split these as follow-up cleanup.
+crates/libs/lxmf-sdk/src/messaging.rs
+crates/libs/lxmf-core/src/announce.rs
+crates/libs/lxmf-core/src/wire_fields_parts/module_prelude.rs
 crates/libs/rns-rpc/src/rpc/daemon/dispatch_legacy_propagation_parts/rpcdaemon_sections/ingest_propagation_payload_hex_at_co.rs
+crates/libs/rns-rpc/src/rpc/daemon/dispatch_legacy_propagation_parts/rpcdaemon_sections/import_remote_propagation_payloads.rs
 crates/libs/rns-rpc/src/rpc/daemon/init_parts/rpcdaemon_sections/issue_ticket.rs
+crates/libs/rns-rpc/src/rpc/helpers_parts/merge_fields_with_options.rs
 crates/libs/rns-rpc/src/storage/messages_parts/outbound_message_sections/core_tests.rs
 crates/libs/rns-transport/src/iface/auto_parts/default_multicast_discovery_address_sections/core_tests.rs
 crates/libs/rns-transport/src/iface/i2p.rs
@@ -44,7 +51,6 @@ crates/libs/rns-transport/src/iface/tcp_server.rs
 crates/libs/rns-transport/src/iface/udp.rs
 crates/libs/rns-transport/src/iface/vrn76_kiss_ble_parts/module_prelude.rs
 crates/libs/rns-transport/src/iface/weave.rs
-crates/libs/rns-transport/src/iface_parts/interfacemanager.rs
 crates/libs/rns-transport/src/iface_tests.rs
 crates/libs/rns-transport/src/resource/tests.rs
 crates/libs/rns-transport/src/transport/announce_limits.rs

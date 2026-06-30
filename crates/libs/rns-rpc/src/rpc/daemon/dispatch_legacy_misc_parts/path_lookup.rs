@@ -73,6 +73,10 @@ fn path_found_from_status(status_fields: &JsonValue) -> bool {
         .unwrap_or(false)
 }
 
+fn bounded_path_poll_delay(delay: std::time::Duration) {
+    std::thread::park_timeout(delay);
+}
+
 fn path_lookup_result(
     destination: String,
     status_fields: JsonValue,
@@ -88,7 +92,7 @@ fn path_lookup_result(
         .and_then(JsonValue::as_bool)
         .unwrap_or_else(|| object.get("known").and_then(JsonValue::as_bool).unwrap_or(false));
 
-    object.insert("destination".to_string(), json!(destination.clone()));
+    object.insert("destination".to_string(), json!(destination));
     object.insert("destination_hash".to_string(), json!(destination));
     object.entry("known".to_string()).or_insert_with(|| json!(path_found));
     object.entry("path_found".to_string()).or_insert_with(|| json!(path_found));
