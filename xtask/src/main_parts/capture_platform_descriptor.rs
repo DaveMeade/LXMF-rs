@@ -136,14 +136,21 @@ fn run_reproducible_build_check() -> Result<()> {
     Ok(())
 }
 
-fn run_package_daemon_bundle(version: Option<String>) -> Result<()> {
+fn run_package_daemon_bundle(version: Option<String>, target: Option<String>) -> Result<()> {
     let version = release_version_label(version)?;
-    let bundle_stem = format!("lxmf-rs-tools-{version}-{}", release_platform_label());
+    let target = target
+        .map(|value| value.trim().to_string())
+        .filter(|value| !value.is_empty());
+    let bundle_stem = format!(
+        "lxmf-rs-tools-{version}-{}",
+        release_platform_label_for_target(target.as_deref())
+    );
+    let release_dir = target_release_dir(target.as_deref());
     let output_dir = Path::new(RELEASE_BUNDLE_OUTPUT_DIR);
     fs::create_dir_all(output_dir).with_context(|| format!("create {}", output_dir.display()))?;
 
     for (package, binary) in DAEMON_RELEASE_BINARIES {
-        run("cargo", &["build", "--release", "-p", package, "--bin", binary])?;
+        run_release_binary_build(package, binary, target.as_deref())?;
     }
 
     let staging_dir = output_dir.join(&bundle_stem);
@@ -155,14 +162,17 @@ fn run_package_daemon_bundle(version: Option<String>) -> Result<()> {
         .with_context(|| format!("create {}", staging_dir.display()))?;
 
     for (_, binary) in DAEMON_RELEASE_BINARIES {
-        let binary_name = executable_name(binary);
-        let source = Path::new("target").join("release").join(&binary_name);
+        let binary_name = executable_name_for_target(binary, target.as_deref());
+        let source = release_dir.join(&binary_name);
         let destination = staging_dir.join(&binary_name);
         fs::copy(&source, &destination).with_context(|| {
             format!("copy bundled binary {} -> {}", source.display(), destination.display())
         })?;
     }
 
+    if target.is_some() {
+        run_release_binary_build("lxmf-cli", "lxmd", None)?;
+    }
     let lxmd_path = Path::new("target").join("release").join(executable_name("lxmd"));
     let example_config = capture_command_stdout(
         lxmd_path.to_str().ok_or_else(|| anyhow!("invalid lxmd path: {}", lxmd_path.display()))?,
@@ -193,6 +203,29 @@ fn run_package_daemon_bundle(version: Option<String>) -> Result<()> {
 
     log::info!("created {}", archive_path.display());
     log::info!("created {}", sha_path.display());
+    Ok(())
+}
+
+fn run_release_binary_build(package: &str, binary: &str, target: Option<&str>) -> Result<()> {
+    let mut args = vec![
+        "build".to_string(),
+        "--release".to_string(),
+        "-p".to_string(),
+        package.to_string(),
+        "--bin".to_string(),
+        binary.to_string(),
+    ];
+    if let Some(target) = target {
+        args.push("--target".to_string());
+        args.push(target.to_string());
+    }
+    let status = Command::new("cargo")
+        .args(&args)
+        .status()
+        .with_context(|| format!("run cargo {}", args.join(" ")))?;
+    if !status.success() {
+        bail!("command failed: cargo {}", args.join(" "));
+    }
     Ok(())
 }
 
@@ -245,6 +278,64 @@ fn release_platform_label() -> String {
         other => other,
     };
     format!("{os}-{arch}")
+}
+
+fn release_platform_label_for_target(target: Option<&str>) -> String {
+    let Some(target) = target else {
+        return release_platform_label();
+    };
+
+    match target {
+        "aarch64-unknown-linux-gnu" | "aarch64-unknown-linux-musl" => {
+            return "linux-arm64".to_string();
+        }
+        "x86_64-unknown-linux-gnu" | "x86_64-unknown-linux-musl" => {
+            return "linux-x64".to_string();
+        }
+        "x86_64-pc-windows-msvc" | "x86_64-pc-windows-gnu" => {
+            return "windows-x64".to_string();
+        }
+        "aarch64-apple-darwin" => return "macos-arm64".to_string(),
+        "x86_64-apple-darwin" => return "macos-x64".to_string(),
+        _ => {}
+    }
+
+    let os = if target.contains("linux") {
+        "linux"
+    } else if target.contains("windows") {
+        "windows"
+    } else if target.contains("darwin") {
+        "macos"
+    } else {
+        "unknown"
+    };
+    let arch = if target.starts_with("aarch64") {
+        "arm64"
+    } else if target.starts_with("x86_64") {
+        "x64"
+    } else if target.starts_with("i686") {
+        "x86"
+    } else if target.starts_with("arm") {
+        "arm"
+    } else {
+        target.split('-').next().unwrap_or("unknown")
+    };
+    format!("{os}-{arch}")
+}
+
+fn target_release_dir(target: Option<&str>) -> PathBuf {
+    match target {
+        Some(target) => Path::new("target").join(target).join("release"),
+        None => Path::new("target").join("release"),
+    }
+}
+
+fn executable_name_for_target(base: &str, target: Option<&str>) -> String {
+    if target.is_some_and(|target| target.contains("windows")) {
+        format!("{base}.exe")
+    } else {
+        executable_name(base)
+    }
 }
 
 fn create_release_archive(

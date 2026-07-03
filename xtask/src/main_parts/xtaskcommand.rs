@@ -10,6 +10,8 @@ enum XtaskCommand {
     PackageDaemonBundle {
         #[arg(long)]
         version: Option<String>,
+        #[arg(long)]
+        target: Option<String>,
     },
     ApiDiff,
     Licenses,
@@ -271,7 +273,9 @@ fn main() -> Result<()> {
     match xtask.command {
         XtaskCommand::Ci { stage, timeout_secs } => run_ci(stage, timeout_secs),
         XtaskCommand::ReleaseCheck => run_release_check(),
-        XtaskCommand::PackageDaemonBundle { version } => run_package_daemon_bundle(version),
+        XtaskCommand::PackageDaemonBundle { version, target } => {
+            run_package_daemon_bundle(version, target)
+        }
         XtaskCommand::ApiDiff => run_api_diff(),
         XtaskCommand::Licenses => run_licenses(),
         XtaskCommand::MigrationChecks => run_migration_checks(),

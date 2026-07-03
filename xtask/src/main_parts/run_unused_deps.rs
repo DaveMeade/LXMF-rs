@@ -364,7 +364,7 @@ fn print_cargo_output(output: &std::process::Output) {
 
 #[cfg(test)]
 mod version_tests {
-    use super::{public_api_line_diff, resolve_release_version};
+    use super::{public_api_line_diff, release_platform_label_for_target, resolve_release_version};
 
     #[test]
     fn public_api_diff_reports_removed_and_added_lines() {
@@ -414,6 +414,14 @@ mod version_tests {
         assert_eq!(
             resolve_release_version(None, None, "0.2.3\n").expect("VERSION fallback"),
             "0.2.3"
+        );
+    }
+
+    #[test]
+    fn raspberry_pi_arm64_target_uses_linux_arm64_bundle_label() {
+        assert_eq!(
+            release_platform_label_for_target(Some("aarch64-unknown-linux-gnu")),
+            "linux-arm64"
         );
     }
 }
