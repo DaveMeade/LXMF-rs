@@ -87,6 +87,63 @@ jobs:
         if: runner.os == 'Linux' && matrix.rust_target == 'aarch64-unknown-linux-gnu'
         run: |
           sudo dpkg --add-architecture arm64
+          sudo python3 - <<'PY'
+          from pathlib import Path
+
+          def restrict_deb_list(path: Path) -> None:
+              lines = []
+              changed = False
+              for line in path.read_text().splitlines():
+                  if line.startswith("deb ") and not line.startswith("deb ["):
+                      line = line.replace("deb ", "deb [arch=amd64] ", 1)
+                      changed = True
+                  lines.append(line)
+              if changed:
+                  path.write_text("\n".join(lines) + "\n")
+
+          def restrict_deb822(path: Path) -> None:
+              blocks = path.read_text().split("\n\n")
+              rewritten = []
+              changed = False
+              for block in blocks:
+                  if not block.strip():
+                      rewritten.append(block)
+                      continue
+                  lines = block.splitlines()
+                  if any(line.startswith("Architectures:") for line in lines):
+                      next_lines = []
+                      for line in lines:
+                          if line.startswith("Architectures:"):
+                              line = "Architectures: amd64"
+                              changed = True
+                          next_lines.append(line)
+                      lines = next_lines
+                  elif any(line == "Types: deb" for line in lines):
+                      for index, line in enumerate(lines):
+                          if line == "Types: deb":
+                              lines.insert(index + 1, "Architectures: amd64")
+                              changed = True
+                              break
+                  rewritten.append("\n".join(lines))
+              if changed:
+                  path.write_text("\n\n".join(rewritten))
+
+          sources = [Path("/etc/apt/sources.list")]
+          sources.extend(Path("/etc/apt/sources.list.d").glob("*.list"))
+          for source in sources:
+              if source.exists():
+                  restrict_deb_list(source)
+          for source in Path("/etc/apt/sources.list.d").glob("*.sources"):
+              restrict_deb822(source)
+          PY
+          sudo tee /etc/apt/sources.list.d/ubuntu-arm64.sources > /dev/null <<'EOF'
+          Types: deb
+          Architectures: arm64
+          URIs: http://ports.ubuntu.com/ubuntu-ports
+          Suites: noble noble-updates noble-backports noble-security
+          Components: main universe restricted multiverse
+          Signed-By: /usr/share/keyrings/ubuntu-archive-keyring.gpg
+          EOF
           sudo apt-get update
           sudo apt-get install -y gcc-aarch64-linux-gnu libc6-dev-arm64-cross pkg-config libdbus-1-dev:arm64
       - uses: dtolnay/rust-toolchain@stable
