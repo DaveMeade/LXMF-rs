@@ -195,7 +195,9 @@ Scoped release evidence is split as follows:
   `RNODE_HIL_ARTIFACT_MANIFEST` verification for
   `schema = "reticulum_interface_hil_matrix_artifacts.v1"` matrix artifacts,
   Pipe subprocess HDLC with a software fake-subprocess smoke for strict daemon
-  startup and refreshed `rnstatus-rs` JSON/human runtime status, UDP
+  startup and refreshed `rnstatus-rs` JSON/human runtime status plus
+  `set_interfaces`/`reload_config` hot-apply for Pipe records with live
+  `_runtime.pipe.status` refresh, UDP
   unicast/multicast plus
   Python-style UDP `device` broadcast-address defaults, IPv4 broadcast socket
   sends, shared-`port` forward fallback semantics, and a software loopback
@@ -443,14 +445,17 @@ Scoped release evidence is split as follows:
   alongside TCP clients and explicit UDP
   listener, peer, and multicast-bind records, with tests proving
   `device`-bound, non-local, and broader TCP server listener shapes stay
-  restart-required or invalid, UDP `device`-bound, partial-target,
+  restart-required or invalid, Pipe records validate command quoting and finite
+  nonnegative respawn delays before mutation, UDP `device`-bound, partial-target,
   out-of-range-target, and multicast-forward shapes remain restart-required or
   invalid, and duplicate TCP server or UDP binds are rejected before mutation.
   Hot-applied explicit TCP server records attach live daemon/RPC
   `_runtime.tcp.listener_status` metadata, hot-applied explicit UDP records
   attach the runtime iface and refresh live daemon/RPC `_runtime.udp.status`
-  counters under focused software tests, and multicast-bind hot-apply goes
-  through the transport peer-routing helper instead of a bare UDP spawn. Serial
+  counters, hot-applied Pipe records attach and refresh live daemon/RPC
+  `_runtime.pipe.status` under focused software tests, and multicast-bind
+  hot-apply goes through the transport peer-routing helper instead of a bare
+  UDP spawn. Serial
   now refreshes live open/reconnect, HDLC frame, packet, byte, EOF, queue,
   decode, serialize, read, and write-error counters.
   KISS/AX.25 KISS and KISS TCP now refresh live packet, data-frame,

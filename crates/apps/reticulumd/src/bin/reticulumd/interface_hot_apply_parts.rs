@@ -1,3 +1,5 @@
+#[path = "interface_hot_apply_parts/pipe_runtime_refresh.rs"]
+pub(super) mod pipe_runtime_refresh;
 #[path = "interface_hot_apply_parts/record_hot_apply.rs"]
 pub(super) mod record_hot_apply;
 #[path = "interface_hot_apply_parts/record_settings.rs"]

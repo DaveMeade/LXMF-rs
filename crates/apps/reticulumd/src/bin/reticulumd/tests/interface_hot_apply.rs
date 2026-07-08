@@ -1,6 +1,7 @@
 use super::{
-    apply_hot_apply_interface_records, refresh_hot_apply_tcp_listener_runtime_status_once,
-    refresh_hot_apply_udp_runtime_status_once, HotApplyUdpRefresh, InterfaceHotApplyBridge,
+    apply_hot_apply_interface_records, refresh_hot_apply_pipe_runtime_status_once,
+    refresh_hot_apply_tcp_listener_runtime_status_once, refresh_hot_apply_udp_runtime_status_once,
+    HotApplyPipeRefresh, HotApplyRuntimeRefreshes, HotApplyUdpRefresh, InterfaceHotApplyBridge,
     InterfaceManager, InterfaceMutationBridge, InterfaceRecord, ManagedHotApplyInterface,
 };
 use rand_core::OsRng;
@@ -63,13 +64,32 @@ fn udp_peer_record(
     record
 }
 
+fn pipe_record(name: &str, command: &str) -> InterfaceRecord {
+    InterfaceRecord {
+        kind: "pipe".to_string(),
+        enabled: true,
+        host: None,
+        port: None,
+        name: Some(name.to_string()),
+        settings: Some(json!({ "command": command })),
+    }
+}
+
 fn udp_refreshes() -> Arc<std::sync::Mutex<HashMap<String, HotApplyUdpRefresh>>> {
+    Arc::new(std::sync::Mutex::new(HashMap::new()))
+}
+
+fn pipe_refreshes() -> Arc<std::sync::Mutex<HashMap<String, HotApplyPipeRefresh>>> {
     Arc::new(std::sync::Mutex::new(HashMap::new()))
 }
 
 fn tcp_listener_refreshes(
 ) -> Arc<std::sync::Mutex<HashMap<String, super::HotApplyTcpListenerRefresh>>> {
     Arc::new(std::sync::Mutex::new(HashMap::new()))
+}
+
+fn runtime_refreshes() -> HotApplyRuntimeRefreshes {
+    HotApplyRuntimeRefreshes::new()
 }
 
 fn test_bridge(
@@ -79,6 +99,7 @@ fn test_bridge(
         tx,
         tcp_listener_refreshes: tcp_listener_refreshes(),
         udp_refreshes: udp_refreshes(),
+        pipe_refreshes: pipe_refreshes(),
     }
 }
 
@@ -205,14 +226,12 @@ async fn hot_apply_spawns_tcp_client_with_record_runtime_settings() {
         "announce_interval": 21600
     }));
 
-    let refreshes = udp_refreshes();
-    let tcp_refreshes = tcp_listener_refreshes();
+    let refreshes = runtime_refreshes();
     apply_hot_apply_interface_records(
         &iface_manager,
         &mut managed,
         vec![record],
         None,
-        &tcp_refreshes,
         &refreshes,
         None,
     )
@@ -256,14 +275,12 @@ async fn hot_apply_updates_existing_tcp_client_runtime_settings() {
         "publish_ifac": true
     }));
 
-    let refreshes = udp_refreshes();
-    let tcp_refreshes = tcp_listener_refreshes();
+    let refreshes = runtime_refreshes();
     apply_hot_apply_interface_records(
         &iface_manager,
         &mut managed,
         vec![record],
         None,
-        &tcp_refreshes,
         &refreshes,
         None,
     )
@@ -289,14 +306,12 @@ async fn hot_apply_spawns_udp_unicast_listener_with_runtime_metadata() {
     let mut managed = HashMap::new();
     let record = udp_record("udp-loopback", "127.0.0.1", 0);
 
-    let refreshes = udp_refreshes();
-    let tcp_refreshes = tcp_listener_refreshes();
+    let refreshes = runtime_refreshes();
     apply_hot_apply_interface_records(
         &iface_manager,
         &mut managed,
         vec![record.clone()],
         None,
-        &tcp_refreshes,
         &refreshes,
         None,
     )
@@ -385,6 +400,25 @@ async fn wait_for_hot_apply_udp_refresh(
     panic!("hot-applied udp refresh was not registered");
 }
 
+async fn wait_for_hot_apply_pipe_refresh(
+    bridge: &InterfaceHotApplyBridge,
+) -> (rns_transport::hash::AddressHash, HotApplyPipeRefresh) {
+    for _ in 0..20 {
+        if let Some(refresh) = bridge
+            .pipe_refreshes
+            .lock()
+            .expect("pipe refresh mutex poisoned")
+            .values()
+            .next()
+            .cloned()
+        {
+            return (refresh.runtime_iface, refresh);
+        }
+        tokio::time::sleep(Duration::from_millis(25)).await;
+    }
+    panic!("hot-applied pipe refresh was not registered");
+}
+
 async fn wait_for_hot_apply_tcp_listener_refresh(
     bridge: &InterfaceHotApplyBridge,
 ) -> (rns_transport::hash::AddressHash, super::HotApplyTcpListenerRefresh) {
@@ -446,6 +480,64 @@ async fn hot_apply_tcp_server_refresh_attaches_listener_status() {
 }
 
 #[tokio::test(flavor = "current_thread")]
+async fn hot_apply_spawns_pipe_with_runtime_metadata() {
+    let iface_manager = Arc::new(tokio::sync::Mutex::new(InterfaceManager::new(8)));
+    let bridge = InterfaceHotApplyBridge::spawn(iface_manager.clone(), Vec::new());
+    let mut record = pipe_record("pipe-cat", "cat");
+    record.settings = Some(json!({ "command": "cat", "mtu": 512, "respawn_delay": 0.25 }));
+
+    let applied = bridge.apply_interfaces(vec![record]).expect("apply pipe interface");
+    let runtime = applied[0]
+        .settings
+        .as_ref()
+        .and_then(|value| value.get("_runtime"))
+        .expect("runtime metadata");
+    assert_eq!(runtime.get("startup_status").and_then(|value| value.as_str()), Some("spawned"));
+    assert_eq!(runtime.get("runtime_status").and_then(|value| value.as_str()), Some("running"));
+    let pipe = runtime.get("pipe").expect("pipe runtime metadata");
+    assert_eq!(pipe.get("mtu").and_then(|value| value.as_u64()), Some(512));
+    assert_eq!(
+        pipe.get("status").and_then(|value| value.get("command")).and_then(|value| value.as_str()),
+        Some("cat")
+    );
+}
+
+#[tokio::test(flavor = "current_thread")]
+async fn hot_apply_pipe_refresh_attaches_runtime_status() {
+    let daemon = Arc::new(RpcDaemon::test_instance());
+    let iface_manager = Arc::new(tokio::sync::Mutex::new(InterfaceManager::new(8)));
+    let bridge = InterfaceHotApplyBridge::spawn_with_daemon(
+        iface_manager,
+        Vec::new(),
+        Arc::downgrade(&daemon),
+    );
+
+    let applied =
+        bridge.apply_interfaces(vec![pipe_record("pipe-cat", "cat")]).expect("apply pipe");
+    daemon.replace_interfaces(applied);
+    let (runtime_iface, refresh) = wait_for_hot_apply_pipe_refresh(&bridge).await;
+    refresh.status.record_error_for_test("backoff", "test pipe closed");
+
+    assert_eq!(refresh_hot_apply_pipe_runtime_status_once(&daemon, &bridge.pipe_refreshes), 1);
+    let result = daemon
+        .handle_rpc(RpcRequest { id: 774, method: "daemon_status_ex".to_string(), params: None })
+        .expect("daemon status")
+        .result
+        .expect("daemon status result");
+    let status = &result["interfaces"][0]["settings"]["_runtime"]["pipe"]["status"];
+
+    assert_eq!(
+        result["interfaces"][0]["settings"]["_runtime"]["iface"].as_str(),
+        Some(runtime_iface.to_string().as_str())
+    );
+    assert_eq!(status["command"].as_str(), Some("cat"));
+    assert_eq!(status["process_state"].as_str(), Some("backoff"));
+    assert_eq!(status["pipe_is_open"].as_bool(), Some(false));
+    assert_eq!(status["respawn_attempts"].as_u64(), Some(1));
+    assert_eq!(status["last_error"].as_str(), Some("test pipe closed"));
+}
+
+#[tokio::test(flavor = "current_thread")]
 async fn hot_apply_spawns_udp_unicast_peer_with_runtime_metadata() {
     let iface_manager = Arc::new(tokio::sync::Mutex::new(InterfaceManager::new(8)));
     let bridge = InterfaceHotApplyBridge::spawn(iface_manager.clone(), Vec::new());
@@ -473,14 +565,12 @@ async fn hot_apply_replaces_udp_when_bind_changes() {
     let iface_manager = Arc::new(tokio::sync::Mutex::new(InterfaceManager::new(8)));
     let mut managed = HashMap::new();
 
-    let refreshes = udp_refreshes();
-    let tcp_refreshes = tcp_listener_refreshes();
+    let refreshes = runtime_refreshes();
     apply_hot_apply_interface_records(
         &iface_manager,
         &mut managed,
         vec![udp_record("udp-loopback", "127.0.0.1", 0)],
         None,
-        &tcp_refreshes,
         &refreshes,
         None,
     )
@@ -491,7 +581,6 @@ async fn hot_apply_replaces_udp_when_bind_changes() {
         &mut managed,
         vec![udp_record("udp-loopback", "127.0.0.2", 0)],
         None,
-        &tcp_refreshes,
         &refreshes,
         None,
     )
@@ -521,14 +610,12 @@ async fn hot_apply_replaces_startup_seeded_udp_when_bind_changes() {
         },
     )]);
 
-    let refreshes = udp_refreshes();
-    let tcp_refreshes = tcp_listener_refreshes();
+    let refreshes = runtime_refreshes();
     apply_hot_apply_interface_records(
         &iface_manager,
         &mut managed,
         vec![udp_record("udp-loopback", "127.0.0.2", 0)],
         None,
-        &tcp_refreshes,
         &refreshes,
         None,
     )
@@ -557,14 +644,12 @@ async fn hot_apply_removes_startup_seeded_udp_when_disabled() {
     let mut disabled = udp_record("udp-loopback", "127.0.0.1", 4242);
     disabled.enabled = false;
 
-    let refreshes = udp_refreshes();
-    let tcp_refreshes = tcp_listener_refreshes();
+    let refreshes = runtime_refreshes();
     apply_hot_apply_interface_records(
         &iface_manager,
         &mut managed,
         vec![disabled],
         None,
-        &tcp_refreshes,
         &refreshes,
         None,
     )
@@ -573,6 +658,39 @@ async fn hot_apply_removes_startup_seeded_udp_when_disabled() {
     assert!(managed.is_empty());
     let manager = iface_manager.lock().await;
     assert_eq!(manager.role(&address), None);
+}
+
+#[tokio::test(flavor = "current_thread")]
+async fn hot_apply_replaces_pipe_when_command_changes() {
+    let iface_manager = Arc::new(tokio::sync::Mutex::new(InterfaceManager::new(8)));
+    let mut managed = HashMap::new();
+    let refreshes = runtime_refreshes();
+
+    apply_hot_apply_interface_records(
+        &iface_manager,
+        &mut managed,
+        vec![pipe_record("pipe-cat", "cat")],
+        None,
+        &refreshes,
+        None,
+    )
+    .await;
+    let first = managed.get("pipe-cat").expect("first pipe").address;
+    apply_hot_apply_interface_records(
+        &iface_manager,
+        &mut managed,
+        vec![pipe_record("pipe-cat", "cat -u")],
+        None,
+        &refreshes,
+        None,
+    )
+    .await;
+
+    let second = managed.get("pipe-cat").expect("replacement pipe").address;
+    assert_ne!(first, second);
+    let manager = iface_manager.lock().await;
+    assert_eq!(manager.role(&first), None);
+    assert_eq!(manager.role(&second), Some(IfaceRole::Unicast));
 }
 
 #[tokio::test(flavor = "current_thread")]

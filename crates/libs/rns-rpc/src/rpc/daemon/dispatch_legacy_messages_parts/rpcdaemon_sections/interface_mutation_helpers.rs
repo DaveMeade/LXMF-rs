@@ -26,7 +26,7 @@ impl RpcDaemon {
         );
         details.insert(
             "legacy_hot_apply_supported_kinds".to_string(),
-            json!(["tcp_client", "tcp_server", "udp"]),
+            json!(["tcp_client", "tcp_server", "udp", "pipe"]),
         );
         error.details = Some(Box::new(details));
 
@@ -131,6 +131,7 @@ impl RpcDaemon {
             "tcp_client" => true,
             "tcp_server" => Self::tcp_server_record_is_hot_apply_safe(iface),
             "udp" => Self::udp_record_is_hot_apply_safe(iface),
+            "pipe" => Self::pipe_record_is_hot_apply_safe(iface),
             _ => false,
         }
     }
@@ -140,6 +141,7 @@ impl RpcDaemon {
             "tcp_client" => Self::legacy_tcp_interface_key(iface),
             "tcp_server" => Self::legacy_tcp_server_interface_key(iface),
             "udp" => Self::legacy_udp_interface_key(iface),
+            "pipe" => Self::legacy_pipe_interface_key(iface),
             _ => None,
         }
     }
@@ -208,6 +210,33 @@ impl RpcDaemon {
         Some(format!("{host}:{port}"))
     }
 
+    fn legacy_pipe_interface_key(iface: &InterfaceRecord) -> Option<String> {
+        if iface.kind != "pipe" {
+            return None;
+        }
+        if let Some(name) = iface.name.as_deref().map(str::trim).filter(|value| !value.is_empty()) {
+            return Some(name.to_string());
+        }
+        Self::interface_setting_str(iface, "command").map(ToOwned::to_owned)
+    }
+
+    fn pipe_record_is_hot_apply_safe(iface: &InterfaceRecord) -> bool {
+        if iface.kind != "pipe" {
+            return false;
+        }
+        if !iface.enabled {
+            return Self::legacy_pipe_interface_key(iface).is_some();
+        }
+        let Some(command) = Self::interface_setting_str(iface, "command") else {
+            return false;
+        };
+        if shlex::split(command).is_none_or(|argv| argv.is_empty()) {
+            return false;
+        }
+        let respawn_delay = Self::interface_setting_f64(iface, "respawn_delay").unwrap_or(5.0);
+        respawn_delay >= 0.0 && respawn_delay.is_finite()
+    }
+
     fn legacy_tcp_server_bind_addr(iface: &InterfaceRecord) -> Option<String> {
         if iface.kind != "tcp_server" {
             return None;
@@ -227,6 +256,10 @@ impl RpcDaemon {
 
     fn interface_setting_u64(iface: &InterfaceRecord, key: &str) -> Option<u64> {
         Self::interface_setting(iface, key)?.as_u64()
+    }
+
+    fn interface_setting_f64(iface: &InterfaceRecord, key: &str) -> Option<f64> {
+        Self::interface_setting(iface, key)?.as_f64()
     }
 
     fn interface_setting_bool(iface: &InterfaceRecord, key: &str) -> Option<bool> {

@@ -31,6 +31,17 @@
         }
     }
 
+    fn pipe_interface(name: &str, command: &str) -> InterfaceRecord {
+        InterfaceRecord {
+            kind: "pipe".to_string(),
+            enabled: true,
+            host: None,
+            port: None,
+            name: Some(name.to_string()),
+            settings: Some(json!({ "command": command })),
+        }
+    }
+
     struct RecordingInterfaceMutationBridge {
         applied: std::sync::Mutex<Vec<Vec<InterfaceRecord>>>,
     }
@@ -459,6 +470,33 @@
     }
 
     #[test]
+    fn set_interfaces_hot_applies_pipe_records() {
+        let daemon = RpcDaemon::test_instance();
+        let bridge = std::sync::Arc::new(RecordingInterfaceMutationBridge::new());
+        daemon.set_interface_mutation_bridge(bridge.clone());
+
+        let response = daemon
+            .handle_rpc(rpc_request(
+                37,
+                "set_interfaces",
+                json!({
+                    "interfaces": [{
+                        "type": "pipe",
+                        "enabled": true,
+                        "name": "pipe-cat",
+                        "settings": { "command": "cat" }
+                    }]
+                }),
+            ))
+            .expect("set_interfaces response");
+
+        assert!(response.error.is_none(), "unexpected error: {response:?}");
+        assert_eq!(bridge.applied(), vec![vec![pipe_interface("pipe-cat", "cat")]]);
+        let interfaces = daemon.interfaces.lock().expect("interfaces mutex poisoned").clone();
+        assert_eq!(interfaces, vec![pipe_interface("pipe-cat", "cat")]);
+    }
+
+    #[test]
     fn set_interfaces_hot_applies_multicast_udp_records() {
         let daemon = RpcDaemon::test_instance();
         let bridge = std::sync::Arc::new(RecordingInterfaceMutationBridge::new());
@@ -796,6 +834,35 @@
         assert_eq!(result["hot_applied_legacy_tcp_only"], json!(false));
         assert_eq!(result["hot_applied_interface_mutation"], json!(true));
         assert_eq!(bridge.applied(), vec![vec![udp_interface("udp-main", "127.0.0.1", 4248)]]);
+    }
+
+    #[test]
+    fn reload_config_hot_applies_pipe_only_diff() {
+        let daemon = RpcDaemon::test_instance();
+        daemon.replace_interfaces(vec![pipe_interface("pipe-cat", "cat")]);
+        let bridge = std::sync::Arc::new(RecordingInterfaceMutationBridge::new());
+        daemon.set_interface_mutation_bridge(bridge.clone());
+
+        let response = daemon
+            .handle_rpc(rpc_request(
+                38,
+                "reload_config",
+                json!({
+                    "interfaces": [{
+                        "type": "pipe",
+                        "enabled": true,
+                        "name": "pipe-cat",
+                        "settings": { "command": "cat -u" }
+                    }]
+                }),
+            ))
+            .expect("reload_config response");
+
+        assert!(response.error.is_none(), "unexpected reload error: {response:?}");
+        let result = response.result.expect("result");
+        assert_eq!(result["hot_applied_legacy_tcp_only"], json!(false));
+        assert_eq!(result["hot_applied_interface_mutation"], json!(true));
+        assert_eq!(bridge.applied(), vec![vec![pipe_interface("pipe-cat", "cat -u")]]);
     }
 
     #[test]
