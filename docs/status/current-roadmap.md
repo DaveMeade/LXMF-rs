@@ -886,6 +886,11 @@ Scoped release evidence is split as follows:
   trace and event state, exposes cancel metadata through raw and envelope SDK
   lifecycle traces, and keeps ZeroMQ direct/envelope cancellation result
   variants typed without claiming hardware or external-client coverage.
+- Ordinary delivery stamp policy control now rides the same SDK envelope path
+  as `app.delivery.stamp_policy.get` and `app.delivery.stamp_policy.set`, with
+  `ZmqPipelineBackendClient::delivery_stamp_policy_get` and
+  `delivery_stamp_policy_set` projecting typed `DeliveryStampPolicyState`
+  fields while preserving the daemon's raw `stamp_policy` payload.
 - The typed ZeroMQ SDK backend now starts the final propagation-first branch
   with `ZmqPipelineBackendClient::propagation_peer_sync`, routing
   `app.propagation.peer_sync` over `sdk_envelope_execute_v2` to the daemon's

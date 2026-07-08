@@ -59,6 +59,8 @@ impl RpcDaemon {
             | "propagation_enable"
             | "get_delivery_policy"
             | "set_delivery_policy"
+            | "stamp_policy_get"
+            | "stamp_policy_set"
             | "propagation_peer_maintenance"
             | "propagation_ingest"
             | "propagation_fetch" => parsed.payload,

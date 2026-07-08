@@ -1,14 +1,15 @@
 use super::{code, ErrorCategory, SdkError, ZmqPipelineBackendClient};
 use crate::app::{Envelope, EnvelopeResponse};
 use crate::domain::{
-    PropagationAcknowledgeSyncRequest, PropagationAcknowledgeSyncResult,
-    PropagationDeliveryPolicyRequest, PropagationDeliveryPolicyResult, PropagationEnableRequest,
-    PropagationFetchRequest, PropagationFetchResult, PropagationIngestRequest,
-    PropagationIngestResult, PropagationNodeListResult, PropagationNodeSelectionResult,
-    PropagationNodeSetRequest, PropagationPeerMaintenanceResult, PropagationPeerSyncRequest,
-    PropagationPeerSyncResult, PropagationRecoveryStateResult, PropagationRemotePeerRequest,
-    PropagationRemoteRequest, PropagationRemoteStatusResult, PropagationRemoteSyncResult,
-    PropagationRemoteTransferResult, PropagationRemoteUnpeerResult, PropagationStatusResult,
+    DeliveryStampPolicyRequest, DeliveryStampPolicyResult, PropagationAcknowledgeSyncRequest,
+    PropagationAcknowledgeSyncResult, PropagationDeliveryPolicyRequest,
+    PropagationDeliveryPolicyResult, PropagationEnableRequest, PropagationFetchRequest,
+    PropagationFetchResult, PropagationIngestRequest, PropagationIngestResult,
+    PropagationNodeListResult, PropagationNodeSelectionResult, PropagationNodeSetRequest,
+    PropagationPeerMaintenanceResult, PropagationPeerSyncRequest, PropagationPeerSyncResult,
+    PropagationRecoveryStateResult, PropagationRemotePeerRequest, PropagationRemoteRequest,
+    PropagationRemoteStatusResult, PropagationRemoteSyncResult, PropagationRemoteTransferResult,
+    PropagationRemoteUnpeerResult, PropagationStatusResult,
 };
 use serde::de::DeserializeOwned;
 use serde::Serialize;
@@ -116,6 +117,17 @@ impl ZmqPipelineBackendClient {
         req: PropagationDeliveryPolicyRequest,
     ) -> Result<PropagationDeliveryPolicyResult, SdkError> {
         self.execute_propagation_envelope("app.propagation.delivery_policy.set", req)
+    }
+
+    pub fn delivery_stamp_policy_get(&self) -> Result<DeliveryStampPolicyResult, SdkError> {
+        self.execute_propagation_query("app.delivery.stamp_policy.get", json!({}))
+    }
+
+    pub fn delivery_stamp_policy_set(
+        &self,
+        req: DeliveryStampPolicyRequest,
+    ) -> Result<DeliveryStampPolicyResult, SdkError> {
+        self.execute_propagation_envelope("app.delivery.stamp_policy.set", req)
     }
 
     pub fn propagation_peer_maintenance(
