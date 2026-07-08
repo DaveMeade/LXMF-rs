@@ -87,6 +87,9 @@ pub struct InboundMessageDetails {
 pub struct InboundDropDetails {
     pub reason: Option<String>,
     pub delivery_kind: Option<String>,
+    pub operation: Option<String>,
+    pub transient_id: Option<String>,
+    pub peer: Option<String>,
     pub raw_destination_hash: Option<String>,
     pub resolved_destination_hash: Option<String>,
     pub source_hash: Option<String>,
@@ -208,7 +211,6 @@ impl Event {
 fn json_str(value: &JsonValue, key: &str) -> Option<String> {
     value.get(key)?.as_str().map(ToOwned::to_owned)
 }
-
 fn nested_json_str(value: &JsonValue, path: &[&str]) -> Option<String> {
     let mut current = value;
     for key in path {
@@ -216,7 +218,6 @@ fn nested_json_str(value: &JsonValue, path: &[&str]) -> Option<String> {
     }
     current.as_str().map(ToOwned::to_owned)
 }
-
 fn nested_json_bool(value: &JsonValue, path: &[&str]) -> Option<bool> {
     let mut current = value;
     for key in path {
@@ -224,7 +225,6 @@ fn nested_json_bool(value: &JsonValue, path: &[&str]) -> Option<bool> {
     }
     current.as_bool()
 }
-
 fn inbound_message_details(payload: &JsonValue) -> InboundMessageDetails {
     let message = payload.get("message").unwrap_or(payload);
     InboundMessageDetails {
@@ -241,11 +241,13 @@ fn inbound_message_details(payload: &JsonValue) -> InboundMessageDetails {
         stamp_status: nested_json_str(message, &["fields", "_lxmf", "stamp_status"]),
     }
 }
-
 fn inbound_drop_details(payload: &JsonValue) -> InboundDropDetails {
     InboundDropDetails {
         reason: json_str(payload, "reason"),
         delivery_kind: json_str(payload, "delivery_kind"),
+        operation: json_str(payload, "operation"),
+        transient_id: json_str(payload, "transient_id"),
+        peer: json_str(payload, "peer").or_else(|| json_str(payload, "peer_id")),
         raw_destination_hash: json_str(payload, "raw_destination_hash"),
         resolved_destination_hash: json_str(payload, "resolved_destination_hash"),
         source_hash: json_str(payload, "source_hash"),
@@ -256,7 +258,6 @@ fn inbound_drop_details(payload: &JsonValue) -> InboundDropDetails {
         detail: json_str(payload, "detail"),
     }
 }
-
 fn delivery_lifecycle_details(payload: &JsonValue) -> DeliveryLifecycleDetails {
     let message = payload.get("message").unwrap_or(payload);
     DeliveryLifecycleDetails {
