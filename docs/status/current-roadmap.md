@@ -1023,18 +1023,18 @@ Scoped release evidence is split as follows:
   typed `policy_state`, so propagation-first clients can inspect auth-required
   mode plus allowed, denied, ignored, and prioritised destination sets without
   parsing raw policy JSON.
-- Direct inbound LXMF packet/resource drops and propagated local delivery-policy
-  drops now emit bounded raw `inbound_dropped` RPC/SDK event-stream entries
-  without storing messages or updating peer activity; identifier fields use the
-  existing event redaction path by default and events distinguish `packet`,
-  `resource`, and `propagation` delivery kinds. The propagated local-delivery
-  coverage includes local envelope ingest plus decryptable remote fetched and
-  remote downloaded propagation payloads that reach local decode, stamp, or
-  delivery-policy handling, plus local-addressed pre-decode rejects for short
-  or undecryptable local envelopes and strict remote fetch/download local-import
-  rejects for short payloads, destination mismatches, and decrypt failures, so
-  those router-coupled drops remain observer-visible instead of only counted as
-  rejected imports.
+- Direct inbound LXMF packet/resource drops, direct duplicate packet drops, and
+  propagated local delivery-policy drops now emit bounded raw `inbound_dropped`
+  RPC/SDK event-stream entries without storing messages or updating peer
+  activity; identifier fields use the existing event redaction path by default
+  and events distinguish `packet`, `resource`, and `propagation` delivery kinds.
+  The propagated local-delivery coverage includes local envelope ingest plus
+  decryptable remote fetched and remote downloaded propagation payloads that
+  reach local decode, stamp, or delivery-policy handling, plus local-addressed
+  pre-decode rejects for short or undecryptable local envelopes and strict
+  remote fetch/download local-import rejects for short payloads, destination
+  mismatches, and decrypt failures, so those router-coupled drops remain
+  observer-visible instead of only counted as rejected imports.
 - The native SDK app event mapper now projects inbound delivery, receipt, and
   drop payloads into typed helpers on the existing event path, preserving
   message IDs, source/destination hashes, raw LXMF bytes, delivery kind,
