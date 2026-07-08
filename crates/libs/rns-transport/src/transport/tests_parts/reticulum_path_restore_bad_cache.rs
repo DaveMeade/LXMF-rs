@@ -26,6 +26,7 @@ async fn reticulum_path_table_restore_skips_malformed_cached_announce_entry() {
         .await
         .expect("restore");
     assert_eq!(restore_report.restored_active_paths, 1);
+    assert_eq!(restore_report.skipped.active_invalid_cached_announce, 1);
     assert_eq!(restore_report.restored_identities.len(), 1);
     assert_eq!(restore_report.restored_identities[0].destination, good.destination);
     assert!(restored.has_path(&good.destination).await, "valid cached row should restore");
@@ -69,6 +70,7 @@ async fn reticulum_path_table_restore_skips_missing_cached_announce_entry() {
         .await
         .expect("restore");
     assert_eq!(restore_report.restored_active_paths, 1);
+    assert_eq!(restore_report.skipped.active_missing_cached_announce, 1);
     assert_eq!(restore_report.restored_identities.len(), 1);
     assert_eq!(restore_report.restored_identities[0].destination, good.destination);
     assert!(restored.has_path(&good.destination).await, "valid cached row should restore");
@@ -107,6 +109,7 @@ async fn reticulum_path_table_restore_skips_mismatched_cached_announce_destinati
         .await
         .expect("restore");
     assert_eq!(restore_report.restored_active_paths, 1);
+    assert_eq!(restore_report.skipped.active_mismatched_cached_announce, 1);
     assert_eq!(restore_report.restored_identities.len(), 1);
     assert_eq!(restore_report.restored_identities[0].destination, good.destination);
     assert!(restored.has_path(&good.destination).await, "valid cached row should restore");
@@ -158,6 +161,7 @@ async fn reticulum_tunnel_table_restore_skips_malformed_cached_announce_entry() 
         .await
         .expect("restore");
     assert_eq!(restore_report.restored_active_paths, 0);
+    assert_eq!(restore_report.skipped.tunnel_invalid_cached_announce, 1);
     assert_eq!(restore_report.restored_identities.len(), 1);
     assert_eq!(restore_report.restored_identities[0].destination, good.destination);
 
@@ -227,6 +231,7 @@ async fn reticulum_tunnel_table_restore_skips_missing_cached_announce_entry() {
         .await
         .expect("restore");
     assert_eq!(restore_report.restored_active_paths, 0);
+    assert_eq!(restore_report.skipped.tunnel_missing_cached_announce, 1);
     assert_eq!(restore_report.restored_identities.len(), 1);
     assert_eq!(restore_report.restored_identities[0].destination, good.destination);
 
@@ -291,6 +296,7 @@ async fn reticulum_tunnel_table_restore_skips_mismatched_cached_announce_destina
         .await
         .expect("restore");
     assert_eq!(restore_report.restored_active_paths, 0);
+    assert_eq!(restore_report.skipped.tunnel_mismatched_cached_announce, 1);
     assert_eq!(restore_report.restored_identities.len(), 1);
     assert_eq!(restore_report.restored_identities[0].destination, good.destination);
 
@@ -443,6 +449,12 @@ fn append_mismatched_tunnel_path_entry(storage_path: &std::path::Path, destinati
     let mut tunnels =
         super::tunnels::TunnelTable::decode_python_entries(&payload).expect("decode tunnels");
     let seed = &tunnels.first().expect("valid seed tunnel").paths[0];
+    let mismatched_packet_hash = Hash::new_from_slice(b"mismatch-tunnel-packet");
+    std::fs::copy(
+        cached_announce_path(storage_path, &seed.packet_hash),
+        cached_announce_path(storage_path, &mismatched_packet_hash),
+    )
+    .expect("copy cached announce under mismatched packet hash");
     let mismatched_path = super::tunnels::PythonTunnelPathEntry {
         destination,
         timestamp_secs: seed.timestamp_secs,
@@ -451,7 +463,7 @@ fn append_mismatched_tunnel_path_entry(storage_path: &std::path::Path, destinati
         expires_secs: seed.expires_secs,
         random_blobs: seed.random_blobs.clone(),
         interface_hash: seed.interface_hash,
-        packet_hash: seed.packet_hash,
+        packet_hash: mismatched_packet_hash,
     };
     tunnels[0].paths.push(mismatched_path);
     std::fs::write(

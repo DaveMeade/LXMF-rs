@@ -353,6 +353,10 @@ Malformed per-entry cached announce files and cached announces whose decoded
 destination does not match the active/tunnel path row are skipped without
 poisoning other valid restored routes, while malformed `destination_table` or
 `tunnels` files still surface as daemon restore errors.
+Daemon/RPC `_runtime.reticulum.path_table_restore.skipped` now reports
+per-reason active/tunnel skip counters for unmapped interfaces, expired rows,
+missing or invalid cached announces, mismatched cached destinations, duplicate
+tunnel packet hashes, and identity conflicts.
 Shared-instance clients now skip local path-table save and restore work like
 Python Reticulum.
 Tunnel-only restored announces are also retained as cache material, so paths

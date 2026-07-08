@@ -256,6 +256,11 @@ fn bootstrap_skips_malformed_cached_announce_entry_without_restore_error() {
     let restore_status = path_table_restore_runtime_status(&context.daemon);
     assert_eq!(restore_status["status"].as_str(), Some("ok"));
     assert_eq!(restore_status["restored_active_paths"].as_u64(), Some(1));
+    assert_eq!(
+        restore_status["skipped"]["active_invalid_cached_announce"].as_u64(),
+        Some(1)
+    );
+    assert_eq!(restore_status["skipped"]["active_missing_cached_announce"].as_u64(), Some(0));
 }
 
 #[test]

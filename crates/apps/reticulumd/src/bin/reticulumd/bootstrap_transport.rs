@@ -289,11 +289,12 @@ pub(super) async fn start_transport_and_interfaces(
         {
             Ok(report) => {
                 let restored = report.restored_active_paths;
+                let skipped = report.skipped;
                 restored_path_identities = report.restored_identities;
                 if restored > 0 {
                     log::info!("[daemon] restored {} Reticulum path table entries", restored);
                 }
-                PathTableRestoreStatus::Ok { restored_active_paths: restored }
+                PathTableRestoreStatus::Ok { restored_active_paths: restored, skipped }
             }
             Err(err) => {
                 let message = err.to_string();

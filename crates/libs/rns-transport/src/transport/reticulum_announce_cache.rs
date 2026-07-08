@@ -26,37 +26,46 @@ impl ReticulumAnnounceCache {
         tokio::fs::write(self.path(packet_hash), payload).await
     }
 
-    pub(super) async fn restore(&self, packet_hash: Hash) -> io::Result<Option<CachedAnnounce>> {
-        let Some(packet) = self.read_packet(packet_hash).await? else {
-            return Ok(None);
+    pub(super) async fn restore_classified(
+        &self,
+        packet_hash: Hash,
+    ) -> io::Result<CachedAnnounceRestore> {
+        let packet = match self.read_packet(packet_hash).await? {
+            CachedAnnouncePacketRestore::Restored(packet) => packet,
+            CachedAnnouncePacketRestore::Missing => return Ok(CachedAnnounceRestore::Missing),
+            CachedAnnouncePacketRestore::Invalid => return Ok(CachedAnnounceRestore::Invalid),
         };
         if packet.header.packet_type != PacketType::Announce {
-            return Ok(None);
+            return Ok(CachedAnnounceRestore::Invalid);
         }
         let Ok(announce) = DestinationAnnounce::validate(&packet) else {
-            return Ok(None);
+            return Ok(CachedAnnounceRestore::Invalid);
         };
         let destination = announce.destination;
-        Ok(Some(CachedAnnounce { packet, destination }))
+        Ok(CachedAnnounceRestore::Restored(Box::new(CachedAnnounce { packet, destination })))
     }
 
-    async fn read_packet(&self, packet_hash: Hash) -> io::Result<Option<Packet>> {
+    async fn read_packet(&self, packet_hash: Hash) -> io::Result<CachedAnnouncePacketRestore> {
         let payload = match tokio::fs::read(self.path(packet_hash)).await {
             Ok(payload) => payload,
-            Err(err) if err.kind() == io::ErrorKind::NotFound => return Ok(None),
+            Err(err) if err.kind() == io::ErrorKind::NotFound => {
+                return Ok(CachedAnnouncePacketRestore::Missing)
+            }
             Err(err) => return Err(err),
         };
         let value: RmpValue = match rmpv::decode::read_value(&mut std::io::Cursor::new(payload)) {
             Ok(value) => value,
-            Err(_) => return Ok(None),
+            Err(_) => return Ok(CachedAnnouncePacketRestore::Invalid),
         };
         let RmpValue::Array(fields) = value else {
-            return Ok(None);
+            return Ok(CachedAnnouncePacketRestore::Invalid);
         };
         let Some(raw) = fields.first().and_then(rmp_bytes) else {
-            return Ok(None);
+            return Ok(CachedAnnouncePacketRestore::Invalid);
         };
-        Ok(Packet::from_bytes(raw).ok())
+        Ok(Packet::from_bytes(raw)
+            .map(CachedAnnouncePacketRestore::Restored)
+            .unwrap_or(CachedAnnouncePacketRestore::Invalid))
     }
 
     fn path(&self, packet_hash: Hash) -> PathBuf {
@@ -67,6 +76,18 @@ impl ReticulumAnnounceCache {
 pub(super) struct CachedAnnounce {
     pub(super) packet: Packet,
     pub(super) destination: SingleOutputDestination,
+}
+
+pub(super) enum CachedAnnounceRestore {
+    Restored(Box<CachedAnnounce>),
+    Missing,
+    Invalid,
+}
+
+enum CachedAnnouncePacketRestore {
+    Restored(Packet),
+    Missing,
+    Invalid,
 }
 
 fn encode_cached_announce(iface: AddressHash, packet: Packet) -> io::Result<Vec<u8>> {
