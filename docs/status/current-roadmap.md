@@ -1031,10 +1031,11 @@ Scoped release evidence is split as follows:
   coverage includes local envelope ingest plus decryptable remote fetched and
   remote downloaded propagation payloads that reach local decode, stamp, or
   delivery-policy handling, plus local-addressed pre-decode rejects for short
-  or undecryptable local envelopes and strict remote fetch/download local-import
-  rejects for short payloads, destination mismatches, and decrypt failures, so
-  those router-coupled drops remain observer-visible instead of only counted as
-  rejected imports.
+  or undecryptable local envelopes, local-delivery skip events for
+  destination-mismatched propagation envelopes that still preserve relay fanout,
+  and strict remote fetch/download local-import rejects for short payloads,
+  destination mismatches, and decrypt failures, so those router-coupled drops
+  remain observer-visible instead of only counted as rejected imports.
 - The native SDK app event mapper now projects inbound delivery, receipt, and
   drop payloads into typed helpers on the existing event path, preserving
   message IDs, source/destination hashes, raw LXMF bytes, delivery kind,

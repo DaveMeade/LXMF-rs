@@ -250,6 +250,13 @@ async fn try_accept_local_propagated_message(
             return Ok(LocalPropagationOutcome::NotLocal);
         }
         if &transient_payload[..16] != destination.desc.address_hash.as_slice() {
+            emit_propagation_predecode_drop_event(
+                daemon,
+                destination_hash,
+                transient_payload,
+                "destination_mismatch",
+                "propagated LXMF payload is not addressed to the local delivery destination",
+            );
             return Ok(LocalPropagationOutcome::NotLocal);
         }
         if daemon.local_propagation_processed_mark_exists(transient_id)? {
