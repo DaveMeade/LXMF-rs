@@ -1,5 +1,7 @@
 use super::announce_ingest::ingest_announce_event;
-use super::announce_persistence::spawn_path_table_persistence_worker;
+use super::announce_persistence::{
+    spawn_path_table_persistence_worker, PathTablePersistenceContext,
+};
 use super::bridge::PeerCrypto;
 use rns_rpc::RpcDaemon;
 use rns_transport::transport::Transport;
@@ -14,9 +16,12 @@ pub(super) fn spawn_announce_worker(
     reticulum_storage_path: Option<PathBuf>,
 ) {
     let daemon_announce = daemon;
-    let persist_tx = reticulum_storage_path
-        .as_ref()
-        .map(|path| spawn_path_table_persistence_worker(transport.clone(), path.clone()));
+    let persist_tx = reticulum_storage_path.as_ref().map(|path| {
+        spawn_path_table_persistence_worker(PathTablePersistenceContext::new(
+            transport.clone(),
+            path.clone(),
+        ))
+    });
     tokio::spawn(async move {
         let mut rx = transport.recv_announces().await;
         loop {

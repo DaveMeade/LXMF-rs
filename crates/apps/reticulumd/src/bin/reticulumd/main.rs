@@ -83,13 +83,18 @@ async fn main() {
     }
     #[cfg(not(feature = "zmq-pipeline-rpc"))]
     {
+        let path_table_persistence = context.path_table_persistence;
         rpc_loop::run_rpc_loop(context.rpc_addr, context.daemon, context.rpc_tls, context.rpc_unix)
+            .await;
+        announce_persistence::flush_reticulum_path_table_if_configured(path_table_persistence)
             .await;
     }
 }
 
 #[cfg(feature = "zmq-pipeline-rpc")]
 async fn run_daemon_loops(context: bootstrap::BootstrapContext, zmq_rpc_command: Option<String>) {
+    let bootstrap::BootstrapContext { rpc_addr, rpc_unix, daemon, rpc_tls, path_table_persistence } =
+        context;
     let (shutdown_tx, shutdown_rx) = tokio::sync::watch::channel(false);
     tokio::spawn(async move {
         match tokio::signal::ctrl_c().await {
@@ -104,7 +109,7 @@ async fn run_daemon_loops(context: bootstrap::BootstrapContext, zmq_rpc_command:
     });
 
     if let Some(command_endpoint) = zmq_rpc_command {
-        let daemon = context.daemon.clone();
+        let daemon = daemon.clone();
         let shutdown = shutdown_rx.clone();
         tokio::spawn(async move {
             let config =
@@ -115,12 +120,6 @@ async fn run_daemon_loops(context: bootstrap::BootstrapContext, zmq_rpc_command:
         });
     }
 
-    rpc_loop::run_rpc_loop_until(
-        context.rpc_addr,
-        context.daemon,
-        context.rpc_tls,
-        context.rpc_unix,
-        shutdown_rx,
-    )
-    .await;
+    rpc_loop::run_rpc_loop_until(rpc_addr, daemon, rpc_tls, rpc_unix, shutdown_rx).await;
+    announce_persistence::flush_reticulum_path_table_if_configured(path_table_persistence).await;
 }
