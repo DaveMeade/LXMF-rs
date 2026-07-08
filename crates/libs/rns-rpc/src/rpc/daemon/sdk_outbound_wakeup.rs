@@ -5,6 +5,34 @@ impl RpcDaemon {
         &self,
         destination: &str,
     ) -> Result<usize, std::io::Error> {
+        self.wake_lxmf_outbound_for_announce(
+            destination,
+            Self::lxmf_wakeable_delivery_method,
+            "delivery",
+        )
+    }
+
+    pub(super) fn wake_lxmf_propagated_outbound_for_announce(
+        &self,
+        destination: &str,
+    ) -> Result<usize, std::io::Error> {
+        let selected = self.outbound_propagation_node();
+        if !selected.as_deref().is_some_and(|peer| peer.eq_ignore_ascii_case(destination)) {
+            return Ok(0);
+        }
+        self.wake_lxmf_outbound_for_announce(
+            destination,
+            Self::lxmf_wakeable_propagation_method,
+            "propagation",
+        )
+    }
+
+    fn wake_lxmf_outbound_for_announce(
+        &self,
+        destination: &str,
+        method_filter: fn(&MessageRecord) -> Option<Option<String>>,
+        announce_kind: &str,
+    ) -> Result<usize, std::io::Error> {
         if self.outbound_bridge.is_none() {
             return Ok(0);
         }
@@ -15,7 +43,7 @@ impl RpcDaemon {
             .map_err(std::io::Error::other)?;
         let mut scheduled = 0_usize;
         for record in candidates {
-            let Some(method) = Self::lxmf_wakeable_delivery_method(&record) else {
+            let Some(method) = method_filter(&record) else {
                 continue;
             };
             let options = Self::outbound_delivery_options_from_record(&record, method);
@@ -45,7 +73,7 @@ impl RpcDaemon {
             }
             if let Err(err) = self.schedule_bridge_delivery(current, options) {
                 log::warn!(
-                    "[daemon] failed to wake pending outbound message {message_id} after delivery announce: {err}"
+                    "[daemon] failed to wake pending outbound message {message_id} after {announce_kind} announce: {err}"
                 );
                 self.store
                     .update_receipt_status(
@@ -82,6 +110,23 @@ impl RpcDaemon {
             .map(str::to_ascii_lowercase);
         match method.as_deref().unwrap_or("direct") {
             "direct" | "opportunistic" => Some(method),
+            _ => None,
+        }
+    }
+
+    fn lxmf_wakeable_propagation_method(record: &MessageRecord) -> Option<Option<String>> {
+        let method = record
+            .fields
+            .as_ref()
+            .and_then(|fields| fields.get("_lxmf"))
+            .and_then(JsonValue::as_object)
+            .and_then(|lxmf| lxmf.get("method"))
+            .and_then(JsonValue::as_str)
+            .map(str::trim)
+            .filter(|value| !value.is_empty())
+            .map(str::to_ascii_lowercase);
+        match method.as_deref() {
+            Some("propagated") => Some(method),
             _ => None,
         }
     }

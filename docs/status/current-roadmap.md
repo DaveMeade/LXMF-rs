@@ -531,6 +531,10 @@ Scoped release evidence is split as follows:
   identity misses after delivery path-request timeout now enter nonterminal
   `queued: waiting for announce` state, so later delivery announces can requeue
   them instead of leaving a terminal `failed:*` receipt.
+- RPC daemon `lxmf.propagation` announce ingestion now wakes stored pending
+  propagated outbound messages only when the announce belongs to the selected
+  outbound propagation node, leaving unselected peers and non-propagated or
+  terminal work untouched.
 - Direct and propagated resource sends support receipt-state separation,
   timeout/failure propagation, and active resource cancellation.
 - Link sends now register packet/resource receipt tracking before handoff and
