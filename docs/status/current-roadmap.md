@@ -121,6 +121,9 @@ Scoped release evidence is split as follows:
   and local transport-policy evidence that the learned next-hop interface mode
   drives Python-style outgoing mode policy, including access-point suppression
   and roaming/boundary loop avoidance.
+- Announce-rate target rebroadcast suppression now has harness-dispatchable
+  local transport-policy evidence that rapid repeats are allowed through the
+  configured grace window, then suppressed until the target interval reopens.
 - Unknown-announce ingress limiting now has harness-dispatchable local
   transport-policy evidence for Python-style per-interface holding and
   lowest-hop release, so bursty unknown announce traffic on one ingress no
