@@ -94,6 +94,12 @@ pub struct PropagationDeliveryPolicyRequest {
 
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
 #[non_exhaustive]
+pub struct PropagationDeliveryPolicyEntryRequest {
+    pub destination: String,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
+#[non_exhaustive]
 pub struct PropagationIngestRequest {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub transient_id: Option<String>,

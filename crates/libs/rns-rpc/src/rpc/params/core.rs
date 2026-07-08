@@ -107,6 +107,12 @@ struct DeliveryPolicyParams {
 }
 
 #[derive(Debug, Deserialize)]
+struct DeliveryPolicyEntryParams {
+    #[serde(alias = "destination_hash", alias = "destination", alias = "hash")]
+    destination: String,
+}
+
+#[derive(Debug, Deserialize)]
 struct PropagationEnableParams {
     enabled: bool,
     #[serde(default)]

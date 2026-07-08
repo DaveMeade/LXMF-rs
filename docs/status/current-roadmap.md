@@ -1023,6 +1023,11 @@ Scoped release evidence is split as follows:
   typed `policy_state`, so propagation-first clients can inspect auth-required
   mode plus allowed, denied, ignored, and prioritised destination sets without
   parsing raw policy JSON.
+- Python-style single-destination delivery-policy mutators now cover daemon RPC
+  and SDK envelope/client paths for `allow_destination`,
+  `disallow_destination`, and `prioritise_destination`, validating 16-byte RNS
+  destination hashes and updating the same cached policy snapshot as whole-policy
+  get/set without broadening delivery-drop behavior.
 - Direct inbound LXMF packet/resource drops and propagated local delivery-policy
   drops now emit bounded raw `inbound_dropped` RPC/SDK event-stream entries
   without storing messages or updating peer activity; identifier fields use the

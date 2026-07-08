@@ -28,6 +28,9 @@ impl RpcDaemon {
             | "get_outbound_lxm_propagation_stamp_cost" => self.handle_rpc_legacy_messages(request),
             "get_delivery_policy"
             | "set_delivery_policy"
+            | "allow_destination"
+            | "disallow_destination"
+            | "prioritise_destination"
             | "propagation_status"
             | "propagation_enable"
             | "propagation_ingest"

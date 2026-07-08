@@ -48,6 +48,57 @@ impl RpcDaemon {
                     error: None,
                 })
             }
+            "allow_destination" | "disallow_destination" | "prioritise_destination" => {
+                let params = request.params.ok_or_else(|| {
+                    std::io::Error::new(std::io::ErrorKind::InvalidInput, "missing params")
+                })?;
+                let parsed: DeliveryPolicyEntryParams = serde_json::from_value(params)
+                    .map_err(|err| std::io::Error::new(std::io::ErrorKind::InvalidInput, err))?;
+                let destination = normalize_policy_destination_hash(parsed.destination.as_str())?;
+
+                let policy = {
+                    let mut guard = self.delivery_policy.lock().expect("policy mutex poisoned");
+                    match request.method.as_str() {
+                        "allow_destination" => {
+                            if !guard
+                                .allowed_destinations
+                                .iter()
+                                .any(|entry| entry.eq_ignore_ascii_case(destination.as_str()))
+                            {
+                                guard.allowed_destinations.push(destination.clone());
+                            }
+                        }
+                        "disallow_destination" => {
+                            guard.allowed_destinations.retain(|entry| {
+                                !entry.eq_ignore_ascii_case(destination.as_str())
+                            });
+                        }
+                        "prioritise_destination" => {
+                            if !guard
+                                .prioritised_destinations
+                                .iter()
+                                .any(|entry| entry.eq_ignore_ascii_case(destination.as_str()))
+                            {
+                                guard.prioritised_destinations.push(destination.clone());
+                            }
+                        }
+                        _ => unreachable!(
+                            "legacy propagation policy mutation route: {}",
+                            request.method
+                        ),
+                    }
+                    guard.clone()
+                };
+                self.update_daemon_status_snapshot(|snapshot| {
+                    snapshot.delivery_policy = policy.clone();
+                });
+
+                Ok(RpcResponse {
+                    id: request.id,
+                    result: Some(json!({ "policy": policy })),
+                    error: None,
+                })
+            }
             "propagation_status" => {
                 let state =
                     self.propagation_state.lock().expect("propagation mutex poisoned").clone();
@@ -207,4 +258,21 @@ impl RpcDaemon {
             _ => unreachable!("legacy propagation policy route: {}", request.method),
         }
     }
+}
+
+fn normalize_policy_destination_hash(destination: &str) -> Result<String, std::io::Error> {
+    let destination = destination.trim();
+    let decoded = hex::decode(destination).map_err(|err| {
+        std::io::Error::new(
+            std::io::ErrorKind::InvalidInput,
+            format!("destination must be hex-encoded: {err}"),
+        )
+    })?;
+    if decoded.len() != 16 {
+        return Err(std::io::Error::new(
+            std::io::ErrorKind::InvalidInput,
+            "destination must decode to a 16-byte RNS destination hash",
+        ));
+    }
+    Ok(destination.to_ascii_lowercase())
 }

@@ -113,6 +113,30 @@ fn propagation_operation_entries() -> Vec<OperationEntry> {
         )
         .with_alias("set_delivery_policy"),
         OperationEntry::new(
+            "app.propagation.delivery_policy.allow_destination",
+            "propagation",
+            OperationKind::Command,
+            TransportVariant::LegacyRpc,
+            "Allow one destination in the local propagation delivery policy.",
+        )
+        .with_alias("allow_destination"),
+        OperationEntry::new(
+            "app.propagation.delivery_policy.disallow_destination",
+            "propagation",
+            OperationKind::Command,
+            TransportVariant::LegacyRpc,
+            "Remove one destination from the local propagation delivery allow-list.",
+        )
+        .with_alias("disallow_destination"),
+        OperationEntry::new(
+            "app.propagation.delivery_policy.prioritise_destination",
+            "propagation",
+            OperationKind::Command,
+            TransportVariant::LegacyRpc,
+            "Prioritise one destination in the local propagation delivery policy.",
+        )
+        .with_alias("prioritise_destination"),
+        OperationEntry::new(
             "app.propagation.peer_maintenance",
             "propagation",
             OperationKind::Command,

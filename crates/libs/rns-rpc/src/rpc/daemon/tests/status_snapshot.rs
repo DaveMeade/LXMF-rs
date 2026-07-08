@@ -1,5 +1,7 @@
 include!("status_snapshot_parts/daemon_status_ex_reads_cached_status.rs");
 
+include!("status_snapshot_parts/delivery_policy_single_entry_mut.rs");
+
 include!("status_snapshot_parts/propagation_enable_clears_selected_n.rs");
 
 include!("status_snapshot_parts/propagation_enable_queues_existing_e.rs");

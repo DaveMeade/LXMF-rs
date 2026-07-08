@@ -2,13 +2,14 @@ use super::{code, ErrorCategory, SdkError, ZmqPipelineBackendClient};
 use crate::app::{Envelope, EnvelopeResponse};
 use crate::domain::{
     PropagationAcknowledgeSyncRequest, PropagationAcknowledgeSyncResult,
-    PropagationDeliveryPolicyRequest, PropagationDeliveryPolicyResult, PropagationEnableRequest,
-    PropagationFetchRequest, PropagationFetchResult, PropagationIngestRequest,
-    PropagationIngestResult, PropagationNodeListResult, PropagationNodeSelectionResult,
-    PropagationNodeSetRequest, PropagationPeerMaintenanceResult, PropagationPeerSyncRequest,
-    PropagationPeerSyncResult, PropagationRecoveryStateResult, PropagationRemotePeerRequest,
-    PropagationRemoteRequest, PropagationRemoteStatusResult, PropagationRemoteSyncResult,
-    PropagationRemoteTransferResult, PropagationRemoteUnpeerResult, PropagationStatusResult,
+    PropagationDeliveryPolicyEntryRequest, PropagationDeliveryPolicyRequest,
+    PropagationDeliveryPolicyResult, PropagationEnableRequest, PropagationFetchRequest,
+    PropagationFetchResult, PropagationIngestRequest, PropagationIngestResult,
+    PropagationNodeListResult, PropagationNodeSelectionResult, PropagationNodeSetRequest,
+    PropagationPeerMaintenanceResult, PropagationPeerSyncRequest, PropagationPeerSyncResult,
+    PropagationRecoveryStateResult, PropagationRemotePeerRequest, PropagationRemoteRequest,
+    PropagationRemoteStatusResult, PropagationRemoteSyncResult, PropagationRemoteTransferResult,
+    PropagationRemoteUnpeerResult, PropagationStatusResult,
 };
 use serde::de::DeserializeOwned;
 use serde::Serialize;
@@ -116,6 +117,33 @@ impl ZmqPipelineBackendClient {
         req: PropagationDeliveryPolicyRequest,
     ) -> Result<PropagationDeliveryPolicyResult, SdkError> {
         self.execute_propagation_envelope("app.propagation.delivery_policy.set", req)
+    }
+
+    pub fn propagation_delivery_policy_allow_destination(
+        &self,
+        req: PropagationDeliveryPolicyEntryRequest,
+    ) -> Result<PropagationDeliveryPolicyResult, SdkError> {
+        self.execute_propagation_envelope("app.propagation.delivery_policy.allow_destination", req)
+    }
+
+    pub fn propagation_delivery_policy_disallow_destination(
+        &self,
+        req: PropagationDeliveryPolicyEntryRequest,
+    ) -> Result<PropagationDeliveryPolicyResult, SdkError> {
+        self.execute_propagation_envelope(
+            "app.propagation.delivery_policy.disallow_destination",
+            req,
+        )
+    }
+
+    pub fn propagation_delivery_policy_prioritise_destination(
+        &self,
+        req: PropagationDeliveryPolicyEntryRequest,
+    ) -> Result<PropagationDeliveryPolicyResult, SdkError> {
+        self.execute_propagation_envelope(
+            "app.propagation.delivery_policy.prioritise_destination",
+            req,
+        )
     }
 
     pub fn propagation_peer_maintenance(
