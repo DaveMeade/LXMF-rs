@@ -24,9 +24,12 @@ forward_port = 4243
 
 The Rust-native aliases are `host`/`port` and `target_host`/`target_port`.
 When only a bind address is configured, the interface is receive-only and the
-runtime role is `listener`. When a forward address is configured, the runtime
-role is `peer`. Device-based UDP configs can derive IPv4 broadcast bind and
-forward addresses from the named host interface.
+runtime role is `listener`. When a unicast forward address is configured, the
+runtime role is `peer`. Explicit software multicast bind or multicast forward
+records use runtime role `multicast` and the transport peer-routing helper.
+This is local/software mutation coverage only; it is not production multicast
+or multi-host parity evidence. Device-based UDP configs can derive IPv4
+broadcast bind and forward addresses from the named host interface.
 
 ## Runtime Status
 
