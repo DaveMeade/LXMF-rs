@@ -62,6 +62,8 @@ impl RpcDaemon {
     ) -> Result<(), std::io::Error> {
         let mut seen = std::collections::HashSet::new();
         let mut seen_tcp_server_bind_addresses = std::collections::HashSet::new();
+        let mut seen_tcp_server_any_bind_ports = std::collections::HashSet::new();
+        let mut seen_tcp_server_wildcard_bind_ports = std::collections::HashSet::new();
         let mut seen_udp_bind_addresses = std::collections::HashSet::new();
         for (index, iface) in interfaces.iter().enumerate() {
             if !Self::is_legacy_hot_apply_record(iface) {
@@ -93,6 +95,35 @@ impl RpcDaemon {
                             Self::interface_identifier(iface, index)
                         ),
                     ));
+                }
+                let Some(port) = iface.port else {
+                    continue;
+                };
+                let host = Self::tcp_server_hot_apply_host(iface.host.as_deref().unwrap_or_default());
+                if Self::host_is_ipv4_unspecified(host) {
+                    if !seen_tcp_server_any_bind_ports.insert(port) {
+                        return Err(std::io::Error::new(
+                            std::io::ErrorKind::InvalidInput,
+                            format!(
+                                "duplicate legacy tcp_server bind address '{}' at {}",
+                                bind_addr,
+                                Self::interface_identifier(iface, index)
+                            ),
+                        ));
+                    }
+                    seen_tcp_server_wildcard_bind_ports.insert(port);
+                } else {
+                    if seen_tcp_server_wildcard_bind_ports.contains(&port) {
+                        return Err(std::io::Error::new(
+                            std::io::ErrorKind::InvalidInput,
+                            format!(
+                                "duplicate legacy tcp_server bind address '{}' at {}",
+                                bind_addr,
+                                Self::interface_identifier(iface, index)
+                            ),
+                        ));
+                    }
+                    seen_tcp_server_any_bind_ports.insert(port);
                 }
             }
             if iface.kind == "udp" && iface.enabled {
@@ -164,7 +195,10 @@ impl RpcDaemon {
         {
             return false;
         }
-        iface.host.as_deref().is_some_and(Self::host_is_loopback)
+        iface
+            .host
+            .as_deref()
+            .is_some_and(|host| Self::host_is_loopback(host) || Self::host_is_ipv4_unspecified(host))
     }
 
     fn legacy_udp_interface_key(iface: &InterfaceRecord) -> Option<String> {
@@ -248,6 +282,11 @@ impl RpcDaemon {
         let host = host.strip_prefix('[').and_then(|value| value.strip_suffix(']')).unwrap_or(host);
         host.eq_ignore_ascii_case("localhost")
             || host.parse::<std::net::IpAddr>().is_ok_and(|ip| ip.is_loopback())
+    }
+
+    fn host_is_ipv4_unspecified(host: &str) -> bool {
+        let host = host.trim();
+        host.parse::<std::net::Ipv4Addr>().is_ok_and(|ip| ip.is_unspecified())
     }
 
     fn tcp_server_hot_apply_host(host: &str) -> &str {

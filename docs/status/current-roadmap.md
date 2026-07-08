@@ -439,10 +439,10 @@ Scoped release evidence is split as follows:
   `UDPInterface` alias parsing, strict daemon startup, bound loopback status,
   and malformed-datagram `bytes_rx`/`decode_errors` telemetry without external
   network services. `set_interfaces` and `reload_config` now hot-apply explicit
-  loopback TCP server listeners, including the local `localhost` hostname,
-  alongside TCP clients and explicit UDP
+  loopback and IPv4 wildcard TCP server listeners, including the local
+  `localhost` hostname and `0.0.0.0`, alongside TCP clients and explicit UDP
   listener, peer, and multicast-bind records, with tests proving
-  `device`-bound, non-local, and broader TCP server listener shapes stay
+  `device`-bound, non-local concrete, and broader TCP server listener shapes stay
   restart-required or invalid, UDP `device`-bound, partial-target,
   out-of-range-target, and multicast-forward shapes remain restart-required or
   invalid, and duplicate TCP server or UDP binds are rejected before mutation.
@@ -1313,8 +1313,9 @@ gate for the SDK-first software slice.
      client-specific compatibility claims.
 2. **Reticulum behavioral breadth**
    - Finish resolver/bootstrap, announce/path edge behavior, and broader runtime
-     mutation parity beyond TCP clients, explicit loopback TCP server
-     listeners, and explicit UDP listener, peer, and multicast-bind records.
+     mutation parity beyond TCP clients, explicit loopback and IPv4 wildcard TCP
+     server listeners, and explicit UDP listener, peer, and multicast-bind
+     records.
 3. **Operational breadth**
    - Add broader prepared-host hardware evidence across serial/TCP/BLE RNode
      device, firmware, management, and radio combinations; ordinary

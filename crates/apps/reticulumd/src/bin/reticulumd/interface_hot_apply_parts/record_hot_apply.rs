@@ -11,6 +11,8 @@ pub(crate) fn validate_hot_apply_uniqueness(
 ) -> Result<(), io::Error> {
     let mut seen = std::collections::HashSet::new();
     let mut seen_tcp_server_bind_addresses = std::collections::HashSet::new();
+    let mut seen_tcp_server_any_bind_ports = std::collections::HashSet::new();
+    let mut seen_tcp_server_wildcard_bind_ports = std::collections::HashSet::new();
     let mut seen_udp_bind_addresses = std::collections::HashSet::new();
     for record in interfaces {
         if record.kind == "tcp_server" {
@@ -20,6 +22,32 @@ pub(crate) fn validate_hot_apply_uniqueness(
                     io::ErrorKind::InvalidInput,
                     format!("duplicate tcp_server bind address '{bind_addr}'"),
                 ));
+            }
+            if record.enabled {
+                let port = record.port.ok_or_else(|| {
+                    io::Error::new(
+                        io::ErrorKind::InvalidInput,
+                        "tcp_server hot-apply requires port",
+                    )
+                })?;
+                let host = tcp_server_hot_apply_host(record.host.as_deref().unwrap_or_default());
+                if host_is_ipv4_unspecified(host) {
+                    if !seen_tcp_server_any_bind_ports.insert(port) {
+                        return Err(io::Error::new(
+                            io::ErrorKind::InvalidInput,
+                            format!("duplicate tcp_server bind address '{bind_addr}'"),
+                        ));
+                    }
+                    seen_tcp_server_wildcard_bind_ports.insert(port);
+                } else {
+                    if seen_tcp_server_wildcard_bind_ports.contains(&port) {
+                        return Err(io::Error::new(
+                            io::ErrorKind::InvalidInput,
+                            format!("duplicate tcp_server bind address '{bind_addr}'"),
+                        ));
+                    }
+                    seen_tcp_server_any_bind_ports.insert(port);
+                }
             }
         }
         if record.kind == "udp" {
@@ -147,10 +175,10 @@ pub(crate) fn tcp_server_bind_addr(record: &InterfaceRecord) -> Result<String, i
             "tcp_server hot-apply does not support i2p_tunneled records",
         ));
     }
-    if !host_is_loopback(host) {
+    if !host_is_loopback(host) && !host_is_ipv4_unspecified(host) {
         return Err(io::Error::new(
             io::ErrorKind::InvalidInput,
-            "tcp_server hot-apply requires an explicit loopback host",
+            "tcp_server hot-apply requires an explicit loopback or IPv4 wildcard host",
         ));
     }
     let port = record.port.ok_or_else(|| {
@@ -178,6 +206,11 @@ fn host_is_loopback(host: &str) -> bool {
     let host = host.strip_prefix('[').and_then(|value| value.strip_suffix(']')).unwrap_or(host);
     host.eq_ignore_ascii_case("localhost")
         || host.parse::<std::net::IpAddr>().is_ok_and(|ip| ip.is_loopback())
+}
+
+fn host_is_ipv4_unspecified(host: &str) -> bool {
+    let host = host.trim();
+    host.parse::<std::net::Ipv4Addr>().is_ok_and(|ip| ip.is_unspecified())
 }
 
 fn tcp_server_hot_apply_host(host: &str) -> &str {
