@@ -171,6 +171,7 @@ fn sdk_paper_decode_bridge_record_persists_and_emits_raw_inbound_event() {
         .expect("poll events");
     assert!(poll.error.is_none());
     let poll_result = poll.result.expect("poll result");
+    let first_next_cursor = poll_result["next_cursor"].as_str().expect("first next cursor").to_owned();
     let events = poll_result["events"].as_array().expect("events");
     let inbound = events
         .iter()
@@ -190,6 +191,51 @@ fn sdk_paper_decode_bridge_record_persists_and_emits_raw_inbound_event() {
     let duplicate = duplicate.result.expect("duplicate paper result");
     assert_eq!(duplicate["duplicate"], json!(true));
     assert_eq!(duplicate["transient_id"], json!("decoded-record-transient-id"));
+
+    let duplicate_poll = daemon
+        .handle_rpc(rpc_request(
+            5,
+            "sdk_poll_events_v2",
+            json!({ "cursor": first_next_cursor, "max": 50 }),
+        ))
+        .expect("poll duplicate events");
+    assert!(duplicate_poll.error.is_none());
+    let duplicate_poll = duplicate_poll.result.expect("duplicate poll result");
+    let duplicate_events = duplicate_poll["events"].as_array().expect("duplicate events");
+    let drop_event = duplicate_events
+        .iter()
+        .find(|event| event["event_type"] == json!("inbound_dropped"))
+        .expect("paper duplicate drop event");
+    assert_eq!(drop_event["payload"]["reason"], json!("duplicate"));
+    assert_eq!(drop_event["payload"]["delivery_kind"], json!("paper"));
+    assert_eq!(drop_event["payload"]["payload_mode"], json!("paper_uri"));
+    assert_eq!(drop_event["payload"]["bytes_len"], json!(3));
+    assert_eq!(drop_event["payload"]["detail"], json!("duplicate paper decode"));
+    assert_eq!(drop_event["payload"]["transient_id"], json!("decoded-record-transient-id"));
+    assert!(drop_event["payload"]["raw_destination_hash"].as_str().is_some_and(|value| {
+        value.starts_with("sha256:") && value != "decoded-record-destination"
+    }));
+    assert!(
+        drop_event["payload"]["resolved_destination_hash"]
+            .as_str()
+            .is_some_and(|value| {
+                value.starts_with("sha256:") && value != "decoded-record-destination"
+            })
+    );
+    assert!(drop_event["payload"]["dropped_message_id"]
+        .as_str()
+        .is_some_and(|value| value.starts_with("sha256:") && value != "paper-record-message-1"));
+    assert!(drop_event["payload"]["source_hash"]
+        .as_str()
+        .is_some_and(|value| value.starts_with("sha256:") && value != "paper-source"));
+    assert!(drop_event["payload"]["destination_hash"].as_str().is_some_and(|value| {
+        value.starts_with("sha256:") && value != "decoded-record-destination"
+    }));
+    assert_eq!(
+        duplicate_events.iter().filter(|event| event["event_type"] == json!("inbound")).count(),
+        0,
+        "duplicate paper decode must not emit a second inbound event"
+    );
 }
 
 #[test]

@@ -11,6 +11,31 @@ impl RpcDaemon {
         (paper_bytes.len() >= 16).then(|| encode_hex(&paper_bytes[..16]))
     }
 
+    fn publish_paper_duplicate_drop_event(
+        &self,
+        transient_id: &str,
+        destination: &str,
+        bytes_len: usize,
+        bridged_decode: Option<&PaperDecodeOutcome>,
+    ) {
+        let mut payload = json!({
+            "reason": "duplicate",
+            "delivery_kind": "paper",
+            "raw_destination_hash": destination,
+            "resolved_destination_hash": destination,
+            "payload_mode": "paper_uri",
+            "bytes_len": bytes_len,
+            "detail": "duplicate paper decode",
+            "transient_id": transient_id,
+        });
+        if let Some(record) = bridged_decode.and_then(|outcome| outcome.record.as_ref()) {
+            payload["dropped_message_id"] = json!(record.id);
+            payload["source_hash"] = json!(record.source);
+            payload["destination_hash"] = json!(record.destination);
+        }
+        self.publish_event(RpcEvent { event_type: "inbound_dropped".to_string(), payload });
+    }
+
     pub(super) fn sdk_command_event_payload_summary(payload: &JsonValue) -> JsonValue {
         let byte_len = payload.to_string().len();
         match payload {
@@ -360,7 +385,14 @@ impl RpcDaemon {
                 false
             }
         };
-        if !duplicate {
+        if duplicate {
+            self.publish_paper_duplicate_drop_event(
+                transient_id.as_str(),
+                destination.as_str(),
+                bytes_len,
+                bridged_decode.as_ref(),
+            );
+        } else {
             if let Some(outcome) = bridged_decode.as_ref() {
                 if let Some(record) = outcome.record.clone() {
                     if let Some(raw_lxmf_bytes) = outcome.raw_lxmf_bytes.as_ref() {

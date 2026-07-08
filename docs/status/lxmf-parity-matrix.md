@@ -417,7 +417,9 @@ Workspace paths are used for navigation. `crates/libs/lxmf-core` publishes as
 - The typed SDK paper decode surface now keeps the legacy `paper_decode` Ack
   path while adding `paper_decode_with_metadata`, exposing daemon paper-ingest
   metadata (`transient_id`, duplicate state, destination, destination hint, and
-  byte length) through the RPC and ZeroMQ backends.
+  byte length) through the RPC and ZeroMQ backends. Duplicate bridge-backed
+  paper decodes now also publish one bounded `inbound_dropped` event without
+  emitting a second inbound event or storing the message again.
 - The `lxmf`/`lxmf-cli` command surface now exposes the same paper operation
   path with `paper-encode --message-id` and `paper-decode --uri`, keeping CLI
   paper handling on the typed SDK calls instead of requiring raw RPC envelopes.
@@ -918,6 +920,10 @@ Workspace paths are used for navigation. `crates/libs/lxmf-core` publishes as
   including default identifier redaction and `delivery_kind` classification,
   without storing a message or updating peer activity. Direct stamp-policy and
   delivery-policy rejections route through the same bounded drop-event helper.
+- Focused paper decode tests cover bridge-backed duplicate paper ingests
+  emitting `delivery_kind = "paper"` `inbound_dropped` events through
+  `sdk_poll_events_v2` while preserving duplicate metadata and avoiding a
+  second raw inbound event.
 - The native SDK app event mapper now exposes typed inbound message, inbound
   drop, receipt, and delivery-lifecycle helpers on the existing event path,
   preserving message IDs, peer/source identity, destination hashes, raw LXMF
