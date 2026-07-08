@@ -25,6 +25,13 @@ mod tests {
             registry.canonicalize("sdk_paper_decode_v2").expect("canonical id").as_str(),
             "app.paper.decode"
         );
+        assert_eq!(
+            registry
+                .canonicalize("message_delivery_trace")
+                .expect("canonical delivery trace id")
+                .as_str(),
+            "app.delivery.trace"
+        );
     }
 
     #[test]

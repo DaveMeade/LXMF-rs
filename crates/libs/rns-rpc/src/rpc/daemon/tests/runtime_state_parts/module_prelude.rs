@@ -292,6 +292,35 @@ fn send_with_bridge_stays_in_sending_until_acknowledged() {
         }),
         "bridge-backed sends must not be marked sent before transport acknowledgements arrive"
     );
+
+    let envelope_trace = daemon
+        .handle_rpc(rpc_request(
+            12,
+            "sdk_envelope_execute_v2",
+            json!({
+                "operation_id": "app.delivery.trace",
+                "kind": "query",
+                "correlation_id": "trace-corr",
+                "payload": {
+                    "message_id": "pending-1"
+                }
+            }),
+        ))
+        .expect("delivery trace through app envelope");
+    assert!(envelope_trace.error.is_none());
+    let envelope_trace_result = envelope_trace.result.expect("envelope trace result");
+    assert_eq!(envelope_trace_result["response"]["operation_id"], json!("app.delivery.trace"));
+    assert_eq!(envelope_trace_result["response"]["kind"], json!("result"));
+    assert_eq!(envelope_trace_result["response"]["correlation_id"], json!("trace-corr"));
+    assert_eq!(envelope_trace_result["response"]["payload"]["message_id"], json!("pending-1"));
+    assert!(
+        envelope_trace_result["response"]["payload"]["transitions"]
+            .as_array()
+            .expect("envelope transitions")
+            .iter()
+            .any(|entry| entry["status"] == json!("sending")),
+        "app.delivery.trace should expose the same non-terminal sending transition"
+    );
 }
 
 #[test]

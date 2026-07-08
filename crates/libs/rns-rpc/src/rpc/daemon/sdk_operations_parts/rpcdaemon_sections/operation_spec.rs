@@ -1,13 +1,14 @@
 impl RpcDaemon {
 
     fn operation_spec(&self, id_or_alias: &str) -> Option<ResolvedSdkOperationSpec> {
-        if let Some(spec) =
-            SDK_OPERATION_SPECS.iter().chain(PROPAGATION_SDK_OPERATION_SPECS.iter()).find(
-                |spec| {
-                    spec.id == id_or_alias
-                        || spec.aliases.iter().any(|alias| alias == &id_or_alias)
-                },
-            )
+        if let Some(spec) = SDK_OPERATION_SPECS
+            .iter()
+            .chain(PROPAGATION_SDK_OPERATION_SPECS.iter())
+            .chain(LEGACY_SDK_OPERATION_SPECS.iter())
+            .find(|spec| {
+                spec.id == id_or_alias
+                    || spec.aliases.iter().any(|alias| alias == &id_or_alias)
+            })
         {
             return Some(ResolvedSdkOperationSpec {
                 id: spec.id.to_owned(),
@@ -38,6 +39,7 @@ impl RpcDaemon {
         let mut entries = SDK_OPERATION_SPECS
             .iter()
             .chain(PROPAGATION_SDK_OPERATION_SPECS.iter())
+            .chain(LEGACY_SDK_OPERATION_SPECS.iter())
             .filter(|spec| {
                 spec.required_capabilities
                     .iter()
@@ -110,11 +112,13 @@ impl RpcDaemon {
         params: JsonValue,
     ) -> Result<RpcResponse, std::io::Error> {
         let delegated = match method {
-            "sdk_send_v2" | "sdk_send_batch_v2" | "peer_sync" => self.handle_rpc_legacy_messages(RpcRequest {
-                id: request_id,
-                method: method.to_owned(),
-                params: Some(params),
-            })?,
+            "sdk_send_v2" | "sdk_send_batch_v2" | "peer_sync" | "message_delivery_trace" => {
+                self.handle_rpc_legacy_messages(RpcRequest {
+                    id: request_id,
+                    method: method.to_owned(),
+                    params: Some(params),
+                })?
+            }
             "propagation_remote_status"
             | "propagation_acknowledge_sync_completion"
             | "get_outbound_propagation_cost"

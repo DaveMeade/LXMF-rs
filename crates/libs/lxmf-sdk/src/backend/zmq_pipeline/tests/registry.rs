@@ -20,6 +20,7 @@ fn operation_registry_uses_zmq_sdk_method_for_chat_peer_and_propagation_operatio
         "app.message.history.list",
         "app.delivery.destination_hash",
         "app.delivery.cancel",
+        "app.delivery.trace",
         "app.peer.connect",
         "app.peer.disconnect",
         "app.peer.reconnect",
