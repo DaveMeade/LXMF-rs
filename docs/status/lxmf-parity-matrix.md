@@ -881,7 +881,7 @@ Workspace paths are used for navigation. `crates/libs/lxmf-core` publishes as
 
 ## Highest-Priority Gaps
 
-1. Validate external clients before making client-specific claims.
+1. Validate remaining external clients before making client-specific claims.
 2. Continue widening non-propagation router convenience coverage only where it
    affects supported clients.
 
@@ -905,6 +905,12 @@ Workspace paths are used for navigation. `crates/libs/lxmf-core` publishes as
 - Focused daemon/RPC tests cover delivery modes, propagation offers, paper
   operation registry/envelope dispatch, peer maintenance, queue policy, source
   accounting, stamps, tickets, receipts, and cancellation.
+- `tools/scripts/external-client-interop-gate.sh columba /home/pgiuseppe/Documents/columba`
+  passed against Columba `3738bd7834128023db491cca0876585b799de942`
+  (`v2.0.9-beta`, clean), proving reticulumd-to-Columba and
+  Columba-to-reticulumd direct LXMF delivery through Columba's current
+  `event_bridge.py` Python backend adapter. The stable summary was emitted at
+  `target/interop/external-client-gate/columba/gate-summary.json`.
 - Focused daemon bridge tests cover deferred normal-stamp queue ownership,
   cancellation, retry metadata, and propagation-stamp preparation before
   delivery handoff.

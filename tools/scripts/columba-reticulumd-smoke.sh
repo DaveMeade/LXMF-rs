@@ -13,6 +13,14 @@ COLUMBA_TO_DAEMON_CONTENT="${COLUMBA_TO_DAEMON_CONTENT:-reply-from-columba}"
 LOG_DIR="${LOG_DIR:-${REPO_ROOT}/target/interop/columba-reticulumd}"
 REPORT_PATH="${REPORT_PATH:-${LOG_DIR}/report.json}"
 RUST_LOG="${RUST_LOG:-info}"
+COLUMBA_PYTHON="${COLUMBA_PYTHON:-}"
+
+if [[ -z "${COLUMBA_PYTHON}" && -x "${HOME}/.reticulum-host/venv/bin/python" ]]; then
+  COLUMBA_PYTHON="${HOME}/.reticulum-host/venv/bin/python"
+fi
+if [[ -z "${COLUMBA_PYTHON}" ]]; then
+  COLUMBA_PYTHON="$(command -v python3)"
+fi
 
 if [[ ! -d "${COLUMBA_ROOT}" ]]; then
   echo "Columba repo not found at ${COLUMBA_ROOT}" >&2
@@ -82,7 +90,7 @@ fi
 
 (
   cd "${REPO_ROOT}"
-  python3 tools/scripts/columba_control.py serve \
+  "${COLUMBA_PYTHON}" tools/scripts/columba_control.py serve \
     --columba-root "${COLUMBA_ROOT}" \
     --storage-dir "${COLUMBA_STORAGE}" \
     --control-dir "${CONTROL_DIR}" \

@@ -1309,7 +1309,12 @@ gate for the SDK-first software slice.
    - Propagation router lifecycle now has dispatchable Python-reference cases
      for remote status, Rust-to-Python fetch/download/sync, Python-origin
      `/get` haves acknowledgement, and Python-origin `/offer` side effects.
-   - Capture release evidence for Sideband, MeshChatX, and Columba before making
+   - Columba release evidence is captured with
+     `tools/scripts/external-client-interop-gate.sh columba /home/pgiuseppe/Documents/columba`
+     against clean Columba `3738bd7834128023db491cca0876585b799de942`
+     (`v2.0.9-beta`), proving bidirectional direct LXMF delivery through the
+     current Python `event_bridge.py` backend adapter.
+   - Capture release evidence for Sideband and MeshChatX before making those
      client-specific compatibility claims.
 2. **Reticulum behavioral breadth**
    - Finish resolver/bootstrap, announce/path edge behavior, and broader runtime
