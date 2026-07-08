@@ -679,6 +679,20 @@ fn hot_apply_rejects_device_bound_tcp_server_records() {
 }
 
 #[test]
+fn hot_apply_rejects_prefer_ipv6_tcp_server_records() {
+    let (tx, _rx) = tokio::sync::mpsc::channel(1);
+    let bridge = test_bridge(tx);
+    let mut record = tcp_server_record("listener", "127.0.0.1", 4242);
+    record.settings = Some(json!({ "prefer_ipv6": true }));
+
+    let err =
+        bridge.apply_interfaces(vec![record]).expect_err("prefer_ipv6 tcp_server should fail");
+
+    assert_eq!(err.kind(), io::ErrorKind::InvalidInput);
+    assert!(err.to_string().contains("prefer_ipv6"));
+}
+
+#[test]
 fn hot_apply_rejects_duplicate_tcp_server_bind_addresses() {
     let (tx, _rx) = tokio::sync::mpsc::channel(1);
     let bridge = test_bridge(tx);
