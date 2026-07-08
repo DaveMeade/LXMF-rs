@@ -1027,14 +1027,16 @@ Scoped release evidence is split as follows:
   drops now emit bounded raw `inbound_dropped` RPC/SDK event-stream entries
   without storing messages or updating peer activity; identifier fields use the
   existing event redaction path by default and events distinguish `packet`,
-  `resource`, and `propagation` delivery kinds. The propagated local-delivery
-  coverage includes local envelope ingest plus decryptable remote fetched and
-  remote downloaded propagation payloads that reach local decode, stamp, or
-  delivery-policy handling, plus local-addressed pre-decode rejects for short
-  or undecryptable local envelopes and strict remote fetch/download local-import
-  rejects for short payloads, destination mismatches, and decrypt failures, so
-  those router-coupled drops remain observer-visible instead of only counted as
-  rejected imports.
+  `resource`, and `propagation` delivery kinds. Direct delivery resources now
+  also enforce the advertised delivery transfer limit before decode or storage,
+  emitting the same bounded drop signal for oversized completed resources. The
+  propagated local-delivery coverage includes local envelope ingest plus
+  decryptable remote fetched and remote downloaded propagation payloads that
+  reach local decode, stamp, or delivery-policy handling, plus local-addressed
+  pre-decode rejects for short or undecryptable local envelopes and strict remote
+  fetch/download local-import rejects for short payloads, destination mismatches,
+  and decrypt failures, so those router-coupled drops remain observer-visible
+  instead of only counted as rejected imports.
 - The native SDK app event mapper now projects inbound delivery, receipt, and
   drop payloads into typed helpers on the existing event path, preserving
   message IDs, source/destination hashes, raw LXMF bytes, delivery kind,
