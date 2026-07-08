@@ -171,7 +171,10 @@ fn maps_inbound_drop_to_typed_details() {
                 "dropped_message_id": "msg-drop-1",
                 "payload_mode": "full_wire",
                 "bytes_len": 24,
-                "detail": "propagated LXMF payload too short"
+                "detail": "propagated LXMF payload too short",
+                "operation": "propagation_remote_fetch",
+                "transient_id": "transient-drop-1",
+                "peer": "peer-drop-source"
             }),
         ),
         "desktop_default",
@@ -179,7 +182,7 @@ fn maps_inbound_drop_to_typed_details() {
 
     assert!(matches!(mapped.kind, EventKind::InboundMessageDropped));
     assert_eq!(mapped.metadata.message_id.as_deref(), Some("msg-drop-1"));
-    assert_eq!(mapped.metadata.peer_id.as_deref(), Some("sha256:source"));
+    assert_eq!(mapped.metadata.peer_id.as_deref(), Some("peer-drop-source"));
     let details = mapped.inbound_drop_details().expect("drop details");
     assert_eq!(details.reason.as_deref(), Some("payload_too_short"));
     assert_eq!(details.delivery_kind.as_deref(), Some("propagation"));
@@ -191,6 +194,9 @@ fn maps_inbound_drop_to_typed_details() {
     assert_eq!(details.payload_mode.as_deref(), Some("full_wire"));
     assert_eq!(details.bytes_len, Some(24));
     assert_eq!(details.detail.as_deref(), Some("propagated LXMF payload too short"));
+    assert_eq!(details.operation.as_deref(), Some("propagation_remote_fetch"));
+    assert_eq!(details.transient_id.as_deref(), Some("transient-drop-1"));
+    assert_eq!(details.peer.as_deref(), Some("peer-drop-source"));
 }
 
 #[test]
