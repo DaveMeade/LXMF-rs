@@ -61,7 +61,10 @@ pub(super) fn handle_message_get_request(
 
     let haves = match entries.get(1) {
         Some(value) if value.is_nil() => Vec::new(),
-        Some(rmpv::Value::Array(values)) => binary_id_list(values),
+        Some(rmpv::Value::Array(values)) => match validated_binary_id_list(values) {
+            Some(ids) => ids,
+            None => return ControlResponse::Code(error_invalid_data),
+        },
         _ => return ControlResponse::Code(error_invalid_data),
     };
     if !haves.is_empty() {
@@ -115,7 +118,10 @@ pub(super) fn handle_message_get_request(
     }
 
     let wants = match entries.first() {
-        Some(rmpv::Value::Array(values)) => binary_id_list(values),
+        Some(rmpv::Value::Array(values)) => match validated_binary_id_list(values) {
+            Some(ids) => ids,
+            None => return ControlResponse::Code(error_invalid_data),
+        },
         _ => return ControlResponse::Code(error_invalid_data),
     };
     let mut retryable_wants = Vec::with_capacity(wants.len());
@@ -298,10 +304,10 @@ pub(super) fn handle_offer_request(
     }
 }
 
-fn binary_id_list(values: &[rmpv::Value]) -> Vec<Vec<u8>> {
+fn validated_binary_id_list(values: &[rmpv::Value]) -> Option<Vec<Vec<u8>>> {
     values
         .iter()
-        .filter_map(|value| match value {
+        .map(|value| match value {
             rmpv::Value::Binary(bytes) if bytes.len() == 32 => Some(bytes.clone()),
             _ => None,
         })

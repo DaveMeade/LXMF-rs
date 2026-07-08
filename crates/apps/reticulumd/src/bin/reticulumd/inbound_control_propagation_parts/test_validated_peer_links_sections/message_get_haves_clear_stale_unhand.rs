@@ -379,7 +379,7 @@
     }
 
     #[test]
-    fn message_get_ignores_malformed_transient_ids_inside_lists_like_python() {
+    fn message_get_rejects_malformed_transient_ids_inside_lists() {
         let daemon = RpcDaemon::test_instance();
         let remote_private =
             rns_transport::identity::PrivateIdentity::new_from_rand(rand_core::OsRng);
@@ -425,9 +425,13 @@
             0xF1,
             0xF4,
         );
-        let ControlResponse::Rmpv(rmpv::Value::Array(messages)) = fetch_response else {
-            panic!("expected fetched message list");
-        };
-        assert_eq!(messages, vec![rmpv::Value::Binary(wanted_payload)]);
-        assert!(!daemon.has_propagation_payload(hex::encode(have).as_str()));
+        assert!(matches!(fetch_response, ControlResponse::Code(0xF4)));
+        assert!(
+            daemon.has_propagation_payload(hex::encode(wanted).as_str()),
+            "malformed message-get wants must not be silently filtered before serving payloads"
+        );
+        assert!(
+            daemon.has_propagation_payload(hex::encode(have).as_str()),
+            "malformed message-get haves must not be silently filtered before purging payloads"
+        );
     }
