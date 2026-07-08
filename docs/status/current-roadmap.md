@@ -133,7 +133,8 @@ Scoped release evidence is split as follows:
   `request_path` RPC after restart, that restored cached-announce identity keys
   are persisted for daemon announce-identity lookup, and daemon status reports
   `_runtime.reticulum.path_table_restore.status` as `ok` or `error` so corrupt
-  `destination_table` state remains observable without making startup fatal.
+  `destination_table` and `tunnels` state remain observable without making
+  startup fatal.
 - Reticulum path-table persistence now writes only routes with cached announce
   material and restore hardens Python-format active and tunnel path-table rows
   by ignoring stale/expired path rows, so restart bootstrap cannot revive
@@ -146,7 +147,8 @@ Scoped release evidence is split as follows:
   active/tunnel cached-announce rows alongside the existing malformed-cache
   daemon evidence.
   Malformed `destination_table` and `tunnels` files remain observable daemon
-  restore errors.
+  restore errors, with focused daemon bootstrap/status coverage for each
+  Python-format table.
 - Shared-instance clients skip local Reticulum path-table save and restore
   work, matching Python's shared-instance bootstrap/persistence boundary.
 - Tunnel-only restored announces are retained as cache material so paths

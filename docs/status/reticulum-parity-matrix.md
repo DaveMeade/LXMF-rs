@@ -351,8 +351,9 @@ announce material, and restore ignores stale/expired Python-format active and
 tunnel path-table rows before reintroducing resolver/cache state.
 Malformed per-entry cached announce files and cached announces whose decoded
 destination does not match the active/tunnel path row are skipped without
-poisoning other valid restored routes, while malformed `destination_table` or
-`tunnels` files still surface as daemon restore errors.
+poisoning other valid restored routes, while malformed `destination_table` and
+`tunnels` files surface as daemon restore errors through focused bootstrap/status
+coverage.
 Shared-instance clients now skip local path-table save and restore work like
 Python Reticulum.
 Tunnel-only restored announces are also retained as cache material, so paths
