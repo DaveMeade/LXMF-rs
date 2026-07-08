@@ -50,6 +50,8 @@ mod peer;
 mod propagation;
 #[path = "zmq_pipeline/send.rs"]
 mod send;
+#[path = "zmq_pipeline/ticket.rs"]
+mod ticket;
 #[path = "zmq_pipeline/transport.rs"]
 mod transport;
 #[path = "zmq_pipeline/workflow.rs"]
