@@ -130,6 +130,9 @@ Workspace paths are used for navigation. `crates/libs/lxmf-core` publishes as
   persist as nonterminal `queued: waiting for announce`, preserving them for
   the delivery-announce wakeup path while propagated/propagation-node misses
   stay terminal.
+- `get_outbound_stamp_cost` now exposes Python-style destination-level cached
+  delivery stamp-cost lookup through legacy RPC and the SDK envelope registry,
+  returning `null` when no delivery announce cost has been learned.
 
 ### Tickets and stamps
 

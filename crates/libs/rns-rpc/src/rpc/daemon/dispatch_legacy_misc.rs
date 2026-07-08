@@ -89,6 +89,24 @@ impl RpcDaemon {
                     error: None,
                 })
             }
+            "get_outbound_stamp_cost" => {
+                let params = request.params.ok_or_else(|| {
+                    std::io::Error::new(std::io::ErrorKind::InvalidInput, "missing params")
+                })?;
+                let parsed: OutboundStampCostParams = serde_json::from_value(params)
+                    .map_err(|err| std::io::Error::new(std::io::ErrorKind::InvalidInput, err))?;
+                let destination = normalize_destination_hash_param(&parsed.destination)?;
+                let stamp_cost = self.outbound_stamp_cost_for(destination.as_str())?;
+
+                Ok(RpcResponse {
+                    id: request.id,
+                    result: Some(json!({
+                        "destination": destination,
+                        "stamp_cost": stamp_cost,
+                    })),
+                    error: None,
+                })
+            }
             "ticket_generate" => {
                 let params = request.params.ok_or_else(|| {
                     std::io::Error::new(std::io::ErrorKind::InvalidInput, "missing params")

@@ -25,6 +25,13 @@ mod tests {
             registry.canonicalize("sdk_paper_decode_v2").expect("canonical id").as_str(),
             "app.paper.decode"
         );
+        assert_eq!(
+            registry
+                .canonicalize("get_outbound_stamp_cost")
+                .expect("canonical outbound stamp cost id")
+                .as_str(),
+            "app.delivery.outbound_stamp_cost"
+        );
     }
 
     #[test]

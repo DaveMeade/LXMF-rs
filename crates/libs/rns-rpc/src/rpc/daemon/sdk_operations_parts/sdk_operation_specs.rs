@@ -497,4 +497,14 @@ const SDK_OPERATION_SPECS: &[SdkOperationSpec] = &[
         required_capabilities: &[],
         rpc_method: "status",
     },
+    SdkOperationSpec {
+        id: "app.delivery.outbound_stamp_cost",
+        group: "delivery",
+        kind: "query",
+        transport_variant: "legacy_rpc",
+        description: "Return the cached outbound delivery stamp cost for one destination.",
+        aliases: &["get_outbound_stamp_cost"],
+        required_capabilities: &[],
+        rpc_method: "get_outbound_stamp_cost",
+    },
 ];

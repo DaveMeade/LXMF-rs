@@ -148,6 +148,11 @@ impl RpcDaemon {
                     Err(err) => return Err(err),
                 }
             }
+            "get_outbound_stamp_cost" => self.handle_rpc_legacy_misc(RpcRequest {
+                id: request_id,
+                method: method.to_owned(),
+                params: Some(params),
+            })?,
             "sdk_snapshot_v2" => self.handle_sdk_snapshot_v2(RpcRequest {
                 id: request_id,
                 method: method.to_owned(),
