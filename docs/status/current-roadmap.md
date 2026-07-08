@@ -527,10 +527,12 @@ Scoped release evidence is split as follows:
 - RPC daemon `lxmf.delivery` announce ingestion now wakes stored pending
   direct/default-direct and opportunistic outbound messages for the announced
   destination while leaving propagated, paper, terminal, already-sending, and
-  other-destination records untouched. Reticulumd direct/opportunistic peer
-  identity misses after delivery path-request timeout now enter nonterminal
-  `queued: waiting for announce` state, so later delivery announces can requeue
-  them instead of leaving a terminal `failed:*` receipt.
+  other-destination records untouched. Delivery announces stay isolated from
+  propagation-router side effects: they do not admit propagation peers, refresh
+  propagation metadata, or queue stored propagation entries. Reticulumd
+  direct/opportunistic peer identity misses after delivery path-request timeout
+  now enter nonterminal `queued: waiting for announce` state, so later delivery
+  announces can requeue them instead of leaving a terminal `failed:*` receipt.
 - Direct and propagated resource sends support receipt-state separation,
   timeout/failure propagation, and active resource cancellation.
 - Link sends now register packet/resource receipt tracking before handoff and

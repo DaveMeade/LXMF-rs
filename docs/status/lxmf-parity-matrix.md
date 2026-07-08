@@ -126,10 +126,12 @@ Workspace paths are used for navigation. `crates/libs/lxmf-core` publishes as
 - RPC daemon `lxmf.delivery` announces reschedule stored pending direct,
   default-direct, and opportunistic outbound messages for the announced
   destination, without waking propagated, paper, terminal, already-sending, or
-  nonmatching records. Reticulumd direct/opportunistic identity/path misses now
-  persist as nonterminal `queued: waiting for announce`, preserving them for
-  the delivery-announce wakeup path while propagated/propagation-node misses
-  stay terminal.
+  nonmatching records. Delivery announces also stay out of propagation-router
+  peer admission, metadata refresh, and stored-entry queue side effects, keeping
+  Python's delivery-vs-propagation announce boundary explicit. Reticulumd
+  direct/opportunistic identity/path misses now persist as nonterminal
+  `queued: waiting for announce`, preserving them for the delivery-announce
+  wakeup path while propagated/propagation-node misses stay terminal.
 
 ### Tickets and stamps
 
