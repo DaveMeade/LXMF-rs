@@ -4,7 +4,6 @@ use crate::event::{Severity as RawSeverity, SubscriptionStart as RawSubscription
 use serde::{Deserialize, Serialize};
 use serde_json::Value as JsonValue;
 use std::collections::BTreeMap;
-
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "snake_case")]
 #[non_exhaustive]
@@ -111,6 +110,7 @@ pub struct DeliveryLifecycleDetails {
     pub method: Option<String>,
     pub bytes: Option<u64>,
     pub link_id: Option<String>,
+    pub stage: Option<String>,
     pub reason: Option<String>,
 }
 
@@ -274,6 +274,7 @@ fn delivery_lifecycle_details(payload: &JsonValue) -> DeliveryLifecycleDetails {
         method: json_str(payload, "method"),
         bytes: payload.get("bytes").and_then(JsonValue::as_u64),
         link_id: json_str(payload, "link_id"),
+        stage: json_str(payload, "stage"),
         reason: json_str(payload, "reason").or_else(|| json_str(payload, "detail")),
     }
 }
@@ -489,7 +490,6 @@ pub fn map_event_batch(batch: RawEventBatch, profile_id: &str) -> EventBatch {
         dropped_count: batch.dropped_count,
     }
 }
-
 #[cfg(feature = "sdk-async")]
 pub fn subscription_cursor(subscription: &EventSubscription) -> Option<crate::EventCursor> {
     subscription.cursor.clone()
