@@ -60,6 +60,14 @@ fn built_in_entries() -> Vec<OperationEntry> {
         )
         .with_alias("sdk_status_v2"),
         OperationEntry::new(
+            "app.delivery.link_available",
+            "delivery",
+            OperationKind::Query,
+            TransportVariant::LegacyRpc,
+            "Return whether a direct or backchannel link exists for a delivery destination.",
+        )
+        .with_alias("delivery_link_available"),
+        OperationEntry::new(
             "app.delivery.cancel",
             "delivery",
             OperationKind::Command,

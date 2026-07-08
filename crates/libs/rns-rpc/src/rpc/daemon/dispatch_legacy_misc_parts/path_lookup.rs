@@ -10,6 +10,12 @@ struct PathLookupParams {
     tag_hex: Option<String>,
 }
 
+#[derive(Debug, Deserialize)]
+struct DeliveryLinkAvailabilityParams {
+    #[serde(alias = "destination_hash", alias = "hash")]
+    destination: String,
+}
+
 fn normalize_destination_hash_param(destination: &str) -> Result<String, std::io::Error> {
     let destination = destination.trim();
     let decoded = hex::decode(destination).map_err(|err| {

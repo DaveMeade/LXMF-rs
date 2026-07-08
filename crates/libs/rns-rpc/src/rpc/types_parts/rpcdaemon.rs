@@ -65,6 +65,7 @@ pub struct RpcDaemon {
     event_sink_tx: Option<mpsc::SyncSender<EventSinkCommand>>,
     interface_mutation_bridge: Mutex<Option<Arc<dyn InterfaceMutationBridge>>>,
     path_lookup_bridge: Mutex<Option<Arc<dyn PathLookupBridge>>>,
+    link_availability_bridge: Mutex<Option<Arc<dyn LinkAvailabilityBridge>>>,
     remote_control_bridge: Mutex<Option<Arc<dyn RemoteControlBridge>>>,
     rnode_management_bridge: Mutex<Option<Arc<dyn RNodeManagementBridge>>>,
     weave_display_control_bridge: Mutex<Option<Arc<dyn WeaveDisplayControlBridge>>>,
@@ -133,6 +134,10 @@ pub trait PathLookupBridge: Send + Sync {
             "path_found": path_found,
         }))
     }
+}
+
+pub trait LinkAvailabilityBridge: Send + Sync {
+    fn delivery_link_available(&self, destination: &str) -> Result<bool, std::io::Error>;
 }
 
 pub trait RNodeManagementBridge: Send + Sync {

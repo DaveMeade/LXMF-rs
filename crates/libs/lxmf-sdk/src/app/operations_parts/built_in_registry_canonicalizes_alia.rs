@@ -81,6 +81,13 @@ mod tests {
             registry.canonicalize("sdk_status_v2").expect("canonical delivery status id").as_str(),
             "app.delivery.status"
         );
+        assert_eq!(
+            registry
+                .canonicalize("delivery_link_available")
+                .expect("canonical link availability id")
+                .as_str(),
+            "app.delivery.link_available"
+        );
         assert!(registry.supports("sdk_snapshot_v2"));
     }
 

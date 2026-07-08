@@ -258,6 +258,46 @@ impl RpcDaemon {
                 add_path_request_scope_fields(&mut result, on_iface.as_deref(), tag.as_deref());
                 Ok(RpcResponse { id: request.id, result: Some(result), error: None })
             }
+            "delivery_link_available" => {
+                let params = request.params.ok_or_else(|| {
+                    std::io::Error::new(std::io::ErrorKind::InvalidInput, "missing params")
+                })?;
+                let parsed: DeliveryLinkAvailabilityParams = serde_json::from_value(params)
+                    .map_err(|err| std::io::Error::new(std::io::ErrorKind::InvalidInput, err))?;
+                let destination = normalize_destination_hash_param(&parsed.destination)?;
+                let Some(bridge) = self
+                    .link_availability_bridge
+                    .lock()
+                    .expect("link_availability_bridge mutex poisoned")
+                    .clone()
+                else {
+                    return Ok(RpcResponse {
+                        id: request.id,
+                        result: None,
+                        error: Some(RpcError::new(
+                            "LINK_AVAILABILITY_UNAVAILABLE",
+                            "link availability bridge is not configured",
+                        )),
+                    });
+                };
+                match bridge.delivery_link_available(destination.as_str()) {
+                    Ok(available) => Ok(RpcResponse {
+                        id: request.id,
+                        result: Some(json!({
+                            "destination": destination.clone(),
+                            "destination_hash": destination,
+                            "available": available,
+                            "link_available": available,
+                        })),
+                        error: None,
+                    }),
+                    Err(err) => Ok(RpcResponse {
+                        id: request.id,
+                        result: None,
+                        error: Some(RpcError::new("LINK_AVAILABILITY_FAILED", err.to_string())),
+                    }),
+                }
+            }
             "rnode_management" => {
                 let params = request.params.ok_or_else(|| {
                     std::io::Error::new(std::io::ErrorKind::InvalidInput, "missing params")

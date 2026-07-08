@@ -537,6 +537,9 @@ Scoped release evidence is split as follows:
   accept Python-style link proofs with default packet context, so Python
   delivery receipts can advance daemon-originated sends from `sent:*` to
   `delivered` while preserving resource completion status.
+- `delivery_link_available` now mirrors Python LXMRouter direct/backchannel
+  link-map membership through a transport-backed legacy RPC method and SDK
+  envelope operation.
 - The typed ZeroMQ SDK delivery status path now preserves daemon-reported
   retry-attempt counts and reason codes in `DeliverySnapshot`, so REM/RCH can
   inspect retry and recovery state without dropping to raw RPC status calls.

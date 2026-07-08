@@ -42,6 +42,9 @@ fn sdk_release_c_domain_methods_roundtrip() {
     assert!(registry_entries.iter().any(|entry| entry["id"] == json!("app.delivery.cancel")));
     assert!(registry_entries
         .iter()
+        .any(|entry| entry["id"] == json!("app.delivery.link_available")));
+    assert!(registry_entries
+        .iter()
         .any(|entry| entry["id"] == json!("app.propagation.peer_sync")));
     assert!(registry_entries
         .iter()

@@ -1,4 +1,29 @@
 impl Transport {
+    pub async fn delivery_link_available(&self, destination: &AddressHash) -> bool {
+        let (out_link, in_links) = {
+            let handler = self.handler.lock().await;
+            (
+                handler.out_links.get(destination).cloned(),
+                handler.in_links.values().cloned().collect::<Vec<_>>(),
+            )
+        };
+
+        if let Some(link) = out_link {
+            if link.lock().await.status() != LinkStatus::Closed {
+                return true;
+            }
+        }
+
+        for link in in_links {
+            let link = link.lock().await;
+            if link.destination().address_hash == *destination && link.status() != LinkStatus::Closed
+            {
+                return true;
+            }
+        }
+
+        false
+    }
 
     pub async fn reset_out_link(&self, destination: &AddressHash) {
         let removed = {

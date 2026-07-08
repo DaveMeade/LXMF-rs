@@ -1,14 +1,15 @@
 impl RpcDaemon {
+    fn static_operation_specs() -> impl Iterator<Item = &'static SdkOperationSpec> {
+        SDK_OPERATION_SPECS
+            .iter()
+            .chain(DELIVERY_SDK_OPERATION_SPECS.iter())
+            .chain(PROPAGATION_SDK_OPERATION_SPECS.iter())
+    }
 
     fn operation_spec(&self, id_or_alias: &str) -> Option<ResolvedSdkOperationSpec> {
-        if let Some(spec) =
-            SDK_OPERATION_SPECS.iter().chain(PROPAGATION_SDK_OPERATION_SPECS.iter()).find(
-                |spec| {
-                    spec.id == id_or_alias
-                        || spec.aliases.iter().any(|alias| alias == &id_or_alias)
-                },
-            )
-        {
+        if let Some(spec) = Self::static_operation_specs().find(|spec| {
+            spec.id == id_or_alias || spec.aliases.iter().any(|alias| alias == &id_or_alias)
+        }) {
             return Some(ResolvedSdkOperationSpec {
                 id: spec.id.to_owned(),
                 kind: spec.kind.to_owned(),
@@ -35,9 +36,7 @@ impl RpcDaemon {
     }
 
     pub(super) fn operation_registry_json(&self) -> JsonValue {
-        let mut entries = SDK_OPERATION_SPECS
-            .iter()
-            .chain(PROPAGATION_SDK_OPERATION_SPECS.iter())
+        let mut entries = Self::static_operation_specs()
             .filter(|spec| {
                 spec.required_capabilities
                     .iter()
@@ -393,6 +392,11 @@ impl RpcDaemon {
                 params: Some(params),
             })?,
             "list_messages" => self.handle_rpc_legacy_messages(RpcRequest {
+                id: request_id,
+                method: method.to_owned(),
+                params: Some(params),
+            })?,
+            "delivery_link_available" => self.handle_rpc_legacy_misc(RpcRequest {
                 id: request_id,
                 method: method.to_owned(),
                 params: Some(params),

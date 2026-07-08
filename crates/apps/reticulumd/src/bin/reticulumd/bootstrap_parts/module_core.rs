@@ -288,7 +288,9 @@ pub(super) async fn bootstrap(args: Args) -> BootstrapContext {
     configure_startup_rpc_token_auth(&args, daemon.as_ref());
     enforce_rpc_bind_security(rpc_addr.as_ref(), rpc_tls.as_ref(), daemon.as_ref());
     if let Some(transport) = transport.as_ref() {
-        daemon.set_path_lookup_bridge(Arc::new(DaemonPathLookupBridge::new(transport.clone())));
+        let path_bridge = Arc::new(DaemonPathLookupBridge::new(transport.clone()));
+        daemon.set_path_lookup_bridge(path_bridge.clone());
+        daemon.set_link_availability_bridge(path_bridge);
         daemon.set_interface_mutation_bridge(Arc::new(
             InterfaceHotApplyBridge::spawn_with_transport_and_daemon(
                 transport.clone(),

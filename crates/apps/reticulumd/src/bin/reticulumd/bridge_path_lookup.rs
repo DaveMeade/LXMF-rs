@@ -1,4 +1,4 @@
-use rns_rpc::PathLookupBridge;
+use rns_rpc::{LinkAvailabilityBridge, PathLookupBridge};
 use rns_transport::destination_hash::parse_destination_hash_required;
 use rns_transport::hash::AddressHash;
 use rns_transport::transport::Transport;
@@ -110,6 +110,24 @@ impl PathLookupBridge for DaemonPathLookupBridge {
                 "interface": status.interface.map(Self::hash_hex),
                 "hops": status.hops,
             }))
+        })
+    }
+}
+
+impl LinkAvailabilityBridge for DaemonPathLookupBridge {
+    fn delivery_link_available(&self, destination: &str) -> Result<bool, std::io::Error> {
+        let destination = Self::destination_hash(destination)?;
+        self.run_transport(move |transport| {
+            let runtime = tokio::runtime::Builder::new_current_thread()
+                .enable_all()
+                .build()
+                .map_err(|err| {
+                    std::io::Error::other(format!(
+                        "failed to build link availability runtime: {err}"
+                    ))
+                })?;
+            Ok(runtime
+                .block_on(async move { transport.delivery_link_available(&destination).await }))
         })
     }
 }

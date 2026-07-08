@@ -106,6 +106,39 @@ impl PathLookupBridge for MetadataPathLookupBridge {
     }
 }
 
+struct RecordingLinkAvailabilityBridge {
+    available: bool,
+    requests: std::sync::Mutex<Vec<String>>,
+}
+
+impl RecordingLinkAvailabilityBridge {
+    fn new(available: bool) -> Self {
+        Self { available, requests: std::sync::Mutex::new(Vec::new()) }
+    }
+
+    fn requests(&self) -> Vec<String> {
+        self.requests.lock().expect("requests mutex poisoned").clone()
+    }
+}
+
+impl LinkAvailabilityBridge for RecordingLinkAvailabilityBridge {
+    fn delivery_link_available(&self, destination: &str) -> Result<bool, std::io::Error> {
+        self.requests
+            .lock()
+            .expect("requests mutex poisoned")
+            .push(destination.to_string());
+        Ok(self.available)
+    }
+}
+
+struct FailingLinkAvailabilityBridge;
+
+impl LinkAvailabilityBridge for FailingLinkAvailabilityBridge {
+    fn delivery_link_available(&self, _destination: &str) -> Result<bool, std::io::Error> {
+        Err(std::io::Error::other("link table unavailable"))
+    }
+}
+
 #[test]
 fn path_status_reports_known_path() {
     let daemon = RpcDaemon::test_instance();
@@ -147,6 +180,94 @@ fn path_status_preserves_bridge_route_metadata() {
     assert_eq!(result["next_hop"].as_str(), Some("8899aabbccddeeff0011223344556677"));
     assert_eq!(result["interface"].as_str(), Some("fedcba98765432100123456789abcdef"));
     assert_eq!(result["hops"].as_u64(), Some(2));
+}
+
+#[test]
+fn delivery_link_available_reports_bridge_status_and_normalizes_hash() {
+    let daemon = RpcDaemon::test_instance();
+    let bridge = Arc::new(RecordingLinkAvailabilityBridge::new(true));
+    daemon.set_link_availability_bridge(bridge.clone());
+
+    let response = daemon
+        .handle_rpc(rpc_request(
+            44,
+            "delivery_link_available",
+            json!({ "hash": "AABBCCDDEEFF00112233445566778899" }),
+        ))
+        .expect("delivery link availability response");
+
+    assert!(response.error.is_none());
+    let result = response.result.expect("delivery link availability result");
+    assert_eq!(result["destination"].as_str(), Some("aabbccddeeff00112233445566778899"));
+    assert_eq!(
+        result["destination_hash"].as_str(),
+        Some("aabbccddeeff00112233445566778899")
+    );
+    assert_eq!(result["available"].as_bool(), Some(true));
+    assert_eq!(result["link_available"].as_bool(), Some(true));
+    assert_eq!(bridge.requests(), vec!["aabbccddeeff00112233445566778899".to_string()]);
+}
+
+#[test]
+fn delivery_link_available_reports_missing_bridge_as_rpc_error() {
+    let daemon = RpcDaemon::test_instance();
+
+    let response = daemon
+        .handle_rpc(rpc_request(
+            45,
+            "delivery_link_available",
+            json!({ "destination": "00112233445566778899aabbccddeeff" }),
+        ))
+        .expect("delivery link availability response");
+
+    assert!(response.result.is_none());
+    let error = response.error.expect("rpc error");
+    assert_eq!(error.code, "LINK_AVAILABILITY_UNAVAILABLE");
+}
+
+#[test]
+fn delivery_link_available_reports_bridge_failure_as_rpc_error() {
+    let daemon = RpcDaemon::test_instance();
+    daemon.set_link_availability_bridge(Arc::new(FailingLinkAvailabilityBridge));
+
+    let response = daemon
+        .handle_rpc(rpc_request(
+            46,
+            "delivery_link_available",
+            json!({ "destination_hash": "00112233445566778899aabbccddeeff" }),
+        ))
+        .expect("delivery link availability response");
+
+    assert!(response.result.is_none());
+    let error = response.error.expect("rpc error");
+    assert_eq!(error.code, "LINK_AVAILABILITY_FAILED");
+    assert!(error.message.contains("link table unavailable"));
+}
+
+#[test]
+fn delivery_link_available_roundtrips_through_sdk_envelope() {
+    let daemon = RpcDaemon::test_instance();
+    daemon.set_link_availability_bridge(Arc::new(RecordingLinkAvailabilityBridge::new(false)));
+
+    let response = daemon
+        .handle_rpc(rpc_request(
+            47,
+            "sdk_envelope_execute_v2",
+            json!({
+                "operation_id": "app.delivery.link_available",
+                "kind": "query",
+                "payload": {
+                    "destination": "00112233445566778899aabbccddeeff"
+                }
+            }),
+        ))
+        .expect("delivery link availability envelope response");
+
+    assert!(response.error.is_none());
+    let result = response.result.expect("envelope result");
+    assert_eq!(result["response"]["operation_id"], json!("app.delivery.link_available"));
+    assert_eq!(result["response"]["payload"]["available"].as_bool(), Some(false));
+    assert_eq!(result["response"]["payload"]["link_available"].as_bool(), Some(false));
 }
 
 #[test]

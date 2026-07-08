@@ -354,6 +354,14 @@ impl RpcDaemon {
         *guard = Some(bridge);
     }
 
+    pub fn set_link_availability_bridge(&self, bridge: Arc<dyn LinkAvailabilityBridge>) {
+        let mut guard = self
+            .link_availability_bridge
+            .lock()
+            .expect("link_availability_bridge mutex poisoned");
+        *guard = Some(bridge);
+    }
+
     pub fn set_remote_control_bridge(&self, bridge: Arc<dyn RemoteControlBridge>) {
         let mut guard =
             self.remote_control_bridge.lock().expect("remote_control_bridge mutex poisoned");

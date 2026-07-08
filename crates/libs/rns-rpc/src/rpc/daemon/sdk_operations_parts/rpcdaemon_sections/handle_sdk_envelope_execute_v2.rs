@@ -119,6 +119,7 @@ impl RpcDaemon {
                     json!({})
                 }
             }
+            "delivery_link_available" => parsed.payload,
             "status" => json!({}),
             "sdk_command_invoke_v2" => json!({
                 "command": canonical_id,
