@@ -138,6 +138,13 @@ fn is_lxmf_delivery_aspect(aspect: Option<&str>) -> bool {
     )
 }
 
+fn is_lxmf_propagation_aspect(aspect: Option<&str>) -> bool {
+    matches!(
+        aspect.map(str::trim).map(str::to_ascii_lowercase).as_deref(),
+        Some("lxmf.propagation" | "propagation")
+    )
+}
+
 fn inbound_ticket_from_record(record: &MessageRecord) -> Option<(i64, String)> {
     let fields = record.fields.as_ref()?.as_object()?;
     let lxmf = fields.get("_lxmf").and_then(JsonValue::as_object);

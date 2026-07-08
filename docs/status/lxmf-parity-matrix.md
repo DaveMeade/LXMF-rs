@@ -960,6 +960,9 @@ Workspace paths are used for navigation. `crates/libs/lxmf-core` publishes as
   already processed transient, or for an already stored message carried by a
   fresh transient, emits one bounded `inbound_dropped` duplicate event while
   preserving the same no-store/no-recount behavior.
+- Propagation announce handling now mirrors Python handler activation: valid
+  `lxmf.propagation` announces are recorded but do not create peers or queue
+  propagation entries unless local propagation handling is active.
 - Focused remote propagation import tests now cover duplicate observability for
   same-response duplicate payloads across sync/fetch/download and already
   processed remote fetch payloads: still-stored duplicates remain accepted for

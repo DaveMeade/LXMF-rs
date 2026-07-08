@@ -1075,6 +1075,9 @@ Scoped release evidence is split as follows:
   fresh transient, now also emits one bounded `inbound_dropped` duplicate event
   with redacted destination identifiers and the transient ID, without storing a
   second message or incrementing receive counters.
+- Propagation announce handling now gates peer/queue side effects on active
+  local propagation handling, matching Python `Handlers.py` behavior while
+  still recording the announce for observability.
 - Remote propagation imports from fetch, download, and sync now keep duplicate
   payloads observer-visible by emitting bounded `inbound_dropped` duplicate
   events with operation, transient, byte-length, and optional peer context while

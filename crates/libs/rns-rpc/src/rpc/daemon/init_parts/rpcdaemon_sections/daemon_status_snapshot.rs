@@ -277,12 +277,16 @@ impl RpcDaemon {
             network_distance: hops,
             peering_timebase,
         };
+        let propagation_side_effects_enabled = !is_lxmf_propagation_aspect(aspect.as_deref()) || {
+            let propagation = self.current_propagation_state();
+            propagation.enabled || propagation.propagation_node_enabled
+        };
         let is_static = self.is_static_peer(peer.as_str());
         let remote_peering_cost_allowed = self.remote_peering_cost_allowed(peering_cost);
-        if !is_static && !remote_peering_cost_allowed {
+        if propagation_side_effects_enabled && !is_static && !remote_peering_cost_allowed {
             self.remove_peer_if_stale_or_expensive(peer.as_str(), timestamp)?;
         }
-        if !is_static && propagation_enabled == Some(false) {
+        if propagation_side_effects_enabled && !is_static && propagation_enabled == Some(false) {
             self.remove_autopeered_peer_if_propagation_disabled(
                 peer.as_str(),
                 peering_timebase.unwrap_or(timestamp),
@@ -297,11 +301,12 @@ impl RpcDaemon {
             .map(|record| record.last_seen)
             .unwrap_or_default();
         let static_path_response_refresh_allowed = !is_path_response || static_peer_last_seen == 0;
-        let should_peer = (is_static && static_path_response_refresh_allowed)
-            || (!is_static
-                && propagation_enabled != Some(false)
-                && remote_peering_cost_allowed
-                && self.should_autopeer_peer(hops));
+        let should_peer = propagation_side_effects_enabled
+            && ((is_static && static_path_response_refresh_allowed)
+                || (!is_static
+                    && propagation_enabled != Some(false)
+                    && remote_peering_cost_allowed
+                    && self.should_autopeer_peer(hops)));
         let peer_type = if is_static {
             Some("static".to_string())
         } else if should_peer {
