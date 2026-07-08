@@ -438,7 +438,10 @@ Scoped release evidence is split as follows:
   `rnstatus-rs`. A software loopback smoke now proves Python-style
   `UDPInterface` alias parsing, strict daemon startup, bound loopback status,
   and malformed-datagram `bytes_rx`/`decode_errors` telemetry without external
-  network services. `set_interfaces` and `reload_config` now hot-apply explicit
+  network services. Reticulum daemon startup now honors Python's
+  default-off `[reticulum] enable_transport` toggle before enabling
+  transport-node retransmit/routing behavior. `set_interfaces` and
+  `reload_config` now hot-apply explicit
   loopback TCP server listeners, including the local `localhost` hostname,
   alongside TCP clients and explicit UDP
   listener, peer, and multicast-bind records, with tests proving

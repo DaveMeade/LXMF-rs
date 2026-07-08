@@ -461,6 +461,28 @@ force_shared_instance_bitrate = 1000000
 }
 
 #[test]
+fn reticulum_enable_transport_defaults_false() {
+    let cfg = DaemonConfig::from_toml("").expect("parse empty config");
+
+    assert!(!cfg.reticulum_transport_enabled());
+}
+
+#[test]
+fn parses_reticulum_enable_transport_toggle() {
+    for (value, expected) in [("true", true), ("false", false)] {
+        let input = format!(
+            r#"
+[reticulum]
+enable_transport = {value}
+"#
+        );
+        let cfg = DaemonConfig::from_toml(&input).expect("parse transport toggle");
+
+        assert_eq!(cfg.reticulum_transport_enabled(), expected);
+    }
+}
+
+#[test]
 fn parses_reticulum_global_share_instance_false_without_implicit_local() {
     let input = r#"
 [reticulum]
@@ -886,6 +908,7 @@ fn filters_enabled_tcp_clients() {
         display_name: None,
         announce_capabilities: Vec::new(),
         propagation_node: None,
+        reticulum_enable_transport: false,
         interfaces: vec![
             InterfaceConfig {
                 kind: "tcp_client".into(),
@@ -915,6 +938,7 @@ fn filters_enabled_tcp_servers_with_default_host() {
         display_name: None,
         announce_capabilities: Vec::new(),
         propagation_node: None,
+        reticulum_enable_transport: false,
         interfaces: vec![
             InterfaceConfig {
                 kind: "tcp_server".into(),

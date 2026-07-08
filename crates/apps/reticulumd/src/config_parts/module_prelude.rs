@@ -15,6 +15,7 @@ pub struct DaemonConfig {
     pub display_name: Option<String>,
     pub announce_capabilities: Vec<String>,
     pub propagation_node: Option<PropagationNodeConfig>,
+    pub reticulum_enable_transport: bool,
     pub interfaces: Vec<InterfaceConfig>,
 }
 
@@ -54,6 +55,11 @@ impl<'de> Deserialize<'de> for DaemonConfig {
             display_name: raw.display_name,
             announce_capabilities: raw.announce_capabilities,
             propagation_node: raw.propagation_node,
+            reticulum_enable_transport: raw
+                .reticulum
+                .as_ref()
+                .and_then(|reticulum| reticulum.enable_transport)
+                .unwrap_or(false),
             interfaces,
         })
     }
@@ -62,6 +68,8 @@ impl<'de> Deserialize<'de> for DaemonConfig {
 #[derive(Debug, Clone, Default, Deserialize)]
 #[allow(dead_code)]
 struct ReticulumConfigRaw {
+    #[serde(default)]
+    enable_transport: Option<bool>,
     #[serde(default)]
     share_instance: Option<bool>,
     #[serde(default)]
@@ -435,6 +443,10 @@ impl DaemonConfig {
         let contents = fs::read_to_string(path)?;
         Self::from_toml(&contents)
             .map_err(|err| std::io::Error::new(std::io::ErrorKind::InvalidData, err))
+    }
+
+    pub fn reticulum_transport_enabled(&self) -> bool {
+        self.reticulum_enable_transport
     }
 
     pub fn enabled_tcp_clients(&self) -> Vec<&InterfaceConfig> {

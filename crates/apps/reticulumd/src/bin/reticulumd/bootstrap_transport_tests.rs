@@ -1,7 +1,25 @@
-use super::{build_selected_tcp_server_adapter, TcpServerSelection};
+use super::{
+    build_selected_tcp_server_adapter, reticulum_transport_retransmit_enabled, TcpServerSelection,
+};
 use rns_transport::iface::InterfaceManager;
 use std::sync::Arc;
 use std::time::Duration;
+
+#[test]
+fn reticulum_enable_transport_controls_daemon_retransmit() {
+    assert!(!reticulum_transport_retransmit_enabled(None));
+
+    for (config, expected) in [
+        ("", false),
+        ("[reticulum]\nenable_transport = false\n", false),
+        ("[reticulum]\nenable_transport = true\n", true),
+    ] {
+        let daemon_config =
+            reticulum_daemon::config::DaemonConfig::from_toml(config).expect("parse daemon config");
+
+        assert_eq!(reticulum_transport_retransmit_enabled(Some(&daemon_config)), expected);
+    }
+}
 
 #[test]
 fn selected_backbone_server_adapter_enables_socket_tuning_and_liveness() {
