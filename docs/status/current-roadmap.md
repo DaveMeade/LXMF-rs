@@ -134,6 +134,10 @@ Scoped release evidence is split as follows:
   are persisted for daemon announce-identity lookup, and daemon status reports
   `_runtime.reticulum.path_table_restore.status` as `ok` or `error` so corrupt
   `destination_table` state remains observable without making startup fatal.
+- Reticulum shared-instance RPC parity now includes read-only `next_hop`,
+  `next_hop_if_name`, and `first_hop_timeout` methods over daemon path lookup,
+  returning null next-hop/interface values for unknown paths and Python-default
+  first-hop timeout when no interface latency is known.
 - Reticulum path-table persistence now writes only routes with cached announce
   material and restore hardens Python-format active and tunnel path-table rows
   by ignoring stale/expired path rows, so restart bootstrap cannot revive
@@ -506,6 +510,9 @@ Scoped release evidence is split as follows:
   `rnpath-rs` exposes matching `--on-iface` and `--tag-hex` flags, and `rnx
   rnpath-smoke` now exercises them against the local daemon mesh after learning
   the non-neighbor path's outgoing interface.
+- The same daemon path lookup bridge now projects Reticulum.py-compatible
+  next-hop, next-hop interface name, interface bitrate/MTU, and first-hop
+  timeout metadata for shared-instance clients without forcing a path request.
 
 ### LXMF
 

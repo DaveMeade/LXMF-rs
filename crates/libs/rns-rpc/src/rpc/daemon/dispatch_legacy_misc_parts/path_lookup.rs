@@ -10,6 +10,9 @@ struct PathLookupParams {
     tag_hex: Option<String>,
 }
 
+const RETICULUM_MTU_BYTES: f64 = 500.0;
+const RETICULUM_DEFAULT_PER_HOP_TIMEOUT_SECS: f64 = 6.0;
+
 fn normalize_destination_hash_param(destination: &str) -> Result<String, std::io::Error> {
     let destination = destination.trim();
     let decoded = hex::decode(destination).map_err(|err| {
@@ -119,5 +122,96 @@ fn add_path_request_scope_fields(
     }
     if let Some(tag) = tag {
         object.insert("tag_hex".to_string(), json!(hex::encode(tag)));
+    }
+}
+
+fn path_status_string(status_fields: &JsonValue, keys: &[&str]) -> Option<String> {
+    keys.iter().find_map(|key| {
+        status_fields
+            .get(*key)
+            .and_then(JsonValue::as_str)
+            .map(str::to_string)
+    })
+}
+
+fn first_hop_timeout_from_status(status_fields: &JsonValue) -> f64 {
+    if let Some(timeout) = status_fields.get("first_hop_timeout").and_then(JsonValue::as_f64) {
+        return timeout;
+    }
+    if let Some(latency) = status_fields.get("per_byte_latency").and_then(JsonValue::as_f64) {
+        return RETICULUM_DEFAULT_PER_HOP_TIMEOUT_SECS + RETICULUM_MTU_BYTES * latency;
+    }
+    let bitrate = ["interface_bitrate", "next_hop_interface_bitrate", "bitrate"]
+        .iter()
+        .find_map(|key| status_fields.get(*key).and_then(JsonValue::as_f64))
+        .filter(|value| *value > 0.0);
+    bitrate
+        .map(|value| RETICULUM_DEFAULT_PER_HOP_TIMEOUT_SECS + (RETICULUM_MTU_BYTES * 8.0 / value))
+        .unwrap_or(RETICULUM_DEFAULT_PER_HOP_TIMEOUT_SECS)
+}
+
+impl RpcDaemon {
+    fn handle_rpc_legacy_path_metadata(
+        &self,
+        request: RpcRequest,
+    ) -> Result<RpcResponse, std::io::Error> {
+        let params = request.params.ok_or_else(|| {
+            std::io::Error::new(std::io::ErrorKind::InvalidInput, "missing params")
+        })?;
+        let parsed: PathLookupParams = serde_json::from_value(params)
+            .map_err(|err| std::io::Error::new(std::io::ErrorKind::InvalidInput, err))?;
+        let destination = normalize_destination_hash_param(&parsed.destination)?;
+        let Some(bridge) = self
+            .path_lookup_bridge
+            .lock()
+            .expect("path_lookup_bridge mutex poisoned")
+            .clone()
+        else {
+            return Ok(RpcResponse {
+                id: request.id,
+                result: None,
+                error: Some(RpcError::new(
+                    "PATH_LOOKUP_UNAVAILABLE",
+                    "path lookup bridge is not configured",
+                )),
+            });
+        };
+        let status_fields = match bridge.path_status(destination.as_str()) {
+            Ok(status_fields) => status_fields,
+            Err(err) => {
+                return Ok(RpcResponse {
+                    id: request.id,
+                    result: None,
+                    error: Some(RpcError::new("PATH_LOOKUP_FAILED", err.to_string())),
+                });
+            }
+        };
+        let mut result = path_lookup_result(destination, status_fields.clone(), None, "unknown");
+        let JsonValue::Object(object) = &mut result else {
+            return Ok(RpcResponse { id: request.id, result: Some(result), error: None });
+        };
+
+        match request.method.as_str() {
+            "next_hop" => {
+                let next_hop = path_status_string(&status_fields, &["next_hop"]);
+                object.insert("next_hop".to_string(), json!(next_hop));
+            }
+            "next_hop_if_name" => {
+                let interface = path_status_string(
+                    &status_fields,
+                    &["next_hop_if_name", "interface_name", "interface"],
+                );
+                object.insert("next_hop_if_name".to_string(), json!(interface));
+            }
+            "first_hop_timeout" => {
+                object.insert(
+                    "first_hop_timeout".to_string(),
+                    json!(first_hop_timeout_from_status(&status_fields)),
+                );
+            }
+            _ => {}
+        }
+
+        Ok(RpcResponse { id: request.id, result: Some(result), error: None })
     }
 }

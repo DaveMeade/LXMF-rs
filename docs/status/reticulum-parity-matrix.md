@@ -20,7 +20,7 @@ Workspace paths are used for navigation. Published package names are
 
 | Python surface | Rust surface | Status | Implemented baseline | Residual gap |
 | --- | --- | --- | --- | --- |
-| `RNS/Reticulum.py` | `crates/libs/rns-transport`, `crates/apps/reticulumd` | partial | Deployable daemon, configuration, propagation-node activation, persistence, RPC, graceful shutdown, unified legacy `status`/`daemon_status_ex` daemon runtime snapshot visibility, daemon/RPC runtime status for Reticulum path-table restore success or failure, multiple live interfaces, and runtime `set_interfaces`/`reload_config` hot-apply for TCP clients, explicit loopback TCP server listeners including `localhost`, and explicit UDP listener, peer, and multicast-bind records. | Python runtime/config mutation remains wider for device-bound, multicast-forward, non-local listener, and broader interface shapes; interface breadth remains wider. |
+| `RNS/Reticulum.py` | `crates/libs/rns-transport`, `crates/apps/reticulumd` | partial | Deployable daemon, configuration, propagation-node activation, persistence, RPC, graceful shutdown, unified legacy `status`/`daemon_status_ex` daemon runtime snapshot visibility, daemon/RPC runtime status for Reticulum path-table restore success or failure, shared-instance path metadata RPCs for `next_hop`, `next_hop_if_name`, and `first_hop_timeout`, multiple live interfaces, and runtime `set_interfaces`/`reload_config` hot-apply for TCP clients, explicit loopback TCP server listeners including `localhost`, and explicit UDP listener, peer, and multicast-bind records. | Python runtime/config mutation remains wider for device-bound, multicast-forward, non-local listener, and broader interface shapes; interface breadth remains wider. |
 | `RNS/Identity.py` | `crates/libs/rns-core` | done | Identity material, hashing, signing, encryption, recall, and key conversion. | No confirmed parity blocker. |
 | `RNS/Destination.py` | `crates/libs/rns-core`, `crates/libs/rns-transport` | done | Destination hashing, descriptors, announces, proof validation, ratchets, and known-key stability checks. | No confirmed parity blocker. |
 | `RNS/Packet.py` | `crates/libs/rns-core`, `crates/libs/rns-transport` | done | Framing, serialization, contexts, proofs, receipts, Python-default link proof context, and header semantics. | No confirmed parity blocker. |
@@ -344,6 +344,10 @@ The mirror Python-origin path-request case suppresses Rust startup/periodic
 announces, holds a quiet window where Python still has no Rust delivery path,
 and then proves Python `RNS.Transport.request_path()` can discover the Rust
 delivery destination over the same software loopback path.
+Reticulum.py shared-instance path metadata RPCs now project known-route
+`next_hop`, `next_hop_if_name`, and `first_hop_timeout` values from daemon
+`path_status`, returning null next-hop/interface values for unknown paths and
+the Python default first-hop timeout when no interface latency metadata exists.
 Restored path-table cached announces are now kept as lookup/cache material
 rather than scheduled as fresh announce rebroadcasts at startup, while still
 serving known-path responses. Path-table save filters routes without cached
