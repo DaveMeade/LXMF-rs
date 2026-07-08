@@ -15,6 +15,7 @@ pub struct DaemonConfig {
     pub display_name: Option<String>,
     pub announce_capabilities: Vec<String>,
     pub propagation_node: Option<PropagationNodeConfig>,
+    pub panic_on_interface_error: bool,
     pub interfaces: Vec<InterfaceConfig>,
 }
 
@@ -54,6 +55,11 @@ impl<'de> Deserialize<'de> for DaemonConfig {
             display_name: raw.display_name,
             announce_capabilities: raw.announce_capabilities,
             propagation_node: raw.propagation_node,
+            panic_on_interface_error: raw
+                .reticulum
+                .as_ref()
+                .and_then(|reticulum| reticulum.panic_on_interface_error)
+                .unwrap_or(false),
             interfaces,
         })
     }
@@ -76,6 +82,8 @@ struct ReticulumConfigRaw {
     instance_control_port: Option<u16>,
     #[serde(default)]
     rpc_key: Option<String>,
+    #[serde(default)]
+    panic_on_interface_error: Option<bool>,
 }
 
 impl ReticulumConfigRaw {

@@ -201,13 +201,15 @@ pub(super) async fn bootstrap(args: Args) -> BootstrapContext {
     let weave_control_bindings = startup.weave_control_bindings;
     let selected_tcp_server = startup.selected_tcp_server;
     let restored_path_identities = startup.restored_path_identities;
+    let strict_interface_startup = args.strict_interface_startup
+        || daemon_config.as_ref().is_some_and(|config| config.panic_on_interface_error);
 
     if !startup_failures.is_empty() {
         log::warn!(
             "[daemon] interface startup degraded started={} failed={} strict={}",
             startup_successes,
             startup_failures.len(),
-            args.strict_interface_startup
+            strict_interface_startup
         );
         for failure in &startup_failures {
             log::warn!(
@@ -219,9 +221,7 @@ pub(super) async fn bootstrap(args: Args) -> BootstrapContext {
         }
     }
 
-    if let Err(policy_error) =
-        enforce_startup_policy(args.strict_interface_startup, &startup_failures)
-    {
+    if let Err(policy_error) = enforce_startup_policy(strict_interface_startup, &startup_failures) {
         panic!("{policy_error}");
     }
 

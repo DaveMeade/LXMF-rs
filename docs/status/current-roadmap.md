@@ -438,7 +438,9 @@ Scoped release evidence is split as follows:
   `rnstatus-rs`. A software loopback smoke now proves Python-style
   `UDPInterface` alias parsing, strict daemon startup, bound loopback status,
   and malformed-datagram `bytes_rx`/`decode_errors` telemetry without external
-  network services. `set_interfaces` and `reload_config` now hot-apply explicit
+  network services. Python-style `[reticulum] panic_on_interface_error = true`
+  now maps to the same fail-closed interface startup policy as the CLI strict
+  flag. `set_interfaces` and `reload_config` now hot-apply explicit
   loopback TCP server listeners, including the local `localhost` hostname,
   alongside TCP clients and explicit UDP
   listener, peer, and multicast-bind records, with tests proving
