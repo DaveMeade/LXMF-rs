@@ -50,6 +50,7 @@ async fn oversized_opportunistic_delivery_falls_back_to_link_delivery() {
         receipt_map: Arc::new(Mutex::new(HashMap::new())),
         outbound_resource_map: outbound_resource_map.clone(),
         outbound_propagation_link: Arc::new(tokio::sync::Mutex::new(None)),
+        direct_backchannel_links: DirectBackchannelLinks::new(),
         receipt_tx,
         message_id: message_id.to_string(),
         source_hash: [1u8; 16],
@@ -96,6 +97,13 @@ async fn oversized_opportunistic_delivery_falls_back_to_link_delivery() {
         outbound_link.lock().await.handle_packet(&inbound.prove(), iface),
         rns_transport::destination::link::LinkHandleResult::Activated
     ));
+
+    let identify = tokio::time::timeout(Duration::from_secs(2), channel.tx_channel.recv())
+        .await
+        .expect("backchannel identify")
+        .expect("backchannel identify");
+    assert_eq!(identify.packet.context, PacketContext::LinkIdentify);
+    assert_eq!(identify.packet.destination, link_id);
 
     let advertisement = tokio::time::timeout(Duration::from_secs(2), channel.tx_channel.recv())
         .await
@@ -193,6 +201,7 @@ async fn propagated_link_send_tracks_resource_with_propagated_status() {
         receipt_map: Arc::new(Mutex::new(HashMap::new())),
         outbound_resource_map: outbound_resource_map.clone(),
         outbound_propagation_link: Arc::new(tokio::sync::Mutex::new(None)),
+        direct_backchannel_links: DirectBackchannelLinks::new(),
         receipt_tx,
         message_id: message_id.to_string(),
         source_hash: [1u8; 16],
@@ -290,6 +299,7 @@ async fn build_payload_records_normal_stamp_lifecycle_metadata() {
         receipt_map: Arc::new(Mutex::new(HashMap::new())),
         outbound_resource_map: Arc::new(Mutex::new(HashMap::new())),
         outbound_propagation_link: Arc::new(tokio::sync::Mutex::new(None)),
+        direct_backchannel_links: DirectBackchannelLinks::new(),
         receipt_tx,
         message_id: message_id.to_string(),
         source_hash,
@@ -368,6 +378,7 @@ async fn build_payload_records_ticket_stamp_lifecycle_metadata() {
         receipt_map: Arc::new(Mutex::new(HashMap::new())),
         outbound_resource_map: Arc::new(Mutex::new(HashMap::new())),
         outbound_propagation_link: Arc::new(tokio::sync::Mutex::new(None)),
+        direct_backchannel_links: DirectBackchannelLinks::new(),
         receipt_tx,
         message_id: message_id.to_string(),
         source_hash,

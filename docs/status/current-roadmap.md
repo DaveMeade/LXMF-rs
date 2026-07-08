@@ -1,6 +1,6 @@
 # Current Roadmap Status
 
-Last reassessed: 2026-07-06
+Last reassessed: 2026-07-08
 
 This file is the repository-level source of truth for parity posture, release
 confidence, and execution order. Detailed row-level status lives in:
@@ -531,6 +531,9 @@ Scoped release evidence is split as follows:
   identity misses after delivery path-request timeout now enter nonterminal
   `queued: waiting for announce` state, so later delivery announces can requeue
   them instead of leaving a terminal `failed:*` receipt.
+- Direct link-mode sends now perform Python-style local `lxmf.delivery`
+  `LinkIdentify`, and inbound delivery-link identifies are signature-checked,
+  cached by remote delivery destination, and reused for later direct replies.
 - Direct and propagated resource sends support receipt-state separation,
   timeout/failure propagation, and active resource cancellation.
 - Link sends now register packet/resource receipt tracking before handoff and

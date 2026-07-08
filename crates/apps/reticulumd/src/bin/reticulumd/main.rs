@@ -9,6 +9,7 @@ mod bridge_helpers;
 mod bridge_path_lookup;
 mod bridge_rnode_management;
 mod bridge_weave_control;
+mod direct_backchannel;
 mod inbound_worker;
 mod interface_hot_apply;
 mod interfaces;

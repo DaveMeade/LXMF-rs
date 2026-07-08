@@ -454,6 +454,7 @@ pub(super) async fn bootstrap(args: Args) -> BootstrapContext {
                 validated_peer_links: Arc::new(Mutex::new(HashSet::new())),
                 identified_peer_links: Arc::new(Mutex::new(HashMap::new())),
             },
+            bridge.as_ref().map(|bridge| bridge.direct_backchannel_links()),
             receipt_tx.clone(),
             outbound_resource_map,
         );

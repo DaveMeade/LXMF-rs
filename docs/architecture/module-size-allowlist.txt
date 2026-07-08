@@ -5,7 +5,6 @@ crates/apps/reticulumd/src/bin/reticulumd/bootstrap_interface_startup_parts/star
 crates/apps/reticulumd/src/bin/reticulumd/bootstrap_parts/module_core.rs
 crates/apps/reticulumd/src/bin/reticulumd/bridge_rnode_management.rs
 crates/apps/reticulumd/src/bin/reticulumd/bridge_delivery_scheduler.rs
-crates/apps/reticulumd/src/bin/reticulumd/bridge_delivery_task_parts/deliverytask_sections/cached_identity_for_destination.rs
 crates/apps/reticulumd/src/bin/reticulumd/inbound_control_peer.rs
 crates/apps/reticulumd/src/bin/reticulumd/interfaces/auto_parts/auto_iface_sections/auto_multicast_discovery_bind_resolv.rs
 crates/apps/reticulumd/src/bin/reticulumd/interfaces/auto_parts/auto_iface_sections/auto_peer_data_transport_bridge_regi.rs

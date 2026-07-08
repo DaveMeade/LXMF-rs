@@ -1,6 +1,7 @@
 use super::identity_resolver;
 
 use super::*;
+use crate::direct_backchannel::DirectBackchannelLinks;
 
 use rand_core::OsRng;
 
@@ -20,6 +21,7 @@ pub(super) struct DeliveryTask {
     pub(super) receipt_map: Arc<Mutex<HashMap<String, String>>>,
     pub(super) outbound_resource_map: OutboundResourceMap,
     pub(super) outbound_propagation_link: Arc<tokio::sync::Mutex<Option<CachedPropagationLink>>>,
+    pub(super) direct_backchannel_links: DirectBackchannelLinks,
     pub(super) receipt_tx: tokio::sync::mpsc::Sender<ReceiptEvent>,
     pub(super) message_id: String,
     pub(super) source_hash: [u8; 16],
