@@ -61,6 +61,10 @@ impl RpcDaemon {
                 let timestamp = now_i64();
                 let culled_peers = self.cull_unreachable_non_static_peers(timestamp)?;
                 let rotated_peers = self.rotate_low_acceptance_non_static_peers()?;
+                let pruned_local_processed = self
+                    .store
+                    .prune_expired_local_propagation_processed(timestamp)
+                    .map_err(std::io::Error::other)?;
                 let synced_peer = self.select_peer_for_maintenance_sync(timestamp)?;
                 let peer_sync = if let Some(peer) = synced_peer.as_ref() {
                     self.handle_rpc(RpcRequest {
@@ -81,6 +85,8 @@ impl RpcDaemon {
                         "culled_peers": culled_peers,
                         "rotated": rotated_peers.len(),
                         "rotated_peers": rotated_peers,
+                        "pruned_local_processed": pruned_local_processed.len(),
+                        "pruned_local_processed_ids": pruned_local_processed,
                         "synced_peer": synced_peer,
                         "peer_sync": peer_sync,
                         "max_unreachable_secs": super::init::LXMF_PEER_MAX_UNREACHABLE_SECS,

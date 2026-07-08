@@ -239,15 +239,7 @@ impl MessagesStore {
     }
 
     pub fn mark_local_propagation_processed(&self, transient_id: &str) -> rusqlite::Result<bool> {
-        self.with_write_conn(|conn| {
-            let affected = conn.execute(
-                "INSERT OR IGNORE INTO propagation_local_entries
-                    (transient_id, processed_at)
-                 VALUES (?1, ?2)",
-                params![normalize_hex_key(transient_id), now_unix_secs()],
-            )?;
-            Ok(affected > 0)
-        })
+        self.mark_local_propagation_processed_at(transient_id, now_unix_secs())
     }
 
     pub fn local_propagation_processed_mark_exists(
