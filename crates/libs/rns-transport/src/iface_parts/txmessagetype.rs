@@ -221,6 +221,5 @@ pub struct InterfaceManager {
     counter: usize,
     rx_recv: Arc<tokio::sync::Mutex<InterfaceRxReceiver>>,
     rx_send: InterfaceRxSender,
-    cancel: CancellationToken,
     ifaces: Vec<LocalInterface>,
 }

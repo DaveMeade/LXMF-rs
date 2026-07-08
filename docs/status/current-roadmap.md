@@ -440,9 +440,10 @@ Scoped release evidence is split as follows:
   and malformed-datagram `bytes_rx`/`decode_errors` telemetry without external
   network services. `set_interfaces` and `reload_config` now hot-apply explicit
   loopback TCP server listeners, including the local `localhost` hostname,
-  alongside TCP clients and explicit UDP
-  listener, peer, and multicast-bind records, with tests proving
-  `device`-bound, non-local, and broader TCP server listener shapes stay
+  alongside TCP clients and explicit UDP listener, peer, and multicast-bind
+  records; explicit TCP server hot-apply now covers listener removal/disable
+  cleanup as well as add/update lifecycle, with tests proving `device`-bound,
+  non-local, and broader TCP server listener shapes stay
   restart-required or invalid, UDP `device`-bound, partial-target,
   out-of-range-target, and multicast-forward shapes remain restart-required or
   invalid, and duplicate TCP server or UDP binds are rejected before mutation.

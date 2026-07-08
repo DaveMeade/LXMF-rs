@@ -142,15 +142,18 @@ placeholders:
   `bytes_rx`/`decode_errors` telemetry without external network services.
   Runtime interface mutation now hot-applies explicit loopback TCP server
   listeners, including `localhost`, plus explicit UDP listener, peer, and
-  multicast-bind records through `set_interfaces` and `reload_config`, while
-  `device`-bound, non-local, and broader TCP server listener shapes, plus UDP
-  `device`-bound, partial-target, out-of-range-target, and multicast-forward
-  records, remain restart-required or invalid. Duplicate TCP server and UDP
-  binds are rejected before mutation. Hot-applied explicit TCP server records
-  attach live daemon/RPC `_runtime.tcp.listener_status` metadata, hot-applied
-  explicit UDP records attach the runtime iface and refresh live daemon/RPC
-  `_runtime.udp.status` counters under focused software tests; multicast-bind
-  hot-apply uses the transport peer-routing helper.
+  multicast-bind records through `set_interfaces` and `reload_config`.
+  Explicit TCP server hot-apply covers listener add/update plus
+  removal/disable cleanup, including runtime listener-status refresher
+  deregistration, while `device`-bound, non-local, and broader TCP server
+  listener shapes, plus UDP `device`-bound, partial-target,
+  out-of-range-target, and multicast-forward records, remain restart-required
+  or invalid. Duplicate TCP server and UDP binds are rejected before mutation.
+  Hot-applied explicit TCP server records attach live daemon/RPC
+  `_runtime.tcp.listener_status` metadata, hot-applied explicit UDP records
+  attach the runtime iface and refresh live daemon/RPC `_runtime.udp.status`
+  counters under focused software tests; multicast-bind hot-apply uses the
+  transport peer-routing helper.
 - Serial now refreshes live daemon/RPC status with open/reconnect, HDLC frame,
   packet, byte, EOF, queue, decode, serialize, read, and write-error counters.
   Serial KISS and AX.25 KISS retain Python-compatible AX.25 UI header wrapping
