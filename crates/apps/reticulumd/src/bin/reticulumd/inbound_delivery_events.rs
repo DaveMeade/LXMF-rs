@@ -93,6 +93,22 @@ pub(super) async fn accept_delivery_resource(
         );
         return;
     }
+    if matches!(daemon.message_exists(record.id.as_str()), Ok(true)) {
+        emit_inbound_drop_event(
+            daemon,
+            InboundDropEvent {
+                reason: "duplicate",
+                delivery_kind: InboundDeliveryKind::Resource,
+                raw_destination_hex: raw_destination_hex.as_str(),
+                destination,
+                payload_mode: InboundPayloadMode::FullWire,
+                bytes_len: data.len(),
+                detail: Some("message already stored".to_string()),
+                record: Some(&record),
+            },
+        );
+        return;
+    }
     let _ = daemon.accept_inbound_with_raw(record, data);
 }
 
@@ -196,6 +212,19 @@ pub(super) async fn accept_delivery_packet(
         return;
     }
     if matches!(daemon.message_exists(record.id.as_str()), Ok(true)) {
+        emit_inbound_drop_event(
+            daemon,
+            InboundDropEvent {
+                reason: "duplicate",
+                delivery_kind: InboundDeliveryKind::Packet,
+                raw_destination_hex,
+                destination,
+                payload_mode,
+                bytes_len: data.len(),
+                detail: Some("message already stored".to_string()),
+                record: Some(&record),
+            },
+        );
         return;
     }
     daemon.record_inbound_peer_activity(&record.source, data.len());

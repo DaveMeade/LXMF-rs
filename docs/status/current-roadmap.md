@@ -1060,6 +1060,10 @@ Scoped release evidence is split as follows:
   `lxmf_bytes_hex`, stored/event identity, content, and metadata consistency,
   direct Curve25519 transport metadata, and verified signature metadata for
   both packet and resource delivery paths.
+- Duplicate direct packet/resource LXMF deliveries now emit bounded
+  `inbound_dropped` events with `reason = "duplicate"` and `delivery_kind`
+  classification while preserving the existing no-duplicate-storage and
+  no-extra-peer-activity behavior.
 - Focused local propagated-delivery tests now also feed a real source announce
   through a transport interface channel before delivery, covering known-source
   propagated messages surface `signature_checked = true` with

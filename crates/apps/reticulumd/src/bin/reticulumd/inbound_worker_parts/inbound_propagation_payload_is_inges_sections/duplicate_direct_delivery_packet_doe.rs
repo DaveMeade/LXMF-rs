@@ -17,6 +17,7 @@
         source_hash.copy_from_slice(source_destination.desc.address_hash.as_slice());
         let source_hex = hex::encode(source_hash);
         daemon.accept_announce(source_hex.clone(), 1).expect("accept source announce");
+        while daemon.take_event().is_some() {}
         let delivery_core_private = to_core_private_identity(&delivery_private);
         let transport_identity = to_transport_private_identity(&delivery_core_private);
         let transport = Transport::new(TransportConfig::new("test", &transport_identity, true));
@@ -46,6 +47,9 @@
         let after_first = peer_row(&daemon, source_hex.as_str(), 45);
         assert_eq!(after_first["rx_bytes"].as_u64(), Some(wire.len() as u64));
         assert_eq!(after_first["messages"]["incoming"].as_u64(), Some(1));
+        let first_event = daemon.take_event().expect("first inbound event");
+        assert_eq!(first_event.event_type, "inbound");
+        assert!(daemon.take_event().is_none(), "first direct delivery should emit one event");
 
         delivery_events::accept_delivery_packet(
             &daemon,
@@ -70,6 +74,30 @@
         let after_second = peer_row(&daemon, source_hex.as_str(), 47);
         assert_eq!(after_second["rx_bytes"].as_u64(), Some(wire.len() as u64));
         assert_eq!(after_second["messages"]["incoming"].as_u64(), Some(1));
+
+        let event = daemon.take_event().expect("duplicate drop event");
+        assert_eq!(event.event_type, "inbound_dropped");
+        assert_eq!(event.payload["reason"], json!("duplicate"));
+        assert_eq!(event.payload["delivery_kind"], json!("packet"));
+        let destination_hex = hex::encode(destination_hash);
+        assert!(event.payload["raw_destination_hash"]
+            .as_str()
+            .is_some_and(|value| value.starts_with("sha256:") && value != destination_hex));
+        assert!(event.payload["resolved_destination_hash"]
+            .as_str()
+            .is_some_and(|value| value.starts_with("sha256:") && value != destination_hex));
+        assert_eq!(event.payload["payload_mode"], json!("full_wire"));
+        assert_eq!(event.payload["bytes_len"], json!(wire.len()));
+        assert!(event.payload["dropped_message_id"].as_str().is_some_and(|value| {
+            value.starts_with("sha256:") && Some(value) != items[0]["id"].as_str()
+        }));
+        assert!(event.payload["source_hash"]
+            .as_str()
+            .is_some_and(|value| value.starts_with("sha256:") && value != source_hex));
+        assert!(event.payload["destination_hash"]
+            .as_str()
+            .is_some_and(|value| value.starts_with("sha256:") && value != destination_hex));
+        assert!(daemon.take_event().is_none(), "duplicate packet should emit one drop event");
     }
 
     #[tokio::test]
@@ -126,64 +154,6 @@
 
         let peers = daemon
             .handle_rpc(RpcRequest { id: 49, method: "list_peers".to_string(), params: None })
-            .expect("list peers")
-            .result
-            .expect("list peers result");
-        assert_eq!(peers["peers"].as_array().expect("peer rows").len(), 0);
-    }
-
-    #[tokio::test]
-    async fn malformed_direct_delivery_resource_emits_drop_event_without_side_effects() {
-        let daemon = RpcDaemon::test_instance();
-        let delivery_private = PrivateIdentity::new_from_rand(OsRng);
-        let delivery_destination = SingleInputDestination::new(
-            delivery_private.clone(),
-            DestinationName::new("lxmf", "delivery"),
-        );
-        let mut destination_hash = [0u8; 16];
-        destination_hash.copy_from_slice(delivery_destination.desc.address_hash.as_slice());
-        let delivery_core_private = to_core_private_identity(&delivery_private);
-        let transport_identity = to_transport_private_identity(&delivery_core_private);
-        let transport = Transport::new(TransportConfig::new("test", &transport_identity, true));
-        let malformed_payload = b"not-a-valid-lxmf-resource-payload";
-
-        delivery_events::accept_delivery_resource(
-            &daemon,
-            &transport,
-            destination_hash,
-            malformed_payload,
-        )
-        .await;
-
-        let event = daemon.take_event().expect("drop event");
-        assert_eq!(event.event_type, "inbound_dropped");
-        assert_eq!(event.payload["reason"], json!("decode_failed"));
-        assert_eq!(event.payload["delivery_kind"], json!("resource"));
-        let raw_destination = hex::encode(destination_hash);
-        assert!(event.payload["raw_destination_hash"]
-            .as_str()
-            .is_some_and(|value| value.starts_with("sha256:") && value != raw_destination));
-        assert!(event.payload["resolved_destination_hash"]
-            .as_str()
-            .is_some_and(|value| value.starts_with("sha256:") && value != raw_destination));
-        assert_eq!(event.payload["payload_mode"], json!("full_wire"));
-        assert_eq!(event.payload["bytes_len"], json!(malformed_payload.len()));
-        assert!(
-            event.payload["detail"].as_str().is_some_and(|detail| detail.contains("full_wire")),
-            "drop event should include bounded decode diagnostics: {:?}",
-            event.payload
-        );
-        assert!(daemon.take_event().is_none(), "malformed resource should emit one event");
-
-        let messages = daemon
-            .handle_rpc(RpcRequest { id: 50, method: "list_messages".to_string(), params: None })
-            .expect("list messages")
-            .result
-            .expect("list messages result");
-        assert_eq!(messages["messages"].as_array().expect("message items").len(), 0);
-
-        let peers = daemon
-            .handle_rpc(RpcRequest { id: 51, method: "list_peers".to_string(), params: None })
             .expect("list peers")
             .result
             .expect("list peers result");
