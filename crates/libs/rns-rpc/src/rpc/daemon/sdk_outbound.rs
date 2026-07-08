@@ -440,6 +440,7 @@ impl RpcDaemon {
             "sdk_voice_session_update_v2",
             "sdk_voice_session_close_v2",
             "announce_now",
+            "announce_delivery",
             "list_interfaces",
             "set_interfaces",
             "reload_config",
