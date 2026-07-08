@@ -209,6 +209,16 @@ struct ListMessagesParams {
 }
 
 #[derive(Debug, Deserialize, Default)]
+struct ListConversationsParams {
+    #[serde(default)]
+    peer_id: Option<String>,
+    #[serde(default)]
+    limit: Option<usize>,
+    #[serde(default)]
+    cursor: Option<String>,
+}
+
+#[derive(Debug, Deserialize, Default)]
 struct ListAnnouncesParams {
     #[serde(default)]
     limit: Option<usize>,

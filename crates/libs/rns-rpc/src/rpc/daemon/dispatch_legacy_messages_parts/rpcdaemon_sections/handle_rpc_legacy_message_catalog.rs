@@ -4,6 +4,103 @@ impl RpcDaemon {
         request: RpcRequest,
     ) -> Result<RpcResponse, std::io::Error> {
         match request.method.as_str() {
+            "list_conversations" => {
+                let parsed = request
+                    .params
+                    .map(serde_json::from_value::<ListConversationsParams>)
+                    .transpose()
+                    .map_err(|err| std::io::Error::new(std::io::ErrorKind::InvalidInput, err))?
+                    .unwrap_or_default();
+                let limit = parsed.limit.unwrap_or(100).clamp(1, 5000);
+                let peer_id =
+                    parsed.peer_id.as_deref().map(str::trim).filter(|value| !value.is_empty());
+                let mut records = if let Some(peer) = peer_id {
+                    self.store.list_messages_page_for_peer(5000, None, None, peer)
+                } else {
+                    self.store.list_messages_page(5000, None, None)
+                }
+                .map_err(std::io::Error::other)?;
+                records.sort_by(|left, right| {
+                    right.timestamp.cmp(&left.timestamp).then_with(|| right.id.cmp(&left.id))
+                });
+                let peer_names = self
+                    .peers
+                    .lock()
+                    .expect("peers mutex poisoned")
+                    .values()
+                    .map(|peer| {
+                        (
+                            peer.peer.to_ascii_lowercase(),
+                            peer.name.clone().unwrap_or_else(|| peer.peer.clone()),
+                        )
+                    })
+                    .collect::<std::collections::HashMap<_, _>>();
+                let mut conversations = Vec::<JsonValue>::new();
+                for record in records {
+                    let conversation_id = conversation_id_for_message(&record);
+                    let Some(existing) = conversations.iter_mut().find(|conversation| {
+                        conversation["conversation_id"].as_str() == Some(conversation_id.as_str())
+                    }) else {
+                        let display_name = peer_names
+                            .get(&conversation_id.to_ascii_lowercase())
+                            .cloned()
+                            .map(JsonValue::from)
+                            .unwrap_or(JsonValue::Null);
+                        conversations.push(json!({
+                            "conversation_id": conversation_id,
+                            "peer_destination_hex": conversation_id,
+                            "peer_display_name": display_name,
+                            "last_message_preview": message_preview(record.content.as_str()),
+                            "last_message_at_ms": record.timestamp,
+                            "unread_count": u64::from(record.direction == "in"),
+                            "last_message_state": record.receipt_status,
+                        }));
+                        continue;
+                    };
+                    if record.direction == "in" {
+                        let current = existing["unread_count"].as_u64().unwrap_or(0);
+                        existing["unread_count"] = JsonValue::from(current.saturating_add(1));
+                    }
+                }
+                if let Some((Some(before_ts), before_id)) =
+                    parse_timestamp_id_cursor(parsed.cursor.as_deref())
+                {
+                    conversations.retain(|conversation| {
+                        let timestamp = conversation["last_message_at_ms"].as_i64().unwrap_or(0);
+                        if timestamp != before_ts {
+                            return timestamp < before_ts;
+                        }
+                        match (conversation["conversation_id"].as_str(), before_id.as_deref()) {
+                            (Some(id), Some(before_id)) => id < before_id,
+                            _ => false,
+                        }
+                    });
+                }
+                let has_more = conversations.len() > limit;
+                if has_more {
+                    conversations.truncate(limit);
+                }
+                let next_cursor = if has_more {
+                    conversations.last().and_then(|conversation| {
+                        Some(format!(
+                            "{}:{}",
+                            conversation["last_message_at_ms"].as_i64()?,
+                            conversation["conversation_id"].as_str()?
+                        ))
+                    })
+                } else {
+                    None
+                };
+                Ok(RpcResponse {
+                    id: request.id,
+                    result: Some(json!({
+                        "conversations": conversations,
+                        "next_cursor": next_cursor,
+                        "meta": self.response_meta(),
+                    })),
+                    error: None,
+                })
+            }
             "list_messages" => {
                 let parsed = request
                     .params
@@ -356,4 +453,20 @@ impl RpcDaemon {
             _ => unreachable!("legacy message catalog route: {}", request.method),
         }
     }
+}
+
+fn conversation_id_for_message(record: &MessageRecord) -> String {
+    if record.direction == "out" {
+        record.destination.clone()
+    } else {
+        record.source.clone()
+    }
+}
+
+fn message_preview(content: &str) -> Option<String> {
+    let trimmed = content.trim();
+    if trimmed.is_empty() {
+        return None;
+    }
+    Some(trimmed.chars().take(80).collect())
 }

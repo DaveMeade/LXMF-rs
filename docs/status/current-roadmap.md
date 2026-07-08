@@ -850,8 +850,9 @@ Scoped release evidence is split as follows:
 - The typed ZeroMQ SDK backend now exposes durable direct-chat conversation
   summaries through `ZmqPipelineBackendClient::list_conversations`, preserving
   peer display names, unread counts, last-message previews with links, receipt
-  inclusion intent, and restart pagination cursors through
-  `app.message.conversation.list` on the SDK envelope path.
+  inclusion intent, and restart pagination cursors through the daemon-registered
+  `app.message.conversation.list` SDK envelope path and `list_conversations`
+  alias.
 - The native SDK app domain now exposes `app.messages().history(...)` and
   `app.messages().conversations(...)` on the existing `Client` surface, so
   direct-chat clients can bind message-list and conversation-list UI without

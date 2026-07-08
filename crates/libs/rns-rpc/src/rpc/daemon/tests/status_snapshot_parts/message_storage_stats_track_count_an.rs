@@ -305,6 +305,141 @@ fn sdk_envelope_history_list_rejects_mismatched_peer_and_conversation_filters() 
 }
 
 #[test]
+fn sdk_registry_and_envelope_expose_conversation_list_summaries() {
+    let daemon = RpcDaemon::test_instance();
+    daemon
+        .accept_announce_with_metadata(
+            "peer-a".to_string(),
+            1_700_000_090,
+            Some("Peer Alpha".to_string()),
+            Some("announce".to_string()),
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+            Some("lxmf.delivery".to_string()),
+            None,
+            None,
+            None,
+            None,
+            None,
+        )
+        .expect("accept peer-a announce");
+    for (id, source, destination, content, timestamp, direction, receipt_status) in [
+        (
+            "peer-a-old",
+            "peer-a",
+            "local-destination",
+            "older alpha",
+            1_700_000_100,
+            "in",
+            Some("delivered"),
+        ),
+        (
+            "peer-b-out",
+            "local-destination",
+            "peer-b",
+            "outbound beta",
+            1_700_000_101,
+            "out",
+            Some("sent"),
+        ),
+        (
+            "peer-a-new",
+            "peer-a",
+            "local-destination",
+            " newest alpha update ",
+            1_700_000_102,
+            "in",
+            Some("delivered"),
+        ),
+    ] {
+        daemon
+            .accept_inbound(MessageRecord {
+                id: id.to_string(),
+                source: source.to_string(),
+                destination: destination.to_string(),
+                title: id.to_string(),
+                content: content.to_string(),
+                timestamp,
+                direction: direction.to_string(),
+                fields: None,
+                receipt_status: receipt_status.map(str::to_string),
+            })
+            .expect("store conversation message");
+    }
+
+    let registry = daemon
+        .handle_rpc(rpc_request(43, "sdk_operation_registry_v2", json!({})))
+        .expect("operation registry")
+        .result
+        .expect("registry result");
+    let entries = registry["registry"]["entries"].as_array().expect("registry entries");
+    assert!(entries.iter().any(|entry| {
+        entry["id"] == json!("app.message.conversation.list")
+            && entry["aliases"].as_array().is_some_and(|aliases| {
+                aliases.iter().any(|alias| alias == "list_conversations")
+            })
+    }));
+
+    let first = daemon
+        .handle_rpc(rpc_request(
+            44,
+            "sdk_envelope_execute_v2",
+            json!({
+                "operation_id": "app.message.conversation.list",
+                "kind": "query",
+                "payload": {
+                    "limit": 1
+                }
+            }),
+        ))
+        .expect("conversation first page")
+        .result
+        .expect("first page result");
+    let first_payload = &first["response"]["payload"];
+    let first_conversations =
+        first_payload["conversations"].as_array().expect("first conversations");
+    assert_eq!(first_conversations.len(), 1);
+    assert_eq!(first_conversations[0]["conversation_id"], json!("peer-a"));
+    assert_eq!(first_conversations[0]["peer_destination_hex"], json!("peer-a"));
+    assert_eq!(first_conversations[0]["peer_display_name"], json!("Peer Alpha"));
+    assert_eq!(first_conversations[0]["last_message_preview"], json!("newest alpha update"));
+    assert_eq!(first_conversations[0]["unread_count"].as_u64(), Some(2));
+    assert_eq!(first_conversations[0]["last_message_state"], json!("delivered"));
+    assert_eq!(first_payload["next_cursor"].as_str(), Some("1700000102:peer-a"));
+
+    let second = daemon
+        .handle_rpc(rpc_request(
+            45,
+            "sdk_envelope_execute_v2",
+            json!({
+                "operation_id": "app.message.conversation.list",
+                "kind": "query",
+                "payload": {
+                    "cursor": first_payload["next_cursor"].as_str().unwrap(),
+                    "limit": 1
+                }
+            }),
+        ))
+        .expect("conversation second page")
+        .result
+        .expect("second page result");
+    let second_payload = &second["response"]["payload"];
+    let second_conversations =
+        second_payload["conversations"].as_array().expect("second conversations");
+    assert_eq!(second_conversations.len(), 1);
+    assert_eq!(second_conversations[0]["conversation_id"], json!("peer-b"));
+    assert_eq!(second_conversations[0]["unread_count"].as_u64(), Some(0));
+    assert_eq!(second_conversations[0]["last_message_state"], json!("sent"));
+    assert_eq!(second_payload["next_cursor"], JsonValue::Null);
+}
+
+#[test]
 fn list_messages_omits_next_cursor_when_exact_limit_is_exhausted() {
     let daemon = RpcDaemon::test_instance();
     for id in ["msg-a", "msg-b"] {

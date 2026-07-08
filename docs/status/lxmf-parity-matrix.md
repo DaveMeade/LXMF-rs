@@ -430,8 +430,9 @@ Workspace paths are used for navigation. `crates/libs/lxmf-core` publishes as
 - The typed ZeroMQ SDK backend exposes durable direct-chat conversation
   summaries through `ZmqPipelineBackendClient::list_conversations`, preserving
   peer display names, unread counts, last-message previews with links, receipt
-  inclusion intent, and restart pagination cursors through
-  `app.message.conversation.list` on the SDK envelope path.
+  inclusion intent, and restart pagination cursors through the daemon-registered
+  `app.message.conversation.list` SDK envelope path and `list_conversations`
+  alias.
 - The native SDK app domain now exposes the same durable message-list and
   conversation-list flows as `app.messages().history(...)` and
   `app.messages().conversations(...)`, so direct-chat clients can stay on the
@@ -902,9 +903,10 @@ Workspace paths are used for navigation. `crates/libs/lxmf-core` publishes as
   `propagation_offer_duplicate_wanted_source_completed_python_to_rust` cases
   for haves-only `/get` side effects, offer side effects, duplicate wanted-ID
   handling, and peer queue lifecycle evidence.
-- Focused daemon/RPC tests cover delivery modes, propagation offers, paper
-  operation registry/envelope dispatch, peer maintenance, queue policy, source
-  accounting, stamps, tickets, receipts, and cancellation.
+- Focused daemon/RPC tests cover delivery modes, direct-chat history and
+  conversation-list SDK envelopes, propagation offers, paper operation
+  registry/envelope dispatch, peer maintenance, queue policy, source accounting,
+  stamps, tickets, receipts, and cancellation.
 - Focused daemon bridge tests cover deferred normal-stamp queue ownership,
   cancellation, retry metadata, and propagation-stamp preparation before
   delivery handoff.
