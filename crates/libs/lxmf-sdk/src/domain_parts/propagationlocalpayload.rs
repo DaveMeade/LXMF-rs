@@ -26,6 +26,74 @@ impl PropagationDeliveryPolicyState {
             ),
         }
     }
+
+    pub fn request_with_allowed_destination(
+        &self,
+        destination: impl Into<String>,
+    ) -> PropagationDeliveryPolicyRequest {
+        let mut updated = self.clone();
+        updated.insert_allowed(destination.into());
+        updated.into_request()
+    }
+
+    pub fn request_without_allowed_destination(
+        &self,
+        destination: &str,
+    ) -> PropagationDeliveryPolicyRequest {
+        let mut updated = self.clone();
+        remove_policy_destination(&mut updated.allowed_destinations, destination);
+        updated.into_request()
+    }
+
+    pub fn request_with_ignored_destination(
+        &self,
+        destination: impl Into<String>,
+    ) -> PropagationDeliveryPolicyRequest {
+        let mut updated = self.clone();
+        insert_policy_destination(&mut updated.ignored_destinations, destination.into());
+        updated.into_request()
+    }
+
+    pub fn request_without_ignored_destination(
+        &self,
+        destination: &str,
+    ) -> PropagationDeliveryPolicyRequest {
+        let mut updated = self.clone();
+        remove_policy_destination(&mut updated.ignored_destinations, destination);
+        updated.into_request()
+    }
+
+    pub fn request_with_prioritised_destination(
+        &self,
+        destination: impl Into<String>,
+    ) -> PropagationDeliveryPolicyRequest {
+        let mut updated = self.clone();
+        insert_policy_destination(&mut updated.prioritised_destinations, destination.into());
+        updated.into_request()
+    }
+
+    pub fn request_without_prioritised_destination(
+        &self,
+        destination: &str,
+    ) -> PropagationDeliveryPolicyRequest {
+        let mut updated = self.clone();
+        remove_policy_destination(&mut updated.prioritised_destinations, destination);
+        updated.into_request()
+    }
+
+    fn insert_allowed(&mut self, destination: String) {
+        insert_policy_destination(&mut self.allowed_destinations, destination);
+    }
+
+    fn into_request(self) -> PropagationDeliveryPolicyRequest {
+        PropagationDeliveryPolicyRequest {
+            auth_required: Some(self.auth_required),
+            allowed_destinations: Some(self.allowed_destinations),
+            denied_destinations: Some(self.denied_destinations),
+            ignored_destinations: Some(self.ignored_destinations),
+            prioritised_destinations: Some(self.prioritised_destinations),
+        }
+    }
 }
 
 #[derive(Clone, Debug, Serialize, PartialEq)]
@@ -173,4 +241,14 @@ fn propagation_policy_json_string_array(value: &JsonValue, key: &str) -> Vec<Str
         .and_then(JsonValue::as_array)
         .map(|items| items.iter().filter_map(JsonValue::as_str).map(ToOwned::to_owned).collect())
         .unwrap_or_default()
+}
+
+fn insert_policy_destination(values: &mut Vec<String>, destination: String) {
+    if !values.iter().any(|value| value.eq_ignore_ascii_case(&destination)) {
+        values.push(destination);
+    }
+}
+
+fn remove_policy_destination(values: &mut Vec<String>, destination: &str) {
+    values.retain(|value| !value.eq_ignore_ascii_case(destination));
 }

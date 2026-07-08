@@ -96,6 +96,109 @@ fn daemon_status_ex_reads_cached_status_snapshot() {
     );
 }
 
+#[test]
+fn delivery_policy_convenience_mutators_match_python_router_surface() {
+    let daemon = RpcDaemon::test_instance();
+    let destination = "00112233445566778899aabbccddeeff";
+    let uppercase_destination = "00112233445566778899AABBCCDDEEFF";
+
+    let auth_noop = daemon
+        .handle_rpc(RpcRequest {
+            id: 19,
+            method: "set_authentication".to_string(),
+            params: None,
+        })
+        .expect("set authentication no-op");
+    assert!(auth_noop.error.is_none());
+
+    let auth_set = daemon
+        .handle_rpc(rpc_request(20, "set_authentication", json!({ "required": true })))
+        .expect("set authentication");
+    assert!(auth_set.error.is_none());
+
+    let auth_get = daemon
+        .handle_rpc(rpc_request(21, "requires_authentication", json!({})))
+        .expect("requires authentication");
+    assert_eq!(
+        auth_get.result.expect("auth get result")["auth_required"].as_bool(),
+        Some(true)
+    );
+
+    for (id, method, key, value) in [
+        (22, "allow", "identity_hash", destination),
+        (23, "allow", "destination", uppercase_destination),
+        (24, "ignore_destination", "destination_hash", destination),
+        (25, "prioritise", "hash", destination),
+    ] {
+        let response = daemon
+            .handle_rpc(rpc_request(id, method, json!({ key: value })))
+            .expect("policy mutator");
+        assert!(response.error.is_none(), "{method}: {:?}", response.error);
+    }
+
+    let status = daemon
+        .handle_rpc(RpcRequest { id: 26, method: "daemon_status_ex".to_string(), params: None })
+        .expect("daemon status")
+        .result
+        .expect("daemon status result");
+    assert_eq!(status["delivery_policy"]["auth_required"].as_bool(), Some(true));
+    assert_eq!(
+        status["delivery_policy"]["allowed_destinations"],
+        json!([destination]),
+        "allow should be idempotent and normalize hex case"
+    );
+    assert_eq!(status["delivery_policy"]["ignored_destinations"], json!([destination]));
+    assert_eq!(status["delivery_policy"]["prioritised_destinations"], json!([destination]));
+
+    let disallow = daemon
+        .handle_rpc(rpc_request(
+            27,
+            "sdk_envelope_execute_v2",
+            json!({
+                "operation_id": "app.propagation.delivery_policy.disallow",
+                "kind": "command",
+                "correlation_id": "policy-disallow-1",
+                "payload": { "identity": destination },
+            }),
+        ))
+        .expect("disallow envelope");
+    assert!(disallow.error.is_none());
+    let disallow_result = disallow.result.expect("disallow result");
+    assert_eq!(
+        disallow_result["response"]["operation_id"],
+        json!("app.propagation.delivery_policy.disallow")
+    );
+    assert_eq!(
+        disallow_result["response"]["correlation_id"],
+        json!("policy-disallow-1")
+    );
+    assert_eq!(
+        disallow_result["response"]["payload"]["policy"]["allowed_destinations"],
+        json!([])
+    );
+
+    for (id, method) in [(28, "unignore_destination"), (29, "unprioritise")] {
+        let response = daemon
+            .handle_rpc(rpc_request(id, method, json!({ "destination": destination })))
+            .expect("policy removal");
+        assert!(response.error.is_none(), "{method}: {:?}", response.error);
+    }
+
+    let final_status = daemon
+        .handle_rpc(RpcRequest { id: 30, method: "daemon_status_ex".to_string(), params: None })
+        .expect("final daemon status")
+        .result
+        .expect("final daemon status result");
+    assert_eq!(final_status["delivery_policy"]["allowed_destinations"], json!([]));
+    assert_eq!(final_status["delivery_policy"]["ignored_destinations"], json!([]));
+    assert_eq!(final_status["delivery_policy"]["prioritised_destinations"], json!([]));
+
+    let invalid = daemon
+        .handle_rpc(rpc_request(31, "allow", json!({ "destination": "short" })))
+        .expect_err("invalid destination hash should fail");
+    assert_eq!(invalid.kind(), std::io::ErrorKind::InvalidInput);
+}
+
 fn assert_status_snapshot_fields(result: &JsonValue) {
     assert_eq!(result["identity_hash"].as_str(), Some("test-identity"));
     assert_eq!(result["delivery_destination_hash"].as_str(), Some("test-identity"));

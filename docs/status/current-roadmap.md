@@ -1023,6 +1023,13 @@ Scoped release evidence is split as follows:
   typed `policy_state`, so propagation-first clients can inspect auth-required
   mode plus allowed, denied, ignored, and prioritised destination sets without
   parsing raw policy JSON.
+- The router policy surface now also exposes Python-style incremental
+  `set_authentication`, `requires_authentication`, `allow`, `disallow`,
+  `ignore_destination`, `unignore_destination`, `prioritise`, and
+  `unprioritise` operations through legacy RPC aliases and SDK envelope
+  operation IDs. The daemon aliases validate 16-byte destination hashes and
+  suppress duplicate list entries, while typed ZeroMQ helpers preserve
+  unrelated auth, allow, deny, ignore, and priority fields through get/set.
 - Direct inbound LXMF packet/resource drops and propagated local delivery-policy
   drops now emit bounded raw `inbound_dropped` RPC/SDK event-stream entries
   without storing messages or updating peer activity; identifier fields use the

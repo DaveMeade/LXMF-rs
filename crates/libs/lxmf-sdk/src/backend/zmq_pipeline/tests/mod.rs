@@ -11,6 +11,7 @@ mod destination;
 mod history;
 mod propagation;
 mod propagation_payload;
+mod propagation_policy;
 mod registry;
 mod status;
 mod workflow;

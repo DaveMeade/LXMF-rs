@@ -107,6 +107,24 @@ struct DeliveryPolicyParams {
 }
 
 #[derive(Debug, Deserialize)]
+struct DeliveryPolicyHashMutationParams {
+    #[serde(
+        default,
+        alias = "identity_hash",
+        alias = "destination_hash",
+        alias = "identity",
+        alias = "hash"
+    )]
+    destination: Option<String>,
+}
+
+#[derive(Debug, Deserialize)]
+struct DeliveryPolicyAuthenticationParams {
+    #[serde(default, alias = "auth_required", alias = "required")]
+    authentication_required: Option<bool>,
+}
+
+#[derive(Debug, Deserialize)]
 struct PropagationEnableParams {
     enabled: bool,
     #[serde(default)]

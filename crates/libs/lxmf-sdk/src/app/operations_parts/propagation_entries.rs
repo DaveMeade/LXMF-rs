@@ -113,6 +113,70 @@ fn propagation_operation_entries() -> Vec<OperationEntry> {
         )
         .with_alias("set_delivery_policy"),
         OperationEntry::new(
+            "app.propagation.delivery_policy.auth.set",
+            "propagation",
+            OperationKind::Command,
+            TransportVariant::LegacyRpc,
+            "Set the local propagation delivery policy authentication requirement.",
+        )
+        .with_alias("set_authentication"),
+        OperationEntry::new(
+            "app.propagation.delivery_policy.auth.get",
+            "propagation",
+            OperationKind::Query,
+            TransportVariant::LegacyRpc,
+            "Return whether the local propagation delivery policy requires authentication.",
+        )
+        .with_alias("requires_authentication"),
+        OperationEntry::new(
+            "app.propagation.delivery_policy.allow",
+            "propagation",
+            OperationKind::Command,
+            TransportVariant::LegacyRpc,
+            "Allow a destination hash in the local propagation delivery policy.",
+        )
+        .with_alias("allow"),
+        OperationEntry::new(
+            "app.propagation.delivery_policy.disallow",
+            "propagation",
+            OperationKind::Command,
+            TransportVariant::LegacyRpc,
+            "Remove a destination hash from the local propagation delivery policy allow list.",
+        )
+        .with_alias("disallow"),
+        OperationEntry::new(
+            "app.propagation.delivery_policy.ignore",
+            "propagation",
+            OperationKind::Command,
+            TransportVariant::LegacyRpc,
+            "Ignore a destination hash in the local propagation delivery policy.",
+        )
+        .with_alias("ignore_destination"),
+        OperationEntry::new(
+            "app.propagation.delivery_policy.unignore",
+            "propagation",
+            OperationKind::Command,
+            TransportVariant::LegacyRpc,
+            "Remove a destination hash from the local propagation delivery policy ignore list.",
+        )
+        .with_alias("unignore_destination"),
+        OperationEntry::new(
+            "app.propagation.delivery_policy.prioritise",
+            "propagation",
+            OperationKind::Command,
+            TransportVariant::LegacyRpc,
+            "Prioritise a destination hash in the local propagation delivery policy.",
+        )
+        .with_alias("prioritise"),
+        OperationEntry::new(
+            "app.propagation.delivery_policy.unprioritise",
+            "propagation",
+            OperationKind::Command,
+            TransportVariant::LegacyRpc,
+            "Remove a destination hash from the local propagation delivery policy priority list.",
+        )
+        .with_alias("unprioritise"),
+        OperationEntry::new(
             "app.propagation.peer_maintenance",
             "propagation",
             OperationKind::Command,

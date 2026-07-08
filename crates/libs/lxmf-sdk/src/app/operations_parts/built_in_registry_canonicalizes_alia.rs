@@ -25,6 +25,18 @@ mod tests {
             registry.canonicalize("sdk_paper_decode_v2").expect("canonical id").as_str(),
             "app.paper.decode"
         );
+        assert_eq!(
+            registry.canonicalize("allow").expect("canonical id").as_str(),
+            "app.propagation.delivery_policy.allow"
+        );
+        assert_eq!(
+            registry.canonicalize("ignore_destination").expect("canonical id").as_str(),
+            "app.propagation.delivery_policy.ignore"
+        );
+        assert_eq!(
+            registry.canonicalize("unprioritise").expect("canonical id").as_str(),
+            "app.propagation.delivery_policy.unprioritise"
+        );
     }
 
     #[test]
