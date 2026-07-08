@@ -1315,6 +1315,8 @@ gate for the SDK-first software slice.
    - Finish resolver/bootstrap, announce/path edge behavior, and broader runtime
      mutation parity beyond TCP clients, explicit loopback TCP server
      listeners, and explicit UDP listener, peer, and multicast-bind records.
+   - Shared-instance `link_count` RPC now reports the live transport link-table
+     length like Python's `Reticulum.get_link_count()` helper.
 3. **Operational breadth**
    - Add broader prepared-host hardware evidence across serial/TCP/BLE RNode
      device, firmware, management, and radio combinations; ordinary

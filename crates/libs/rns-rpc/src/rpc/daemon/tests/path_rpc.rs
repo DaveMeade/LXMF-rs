@@ -8,6 +8,7 @@ struct ScopedPathRequest {
 struct RecordingPathLookupBridge {
     known: std::sync::Mutex<bool>,
     discover_on_request: bool,
+    link_count: usize,
     requests: std::sync::Mutex<Vec<String>>,
     scoped_requests: std::sync::Mutex<Vec<ScopedPathRequest>>,
 }
@@ -17,15 +18,21 @@ impl RecordingPathLookupBridge {
         Self {
             known: std::sync::Mutex::new(known),
             discover_on_request: false,
+            link_count: 0,
             requests: std::sync::Mutex::new(Vec::new()),
             scoped_requests: std::sync::Mutex::new(Vec::new()),
         }
+    }
+
+    fn with_link_count(link_count: usize) -> Self {
+        Self { link_count, ..Self::new(false) }
     }
 
     fn discover_on_request() -> Self {
         Self {
             known: std::sync::Mutex::new(false),
             discover_on_request: true,
+            link_count: 0,
             requests: std::sync::Mutex::new(Vec::new()),
             scoped_requests: std::sync::Mutex::new(Vec::new()),
         }
@@ -71,6 +78,10 @@ impl PathLookupBridge for RecordingPathLookupBridge {
         );
         self.request_path(destination)
     }
+
+    fn link_count(&self) -> Result<usize, std::io::Error> {
+        Ok(self.link_count)
+    }
 }
 
 struct FailingPathLookupBridge;
@@ -82,6 +93,10 @@ impl PathLookupBridge for FailingPathLookupBridge {
 
     fn request_path(&self, _destination: &str) -> Result<(), std::io::Error> {
         Err(std::io::Error::other("path request dispatch unavailable"))
+    }
+
+    fn link_count(&self) -> Result<usize, std::io::Error> {
+        Err(std::io::Error::other("link table unavailable"))
     }
 }
 
@@ -126,6 +141,32 @@ fn path_status_reports_known_path() {
     assert_eq!(result["known"].as_bool(), Some(true));
     assert_eq!(result["path_found"].as_bool(), Some(true));
     assert_eq!(result["status"].as_str(), Some("found"));
+}
+
+#[test]
+fn link_count_reports_bridge_count_as_python_shared_instance_integer() {
+    let daemon = RpcDaemon::test_instance();
+    daemon.set_path_lookup_bridge(Arc::new(RecordingPathLookupBridge::with_link_count(2)));
+
+    let response = daemon
+        .handle_rpc(rpc_request(12, "link_count", json!({})))
+        .expect("link count response");
+
+    assert!(response.error.is_none());
+    assert_eq!(response.result, Some(json!(2)));
+}
+
+#[test]
+fn link_count_reports_missing_bridge() {
+    let daemon = RpcDaemon::test_instance();
+
+    let response = daemon
+        .handle_rpc(rpc_request(13, "link_count", json!({})))
+        .expect("link count response");
+
+    let error = response.error.expect("missing bridge error");
+    assert_eq!(error.code, "LINK_COUNT_UNAVAILABLE");
+    assert!(response.result.is_none());
 }
 
 #[test]

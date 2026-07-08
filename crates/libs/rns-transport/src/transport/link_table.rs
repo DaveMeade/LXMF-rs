@@ -49,6 +49,10 @@ impl LinkTable {
         Self { entries: HashMap::new(), proof_timeout, idle_timeout }
     }
 
+    pub fn len(&self) -> usize {
+        self.entries.len()
+    }
+
     pub fn add(
         &mut self,
         link_request: &Packet,
@@ -148,5 +152,17 @@ impl LinkTable {
         }
 
         expired_unvalidated
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn link_table_len_reports_empty_table() {
+        let table = LinkTable::new(Duration::from_secs(5), Duration::from_secs(30));
+
+        assert_eq!(table.len(), 0);
     }
 }

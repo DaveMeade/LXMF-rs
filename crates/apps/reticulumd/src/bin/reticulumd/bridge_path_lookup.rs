@@ -112,6 +112,18 @@ impl PathLookupBridge for DaemonPathLookupBridge {
             }))
         })
     }
+
+    fn link_count(&self) -> Result<usize, std::io::Error> {
+        self.run_transport(move |transport| {
+            let runtime = tokio::runtime::Builder::new_current_thread()
+                .enable_all()
+                .build()
+                .map_err(|err| {
+                    std::io::Error::other(format!("failed to build link count runtime: {err}"))
+                })?;
+            Ok(runtime.block_on(async move { transport.link_count().await }))
+        })
+    }
 }
 
 #[cfg(test)]
@@ -154,6 +166,13 @@ mod tests {
         let known = bridge.has_path("00112233445566778899aabbccddeeff").expect("query path");
 
         assert!(!known);
+    }
+
+    #[test]
+    fn path_lookup_bridge_reports_fresh_transport_link_count() {
+        let bridge = bridge();
+
+        assert_eq!(bridge.link_count().expect("link count"), 0);
     }
 
     #[test]

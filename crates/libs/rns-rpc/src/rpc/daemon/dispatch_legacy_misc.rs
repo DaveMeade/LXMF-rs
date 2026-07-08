@@ -124,6 +124,33 @@ impl RpcDaemon {
                     error: None,
                 })
             }
+            "link_count" => {
+                let Some(bridge) = self
+                    .path_lookup_bridge
+                    .lock()
+                    .expect("path_lookup_bridge mutex poisoned")
+                    .clone()
+                else {
+                    return Ok(RpcResponse {
+                        id: request.id,
+                        result: None,
+                        error: Some(RpcError::new(
+                            "LINK_COUNT_UNAVAILABLE",
+                            "link count bridge is not configured",
+                        )),
+                    });
+                };
+                match bridge.link_count() {
+                    Ok(count) => {
+                        Ok(RpcResponse { id: request.id, result: Some(json!(count)), error: None })
+                    }
+                    Err(err) => Ok(RpcResponse {
+                        id: request.id,
+                        result: None,
+                        error: Some(RpcError::new("LINK_COUNT_FAILED", err.to_string())),
+                    }),
+                }
+            }
             "path_status" => {
                 let params = request.params.ok_or_else(|| {
                     std::io::Error::new(std::io::ErrorKind::InvalidInput, "missing params")
