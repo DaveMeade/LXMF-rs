@@ -1,0 +1,87 @@
+#[test]
+fn blackhole_identity_rpc_matches_reticulum_boolean_semantics() {
+    let daemon = RpcDaemon::test_instance();
+    let identity = "00112233445566778899AABBCCDDEEFF";
+    let normalized = "00112233445566778899aabbccddeeff";
+
+    let empty = daemon
+        .handle_rpc(RpcRequest {
+            id: 1,
+            method: "get_blackholed_identities".to_string(),
+            params: None,
+        })
+        .expect("get empty blackholed identities");
+    assert_eq!(empty.result.expect("empty result"), json!({}));
+
+    let added = daemon
+        .handle_rpc(rpc_request(
+            2,
+            "blackhole_identity",
+            json!({
+                "identity_hash": identity,
+                "until": 1_700_000_100_i64,
+                "reason": "operator"
+            }),
+        ))
+        .expect("blackhole identity");
+    assert_eq!(added.result.expect("added result"), json!(true));
+
+    let duplicate = daemon
+        .handle_rpc(rpc_request(3, "blackhole_identity", json!({ "identity": normalized })))
+        .expect("duplicate blackhole identity");
+    assert_eq!(duplicate.result.expect("duplicate result"), JsonValue::Null);
+
+    let listed = daemon
+        .handle_rpc(RpcRequest {
+            id: 4,
+            method: "get_blackholed_identities".to_string(),
+            params: None,
+        })
+        .expect("get blackholed identities");
+    let listed = listed.result.expect("listed result");
+    assert_eq!(listed[normalized]["source"], json!("test-identity"));
+    assert_eq!(listed[normalized]["until"], json!(1_700_000_100_i64));
+    assert_eq!(listed[normalized]["reason"], json!("operator"));
+
+    let removed = daemon
+        .handle_rpc(rpc_request(5, "unblackhole_identity", json!({ "hash": normalized })))
+        .expect("unblackhole identity");
+    assert_eq!(removed.result.expect("removed result"), json!(true));
+
+    let duplicate_remove = daemon
+        .handle_rpc(rpc_request(
+            6,
+            "unblackhole_identity",
+            json!({ "identity_hash": normalized }),
+        ))
+        .expect("duplicate unblackhole identity");
+    assert_eq!(duplicate_remove.result.expect("duplicate remove result"), JsonValue::Null);
+}
+
+#[test]
+fn blackhole_identity_rpc_returns_false_for_malformed_identity_hashes() {
+    let daemon = RpcDaemon::test_instance();
+
+    let short = daemon
+        .handle_rpc(rpc_request(10, "blackhole_identity", json!({ "identity_hash": "abcd" })))
+        .expect("short identity hash returns false");
+    assert_eq!(short.result.expect("short result"), json!(false));
+
+    let non_hex = daemon
+        .handle_rpc(rpc_request(
+            11,
+            "unblackhole_identity",
+            json!({ "identity_hash": "not-hex" }),
+        ))
+        .expect("non-hex identity hash returns false");
+    assert_eq!(non_hex.result.expect("non-hex result"), json!(false));
+
+    let listed = daemon
+        .handle_rpc(RpcRequest {
+            id: 12,
+            method: "get_blackholed_identities".to_string(),
+            params: None,
+        })
+        .expect("get blackholed identities");
+    assert_eq!(listed.result.expect("listed result"), json!({}));
+}

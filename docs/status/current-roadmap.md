@@ -134,6 +134,11 @@ Scoped release evidence is split as follows:
   are persisted for daemon announce-identity lookup, and daemon status reports
   `_runtime.reticulum.path_table_restore.status` as `ok` or `error` so corrupt
   `destination_table` state remains observable without making startup fatal.
+- `reticulumd` now exposes Reticulum-style blackholed identity RPC state through
+  `get_blackholed_identities`, `blackhole_identity`, and
+  `unblackhole_identity`, matching Python's `true`/`null`/`false` mutation
+  semantics for add, duplicate/no-op, and malformed identity hashes while
+  leaving persisted transport-side blackhole removal work out of this slice.
 - Reticulum path-table persistence now writes only routes with cached announce
   material and restore hardens Python-format active and tunnel path-table rows
   by ignoring stale/expired path rows, so restart bootstrap cannot revive
