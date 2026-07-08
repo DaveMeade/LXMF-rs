@@ -78,6 +78,18 @@
         );
     }
 
+    fn assert_reload_restart_required_without_apply(
+        daemon: &RpcDaemon,
+        bridge: &RecordingInterfaceMutationBridge,
+        response: RpcResponse,
+        expected_interfaces: Vec<InterfaceRecord>,
+    ) {
+        assert_restart_required(response);
+        assert!(bridge.applied().is_empty(), "restart-required reload must not hot-apply");
+        let interfaces = daemon.interfaces.lock().expect("interfaces mutex poisoned").clone();
+        assert_eq!(interfaces, expected_interfaces);
+    }
+
     #[test]
     fn set_interfaces_rejects_startup_only_interface_kinds() {
         let daemon = RpcDaemon::test_instance();
@@ -834,7 +846,10 @@
     #[test]
     fn reload_config_reports_multicast_udp_forward_target_requires_restart() {
         let daemon = RpcDaemon::test_instance();
-        daemon.replace_interfaces(vec![udp_interface("udp-peer", "127.0.0.1", 4242)]);
+        let original_interfaces = vec![udp_interface("udp-peer", "127.0.0.1", 4242)];
+        daemon.replace_interfaces(original_interfaces.clone());
+        let bridge = std::sync::Arc::new(RecordingInterfaceMutationBridge::new());
+        daemon.set_interface_mutation_bridge(bridge.clone());
 
         let response = daemon
             .handle_rpc(rpc_request(
@@ -856,7 +871,98 @@
             ))
             .expect("reload_config response");
 
-        assert_restart_required(response);
+        assert_reload_restart_required_without_apply(&daemon, &bridge, response, original_interfaces);
+    }
+
+    #[test]
+    fn reload_config_reports_device_udp_requires_restart_without_partial_apply() {
+        let daemon = RpcDaemon::test_instance();
+        let original_interfaces = vec![udp_interface("udp-device", "127.0.0.1", 4242)];
+        daemon.replace_interfaces(original_interfaces.clone());
+        let bridge = std::sync::Arc::new(RecordingInterfaceMutationBridge::new());
+        daemon.set_interface_mutation_bridge(bridge.clone());
+
+        let response = daemon
+            .handle_rpc(rpc_request(
+                37,
+                "reload_config",
+                json!({
+                    "interfaces": [{
+                        "type": "udp",
+                        "enabled": true,
+                        "host": "127.0.0.1",
+                        "port": 4242,
+                        "name": "udp-device",
+                        "settings": {
+                            "device": "eth0"
+                        }
+                    }]
+                }),
+            ))
+            .expect("reload_config response");
+
+        assert_reload_restart_required_without_apply(&daemon, &bridge, response, original_interfaces);
+    }
+
+    #[test]
+    fn reload_config_reports_out_of_range_udp_forward_port_requires_restart_without_partial_apply() {
+        let daemon = RpcDaemon::test_instance();
+        let original_interfaces = vec![udp_interface("udp-peer", "127.0.0.1", 4242)];
+        daemon.replace_interfaces(original_interfaces.clone());
+        let bridge = std::sync::Arc::new(RecordingInterfaceMutationBridge::new());
+        daemon.set_interface_mutation_bridge(bridge.clone());
+
+        let response = daemon
+            .handle_rpc(rpc_request(
+                38,
+                "reload_config",
+                json!({
+                    "interfaces": [{
+                        "type": "udp",
+                        "enabled": true,
+                        "host": "127.0.0.1",
+                        "port": 4242,
+                        "name": "udp-peer",
+                        "settings": {
+                            "target_host": "127.0.0.1",
+                            "target_port": 70000
+                        }
+                    }]
+                }),
+            ))
+            .expect("reload_config response");
+
+        assert_reload_restart_required_without_apply(&daemon, &bridge, response, original_interfaces);
+    }
+
+    #[test]
+    fn reload_config_reports_partial_udp_forward_target_requires_restart_without_partial_apply() {
+        let daemon = RpcDaemon::test_instance();
+        let original_interfaces = vec![udp_interface("udp-peer", "127.0.0.1", 4242)];
+        daemon.replace_interfaces(original_interfaces.clone());
+        let bridge = std::sync::Arc::new(RecordingInterfaceMutationBridge::new());
+        daemon.set_interface_mutation_bridge(bridge.clone());
+
+        let response = daemon
+            .handle_rpc(rpc_request(
+                39,
+                "reload_config",
+                json!({
+                    "interfaces": [{
+                        "type": "udp",
+                        "enabled": true,
+                        "host": "127.0.0.1",
+                        "port": 4242,
+                        "name": "udp-peer",
+                        "settings": {
+                            "target_host": "127.0.0.1"
+                        }
+                    }]
+                }),
+            ))
+            .expect("reload_config response");
+
+        assert_reload_restart_required_without_apply(&daemon, &bridge, response, original_interfaces);
     }
 
     #[test]

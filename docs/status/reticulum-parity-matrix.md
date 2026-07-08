@@ -145,8 +145,10 @@ placeholders:
   multicast-bind records through `set_interfaces` and `reload_config`, while
   `device`-bound, non-local, and broader TCP server listener shapes, plus UDP
   `device`-bound, partial-target, out-of-range-target, and multicast-forward
-  records, remain restart-required or invalid. Duplicate TCP server and UDP
-  binds are rejected before mutation. Hot-applied explicit TCP server records
+  records, remain restart-required or invalid, with `reload_config` evidence
+  that unsafe UDP records do not invoke the mutation bridge or change stored
+  interfaces. Duplicate TCP server and UDP binds are rejected before mutation.
+  Hot-applied explicit TCP server records
   attach live daemon/RPC `_runtime.tcp.listener_status` metadata, hot-applied
   explicit UDP records attach the runtime iface and refresh live daemon/RPC
   `_runtime.udp.status` counters under focused software tests; multicast-bind
