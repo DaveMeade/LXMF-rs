@@ -115,6 +115,8 @@ pub struct PropagationRemoteStatusResult {
     pub status: JsonValue,
     #[serde(default)]
     pub status_state: PropagationRemoteStatusState,
+    #[serde(default)]
+    pub stats: PropagationRemoteStats,
 }
 
 #[derive(Deserialize)]
@@ -131,10 +133,12 @@ impl<'de> Deserialize<'de> for PropagationRemoteStatusResult {
     {
         let raw = RawPropagationRemoteStatusResult::deserialize(deserializer)?;
         let status_state = PropagationRemoteStatusState::from_status(&raw.status);
+        let stats = PropagationRemoteStats::from_status(&raw.status);
         Ok(Self {
             remote: raw.remote,
             status: raw.status,
             status_state,
+            stats,
         })
     }
 }
