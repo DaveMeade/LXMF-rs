@@ -1,6 +1,6 @@
 # Current Roadmap Status
 
-Last reassessed: 2026-07-06
+Last reassessed: 2026-07-08
 
 This file is the repository-level source of truth for parity posture, release
 confidence, and execution order. Detailed row-level status lives in:
@@ -182,7 +182,9 @@ Scoped release evidence is split as follows:
   implicit shared local TCP listener coexistence with configured TCP/Backbone
   listeners through a sidecar startup path,
   Python-style `force_shared_instance_bitrate` stream pacing, plus
-  shared-instance one-hop transport wrapping,
+  shared-instance one-hop transport wrapping, and `status`/`daemon_status_ex`
+  now report Reticulum shared-instance mode, flags, endpoint, and interface
+  name for active server, attached client, and disabled states,
   LocalInterface TCP and Unix shared-instance software smoke coverage for
   strict startup, TCP listener/attach status, filesystem Unix listener startup,
   Linux abstract Unix listener/client attach, Python local MTU, bitrate alias
