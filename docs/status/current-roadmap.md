@@ -1,6 +1,6 @@
 # Current Roadmap Status
 
-Last reassessed: 2026-07-06
+Last reassessed: 2026-07-08
 
 This file is the repository-level source of truth for parity posture, release
 confidence, and execution order. Detailed row-level status lives in:
@@ -445,7 +445,8 @@ Scoped release evidence is split as follows:
   `device`-bound, non-local, and broader TCP server listener shapes stay
   restart-required or invalid, UDP `device`-bound, partial-target,
   out-of-range-target, and multicast-forward shapes remain restart-required or
-  invalid, and duplicate TCP server or UDP binds are rejected before mutation.
+  invalid with focused target-validation regressions, and duplicate TCP server
+  or UDP binds are rejected before mutation.
   Hot-applied explicit TCP server records attach live daemon/RPC
   `_runtime.tcp.listener_status` metadata, hot-applied explicit UDP records
   attach the runtime iface and refresh live daemon/RPC `_runtime.udp.status`
