@@ -441,9 +441,10 @@ Scoped release evidence is split as follows:
   network services. `set_interfaces` and `reload_config` now hot-apply explicit
   loopback TCP server listeners, including the local `localhost` hostname,
   alongside TCP clients and explicit UDP
-  listener, peer, and multicast-bind records, with tests proving
+  listener, peer, multicast-bind, and Python-style shared-port forward-peer
+  records, with tests proving
   `device`-bound, non-local, and broader TCP server listener shapes stay
-  restart-required or invalid, UDP `device`-bound, partial-target,
+  restart-required or invalid, UDP `device`-bound, native partial-target,
   out-of-range-target, and multicast-forward shapes remain restart-required or
   invalid, and duplicate TCP server or UDP binds are rejected before mutation.
   Hot-applied explicit TCP server records attach live daemon/RPC

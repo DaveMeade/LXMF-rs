@@ -1,7 +1,8 @@
 use super::{
-    apply_hot_apply_interface_records, refresh_hot_apply_tcp_listener_runtime_status_once,
-    refresh_hot_apply_udp_runtime_status_once, HotApplyUdpRefresh, InterfaceHotApplyBridge,
-    InterfaceManager, InterfaceMutationBridge, InterfaceRecord, ManagedHotApplyInterface,
+    apply_hot_apply_interface_records, mark_udp_record_runtime_status,
+    refresh_hot_apply_tcp_listener_runtime_status_once, refresh_hot_apply_udp_runtime_status_once,
+    HotApplyUdpRefresh, InterfaceHotApplyBridge, InterfaceManager, InterfaceMutationBridge,
+    InterfaceRecord, ManagedHotApplyInterface,
 };
 use rand_core::OsRng;
 use rns_rpc::{RpcDaemon, RpcRequest};
@@ -59,6 +60,14 @@ fn udp_peer_record(
     record.settings = Some(json!({
         "target_host": target_host,
         "target_port": target_port
+    }));
+    record
+}
+
+fn udp_forward_ip_record(name: &str, host: &str, port: u16, forward_ip: &str) -> InterfaceRecord {
+    let mut record = udp_record(name, host, port);
+    record.settings = Some(json!({
+        "forward_ip": forward_ip,
     }));
     record
 }
@@ -465,6 +474,23 @@ async fn hot_apply_spawns_udp_unicast_peer_with_runtime_metadata() {
     assert_eq!(
         udp_status.get("forward_addr").and_then(|value| value.as_str()),
         Some("127.0.0.1:4242")
+    );
+}
+
+#[test]
+fn hot_apply_udp_forward_ip_uses_shared_port_for_runtime_metadata() {
+    let mut record = udp_forward_ip_record("udp-peer", "127.0.0.1", 4242, "127.0.0.2");
+
+    mark_udp_record_runtime_status(&mut record, None);
+
+    let runtime =
+        record.settings.as_ref().and_then(|value| value.get("_runtime")).expect("runtime metadata");
+    let udp_status =
+        runtime.get("udp").and_then(|value| value.get("status")).expect("udp runtime status");
+    assert_eq!(udp_status.get("role").and_then(|value| value.as_str()), Some("peer"));
+    assert_eq!(
+        udp_status.get("forward_addr").and_then(|value| value.as_str()),
+        Some("127.0.0.2:4242")
     );
 }
 

@@ -488,6 +488,46 @@
     }
 
     #[test]
+    fn set_interfaces_hot_applies_udp_forward_ip_with_shared_port() {
+        let daemon = RpcDaemon::test_instance();
+        let bridge = std::sync::Arc::new(RecordingInterfaceMutationBridge::new());
+        daemon.set_interface_mutation_bridge(bridge.clone());
+
+        let response = daemon
+            .handle_rpc(rpc_request(
+                37,
+                "set_interfaces",
+                json!({
+                    "interfaces": [{
+                        "type": "udp",
+                        "enabled": true,
+                        "host": "127.0.0.1",
+                        "port": 4242,
+                        "name": "udp-peer",
+                        "settings": {
+                            "forward_ip": "127.0.0.2"
+                        }
+                    }]
+                }),
+            ))
+            .expect("set_interfaces response");
+
+        assert!(response.error.is_none(), "unexpected error: {response:?}");
+        let applied = bridge.applied();
+        assert_eq!(applied.len(), 1);
+        let iface = &applied[0][0];
+        assert_eq!(iface.name.as_deref(), Some("udp-peer"));
+        assert_eq!(iface.port, Some(4242));
+        assert_eq!(
+            iface.settings
+                .as_ref()
+                .and_then(|settings| settings.get("forward_ip"))
+                .and_then(|value| value.as_str()),
+            Some("127.0.0.2")
+        );
+    }
+
+    #[test]
     fn set_interfaces_reports_device_udp_requires_restart() {
         let daemon = RpcDaemon::test_instance();
 
@@ -828,6 +868,50 @@
         assert_eq!(
             bridge.applied(),
             vec![vec![udp_interface("udp-mcast", "239.255.0.1", 4248)]]
+        );
+    }
+
+    #[test]
+    fn reload_config_hot_applies_udp_forward_ip_with_shared_port() {
+        let daemon = RpcDaemon::test_instance();
+        daemon.replace_interfaces(vec![udp_interface("udp-peer", "127.0.0.1", 4242)]);
+        let bridge = std::sync::Arc::new(RecordingInterfaceMutationBridge::new());
+        daemon.set_interface_mutation_bridge(bridge.clone());
+
+        let response = daemon
+            .handle_rpc(rpc_request(
+                36,
+                "reload_config",
+                json!({
+                    "interfaces": [{
+                        "type": "udp",
+                        "enabled": true,
+                        "host": "127.0.0.1",
+                        "port": 4242,
+                        "name": "udp-peer",
+                        "settings": {
+                            "forward_ip": "127.0.0.2"
+                        }
+                    }]
+                }),
+            ))
+            .expect("reload_config response");
+
+        assert!(response.error.is_none(), "unexpected reload error: {response:?}");
+        let result = response.result.expect("result");
+        assert_eq!(result["hot_applied_legacy_tcp_only"], json!(false));
+        assert_eq!(result["hot_applied_interface_mutation"], json!(true));
+        let applied = bridge.applied();
+        assert_eq!(applied.len(), 1);
+        let iface = &applied[0][0];
+        assert_eq!(iface.name.as_deref(), Some("udp-peer"));
+        assert_eq!(iface.port, Some(4242));
+        assert_eq!(
+            iface.settings
+                .as_ref()
+                .and_then(|settings| settings.get("forward_ip"))
+                .and_then(|value| value.as_str()),
+            Some("127.0.0.2")
         );
     }
 
