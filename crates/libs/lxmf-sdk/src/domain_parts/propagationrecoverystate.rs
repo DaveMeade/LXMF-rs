@@ -64,6 +64,8 @@ pub struct PropagationRecoveryStateResult {
     #[serde(default)]
     pub remote_peering_cost_max: Option<u64>,
     #[serde(default)]
+    pub control_allowed: Vec<String>,
+    #[serde(default)]
     pub total_ingested: u64,
     #[serde(default)]
     pub last_ingest_count: u64,
@@ -124,6 +126,7 @@ impl PropagationRecoveryStateResult {
             retain_synced_on_node: json_bool(&propagation, "retain_synced_on_node").ok().flatten(),
             peering_cost: json_u64(&propagation, "peering_cost").ok().flatten(),
             remote_peering_cost_max: json_u64(&propagation, "remote_peering_cost_max").ok().flatten(),
+            control_allowed: remote_transfer_json_string_array(&propagation, "control_allowed"),
             total_ingested: json_u64(&propagation, "total_ingested").ok().flatten().unwrap_or(0),
             last_ingest_count: json_u64(&propagation, "last_ingest_count").ok().flatten().unwrap_or(0),
             client_propagation_messages_received: json_u64(

@@ -25,6 +25,17 @@ mod tests {
             registry.canonicalize("sdk_paper_decode_v2").expect("canonical id").as_str(),
             "app.paper.decode"
         );
+        assert_eq!(
+            registry.canonicalize("allow_control").expect("canonical propagation control id").as_str(),
+            "app.propagation.control.allow"
+        );
+        assert_eq!(
+            registry
+                .canonicalize("disallow_control")
+                .expect("canonical propagation control id")
+                .as_str(),
+            "app.propagation.control.disallow"
+        );
     }
 
     #[test]

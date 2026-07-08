@@ -125,6 +125,8 @@ impl RpcDaemon {
             | "propagation_enable"
             | "get_delivery_policy"
             | "set_delivery_policy"
+            | "allow_control"
+            | "disallow_control"
             | "propagation_peer_maintenance"
             | "propagation_ingest"
             | "propagation_fetch" => self.handle_rpc_legacy_propagation(RpcRequest {

@@ -1,4 +1,47 @@
 impl RpcDaemon {
+    fn normalize_control_identity_hash(value: &str) -> Result<String, std::io::Error> {
+        let value = value.trim();
+        let decoded = hex::decode(value).map_err(|err| {
+            std::io::Error::new(
+                std::io::ErrorKind::InvalidInput,
+                format!("identity_hash must be hex-encoded: {err}"),
+            )
+        })?;
+        if decoded.len() != 16 {
+            return Err(std::io::Error::new(
+                std::io::ErrorKind::InvalidInput,
+                "identity_hash must decode to a 16-byte RNS destination hash",
+            ));
+        }
+        Ok(value.to_ascii_lowercase())
+    }
+
+    fn normalize_control_allowed(values: &[String]) -> Result<Vec<String>, std::io::Error> {
+        let mut normalized = Vec::new();
+        for value in values {
+            let value = Self::normalize_control_identity_hash(value)?;
+            if !normalized.iter().any(|candidate| candidate == &value) {
+                normalized.push(value);
+            }
+        }
+        Ok(normalized)
+    }
+
+    fn update_propagation_control_allowed<F>(&self, update: F) -> PropagationState
+    where
+        F: FnOnce(&mut Vec<String>),
+    {
+        let state = {
+            let mut guard = self.propagation_state.lock().expect("propagation mutex poisoned");
+            update(&mut guard.control_allowed);
+            guard.clone()
+        };
+        self.update_daemon_status_snapshot(|snapshot| {
+            snapshot.propagation = state.clone();
+        });
+        state
+    }
+
     fn handle_rpc_legacy_propagation_policy(
         &self,
         request: RpcRequest,
@@ -88,6 +131,46 @@ impl RpcDaemon {
                     error: None,
                 })
             }
+            "allow_control" => {
+                let params = request.params.ok_or_else(|| {
+                    std::io::Error::new(std::io::ErrorKind::InvalidInput, "missing params")
+                })?;
+                let parsed: PropagationControlAclParams = serde_json::from_value(params)
+                    .map_err(|err| std::io::Error::new(std::io::ErrorKind::InvalidInput, err))?;
+                let identity_hash = Self::normalize_control_identity_hash(&parsed.identity_hash)?;
+                let state = self.update_propagation_control_allowed(|control_allowed| {
+                    if !control_allowed.iter().any(|candidate| candidate == &identity_hash) {
+                        control_allowed.push(identity_hash.clone());
+                    }
+                });
+                Ok(RpcResponse {
+                    id: request.id,
+                    result: Some(json!({
+                        "identity_hash": identity_hash,
+                        "propagation": state,
+                    })),
+                    error: None,
+                })
+            }
+            "disallow_control" => {
+                let params = request.params.ok_or_else(|| {
+                    std::io::Error::new(std::io::ErrorKind::InvalidInput, "missing params")
+                })?;
+                let parsed: PropagationControlAclParams = serde_json::from_value(params)
+                    .map_err(|err| std::io::Error::new(std::io::ErrorKind::InvalidInput, err))?;
+                let identity_hash = Self::normalize_control_identity_hash(&parsed.identity_hash)?;
+                let state = self.update_propagation_control_allowed(|control_allowed| {
+                    control_allowed.retain(|candidate| candidate != &identity_hash);
+                });
+                Ok(RpcResponse {
+                    id: request.id,
+                    result: Some(json!({
+                        "identity_hash": identity_hash,
+                        "propagation": state,
+                    })),
+                    error: None,
+                })
+            }
             "propagation_enable" => {
                 let params = request.params.ok_or_else(|| {
                     std::io::Error::new(std::io::ErrorKind::InvalidInput, "missing params")
@@ -151,6 +234,9 @@ impl RpcDaemon {
                     }
                     if let Some(remote_peering_cost_max) = parsed.remote_peering_cost_max {
                         guard.remote_peering_cost_max = Some(remote_peering_cost_max);
+                    }
+                    if let Some(control_allowed) = parsed.control_allowed {
+                        guard.control_allowed = Self::normalize_control_allowed(&control_allowed)?;
                     }
                     guard.clone()
                 };

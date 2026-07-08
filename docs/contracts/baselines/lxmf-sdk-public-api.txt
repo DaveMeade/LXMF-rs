@@ -947,6 +947,7 @@ pub lxmf_sdk::domain::PropagationDeliveryPolicyState::prioritised_destinations: 
 pub lxmf_sdk::domain::PropagationEnableRequest::auth_required: core::option::Option<bool>
 pub lxmf_sdk::domain::PropagationEnableRequest::autopeer: core::option::Option<bool>
 pub lxmf_sdk::domain::PropagationEnableRequest::autopeer_maxdepth: core::option::Option<u32>
+pub lxmf_sdk::domain::PropagationEnableRequest::control_allowed: core::option::Option<alloc::vec::Vec<alloc::string::String>>
 pub lxmf_sdk::domain::PropagationEnableRequest::delivery_limit: core::option::Option<u32>
 pub lxmf_sdk::domain::PropagationEnableRequest::enabled: bool
 pub lxmf_sdk::domain::PropagationEnableRequest::from_static_only: core::option::Option<bool>
@@ -1099,6 +1100,7 @@ pub lxmf_sdk::domain::PropagationRecoveryStateResult::autopeer: core::option::Op
 pub lxmf_sdk::domain::PropagationRecoveryStateResult::autopeer_maxdepth: core::option::Option<u64>
 pub lxmf_sdk::domain::PropagationRecoveryStateResult::client_propagation_messages_received: u64
 pub lxmf_sdk::domain::PropagationRecoveryStateResult::client_propagation_messages_served: u64
+pub lxmf_sdk::domain::PropagationRecoveryStateResult::control_allowed: alloc::vec::Vec<alloc::string::String>
 pub lxmf_sdk::domain::PropagationRecoveryStateResult::delivery_limit: core::option::Option<u64>
 pub lxmf_sdk::domain::PropagationRecoveryStateResult::enabled: bool
 pub lxmf_sdk::domain::PropagationRecoveryStateResult::failure_kind: core::option::Option<alloc::string::String>
@@ -2745,6 +2747,7 @@ pub lxmf_sdk::PropagationDeliveryPolicyState::prioritised_destinations: alloc::v
 pub lxmf_sdk::PropagationEnableRequest::auth_required: core::option::Option<bool>
 pub lxmf_sdk::PropagationEnableRequest::autopeer: core::option::Option<bool>
 pub lxmf_sdk::PropagationEnableRequest::autopeer_maxdepth: core::option::Option<u32>
+pub lxmf_sdk::PropagationEnableRequest::control_allowed: core::option::Option<alloc::vec::Vec<alloc::string::String>>
 pub lxmf_sdk::PropagationEnableRequest::delivery_limit: core::option::Option<u32>
 pub lxmf_sdk::PropagationEnableRequest::enabled: bool
 pub lxmf_sdk::PropagationEnableRequest::from_static_only: core::option::Option<bool>
@@ -2876,6 +2879,7 @@ pub lxmf_sdk::PropagationRecoveryStateResult::autopeer: core::option::Option<boo
 pub lxmf_sdk::PropagationRecoveryStateResult::autopeer_maxdepth: core::option::Option<u64>
 pub lxmf_sdk::PropagationRecoveryStateResult::client_propagation_messages_received: u64
 pub lxmf_sdk::PropagationRecoveryStateResult::client_propagation_messages_served: u64
+pub lxmf_sdk::PropagationRecoveryStateResult::control_allowed: alloc::vec::Vec<alloc::string::String>
 pub lxmf_sdk::PropagationRecoveryStateResult::delivery_limit: core::option::Option<u64>
 pub lxmf_sdk::PropagationRecoveryStateResult::enabled: bool
 pub lxmf_sdk::PropagationRecoveryStateResult::failure_kind: core::option::Option<alloc::string::String>
