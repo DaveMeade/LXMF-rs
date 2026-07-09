@@ -250,6 +250,12 @@ impl TransportHandler {
                     PacketContext::KeepAlive
                         | PacketContext::LinkClose
                         | PacketContext::ResourceRequest
+                        // The channel protocol has its own sequencing/dedup, so
+                        // transport-level dedup must not suppress channel frames.
+                        // Otherwise a retransmit needed after the receiver's
+                        // channel opens (link-activation race) is dropped as a
+                        // duplicate of the pre-open copy, stalling auth.
+                        | PacketContext::Channel
                 );
             }
             PacketType::Proof => {
@@ -355,6 +361,71 @@ impl TransportHandler {
         );
         self.unicast_udp_ifaces.insert(peer, (virtual_hash, now));
         Some(virtual_hash)
+    }
+
+    /// Whether an inbound link-associated packet targets something we will
+    /// actually route or deliver — i.e. it is "accepted" rather than dropped.
+    /// Used to gate eager unicast-route learning so that unauthenticated
+    /// multicast senders cannot grow `unicast_udp_ifaces` / the `iface_manager`
+    /// virtual-iface set with requests to unknown destinations.
+    ///
+    /// The criteria mirror the accept branches of the individual handlers:
+    ///   - Link packets (`Proof` / `Data` with `DestinationType::Link`) are
+    ///     accepted when we already track the link — as an inbound link, an
+    ///     outbound link (matched by id), or a forward in the `link_table`.
+    ///   - Everything else (`LinkRequest` and single `Data`, both
+    ///     `DestinationType::Single`) is accepted when the destination is a
+    ///     local input destination or has a known next hop — exactly
+    ///     `handle_link_request`'s destination/intermediate split.
+    pub(super) async fn should_learn_unicast_route(&self, packet: &Packet) -> bool {
+        if packet.header.destination_type == DestinationType::Link {
+            // `LinkId == AddressHash`, so the link id is `packet.destination`.
+            if self.in_links.contains_key(&packet.destination)
+                || self.link_table.knows(&packet.destination)
+            {
+                return true;
+            }
+            for link in self.out_links.values() {
+                if *link.lock().await.id() == packet.destination {
+                    return true;
+                }
+            }
+            false
+        } else {
+            self.single_in_destinations.contains_key(&packet.destination)
+                || self.path_table.next_hop_full(&packet.destination).is_some()
+        }
+    }
+
+    /// Resolve the interface an inbound *link-associated* packet (LinkRequest /
+    /// Proof / link Data) should be handled on, eagerly learning the sender's
+    /// unicast route in the process.
+    pub(super) async fn ingress_route_iface(
+        &mut self,
+        packet: &Packet,
+        iface: AddressHash,
+        source: IfaceSource,
+    ) -> AddressHash {
+        if !self.should_learn_unicast_route(packet).await {
+            log::info!(
+                "tp({}): unrecognized target: {}, keeping ingress as-is.",
+                self.config.name,
+                packet.destination.to_hex_string()
+            );
+            return iface;
+        }
+        match self.unicast_iface_for_source(iface, source).await {
+            Some(virtual_iface) => virtual_iface,
+            None => {
+                log::trace!(
+                    "tp({}): no unicast route learned for source {:?} on iface {}; keeping ingress iface",
+                    self.config.name,
+                    source,
+                    iface,
+                );
+                iface
+            }
+        }
     }
 
     /// Register a `PeerRouting` map for a multicast iface at
