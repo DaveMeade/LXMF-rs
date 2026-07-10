@@ -4,6 +4,7 @@ impl RpcDaemon {
             .iter()
             .chain(TICKET_SDK_OPERATION_SPECS.iter())
             .chain(CONVERSATION_SDK_OPERATION_SPECS.iter())
+            .chain(DELIVERY_SDK_OPERATION_SPECS.iter())
             .chain(PROPAGATION_SDK_OPERATION_SPECS.iter())
             .find(|spec| spec.id == id_or_alias || spec.aliases.iter().any(|alias| alias == &id_or_alias))
         {
@@ -35,6 +36,7 @@ impl RpcDaemon {
             .iter()
             .chain(TICKET_SDK_OPERATION_SPECS.iter())
             .chain(CONVERSATION_SDK_OPERATION_SPECS.iter())
+            .chain(DELIVERY_SDK_OPERATION_SPECS.iter())
             .chain(PROPAGATION_SDK_OPERATION_SPECS.iter())
             .filter(|spec| {
                 spec.required_capabilities
@@ -133,6 +135,11 @@ impl RpcDaemon {
             method if propagation_policy_method(method) => {
                 self.handle_rpc_legacy_propagation_request(request_id, method, params)?
             }
+            "stamp_policy_get" | "stamp_policy_set" => self.handle_rpc_legacy_misc(RpcRequest {
+                id: request_id,
+                method: method.to_owned(),
+                params: Some(params),
+            })?,
             "propagation_remote_fetch"
             | "propagation_remote_download"
             | "propagation_remote_sync"

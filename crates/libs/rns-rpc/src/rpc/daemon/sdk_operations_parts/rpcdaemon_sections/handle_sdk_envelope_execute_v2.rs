@@ -71,6 +71,8 @@ impl RpcDaemon {
             | "unprioritise"
             | "allow_control"
             | "disallow_control"
+            | "stamp_policy_get"
+            | "stamp_policy_set"
             | "propagation_peer_maintenance"
             | "propagation_ingest"
             | "propagation_fetch" => parsed.payload,

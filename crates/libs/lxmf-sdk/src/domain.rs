@@ -8,6 +8,8 @@ include!("domain_parts/deliveryticket.rs");
 
 include!("domain_parts/peerconnectionrequest.rs");
 
+include!("domain_parts/deliverystamppolicy.rs");
+
 include!("domain_parts/propagationpeersync.rs");
 
 include!("domain_parts/propagationnode.rs");

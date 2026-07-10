@@ -1,6 +1,7 @@
 use super::{code, ErrorCategory, SdkError, ZmqPipelineBackendClient};
 use crate::app::{Envelope, EnvelopeResponse};
 use crate::domain::{
+    DeliveryStampPolicyRequest, DeliveryStampPolicyResult,
     PropagationAcknowledgeSyncRequest, PropagationAcknowledgeSyncResult,
     PropagationDeliveryPolicyRequest, PropagationDeliveryPolicyResult, PropagationEnableRequest,
     PropagationFetchRequest, PropagationFetchResult, PropagationIngestRequest,
@@ -176,6 +177,17 @@ impl ZmqPipelineBackendClient {
         self.propagation_delivery_policy_set(
             current.policy_state.request_without_prioritised_destination(destination),
         )
+    }
+
+    pub fn delivery_stamp_policy_get(&self) -> Result<DeliveryStampPolicyResult, SdkError> {
+        self.execute_propagation_query("app.delivery.stamp_policy.get", json!({}))
+    }
+
+    pub fn delivery_stamp_policy_set(
+        &self,
+        req: DeliveryStampPolicyRequest,
+    ) -> Result<DeliveryStampPolicyResult, SdkError> {
+        self.execute_propagation_envelope("app.delivery.stamp_policy.set", req)
     }
 
     pub fn propagation_peer_maintenance(

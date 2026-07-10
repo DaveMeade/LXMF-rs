@@ -75,6 +75,22 @@ fn built_in_entries() -> Vec<OperationEntry> {
             "Generate or reuse an outbound delivery ticket for a destination.",
         )
         .with_alias("ticket_generate"),
+        OperationEntry::new(
+            "app.delivery.stamp_policy.get",
+            "delivery",
+            OperationKind::Query,
+            TransportVariant::LegacyRpc,
+            "Return the local delivery stamp policy.",
+        )
+        .with_alias("stamp_policy_get"),
+        OperationEntry::new(
+            "app.delivery.stamp_policy.set",
+            "delivery",
+            OperationKind::Command,
+            TransportVariant::LegacyRpc,
+            "Update the local delivery stamp policy and return the resulting policy.",
+        )
+        .with_alias("stamp_policy_set"),
     ],
     propagation_operation_entries(),
     vec![
