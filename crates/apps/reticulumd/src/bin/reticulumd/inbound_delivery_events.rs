@@ -18,6 +18,26 @@ pub(super) async fn accept_delivery_resource(
     data: &[u8],
 ) {
     let raw_destination_hex = hex::encode(destination);
+    if let Some(limit_bytes) = direct_delivery_resource_limit_exceeded(daemon, data) {
+        emit_inbound_drop_event(
+            daemon,
+            InboundDropEvent {
+                reason: "delivery_resource_too_large",
+                delivery_kind: InboundDeliveryKind::Resource,
+                raw_destination_hex: raw_destination_hex.as_str(),
+                destination,
+                payload_mode: InboundPayloadMode::FullWire,
+                bytes_len: data.len(),
+                detail: Some(format!(
+                    "resource size {} exceeds delivery limit {} bytes",
+                    data.len(),
+                    limit_bytes
+                )),
+                record: None,
+            },
+        );
+        return;
+    }
     let (record, diagnostics) =
         decode_inbound_payload_with_diagnostics(destination, data, InboundPayloadMode::FullWire);
     let Some(mut record) = record else {
@@ -348,6 +368,13 @@ fn inbound_payload_mode_name(mode: InboundPayloadMode) -> &'static str {
         InboundPayloadMode::FullWire => "full_wire",
         InboundPayloadMode::DestinationStripped => "destination_stripped",
     }
+}
+
+fn direct_delivery_resource_limit_exceeded(daemon: &RpcDaemon, data: &[u8]) -> Option<u64> {
+    let limit_bytes =
+        u64::from(daemon.current_propagation_state().delivery_limit).saturating_mul(1000);
+    let resource_size = data.len() as u64;
+    (resource_size > limit_bytes).then_some(limit_bytes)
 }
 
 fn inbound_delivery_kind_name(kind: InboundDeliveryKind) -> &'static str {
