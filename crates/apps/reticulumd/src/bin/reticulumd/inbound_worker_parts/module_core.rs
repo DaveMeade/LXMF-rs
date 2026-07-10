@@ -179,6 +179,15 @@ pub(super) fn spawn_inbound_worker(
                             failure.progress.total_parts
                         );
                     }
+                    ResourceEventKind::SegmentComplete(segment) => {
+                        log::debug!(
+                            "[daemon-rx] resource segment complete link={} original_hash={} segment={}/{}",
+                            event.link_id,
+                            segment.original_hash,
+                            segment.segment_index,
+                            segment.total_segments
+                        );
+                    }
                     ResourceEventKind::Progress(_) => {}
                 }
             }

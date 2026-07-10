@@ -41,6 +41,7 @@ const FLAG_METADATA: u8 = 0x20;
 
 const METADATA_MAX_SIZE: usize = 16 * 1024 * 1024 - 1;
 const AUTO_COMPRESS_MAX_SIZE: usize = 64 * 1024 * 1024;
+pub const MAX_EFFICIENT_SIZE: usize = 1024 * 1024 - 1;
 const MAX_INBOUND_RESOURCE_TRANSFER_SIZE: u64 = AUTO_COMPRESS_MAX_SIZE as u64;
 const MAX_INBOUND_RESOURCE_PARTS: u64 = 8_192;
 pub const DEFAULT_RESOURCE_RETRY_INTERVAL_SECS: u64 = 2;
@@ -165,6 +166,9 @@ pub struct ResourceEvent {
 #[derive(Debug, Clone)]
 pub enum ResourceEventKind {
     Progress(ResourceProgress),
+    /// One segment of a split resource completed and was accepted into the
+    /// ordered assembly. The final segment is followed by `Complete`.
+    SegmentComplete(ResourceSegmentProgress),
     Complete(ResourceComplete),
     /// Inbound transfer failed before completion. This variant was added for
     /// issue #369 diagnostics and is an intentional public event surface change.
@@ -195,6 +199,14 @@ pub struct ResourceComplete {
     pub request_id: Option<Vec<u8>>,
     pub is_request: bool,
     pub is_response: bool,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct ResourceSegmentProgress {
+    pub original_hash: Hash,
+    pub segment_index: u32,
+    pub total_segments: u32,
+    pub total_data_size: u64,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -398,6 +410,7 @@ impl ResourceProof {
 include!("resource/sender.rs");
 include!("resource/receiver.rs");
 include!("resource/manager_start.rs");
+include!("resource/manager_segments.rs");
 include!("resource/manager.rs");
 include!("resource/utils.rs");
 include!("resource/tests.rs");

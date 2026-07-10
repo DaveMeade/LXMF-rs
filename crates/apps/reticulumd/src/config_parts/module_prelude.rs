@@ -6,10 +6,6 @@ use serde_json::{Map as JsonMap, Value as JsonValue};
 
 use std::collections::BTreeMap;
 
-use std::fs;
-
-use std::path::Path;
-
 #[derive(Debug)]
 pub struct DaemonConfig {
     pub display_name: Option<String>,
@@ -437,64 +433,19 @@ pub struct InterfaceConfig {
     #[serde(default)]
     pub max_payload_bytes: Option<u16>,
     #[serde(default)]
+    pub hop_limit: Option<u8>,
+    #[serde(default)]
+    pub modem_preset: Option<u8>,
+    #[serde(default)]
+    pub send_delay_ms: Option<u64>,
+    #[serde(default)]
+    pub destination_cache_size: Option<usize>,
+    #[serde(default)]
+    pub simulation_loopback: Option<bool>,
+    #[serde(default)]
+    pub simulation_node_id: Option<u32>,
+    #[serde(default)]
     pub state_path: Option<String>,
     #[serde(flatten)]
     pub extra: BTreeMap<String, toml::Value>,
-}
-
-impl DaemonConfig {
-    pub fn from_toml(input: &str) -> Result<Self, toml::de::Error> {
-        toml::from_str(input)
-    }
-
-    pub fn from_path<P: AsRef<Path>>(path: P) -> Result<Self, std::io::Error> {
-        let contents = fs::read_to_string(path)?;
-        Self::from_toml(&contents)
-            .map_err(|err| std::io::Error::new(std::io::ErrorKind::InvalidData, err))
-    }
-
-    pub fn reticulum_transport_enabled(&self) -> bool {
-        self.reticulum_enable_transport
-    }
-    pub fn enabled_tcp_clients(&self) -> Vec<&InterfaceConfig> {
-        self.interfaces
-            .iter()
-            .filter(|iface| iface.enabled() && iface.kind == "tcp_client")
-            .collect()
-    }
-
-    pub fn tcp_client_endpoints(&self) -> Vec<(String, u16)> {
-        self.enabled_tcp_clients()
-            .iter()
-            .filter_map(|iface| {
-                let host = iface.host.as_ref()?;
-                let port = iface.port?;
-                Some((host.clone(), port))
-            })
-            .collect()
-    }
-
-    pub fn enabled_tcp_servers(&self) -> Vec<&InterfaceConfig> {
-        self.interfaces
-            .iter()
-            .filter(|iface| iface.enabled() && iface.kind == "tcp_server")
-            .collect()
-    }
-
-    pub fn tcp_server_endpoints(&self) -> Vec<(String, u16)> {
-        self.enabled_tcp_servers()
-            .iter()
-            .filter_map(|iface| {
-                let port = iface.port?;
-                let host = iface
-                    .host
-                    .as_deref()
-                    .map(str::trim)
-                    .filter(|value| !value.is_empty())
-                    .unwrap_or("0.0.0.0")
-                    .to_string();
-                Some((host, port))
-            })
-            .collect()
-    }
 }

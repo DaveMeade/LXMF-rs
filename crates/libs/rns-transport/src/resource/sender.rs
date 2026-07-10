@@ -4,6 +4,9 @@ const MAX_AWAITING_PROOF_RETRIES: u8 = 3;
 struct ResourceSender {
     link_id: AddressHash,
     resource_hash: Hash,
+    original_hash: Hash,
+    segment_index: u32,
+    total_segments: u32,
     parts: Vec<Vec<u8>>,
     sent_parts: Vec<bool>,
     map_hashes: Vec<[u8; MAPHASH_LEN]>,
@@ -25,10 +28,12 @@ enum OutboundResourcePoll {
 }
 
 impl ResourceSender {
+    #[cfg(test)]
     fn new(link: &Link, data: Vec<u8>, metadata: Option<Vec<u8>>) -> Result<Self, RnsError> {
         Self::new_with_mtu(link, data, metadata, DEFAULT_RESOURCE_INTERFACE_MTU)
     }
 
+    #[cfg(test)]
     fn new_with_mtu(
         link: &Link,
         data: Vec<u8>,
@@ -38,6 +43,7 @@ impl ResourceSender {
         Self::new_with_options_mtu(link, data, metadata, None, false, interface_mtu)
     }
 
+    #[cfg(test)]
     pub(super) fn new_with_options(
         link: &Link,
         data: Vec<u8>,
@@ -62,6 +68,33 @@ impl ResourceSender {
         request_id: Option<Vec<u8>>,
         is_response: bool,
         interface_mtu: usize,
+    ) -> Result<Self, RnsError> {
+        Self::new_segment_with_options_mtu(
+            link,
+            data,
+            metadata,
+            request_id,
+            is_response,
+            interface_mtu,
+            None,
+            1,
+            1,
+            None,
+        )
+    }
+
+    #[allow(clippy::too_many_arguments)]
+    pub(super) fn new_segment_with_options_mtu(
+        link: &Link,
+        data: Vec<u8>,
+        metadata: Option<Vec<u8>>,
+        request_id: Option<Vec<u8>>,
+        is_response: bool,
+        interface_mtu: usize,
+        original_hash: Option<Hash>,
+        segment_index: u32,
+        total_segments: u32,
+        total_data_size: Option<u64>,
     ) -> Result<Self, RnsError> {
         let resource_mdu = resource_packet_mdu_for_mtu(interface_mtu)?;
         let hashmap_segment_len = resource_hashmap_segment_len_for_mtu(interface_mtu)?;
@@ -88,6 +121,7 @@ impl ResourceSender {
         hasher.update(&combined);
         hasher.update(random_hash);
         let resource_hash = Hash::new(copy_hash(&hasher.finalize())?);
+        let original_hash = original_hash.unwrap_or(resource_hash);
 
         let mut proof_hasher = sha2::Sha256::new();
         proof_hasher.update(&combined);
@@ -113,13 +147,13 @@ impl ResourceSender {
 
         let advertisement = ResourceAdvertisement {
             transfer_size: parts.iter().map(|part| part.len() as u64).sum(),
-            data_size,
+            data_size: total_data_size.unwrap_or(data_size),
             parts: parts.len() as u32,
             hash: resource_hash,
             random_hash,
-            original_hash: resource_hash,
-            segment_index: 1,
-            total_segments: 1,
+            original_hash,
+            segment_index,
+            total_segments,
             request_id: request_id.map(ByteBuf::from),
             flags: {
                 let mut flags = FLAG_ENCRYPTED;
@@ -128,6 +162,9 @@ impl ResourceSender {
                 }
                 if has_request_id {
                     flags |= if is_response { FLAG_RESPONSE } else { FLAG_REQUEST };
+                }
+                if total_segments > 1 {
+                    flags |= FLAG_SPLIT;
                 }
                 flags
             },
@@ -144,6 +181,9 @@ impl ResourceSender {
         Ok(Self {
             link_id: *link.id(),
             resource_hash,
+            original_hash,
+            segment_index,
+            total_segments,
             parts,
             sent_parts: vec![false; map_hashes.len()],
             map_hashes,

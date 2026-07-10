@@ -2,7 +2,9 @@
 pub struct ResourceManager {
     pending_outgoing: HashMap<Hash, ResourceSender>,
     outgoing: HashMap<Hash, ResourceSender>,
+    outgoing_segment_chains: HashMap<Hash, VecDeque<ResourceSender>>,
     incoming: HashMap<Hash, ResourceReceiver>,
+    incoming_segments: HashMap<Hash, InboundSegmentAssembly>,
     events: Vec<ResourceEvent>,
     retry_interval: Duration,
     retry_limit: u8,
@@ -19,6 +21,7 @@ impl ResourceManager {
             sender.mark_advertised(self.retry_limit);
             self.outgoing.insert(resource_hash, sender);
         } else {
+            self.outgoing_segment_chains.remove(&sender.original_hash);
             self.events.push(ResourceEvent {
                 hash: resource_hash,
                 link_id: sender.link_id,
@@ -32,19 +35,24 @@ impl ResourceManager {
         resource_hash: Hash,
         link: &Link,
     ) -> Result<Option<Packet>, RnsError> {
-        if self.outgoing.contains_key(&resource_hash) {
+        let active_hash = self
+            .outgoing
+            .iter()
+            .find_map(|(hash, sender)| (sender.original_hash == resource_hash).then_some(*hash));
+        if let Some(active_hash) = active_hash {
             let packet = build_link_packet(
                 link,
                 PacketType::Data,
                 PacketContext::ResourceInitiatorCancel,
-                resource_hash.as_slice(),
+                active_hash.as_slice(),
             )?;
             let sender = self
                 .outgoing
-                .remove(&resource_hash)
+                .remove(&active_hash)
                 .expect("outgoing sender existed before cancel packet");
+            self.outgoing_segment_chains.remove(&sender.original_hash);
             self.events.push(ResourceEvent {
-                hash: resource_hash,
+                hash: sender.original_hash,
                 link_id: sender.link_id,
                 kind: ResourceEventKind::OutboundCancelled,
             });
@@ -52,6 +60,7 @@ impl ResourceManager {
         }
 
         if let Some(sender) = self.pending_outgoing.remove(&resource_hash) {
+            self.outgoing_segment_chains.remove(&sender.original_hash);
             self.events.push(ResourceEvent {
                 hash: resource_hash,
                 link_id: sender.link_id,
@@ -64,7 +73,10 @@ impl ResourceManager {
     pub fn remove_link_state(&mut self, link_id: AddressHash) {
         self.pending_outgoing.retain(|_, sender| sender.link_id != link_id);
         self.outgoing.retain(|_, sender| sender.link_id != link_id);
+        self.outgoing_segment_chains
+            .retain(|_, senders| senders.front().is_none_or(|sender| sender.link_id != link_id));
         self.incoming.retain(|_, receiver| receiver.link_id != link_id);
+        self.incoming_segments.retain(|_, assembly| assembly.link_id != link_id);
         self.link_stats.remove(&link_id);
     }
 
@@ -121,18 +133,19 @@ impl ResourceManager {
                 }
                 OutboundResourcePoll::Failed => {
                     self.events.push(ResourceEvent {
-                        hash: *hash,
+                        hash: sender.original_hash,
                         link_id: sender.link_id,
                         kind: ResourceEventKind::OutboundFailed,
                     });
-                    failed.push(*hash);
+                    failed.push((*hash, sender.original_hash));
                 }
                 OutboundResourcePoll::None => {}
             }
         }
 
-        for hash in failed {
+        for (hash, original_hash) in failed {
             self.outgoing.remove(&hash);
+            self.outgoing_segment_chains.remove(&original_hash);
         }
 
         packets
@@ -203,13 +216,21 @@ impl ResourceManager {
             advertisement.compressed(),
             advertisement.encrypted()
         );
-        if (advertisement.flags & FLAG_SPLIT) == FLAG_SPLIT {
-            log::warn!(
-                "rejecting unsupported advertisement flags (split={})",
-                (advertisement.flags & FLAG_SPLIT) == FLAG_SPLIT
-            );
-            log::debug!("[resource-diag] reject_advertisement split");
-            return;
+        if advertisement.total_segments > 1 {
+            let expected_segment = self
+                .incoming_segments
+                .get(&advertisement.original_hash)
+                .map(|assembly| assembly.next_segment)
+                .unwrap_or(1);
+            if advertisement.segment_index != expected_segment {
+                log::warn!(
+                    "rejecting out-of-order resource segment original_hash={} expected={} received={}",
+                    advertisement.original_hash,
+                    expected_segment,
+                    advertisement.segment_index
+                );
+                return;
+            }
         }
         let resource_hash = advertisement.hash;
         if self.incoming.get(&resource_hash).is_some_and(|receiver| receiver.is_active()) {
@@ -418,17 +439,7 @@ impl ResourceManager {
                 stats.last_arrival = None;
             }
             if let Some(payload) = payload {
-                self.events.push(ResourceEvent {
-                    hash,
-                    link_id: *link.id(),
-                    kind: ResourceEventKind::Complete(ResourceComplete {
-                        data: payload.data,
-                        metadata: payload.metadata,
-                        request_id: payload.request_id,
-                        is_request: payload.is_request,
-                        is_response: payload.is_response,
-                    }),
-                });
+                self.finish_inbound_payload(hash, *link.id(), payload);
             }
         }
         if let Some(packet) = proof_packet {
@@ -438,15 +449,32 @@ impl ResourceManager {
         }
     }
 
-    fn handle_proof_into(&mut self, packet: &Packet, _responses: &mut Vec<Packet>) {
+    fn handle_proof_into(&mut self, packet: &Packet, responses: &mut Vec<Packet>) {
         let Ok(proof) = ResourceProof::decode(packet.data.as_slice()) else {
             return;
         };
-        if let Some(sender) = self.outgoing.get_mut(&proof.resource_hash) {
-            if sender.handle_proof(&proof) {
-                self.outgoing.remove(&proof.resource_hash);
+        if self
+            .outgoing
+            .get_mut(&proof.resource_hash)
+            .is_some_and(|sender| sender.handle_proof(&proof))
+        {
+            if let Some(sender) = self.outgoing.remove(&proof.resource_hash) {
+                if sender.segment_index < sender.total_segments {
+                    let next = self
+                        .outgoing_segment_chains
+                        .get_mut(&sender.original_hash)
+                        .and_then(VecDeque::pop_front);
+                    if let Some(mut next) = next {
+                        let advertisement = next.advertisement_packet();
+                        next.mark_advertised(self.retry_limit);
+                        self.outgoing.insert(next.resource_hash, next);
+                        responses.push(advertisement);
+                        return;
+                    }
+                }
+                self.outgoing_segment_chains.remove(&sender.original_hash);
                 self.events.push(ResourceEvent {
-                    hash: proof.resource_hash,
+                    hash: sender.original_hash,
                     link_id: packet.destination,
                     kind: ResourceEventKind::OutboundComplete,
                 });
@@ -469,4 +497,3 @@ impl Default for ResourceManager {
         Self::new()
     }
 }
-

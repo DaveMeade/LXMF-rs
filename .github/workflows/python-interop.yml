@@ -94,6 +94,16 @@ jobs:
           git -C Reticulum rev-parse HEAD
           git -C LXMF rev-parse HEAD
 
+      - name: Pinned Python public-surface inventory
+        working-directory: lxmf-rs
+        run: |
+          python tools/scripts/python_surface_inventory.py \
+            --python-rns-path "${{ github.workspace }}/Reticulum/RNS" \
+            --python-lxmf-path "${{ github.workspace }}/LXMF/LXMF" \
+            --mapping docs/status/python-surface-mapping.json \
+            --json-out docs/status/python-surface-parity.json \
+            --check
+
       - name: Python reference conformance baseline
         working-directory: reticulum-conformance
         env:
@@ -108,6 +118,14 @@ jobs:
             --python-rns-path "${{ github.workspace }}/Reticulum" \
             --json-out target/python-reference/resolver.json
           cargo test -p reticulum-rs-transport utils::resolver::tests -- --nocapture
+
+      - name: Pinned Python segmented-resource surface probe
+        working-directory: lxmf-rs
+        run: |
+          python tools/scripts/python_resource_segment_probe.py \
+            --python-rns-path "${{ github.workspace }}/Reticulum" \
+            --json-out target/python-reference/resource-segments.json
+          cargo test -p reticulum-rs-transport split --lib -- --nocapture
 
       - name: Python selector Backbone slow-reader probe
         working-directory: lxmf-rs

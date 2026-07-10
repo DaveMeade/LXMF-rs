@@ -6,7 +6,10 @@ fn run_ci_stage(stage: CiStage, timeout_secs: Option<u64>) -> Result<()> {
             run("cargo", &["nextest", "run", "--workspace", "--lib", "--bins"])
         }
         CiStage::TestIntegration => run("cargo", &["test", "--workspace", "--tests"]),
-        CiStage::Doc => run("cargo", &["doc", "--workspace", "--no-deps", "--lib"]),
+        CiStage::Doc => {
+            run("cargo", &["doc", "--workspace", "--no-deps", "--lib"])?;
+            run_python_surface_parity_check(false)
+        }
         CiStage::Security => {
             run_cargo_deny_policy_check()?;
             run_cargo_audit()?;
@@ -100,6 +103,7 @@ fn run_release_check() -> Result<()> {
     run_pr_core_ci()?;
     run_correctness_check()?;
     run("cargo", &["doc", "--workspace", "--no-deps", "--lib"])?;
+    run_python_surface_parity_check(false)?;
     run_sdk_docs_check()?;
     run_sdk_cookbook_check()?;
     run_sdk_ergonomics_check()?;
@@ -156,6 +160,19 @@ fn run_release_check() -> Result<()> {
     run_migration_checks()?;
     run_architecture_checks()?;
     Ok(())
+}
+
+fn run_python_surface_parity_check(require_complete: bool) -> Result<()> {
+    let mut args = vec![
+        "tools/scripts/python_surface_inventory.py",
+        "--check",
+        "--json-out",
+        "docs/status/python-surface-parity.json",
+    ];
+    if require_complete {
+        args.push("--require-complete");
+    }
+    run("python3", &args)
 }
 
 fn run_interfaces_required() -> Result<()> {

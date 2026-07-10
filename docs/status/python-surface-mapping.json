@@ -1,0 +1,178 @@
+{
+  "schema_version": 1,
+  "rules": [
+    {
+      "pattern": "RNS.Cryptography.*",
+      "implementation": "complete",
+      "rust_surface": ["reticulum-rs-core::crypto"],
+      "evidence": ["unit", "pinned-python"]
+    },
+    {
+      "pattern": "RNS.Identity.*",
+      "implementation": "complete",
+      "rust_surface": ["reticulum-rs-core::identity"],
+      "evidence": ["unit", "pinned-python"]
+    },
+    {
+      "pattern": "RNS.Destination.*",
+      "implementation": "complete",
+      "rust_surface": ["reticulum-rs-core::destination", "reticulum-rs-transport::destination"],
+      "evidence": ["unit", "pinned-python"]
+    },
+    {
+      "pattern": "RNS.Packet.*",
+      "implementation": "complete",
+      "rust_surface": ["reticulum-rs-core::packet", "reticulum-rs-transport::packet"],
+      "evidence": ["unit", "pinned-python"]
+    },
+    {
+      "pattern": "RNS.Link.*",
+      "implementation": "complete",
+      "rust_surface": ["reticulum-rs-transport::destination::link"],
+      "evidence": ["unit", "pinned-python"]
+    },
+    {
+      "pattern": "RNS.Resource.*",
+      "implementation": "complete",
+      "rust_surface": ["reticulum-rs-transport::resource"],
+      "evidence": ["unit", "simulated", "pinned-python"],
+      "notes": "Includes ordered split-resource advertisements, proof-gated segment sequencing, reassembly, and segment progress metadata."
+    },
+    {
+      "pattern": "RNS.Channel.*",
+      "implementation": "complete",
+      "rust_surface": ["reticulum-rs-transport::channel"],
+      "evidence": ["unit", "pinned-python"]
+    },
+    {
+      "pattern": "RNS.Buffer.*",
+      "implementation": "complete",
+      "rust_surface": ["reticulum-rs-core::buffer", "reticulum-rs-transport::channel_buffer"],
+      "evidence": ["unit", "pinned-python"]
+    },
+    {
+      "pattern": "RNS.Resolver.*",
+      "implementation": "complete",
+      "rust_surface": ["reticulum-rs-transport::utils::resolver"],
+      "evidence": ["unit", "pinned-python"]
+    },
+    {
+      "pattern": "RNS.Reticulum.*",
+      "implementation": "partial",
+      "rust_surface": ["reticulumd", "reticulum-rs-rpc::RpcDaemon"],
+      "evidence": ["unit", "simulated", "pinned-python"]
+    },
+    {
+      "pattern": "RNS.Transport.*",
+      "implementation": "partial",
+      "rust_surface": ["reticulum-rs-transport::transport", "reticulumd"],
+      "evidence": ["unit", "simulated", "pinned-python"]
+    },
+    {
+      "pattern": "RNS.Discovery.*",
+      "implementation": "partial",
+      "rust_surface": ["reticulum-rs-transport::iface::auto", "reticulumd"],
+      "evidence": ["unit", "simulated", "pinned-python"]
+    },
+    {
+      "pattern": "RNS.Interfaces.*",
+      "implementation": "partial",
+      "rust_surface": ["reticulum-rs-transport::iface", "reticulumd::interfaces"],
+      "evidence": ["unit", "simulated", "hardware-unverified"]
+    },
+    {
+      "pattern": "RNS.Utilities.*",
+      "implementation": "partial",
+      "rust_surface": ["rns-tools"],
+      "evidence": ["unit", "simulated", "pinned-python"]
+    },
+    {
+      "pattern": "RNS.*",
+      "implementation": "complete",
+      "rust_surface": ["reticulum-rs-core", "reticulum-rs-transport"],
+      "evidence": ["unit", "pinned-python"]
+    },
+    {
+      "pattern": "LXMF.LXMF.*",
+      "implementation": "complete",
+      "rust_surface": ["lxmf-wire::announce"],
+      "evidence": ["unit", "pinned-python"]
+    },
+    {
+      "pattern": "LXMF.LXMessage.*",
+      "implementation": "complete",
+      "rust_surface": ["lxmf-wire::message"],
+      "evidence": ["unit", "pinned-python"]
+    },
+    {
+      "pattern": "LXMF.LXMPeer.*",
+      "implementation": "complete",
+      "rust_surface": ["reticulum-rs-rpc::propagation_peer"],
+      "evidence": ["unit", "pinned-python"]
+    },
+    {
+      "pattern": "LXMF.LXStamper.*",
+      "implementation": "complete",
+      "rust_surface": ["lxmf-wire::stamp", "reticulumd::bridge"],
+      "evidence": ["unit", "pinned-python"]
+    },
+    {
+      "pattern": "LXMF.LXMRouter.*",
+      "implementation": "partial",
+      "rust_surface": ["reticulum-rs-rpc::RpcDaemon", "lxmf-sdk", "lxmf-runtime"],
+      "evidence": ["unit", "simulated", "pinned-python"]
+    },
+    {
+      "pattern": "LXMF.Handlers.*",
+      "implementation": "complete",
+      "rust_surface": ["reticulumd::bridge", "reticulum-rs-rpc::events", "lxmf-sdk::event"],
+      "evidence": ["unit", "simulated", "pinned-python"]
+    },
+    {
+      "pattern": "LXMF.Utilities.*",
+      "implementation": "partial",
+      "rust_surface": ["lxmf-cli::lxmd"],
+      "evidence": ["unit", "simulated", "pinned-python"]
+    },
+    {
+      "pattern": "LXMF.*",
+      "implementation": "complete",
+      "rust_surface": ["lxmf-wire", "lxmf-sdk"],
+      "evidence": ["unit", "pinned-python"]
+    },
+    {
+      "pattern": "CRNS.*",
+      "implementation": "not-applicable",
+      "rust_surface": ["docs/status/reticulum-parity-matrix.md"],
+      "evidence": ["pinned-python"],
+      "notes": "No CRNS package exists in the pinned Reticulum or LXMF references."
+    }
+  ],
+  "manual_items": [
+    {
+      "id": "RNS.Resource.segmented-transfer-contract",
+      "kind": "protocol",
+      "source": "RNS/Resource.py"
+    },
+    {
+      "id": "RNS.Interfaces.Meshtastic.daemon-lifecycle",
+      "kind": "interface",
+      "source": "software extension"
+    },
+    {
+      "id": "RNS.Utilities.cli-contracts",
+      "kind": "cli",
+      "source": "RNS/Utilities"
+    },
+    {
+      "id": "LXMF.Utilities.lxmd.cli-contract",
+      "kind": "cli",
+      "source": "LXMF/Utilities/lxmd.py"
+    },
+    {
+      "id": "CRNS.provenance",
+      "kind": "provenance",
+      "source": "pinned references"
+    }
+  ]
+}

@@ -8,6 +8,30 @@ repository.workspace = true
 description = "Reticulum diagnostic and embedded tooling binaries for LXMF-rs."
 build = "build.rs"
 
+[[bin]]
+name = "rnstatus"
+path = "src/bin/rnstatus-rs.rs"
+
+[[bin]]
+name = "rnstatus-rs"
+path = "src/bin/rnstatus-rs.rs"
+
+[[bin]]
+name = "rnpath"
+path = "src/bin/rnpath-rs.rs"
+
+[[bin]]
+name = "rnpath-rs"
+path = "src/bin/rnpath-rs.rs"
+
+[[bin]]
+name = "rnodeconf"
+path = "src/bin/rnodeconf-rs.rs"
+
+[[bin]]
+name = "rnodeconf-rs"
+path = "src/bin/rnodeconf-rs.rs"
+
 [dependencies]
 clap.workspace = true
 tempfile.workspace = true

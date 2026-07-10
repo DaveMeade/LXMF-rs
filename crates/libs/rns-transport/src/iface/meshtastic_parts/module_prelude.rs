@@ -128,3 +128,23 @@ impl MeshtasticTunnelStatus {
         })
     }
 }
+
+#[derive(Debug, Clone, Default)]
+pub struct MeshtasticRuntimeStatusHandle {
+    inner: Arc<Mutex<MeshtasticTunnelStatus>>,
+}
+
+impl MeshtasticRuntimeStatusHandle {
+    #[must_use]
+    pub fn to_json(&self) -> serde_json::Value {
+        self.inner
+            .lock()
+            .expect("meshtastic status mutex poisoned")
+            .to_json()
+    }
+
+    #[must_use]
+    pub fn snapshot(&self) -> MeshtasticTunnelStatus {
+        self.inner.lock().expect("meshtastic status mutex poisoned").clone()
+    }
+}

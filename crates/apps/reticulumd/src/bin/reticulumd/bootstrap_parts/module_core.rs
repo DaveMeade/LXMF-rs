@@ -198,6 +198,7 @@ pub(super) async fn bootstrap(args: Args) -> BootstrapContext {
     let weave_runtime_refreshes = startup.weave_runtime_refreshes;
     let rnode_multi_runtime_refreshes = startup.rnode_multi_runtime_refreshes;
     let lora_runtime_refreshes = startup.lora_runtime_refreshes;
+    let meshtastic_runtime_refreshes = startup.meshtastic_runtime_refreshes;
     #[cfg(feature = "vrn76-kiss-ble")]
     let vrn76_runtime_refreshes = startup.vrn76_runtime_refreshes;
     let rnode_management_bindings = startup.rnode_management_bindings;
@@ -343,6 +344,7 @@ pub(super) async fn bootstrap(args: Args) -> BootstrapContext {
     spawn_weave_runtime_status_refresher(daemon.clone(), weave_runtime_refreshes);
     spawn_rnode_multi_runtime_status_refresher(daemon.clone(), rnode_multi_runtime_refreshes);
     spawn_lora_runtime_status_refresher(daemon.clone(), lora_runtime_refreshes);
+    spawn_meshtastic_runtime_status_refresher(daemon.clone(), meshtastic_runtime_refreshes);
     #[cfg(feature = "vrn76-kiss-ble")]
     spawn_vrn76_runtime_status_refresher(daemon.clone(), vrn76_runtime_refreshes);
     daemon.set_propagation_state(transport.is_some(), None, 0);
@@ -789,6 +791,40 @@ fn spawn_tcp_runtime_status_refresher(
             refresh_tcp_runtime_status_once(&daemon, &refreshes);
         }
     });
+}
+
+fn spawn_meshtastic_runtime_status_refresher(
+    daemon: Arc<RpcDaemon>,
+    refreshes: Vec<transport_startup::MeshtasticRuntimeRefresh>,
+) {
+    if refreshes.is_empty() {
+        return;
+    }
+    tokio::spawn(async move {
+        let mut interval = tokio::time::interval(INTERFACE_RUNTIME_STATUS_REFRESH_INTERVAL);
+        interval.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Delay);
+        loop {
+            interval.tick().await;
+            refresh_meshtastic_runtime_status_once(&daemon, &refreshes);
+        }
+    });
+}
+
+fn refresh_meshtastic_runtime_status_once(
+    daemon: &RpcDaemon,
+    refreshes: &[transport_startup::MeshtasticRuntimeRefresh],
+) -> usize {
+    refreshes
+        .iter()
+        .filter(|refresh| {
+            daemon.update_interface_runtime_metadata_by_iface(
+                refresh.runtime_iface.to_string().as_str(),
+                "meshtastic",
+                "status",
+                refresh.status.to_json(),
+            )
+        })
+        .count()
 }
 
 fn refresh_tcp_runtime_status_once(

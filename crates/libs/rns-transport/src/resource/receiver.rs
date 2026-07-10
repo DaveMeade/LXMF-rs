@@ -1,6 +1,9 @@
 #[derive(Debug, Clone)]
 struct ResourceReceiver {
     resource_hash: Hash,
+    original_hash: Hash,
+    segment_index: u32,
+    total_segments: u32,
     link_id: AddressHash,
     random_hash: [u8; RANDOM_HASH_SIZE],
     parts: Vec<Option<Vec<u8>>>,
@@ -12,7 +15,6 @@ struct ResourceReceiver {
     data_size: u64,
     encrypted: bool,
     compressed: bool,
-    split: bool,
     has_metadata: bool,
     request_id: Option<Vec<u8>>,
     is_request: bool,
@@ -38,6 +40,7 @@ struct ResourcePayload {
     request_id: Option<Vec<u8>>,
     is_request: bool,
     is_response: bool,
+    segmentation: ResourceSegmentProgress,
 }
 
 #[allow(clippy::large_enum_variant)]
@@ -62,6 +65,15 @@ impl ResourceReceiver {
         let resource_mdu = resource_packet_mdu_for_mtu(interface_mtu)?;
         let local_hashmap_segment_len = resource_hashmap_segment_len_for_mtu(interface_mtu)?;
         let max_parts = max_advertised_parts(adv.transfer_size, resource_mdu)?;
+        if adv.total_segments == 0
+            || adv.segment_index == 0
+            || adv.segment_index > adv.total_segments
+            || ((adv.flags & FLAG_SPLIT) == FLAG_SPLIT) != (adv.total_segments > 1)
+            || (adv.segment_index == 1 && adv.original_hash != adv.hash)
+            || adv.data_size > MAX_INBOUND_RESOURCE_TRANSFER_SIZE
+        {
+            return Err(RnsError::InvalidArgument);
+        }
         if adv.parts == 0 || u64::from(adv.parts) > max_parts {
             return Err(RnsError::InvalidArgument);
         }
@@ -74,6 +86,9 @@ impl ResourceReceiver {
         };
         let mut receiver = Self {
             resource_hash: adv.hash,
+            original_hash: adv.original_hash,
+            segment_index: adv.segment_index,
+            total_segments: adv.total_segments,
             link_id,
             random_hash: adv.random_hash,
             parts: vec![None; total_parts],
@@ -85,7 +100,6 @@ impl ResourceReceiver {
             data_size: adv.data_size,
             encrypted: adv.encrypted(),
             compressed: adv.compressed(),
-            split: (adv.flags & FLAG_SPLIT) == FLAG_SPLIT,
             has_metadata: (adv.flags & FLAG_METADATA) == FLAG_METADATA,
             request_id: adv.request_id.as_ref().map(|request_id| request_id.to_vec()),
             is_request: adv.is_request(),
@@ -99,7 +113,10 @@ impl ResourceReceiver {
             in_flight_set: HashMap::new(),
             last_rtt_sample: None,
         };
-        receiver.apply_hashmap_segment(adv.segment_index.saturating_sub(1) as usize, &adv.hashmap);
+        // Advertisement hashmaps always contain resource hashmap segment zero.
+        // `segment_index` identifies a split resource segment, not a hashmap
+        // update segment.
+        receiver.apply_hashmap_segment(0, &adv.hashmap);
         Ok(receiver)
     }
 
@@ -194,10 +211,6 @@ impl ResourceReceiver {
     }
 
     fn handle_part(&mut self, part: &[u8], link: &Link) -> PartOutcome {
-        if self.split {
-            return self.fail("split_resource_unsupported");
-        }
-
         let hash = map_hash(part, &self.random_hash);
         let Some(index) = self.hashmap.iter().position(|entry| entry.as_ref() == Some(&hash))
         else {
@@ -322,6 +335,12 @@ impl ResourceReceiver {
                         request_id: self.request_id.clone(),
                         is_request: self.is_request,
                         is_response: self.is_response,
+                        segmentation: ResourceSegmentProgress {
+                            original_hash: self.original_hash,
+                            segment_index: self.segment_index,
+                            total_segments: self.total_segments,
+                            total_data_size: self.data_size,
+                        },
                     },
                 );
             } else {
