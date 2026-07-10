@@ -853,10 +853,11 @@ Scoped release evidence is split as follows:
   peer display names, unread counts, last-message previews with links, receipt
   inclusion intent, and restart pagination cursors through
   `app.message.conversation.list` on the SDK envelope path.
-- The native SDK app domain now exposes `app.messages().history(...)` and
-  `app.messages().conversations(...)` on the existing `Client` surface, so
-  direct-chat clients can bind message-list and conversation-list UI without
-  decoding raw SDK envelopes.
+- The native SDK app domain now exposes `app.messages().history(...)`,
+  `app.messages().conversations(...)`, and `app.messages().cancel(...)` on
+  the existing `Client` surface, so direct-chat clients can bind message-list,
+  conversation-list, and cancellation UI without decoding raw SDK envelopes or
+  dropping to the root client handle.
 - `ZmqPipelineBackendClient::list_message_history` now accepts both canonical
   `id`/`content` records and legacy direct-chat `message_id`/`body` records
   from `app.message.history.list`, keeping restart-recovered conversation
@@ -882,6 +883,9 @@ Scoped release evidence is split as follows:
   cancellation through both `ZmqPipelineBackendClient::cancel` and
   `app.delivery.cancel` envelope execution, preserving daemon cancellation
   outcomes without raw RPC envelopes.
+- The native SDK app facade now routes `app.delivery.cancel` locally through
+  `Client::cancel_delivery`, preserving typed cancellation results for app
+  callers instead of falling through to generic remote-command dispatch.
 - `app.delivery.cancel` now cancels queued/pre-handoff outbound work before
   bridge delivery, persists `receipt_status = cancelled`, records delivery
   trace and event state, exposes cancel metadata through raw and envelope SDK
