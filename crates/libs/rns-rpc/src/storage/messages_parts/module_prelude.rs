@@ -161,6 +161,8 @@ pub struct PropagationEntryStats {
     pub bytes: u64,
 }
 
+pub const LXMF_LOCAL_TRANSIENT_CACHE_EXPIRY_SECS: i64 = 30 * 24 * 60 * 60 * 6;
+
 fn propagation_entry_from_row(row: &rusqlite::Row<'_>) -> rusqlite::Result<PropagationEntryRecord> {
     let size_bytes: i64 = row.get(4)?;
     let stamp_value: Option<u32> = row.get(5)?;

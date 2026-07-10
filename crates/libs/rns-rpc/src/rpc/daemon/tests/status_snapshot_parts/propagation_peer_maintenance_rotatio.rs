@@ -264,6 +264,45 @@ fn propagation_peer_maintenance_syncs_one_waiting_peer_like_python() {
 }
 
 #[test]
+fn propagation_peer_maintenance_prunes_expired_local_processed_marks_like_python() {
+    let (daemon, _) = ready_propagation_peer_daemon(0x57);
+    let expired = "e7".repeat(32);
+    let fresh = "f8".repeat(32);
+    let now = now_i64();
+    daemon
+        .store
+        .mark_local_propagation_processed_at(
+            expired.as_str(),
+            now - crate::storage::messages::LXMF_LOCAL_TRANSIENT_CACHE_EXPIRY_SECS - 1,
+        )
+        .expect("insert expired mark");
+    daemon
+        .store
+        .mark_local_propagation_processed_at(fresh.as_str(), now - 1)
+        .expect("insert fresh mark");
+
+    let result = daemon
+        .handle_rpc(rpc_request(57, "propagation_peer_maintenance", json!({})))
+        .expect("peer maintenance")
+        .result
+        .expect("peer maintenance result");
+
+    assert_eq!(result["pruned_local_processed"].as_u64(), Some(1));
+    assert_eq!(
+        result["pruned_local_processed_ids"].as_array().expect("pruned ids"),
+        &[json!(expired)]
+    );
+    assert!(!daemon
+        .store
+        .local_propagation_processed_mark_exists(expired.as_str())
+        .expect("expired mark pruned"));
+    assert!(daemon
+        .store
+        .local_propagation_processed_mark_exists(fresh.as_str())
+        .expect("fresh mark retained"));
+}
+
+#[test]
 fn propagation_peer_maintenance_selection_claims_peer_before_sync_like_python() {
     let (daemon, peer) = ready_propagation_peer_daemon(0x64);
     let entry = PropagationEntryRecord {

@@ -753,6 +753,9 @@ Workspace paths are used for navigation. `crates/libs/lxmf-core` publishes as
   retained payload entries, so payloads reintroduced after purge or peer
   acknowledgement can refresh relay state without inflating local received or
   ingested counters.
+- Propagation peer maintenance expires local processed-transient markers after
+  Python's six-message-expiry cache window, preventing duplicate suppression
+  state from retaining stale transient IDs indefinitely.
 - Propagation-node ingest enforces the configured message-storage byte limit
   against retained propagation entries, using age, size, and
   prioritised-destination weighting while pruning stale retryable peer marks.
@@ -994,7 +997,9 @@ Workspace paths are used for navigation. `crates/libs/lxmf-core` publishes as
   local receive counters again. Replayed local propagated delivery for an
   already processed transient, or for an already stored message carried by a
   fresh transient, emits one bounded `inbound_dropped` duplicate event while
-  preserving the same no-store/no-recount behavior.
+  preserving the same no-store/no-recount behavior. Propagation maintenance
+  now prunes those local processed-transient markers after the Python
+  six-message-expiry cache window.
 - Focused remote propagation import tests now cover duplicate observability for
   same-response duplicate payloads across sync/fetch/download and already
   processed remote fetch payloads: still-stored duplicates remain accepted for

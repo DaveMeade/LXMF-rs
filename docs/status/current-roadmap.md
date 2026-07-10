@@ -1212,6 +1212,9 @@ Scoped release evidence is split as follows:
   from retained payload entries, so reintroduced payloads after purge or peer
   acknowledgement can refresh relay state without inflating local received or
   ingested counters.
+- Propagation peer maintenance now expires local processed-transient markers
+  after the Python six-message-expiry cache window, so duplicate suppression
+  does not retain stale transient IDs indefinitely.
 - Propagation payload ingest now enforces the configured node message-storage
   byte limit against retained propagation entries, using age, size, and
   prioritised-destination weighting while clearing retryable peer queue marks.

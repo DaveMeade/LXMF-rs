@@ -68,6 +68,46 @@
     }
 
     #[test]
+    fn local_propagation_processed_prune_expires_python_cache_window() {
+        let store = MessagesStore::in_memory().expect("in-memory store");
+        let now = 2_000_000_000;
+        let expired = "AB".repeat(32);
+        let boundary = "bc".repeat(32);
+        let fresh = "cd".repeat(32);
+
+        assert!(store
+            .mark_local_propagation_processed_at(
+                expired.as_str(),
+                now - LXMF_LOCAL_TRANSIENT_CACHE_EXPIRY_SECS - 1,
+            )
+            .expect("insert expired mark"));
+        assert!(store
+            .mark_local_propagation_processed_at(
+                boundary.as_str(),
+                now - LXMF_LOCAL_TRANSIENT_CACHE_EXPIRY_SECS,
+            )
+            .expect("insert boundary mark"));
+        assert!(store
+            .mark_local_propagation_processed_at(fresh.as_str(), now - 1)
+            .expect("insert fresh mark"));
+
+        let pruned = store
+            .prune_expired_local_propagation_processed(now)
+            .expect("prune expired processed marks");
+
+        assert_eq!(pruned, vec!["ab".repeat(32)]);
+        assert!(!store
+            .local_propagation_processed_mark_exists(expired.as_str())
+            .expect("expired mark pruned"));
+        assert!(store
+            .local_propagation_processed_mark_exists(boundary.as_str())
+            .expect("boundary mark retained"));
+        assert!(store
+            .local_propagation_processed_mark_exists(fresh.as_str())
+            .expect("fresh mark retained"));
+    }
+
+    #[test]
     fn resolve_receipt_status_updates_non_terminal_message() {
         let store = MessagesStore::in_memory().expect("in-memory store");
         store.insert_message(&outbound_message("msg-1", 1, None)).expect("insert message");
