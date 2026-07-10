@@ -138,6 +138,38 @@ fn ticket_generate_suppresses_recently_delivered_ticket() {
 }
 
 #[test]
+fn app_delivery_ticket_generate_envelope_delegates_to_ticket_generate() {
+    let daemon = RpcDaemon::test_instance();
+
+    let response = daemon
+        .handle_rpc(rpc_request(
+            96,
+            "sdk_envelope_execute_v2",
+            json!({
+                "operation_id": "app.delivery.ticket.generate",
+                "kind": "command",
+                "correlation_id": "ticket-corr",
+                "payload": {
+                    "destination": "peer-ticket-sdk",
+                    "ttl_secs": 3_600,
+                },
+            }),
+        ))
+        .expect("ticket generate envelope")
+        .result
+        .expect("ticket generate envelope result");
+
+    assert_eq!(response["response"]["operation_id"], json!("app.delivery.ticket.generate"));
+    assert_eq!(response["response"]["correlation_id"], json!("ticket-corr"));
+    let payload = &response["response"]["payload"];
+    assert_eq!(payload["destination"], json!("peer-ticket-sdk"));
+    assert_eq!(payload["ttl_secs"], json!(3_600));
+    assert_eq!(payload["included"], json!(true));
+    assert_eq!(payload["ticket"].as_str().map(str::len), Some(32));
+    assert!(payload["expires_at"].as_i64().is_some());
+}
+
+#[test]
 fn ticket_generate_suppresses_recent_delivery_after_daemon_restart() {
     let temp = tempfile::tempdir().expect("tempdir");
     let db_path = temp.path().join("ticket-deliveries.sqlite");

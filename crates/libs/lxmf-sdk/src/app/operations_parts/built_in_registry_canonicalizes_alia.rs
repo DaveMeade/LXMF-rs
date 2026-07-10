@@ -111,6 +111,10 @@ mod tests {
             registry.canonicalize("sdk_status_v2").expect("canonical delivery status id").as_str(),
             "app.delivery.status"
         );
+        assert_eq!(
+            registry.canonicalize("ticket_generate").expect("canonical ticket generate id").as_str(),
+            "app.delivery.ticket.generate"
+        );
         assert!(registry.supports("sdk_snapshot_v2"));
     }
 

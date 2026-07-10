@@ -14,6 +14,7 @@ mod propagation_payload;
 mod propagation_policy;
 mod registry;
 mod status;
+mod ticket;
 mod workflow;
 
 #[derive(Debug, Clone, PartialEq)]

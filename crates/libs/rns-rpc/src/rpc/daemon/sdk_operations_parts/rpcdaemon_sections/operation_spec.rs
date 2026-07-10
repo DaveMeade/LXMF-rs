@@ -1,13 +1,10 @@
 impl RpcDaemon {
-
     fn operation_spec(&self, id_or_alias: &str) -> Option<ResolvedSdkOperationSpec> {
-        if let Some(spec) =
-            SDK_OPERATION_SPECS.iter().chain(PROPAGATION_SDK_OPERATION_SPECS.iter()).find(
-                |spec| {
-                    spec.id == id_or_alias
-                        || spec.aliases.iter().any(|alias| alias == &id_or_alias)
-                },
-            )
+        if let Some(spec) = SDK_OPERATION_SPECS
+            .iter()
+            .chain(TICKET_SDK_OPERATION_SPECS.iter())
+            .chain(PROPAGATION_SDK_OPERATION_SPECS.iter())
+            .find(|spec| spec.id == id_or_alias || spec.aliases.iter().any(|alias| alias == &id_or_alias))
         {
             return Some(ResolvedSdkOperationSpec {
                 id: spec.id.to_owned(),
@@ -15,7 +12,6 @@ impl RpcDaemon {
                 rpc_method: spec.rpc_method,
             });
         }
-
         self.sdk_custom_operations
             .lock()
             .expect("sdk_custom_operations mutex poisoned")
@@ -33,10 +29,10 @@ impl RpcDaemon {
                 rpc_method: "sdk_command_invoke_v2",
             })
     }
-
     pub(super) fn operation_registry_json(&self) -> JsonValue {
         let mut entries = SDK_OPERATION_SPECS
             .iter()
+            .chain(TICKET_SDK_OPERATION_SPECS.iter())
             .chain(PROPAGATION_SDK_OPERATION_SPECS.iter())
             .filter(|spec| {
                 spec.required_capabilities
@@ -401,6 +397,11 @@ impl RpcDaemon {
                 params: Some(params),
             })?,
             "list_messages" => self.handle_rpc_legacy_messages(RpcRequest {
+                id: request_id,
+                method: method.to_owned(),
+                params: Some(params),
+            })?,
+            "ticket_generate" => self.handle_rpc_legacy_misc(RpcRequest {
                 id: request_id,
                 method: method.to_owned(),
                 params: Some(params),

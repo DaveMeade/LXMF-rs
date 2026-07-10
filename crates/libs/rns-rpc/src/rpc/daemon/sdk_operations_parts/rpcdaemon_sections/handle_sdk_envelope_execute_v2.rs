@@ -45,6 +45,7 @@ impl RpcDaemon {
                 "message_id": parsed.payload.get("message_id").and_then(JsonValue::as_str),
             }),
             "peer_sync"
+            | "ticket_generate"
             | "propagation_remote_status"
             | "propagation_remote_fetch"
             | "propagation_remote_download"

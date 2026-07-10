@@ -547,6 +547,10 @@ Scoped release evidence is split as follows:
   inspect retry and recovery state without dropping to raw RPC status calls.
 - Ticket validity, renewal, derivation, persistence, and inbound ticket reuse
   are implemented.
+- Delivery ticket generation is now exposed through the registered SDK
+  operation path as `app.delivery.ticket.generate` with legacy
+  `ticket_generate` alias support, preserving ticket interval suppression
+  metadata over typed ZeroMQ backend calls.
 - Propagation peers have real queue, policy, maintenance, throttling, peering,
   offer-response, source-accounting, and acceptance-rate behavior. These are
   substantial implementations, not SDK-only placeholders.
@@ -837,9 +841,10 @@ Scoped release evidence is split as follows:
   announce-slot metadata, and per-call extensions.
 - The typed ZeroMQ SDK backend now also covers the operation registry and SDK
   envelope execution path, including `app.message.history.list` and
-  `app.delivery.destination_hash`, so REM/RCH direct-chat history and runtime
-  delivery-destination lookups can stay on `ZmqPipelineBackendClient` instead
-  of constructing raw RPC/HTTP envelopes.
+  `app.delivery.destination_hash` plus delivery ticket generation over
+  `app.delivery.ticket.generate`, so REM/RCH direct-chat history, runtime
+  delivery-destination lookups, and ticket convenience flows can stay on
+  `ZmqPipelineBackendClient` instead of constructing raw RPC/HTTP envelopes.
 - Paper-message encode/decode now ride the registered SDK envelope path as
   `app.paper.encode` and `app.paper.decode` in both the daemon and SDK app
   registries, with typed envelope payloads for `sdk_paper_encode_v2` and

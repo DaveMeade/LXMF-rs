@@ -137,6 +137,9 @@ Workspace paths are used for navigation. `crates/libs/lxmf-core` publishes as
 ### Tickets and stamps
 
 - Ticket grace, renewal, derivation, persistence, and reply reuse are complete.
+- `app.delivery.ticket.generate` now exposes ticket generation through the
+  registered SDK envelope path and typed ZeroMQ backend, with `ticket_generate`
+  alias support and ticket-interval suppression metadata preserved.
 - Inbound normal and propagation stamps honor configured flexibility.
 - Outbound normal and propagation work records generating, ready, failed, and
   cancelled state.
@@ -922,8 +925,9 @@ Workspace paths are used for navigation. `crates/libs/lxmf-core` publishes as
   for haves-only `/get` side effects, offer side effects, duplicate wanted-ID
   handling, and peer queue lifecycle evidence.
 - Focused daemon/RPC tests cover delivery modes, propagation offers, paper
-  operation registry/envelope dispatch, peer maintenance, queue policy, source
-  accounting, stamps, tickets, receipts, and cancellation.
+  operation registry/envelope dispatch, SDK ticket-generation envelopes, peer
+  maintenance, queue policy, source accounting, stamps, tickets, receipts, and
+  cancellation.
 - Focused daemon bridge tests cover deferred normal-stamp queue ownership,
   cancellation, retry metadata, and propagation-stamp preparation before
   delivery handoff.

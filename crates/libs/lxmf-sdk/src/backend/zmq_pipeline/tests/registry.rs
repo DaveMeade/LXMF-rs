@@ -21,6 +21,7 @@ fn operation_registry_uses_zmq_sdk_method_for_chat_peer_and_propagation_operatio
         "app.delivery.destination_hash",
         "app.delivery.outbound_stamp_cost",
         "app.delivery.cancel",
+        "app.delivery.ticket.generate",
         "app.peer.connect",
         "app.peer.disconnect",
         "app.peer.reconnect",
