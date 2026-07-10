@@ -169,6 +169,9 @@ impl RpcDaemon {
                     }),
                 }
             }
+            "get_blackholed_identities" | "blackhole_identity" | "unblackhole_identity" => {
+                self.handle_rpc_legacy_blackhole_identity(request)
+            }
             "path_status" => {
                 let params = request.params.ok_or_else(|| {
                     std::io::Error::new(std::io::ErrorKind::InvalidInput, "missing params")
@@ -494,3 +497,4 @@ impl RpcDaemon {
 
 include!("dispatch_legacy_misc_parts/path_lookup.rs");
 include!("dispatch_legacy_misc_parts/announce_delivery.rs");
+include!("dispatch_legacy_misc_parts/blackhole_identity.rs");

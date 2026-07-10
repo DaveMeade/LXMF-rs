@@ -66,7 +66,10 @@ impl RpcDaemon {
             | "link_count"
             | "announce_now"
             | "announce_delivery"
-            | "announce_received" => self.handle_rpc_legacy_misc(request),
+            | "announce_received"
+            | "get_blackholed_identities"
+            | "blackhole_identity"
+            | "unblackhole_identity" => self.handle_rpc_legacy_misc(request),
             "rnode_management" | "weave_remote_display_control" => {
                 self.handle_rpc_legacy_misc(request)
             }

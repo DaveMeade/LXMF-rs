@@ -44,6 +44,7 @@ pub struct RpcDaemon {
     peers: Mutex<HashMap<String, PeerRecord>>,
     interfaces: Mutex<Vec<InterfaceRecord>>,
     delivery_policy: Mutex<DeliveryPolicy>,
+    blackholed_identities: Mutex<HashMap<String, JsonValue>>,
     propagation_state: Mutex<PropagationState>,
     remote_unpeer_failure_state: Mutex<Option<PropagationState>>,
     propagation_payloads: Mutex<HashMap<String, String>>,

@@ -78,6 +78,16 @@ struct AnnounceDeliveryParams {
 }
 
 #[derive(Debug, Deserialize)]
+struct BlackholeIdentityParams {
+    #[serde(alias = "identity_hash", alias = "identity", alias = "hash")]
+    identity: String,
+    #[serde(default)]
+    until: Option<JsonValue>,
+    #[serde(default)]
+    reason: Option<JsonValue>,
+}
+
+#[derive(Debug, Deserialize)]
 struct SetInterfacesParams {
     interfaces: Vec<InterfaceRecord>,
 }
