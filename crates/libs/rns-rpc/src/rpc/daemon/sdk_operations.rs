@@ -10,4 +10,6 @@ include!("sdk_operations_parts/delivery_operation_specs.rs");
 
 include!("sdk_operations_parts/propagation_operation_specs.rs");
 
+include!("sdk_operations_parts/legacy_operation_specs.rs");
+
 include!("sdk_operations_parts/rpcdaemon.rs");

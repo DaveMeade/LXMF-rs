@@ -60,6 +60,14 @@ fn built_in_entries() -> Vec<OperationEntry> {
         )
         .with_alias("sdk_status_v2"),
         OperationEntry::new(
+            "app.delivery.trace",
+            "delivery",
+            OperationKind::Query,
+            TransportVariant::Rpc,
+            "Return delivery trace transitions for a specific message id.",
+        )
+        .with_alias("message_delivery_trace"),
+        OperationEntry::new(
             "app.delivery.cancel",
             "delivery",
             OperationKind::Command,

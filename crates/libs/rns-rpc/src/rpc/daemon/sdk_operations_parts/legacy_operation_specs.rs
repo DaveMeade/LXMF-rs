@@ -1,0 +1,32 @@
+const LEGACY_SDK_OPERATION_SPECS: &[SdkOperationSpec] = &[
+    SdkOperationSpec {
+        id: "app.message.history.list",
+        group: "messaging",
+        kind: "query",
+        transport_variant: "legacy_rpc",
+        description: "List message history records for app chat flows.",
+        aliases: &["list_messages"],
+        required_capabilities: &[],
+        rpc_method: "list_messages",
+    },
+    SdkOperationSpec {
+        id: "app.delivery.destination_hash",
+        group: "identity",
+        kind: "query",
+        transport_variant: "legacy_rpc",
+        description: "Resolve the runtime delivery destination hash.",
+        aliases: &["status"],
+        required_capabilities: &[],
+        rpc_method: "status",
+    },
+    SdkOperationSpec {
+        id: "app.delivery.outbound_stamp_cost",
+        group: "delivery",
+        kind: "query",
+        transport_variant: "legacy_rpc",
+        description: "Return the cached outbound delivery stamp cost for one destination.",
+        aliases: &["get_outbound_stamp_cost"],
+        required_capabilities: &[],
+        rpc_method: "get_outbound_stamp_cost",
+    },
+];

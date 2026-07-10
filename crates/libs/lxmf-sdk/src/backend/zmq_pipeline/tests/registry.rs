@@ -24,6 +24,7 @@ fn operation_registry_uses_zmq_sdk_method_for_chat_peer_and_propagation_operatio
         "app.delivery.ticket.generate",
         "app.delivery.stamp_policy.get",
         "app.delivery.stamp_policy.set",
+        "app.delivery.trace",
         "app.peer.connect",
         "app.peer.disconnect",
         "app.peer.reconnect",

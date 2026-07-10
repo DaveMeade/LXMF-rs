@@ -6,6 +6,7 @@ impl RpcDaemon {
             .chain(CONVERSATION_SDK_OPERATION_SPECS.iter())
             .chain(DELIVERY_SDK_OPERATION_SPECS.iter())
             .chain(PROPAGATION_SDK_OPERATION_SPECS.iter())
+            .chain(LEGACY_SDK_OPERATION_SPECS.iter())
             .find(|spec| spec.id == id_or_alias || spec.aliases.iter().any(|alias| alias == &id_or_alias))
         {
             return Some(ResolvedSdkOperationSpec {
@@ -38,6 +39,7 @@ impl RpcDaemon {
             .chain(CONVERSATION_SDK_OPERATION_SPECS.iter())
             .chain(DELIVERY_SDK_OPERATION_SPECS.iter())
             .chain(PROPAGATION_SDK_OPERATION_SPECS.iter())
+            .chain(LEGACY_SDK_OPERATION_SPECS.iter())
             .filter(|spec| {
                 spec.required_capabilities
                     .iter()

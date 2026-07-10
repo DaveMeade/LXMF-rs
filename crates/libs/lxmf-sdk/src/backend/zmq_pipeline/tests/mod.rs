@@ -8,6 +8,7 @@ use zeromq::{PullSocket, PushSocket, Socket, SocketRecv, SocketSend, ZmqMessage}
 mod batch;
 mod cancel;
 mod delivery_stamp_policy;
+mod delivery_trace;
 mod destination;
 mod history;
 mod propagation;

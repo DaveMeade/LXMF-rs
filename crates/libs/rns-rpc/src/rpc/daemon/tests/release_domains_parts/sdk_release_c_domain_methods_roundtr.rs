@@ -40,6 +40,7 @@ fn sdk_release_c_domain_methods_roundtrip() {
         .any(|entry| entry["id"] == json!("app.workflow.mission_update_send")));
     assert!(registry_entries.iter().any(|entry| entry["id"] == json!("app.delivery.send_batch")));
     assert!(registry_entries.iter().any(|entry| entry["id"] == json!("app.delivery.cancel")));
+    assert!(registry_entries.iter().any(|entry| entry["id"] == json!("app.delivery.trace")));
     assert!(registry_entries
         .iter()
         .any(|entry| entry["id"] == json!("app.delivery.ticket.generate")));

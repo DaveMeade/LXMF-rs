@@ -55,6 +55,13 @@ mod tests {
                 .as_str(),
             "app.propagation.control.disallow"
         );
+        assert_eq!(
+            registry
+                .canonicalize("message_delivery_trace")
+                .expect("canonical delivery trace id")
+                .as_str(),
+            "app.delivery.trace"
+        );
     }
 
     #[test]
