@@ -43,7 +43,7 @@ impl ReticulumRuntimePolicy {
             .as_ref()
             .map(ReticulumConfigRaw::runtime_policy)
             .transpose()
-            .map_err(|error| <toml::de::Error as serde::de::Error>::custom(error))
+            .map_err(<toml::de::Error as serde::de::Error>::custom)
             .map(Option::unwrap_or_default)
     }
 }
