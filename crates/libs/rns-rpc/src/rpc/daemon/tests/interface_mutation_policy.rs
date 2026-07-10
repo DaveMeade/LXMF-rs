@@ -420,6 +420,34 @@
     }
 
     #[test]
+    fn set_interfaces_reports_prefer_ipv6_tcp_server_requires_restart() {
+        let daemon = RpcDaemon::test_instance();
+
+        let response = daemon
+            .handle_rpc(rpc_request(
+                137,
+                "set_interfaces",
+                json!({
+                    "interfaces": [
+                        {
+                            "type": "tcp_server",
+                            "enabled": true,
+                            "host": "127.0.0.1",
+                            "port": 4242,
+                            "name": "listener",
+                            "settings": {
+                                "prefer_ipv6": true
+                            }
+                        }
+                    ]
+                }),
+            ))
+            .expect("set_interfaces response");
+
+        assert_restart_required(response);
+    }
+
+    #[test]
     fn set_interfaces_rejects_duplicate_tcp_server_bind_addresses() {
         let daemon = RpcDaemon::test_instance();
 
@@ -1128,6 +1156,39 @@
             .expect("reload_config response");
 
         assert_reload_restart_required_without_apply(&daemon, &bridge, response, original_interfaces);
+    }
+
+    #[test]
+    fn reload_config_reports_prefer_ipv6_tcp_server_requires_restart_without_partial_apply() {
+        let daemon = RpcDaemon::test_instance();
+        daemon.replace_interfaces(vec![tcp_server_interface("listener", "127.0.0.1", 4242)]);
+        let bridge = std::sync::Arc::new(RecordingInterfaceMutationBridge::new());
+        daemon.set_interface_mutation_bridge(bridge.clone());
+
+        let response = daemon
+            .handle_rpc(rpc_request(
+                38,
+                "reload_config",
+                json!({
+                    "interfaces": [{
+                        "type": "tcp_server",
+                        "enabled": true,
+                        "host": "127.0.0.1",
+                        "port": 4248,
+                        "name": "listener",
+                        "settings": {
+                            "prefer_ipv6": true
+                        }
+                    }]
+                }),
+            ))
+            .expect("reload_config response");
+
+        assert_restart_required(response);
+        assert!(bridge.applied().is_empty());
+
+        let interfaces = daemon.interfaces.lock().expect("interfaces mutex poisoned").clone();
+        assert_eq!(interfaces, vec![tcp_server_interface("listener", "127.0.0.1", 4242)]);
     }
 
     #[test]
