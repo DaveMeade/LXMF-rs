@@ -14,6 +14,7 @@ The selected external client must already exist as a local source checkout.
 
 Environment overrides:
   MESHCHATX_ROOT, SIDEBAND_ROOT, COLUMBA_ROOT
+  COLUMBA_PYTHON
   LOG_DIR, REPORT_PATH, GATE_SUMMARY_PATH
   RPC_ADDR, TRANSPORT_ADDR
 EOF
