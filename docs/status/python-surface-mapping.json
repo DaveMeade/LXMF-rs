@@ -57,6 +57,66 @@
       "evidence": ["unit", "pinned-python"]
     },
     {
+      "pattern": "RNS.Reticulum.Reticulum.link_mtu_discovery",
+      "implementation": "complete",
+      "rust_surface": ["reticulumd::config::ReticulumRuntimePolicy"],
+      "evidence": ["unit", "pinned-python"]
+    },
+    {
+      "pattern": "RNS.Reticulum.Reticulum.remote_management_enabled",
+      "implementation": "complete",
+      "rust_surface": ["reticulumd::config::ReticulumRuntimePolicy"],
+      "evidence": ["unit", "pinned-python"]
+    },
+    {
+      "pattern": "RNS.Reticulum.Reticulum.probe_destination_enabled",
+      "implementation": "complete",
+      "rust_surface": ["reticulumd::config::ReticulumRuntimePolicy"],
+      "evidence": ["unit", "pinned-python"]
+    },
+    {
+      "pattern": "RNS.Reticulum.Reticulum.required_discovery_value",
+      "implementation": "complete",
+      "rust_surface": ["reticulumd::config::ReticulumRuntimePolicy"],
+      "evidence": ["unit", "pinned-python"]
+    },
+    {
+      "pattern": "RNS.Reticulum.Reticulum.publish_blackhole_enabled",
+      "implementation": "complete",
+      "rust_surface": ["reticulumd::config::ReticulumRuntimePolicy"],
+      "evidence": ["unit", "pinned-python"]
+    },
+    {
+      "pattern": "RNS.Reticulum.Reticulum.blackhole_sources",
+      "implementation": "complete",
+      "rust_surface": ["reticulumd::config::ReticulumRuntimePolicy"],
+      "evidence": ["unit", "pinned-python"]
+    },
+    {
+      "pattern": "RNS.Reticulum.Reticulum.interface_discovery_sources",
+      "implementation": "complete",
+      "rust_surface": ["reticulumd::config::ReticulumRuntimePolicy"],
+      "evidence": ["unit", "pinned-python"]
+    },
+    {
+      "pattern": "RNS.Reticulum.Reticulum.should_autoconnect_discovered_interfaces",
+      "implementation": "complete",
+      "rust_surface": ["reticulumd::config::ReticulumRuntimePolicy"],
+      "evidence": ["unit", "pinned-python"]
+    },
+    {
+      "pattern": "RNS.Reticulum.Reticulum.max_autoconnected_interfaces",
+      "implementation": "complete",
+      "rust_surface": ["reticulumd::config::ReticulumRuntimePolicy"],
+      "evidence": ["unit", "pinned-python"]
+    },
+    {
+      "pattern": "RNS.Reticulum.Reticulum.should_use_implicit_proof",
+      "implementation": "complete",
+      "rust_surface": ["reticulumd::config::ReticulumRuntimePolicy"],
+      "evidence": ["unit", "pinned-python"]
+    },
+    {
       "pattern": "RNS.Reticulum.*",
       "implementation": "partial",
       "rust_surface": ["reticulumd", "reticulum-rs-rpc::RpcDaemon"],

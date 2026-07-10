@@ -48,6 +48,12 @@ impl<'de> Deserialize<'de> for DaemonConfig {
             iface.normalize_aliases(index, original_kind.as_str()).map_err(D::Error::custom)?;
             iface.validate(index, original_kind.as_str()).map_err(D::Error::custom)?;
         }
+        raw
+            .reticulum
+            .as_ref()
+            .map(ReticulumConfigRaw::runtime_policy)
+            .transpose()
+            .map_err(D::Error::custom)?;
         Ok(Self {
             display_name: raw.display_name,
             announce_capabilities: raw.announce_capabilities,
@@ -88,6 +94,26 @@ struct ReticulumConfigRaw {
     rpc_key: Option<String>,
     #[serde(default)]
     panic_on_interface_error: Option<bool>,
+    #[serde(default)]
+    link_mtu_discovery: Option<bool>,
+    #[serde(default)]
+    enable_remote_management: Option<bool>,
+    #[serde(default)]
+    respond_to_probes: Option<bool>,
+    #[serde(default)]
+    use_implicit_proof: Option<bool>,
+    #[serde(default)]
+    discover_interfaces: Option<bool>,
+    #[serde(default)]
+    required_discovery_value: Option<i64>,
+    #[serde(default)]
+    publish_blackhole: Option<bool>,
+    #[serde(default)]
+    blackhole_sources: Vec<String>,
+    #[serde(default)]
+    interface_discovery_sources: Vec<String>,
+    #[serde(default)]
+    autoconnect_discovered_interfaces: Option<i64>,
 }
 
 impl ReticulumConfigRaw {

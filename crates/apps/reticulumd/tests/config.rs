@@ -7,3 +7,5 @@ include!("config_parts/parses_reticulum_kiss_interface_type.rs");
 include!("config_parts/parses_lora_python_rnode_arbitrary_v.rs");
 
 include!("config_parts/parses_meshtastic_interface.rs");
+
+include!("config_parts/parses_reticulum_runtime_policy.rs");
