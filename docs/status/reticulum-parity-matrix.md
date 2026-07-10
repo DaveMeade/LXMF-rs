@@ -36,6 +36,18 @@ Workspace paths are used for navigation. Published package names are
 | `RNS/Utilities/*` | `crates/apps/rns-tools` | partial | `rnx` is substantial; `rnsd` delegates to `reticulumd` with CLI coverage for `RETICULUMD_BIN`, forwarded args/output, and delegated success/failure status; `rnstatus-rs` reports local daemon/interface and propagation peer status over TCP or Unix-domain daemon RPC with JSON and human output, including configured endpoints for host/port, UDP target, Unix local socket, serial/KISS/RNode/Weave/VR-N76 devices, Pipe command, I2P SAM/peer count, and Auto group rows, plus Auto carrier/link-local, TCP/Backbone stream/listener, UDP, serial, KISS/AX.25 KISS, KISS TCP, BLE GATT, I2P, RNode/LoRa, RNodeMulti, Weave, and VR-N76 runtime summaries; `rnodeconf-rs` covers serial/TCP, feature-gated BLE, and RNodeMulti parent/vport RNode radio-state query, blink, safe read/display/local-radio commands, and guarded persistent/destructive management commands over daemon RPC; `rnpath-rs` validates destination hashes, calls daemon-backed `request_path` over TCP or Unix-domain daemon RPC, honors timeout/nonzero unresolved outcomes, supports scoped requests with `--on-iface`/`--tag-hex`, supports JSON/human status output with next-hop/interface metadata over software RPC, and is exercised by a local non-neighbor mesh daemon smoke through `rnx rnpath-smoke` including scoped/tagged refresh on the learned outgoing interface. | Full equivalents for retired `rncp`, `rnid`, `rnir`, `rnpkg`, and `rnprobe` remain absent; `rnodeconf-rs` is not a full Python `rnodeconf` equivalent; `rnstatus-rs` is local status only. |
 | `CRNS/*` | `crates/apps/rns-tools` | partial | Selected command workflows exist. | The Python command ecosystem is not reproduced. |
 
+### Runtime and daemon compatibility
+
+- `[reticulum] enable_transport` now controls Reticulum retransmission
+  independently from interface startup, while `panic_on_interface_error`
+  remains a separate strict-startup policy.
+- Legacy daemon RPC now exposes `next_hop`, `next_hop_if_name`,
+  `first_hop_timeout`, and `link_count`, and tracks blackholed identity
+  list/add/remove state with Python-compatible malformed-input behavior.
+- Shared-instance server/client/disabled state, final path-table flush, and
+  path/tunnel restore skip accounting are visible through the daemon status
+  surface and focused Rust regressions.
+
 ## Interface Detail
 
 Implemented interface families are active runtime code, not parser-only

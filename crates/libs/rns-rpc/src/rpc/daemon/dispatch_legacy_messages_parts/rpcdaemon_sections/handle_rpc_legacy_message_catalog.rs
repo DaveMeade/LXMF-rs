@@ -23,18 +23,22 @@ impl RpcDaemon {
                 records.sort_by(|left, right| {
                     right.timestamp.cmp(&left.timestamp).then_with(|| right.id.cmp(&left.id))
                 });
-                let peer_names = self
-                    .peers
-                    .lock()
-                    .expect("peers mutex poisoned")
-                    .values()
-                    .map(|peer| {
-                        (
-                            peer.peer.to_ascii_lowercase(),
-                            peer.name.clone().unwrap_or_else(|| peer.peer.clone()),
-                        )
-                    })
-                    .collect::<std::collections::HashMap<_, _>>();
+                let mut peer_names = std::collections::HashMap::new();
+                for announce in self
+                    .store
+                    .list_announces(5000, None, None)
+                    .map_err(std::io::Error::other)?
+                {
+                    if let Some(name) = announce.name {
+                        peer_names.entry(announce.peer.to_ascii_lowercase()).or_insert(name);
+                    }
+                }
+                for peer in self.peers.lock().expect("peers mutex poisoned").values() {
+                    peer_names.insert(
+                        peer.peer.to_ascii_lowercase(),
+                        peer.name.clone().unwrap_or_else(|| peer.peer.clone()),
+                    );
+                }
                 let mut conversations = Vec::<JsonValue>::new();
                 for record in records {
                     let conversation_id = conversation_id_for_message(&record);

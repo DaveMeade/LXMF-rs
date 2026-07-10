@@ -456,7 +456,6 @@ impl DaemonConfig {
     pub fn reticulum_transport_enabled(&self) -> bool {
         self.reticulum_enable_transport
     }
-
     pub fn enabled_tcp_clients(&self) -> Vec<&InterfaceConfig> {
         self.interfaces
             .iter()

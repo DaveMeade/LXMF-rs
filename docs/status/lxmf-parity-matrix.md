@@ -65,6 +65,20 @@ Workspace paths are used for navigation. `crates/libs/lxmf-core` publishes as
 
 ## Capability Detail
 
+### Integrated delivery and router compatibility
+
+- Direct delivery can reuse an identified inbound backchannel link for the
+  same LXMF delivery destination, while closed or failed cached links are
+  removed before normal link establishment resumes.
+- Atomic `allow_destination`, `disallow_destination`, and
+  `prioritise_destination` RPC/SDK operations coexist with the broader
+  Python-style authentication, allow/ignore, and priority convenience surface.
+- SDK delivery trace, opportunistic packet receipt metadata, conversation
+  summaries, and inbound duplicate/drop events retain typed metadata after
+  daemon restart and through ZeroMQ envelope dispatch. Conversation display
+  names fall back to durable delivery announce history without turning delivery
+  announces into propagation peers.
+
 ### v0.7.0 SDK-first boundary
 
 - v0.7.0 improves the existing `lxmf-sdk` and

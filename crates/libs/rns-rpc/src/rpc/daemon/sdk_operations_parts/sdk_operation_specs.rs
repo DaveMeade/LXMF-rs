@@ -51,6 +51,16 @@ const SDK_OPERATION_SPECS: &[SdkOperationSpec] = &[
         rpc_method: "sdk_status_v2",
     },
     SdkOperationSpec {
+        id: "app.delivery.trace",
+        group: "delivery",
+        kind: "query",
+        transport_variant: "rpc",
+        description: "Return delivery trace transitions for a specific message id.",
+        aliases: &["message_delivery_trace"],
+        required_capabilities: &[],
+        rpc_method: "message_delivery_trace",
+    },
+    SdkOperationSpec {
         id: "app.delivery.cancel",
         group: "delivery",
         kind: "command",

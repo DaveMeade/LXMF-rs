@@ -1,6 +1,6 @@
 # Current Roadmap Status
 
-Last reassessed: 2026-07-08
+Last reassessed: 2026-07-10
 
 This file is the repository-level source of truth for parity posture, release
 confidence, and execution order. Detailed row-level status lives in:
@@ -32,6 +32,18 @@ The project is best described by capability level:
 | Propagation interoperable | achieved | Propagated delivery, complete Python-only `LXMPeer.py` lifecycle coverage, and Python-reference propagation router fetch/download/sync lifecycle coverage are implemented and tested. |
 | Operationally substitutable | partial | `reticulumd` is deployable and supports several production interfaces, but runtime, interface, and utility breadth remains narrower than Python. |
 | Full Python surface parity | not achieved | Remaining gaps are tracked in the two parity matrices. |
+
+The 2026-07-10 integration pass reconciled the outstanding parity branches as
+one compatible Rust surface. Reticulum configuration now keeps
+`enable_transport` independent from strict `panic_on_interface_error` startup,
+and daemon RPC exposes next-hop/interface/first-hop timeout metadata,
+`link_count`, blackholed-identity state, and shared-instance status without
+collapsing absence into malformed data. LXMF delivery keeps atomic
+single-destination policy mutators alongside the broader Python convenience
+surface, reuses identified direct backchannels, preserves delivery-trace and
+opportunistic packet metadata, and resolves conversation display names from
+durable delivery announces even when delivery announces are intentionally not
+promoted to propagation peers.
 
 ## v0.7.0 SDK-First Release Focus
 

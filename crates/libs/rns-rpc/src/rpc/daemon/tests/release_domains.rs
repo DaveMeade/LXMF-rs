@@ -3,6 +3,7 @@ include!("release_domains_parts/sdk_release_b_domain_methods_roundtr.rs");
 include!("release_domains_parts/sdk_release_b_attachment_streaming_u.rs");
 
 include!("release_domains_parts/sdk_release_c_domain_methods_roundtr.rs");
+include!("release_domains_parts/sdk_release_c_identity_peer.rs");
 
 include!("release_domains_parts/sdk_policy_mutator_registry.rs");
 

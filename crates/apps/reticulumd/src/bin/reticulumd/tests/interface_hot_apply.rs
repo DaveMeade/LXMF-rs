@@ -870,7 +870,7 @@ fn hot_apply_rejects_partial_udp_forward_target() {
 }
 
 #[test]
-fn hot_apply_rejects_multicast_udp_forward_target() {
+fn hot_apply_accepts_multicast_udp_forward_target() {
     let (tx, _rx) = tokio::sync::mpsc::channel(1);
     let bridge = test_bridge(tx);
     let mut record = udp_record("udp-multicast-target", "127.0.0.1", 4242);
@@ -879,10 +879,11 @@ fn hot_apply_rejects_multicast_udp_forward_target() {
         "target_port": 4243
     }));
 
-    let err = bridge.apply_interfaces(vec![record]).expect_err("multicast target should fail");
+    let applied = bridge.apply_interfaces(vec![record]).expect("multicast target should apply");
 
-    assert_eq!(err.kind(), io::ErrorKind::InvalidInput);
-    assert!(err.to_string().contains("multicast targets"));
+    let status = &applied[0].settings.as_ref().expect("settings")["_runtime"]["udp"]["status"];
+    assert_eq!(status["role"], json!("multicast"));
+    assert_eq!(status["forward_addr"], json!("224.0.0.1:4243"));
 }
 
 #[test]
