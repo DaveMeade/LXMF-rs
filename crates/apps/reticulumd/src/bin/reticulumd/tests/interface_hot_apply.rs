@@ -1,7 +1,8 @@
 use super::{
     apply_hot_apply_interface_records, mark_udp_record_runtime_status,
     refresh_hot_apply_pipe_runtime_status_once, refresh_hot_apply_tcp_listener_runtime_status_once,
-    refresh_hot_apply_udp_runtime_status_once, HotApplyPipeRefresh, HotApplyRuntimeRefreshes,
+    refresh_hot_apply_udp_runtime_status_once, tcp_server_bind_addr_with_device_resolver,
+    udp_bind_and_forward_addr_with_device_resolver, HotApplyPipeRefresh, HotApplyRuntimeRefreshes,
     HotApplyUdpRefresh, InterfaceHotApplyBridge, InterfaceManager, InterfaceMutationBridge,
     InterfaceRecord, ManagedHotApplyInterface,
 };
@@ -904,71 +905,106 @@ fn hot_apply_rejects_out_of_range_udp_forward_target_port() {
 }
 
 #[test]
-fn hot_apply_rejects_device_bound_udp_records() {
+fn hot_apply_resolves_device_bound_udp_defaults() {
+    let mut record = udp_record("udp-device", "", 4242);
+    record.host = None;
+    record.settings = Some(json!({ "device": "eth0" }));
+
+    let (bind_addr, forward_addr) =
+        udp_bind_and_forward_addr_with_device_resolver(&record, |device| {
+            assert_eq!(device, "eth0");
+            Ok("192.0.2.255".to_string())
+        })
+        .expect("device-bound udp addresses");
+
+    assert_eq!(bind_addr, "192.0.2.255:4242");
+    assert_eq!(forward_addr.as_deref(), Some("192.0.2.255:4242"));
+}
+
+#[test]
+fn hot_apply_accepts_device_bound_udp_with_explicit_addresses() {
     let (tx, _rx) = tokio::sync::mpsc::channel(1);
     let bridge = test_bridge(tx);
     let mut record = udp_record("udp-device", "127.0.0.1", 4242);
-    record.settings = Some(json!({ "device": "eth0" }));
+    record.settings = Some(json!({
+        "device": "eth0",
+        "target_host": "127.0.0.1",
+        "target_port": 4243
+    }));
 
-    let err =
-        bridge.apply_interfaces(vec![record]).expect_err("device-bound udp should require restart");
+    let applied = bridge
+        .apply_interfaces(vec![record])
+        .expect("device-bound udp with explicit addresses should hot-apply");
 
-    assert_eq!(err.kind(), io::ErrorKind::InvalidInput);
-    assert!(err.to_string().contains("device-bound"));
+    assert_eq!(applied.len(), 1);
+    assert_eq!(applied[0].kind, "udp");
 }
 
 #[test]
-fn hot_apply_rejects_non_loopback_tcp_server_records() {
+fn hot_apply_accepts_non_loopback_tcp_server_records() {
     let (tx, _rx) = tokio::sync::mpsc::channel(1);
     let bridge = test_bridge(tx);
 
-    let err = bridge
+    let applied = bridge
         .apply_interfaces(vec![tcp_server_record("listener", "192.0.2.1", 4242)])
-        .expect_err("non-loopback tcp_server should require restart");
+        .expect("non-loopback tcp_server should hot-apply");
 
-    assert_eq!(err.kind(), io::ErrorKind::InvalidInput);
-    assert!(err.to_string().contains("loopback"));
+    assert_eq!(applied.len(), 1);
 }
 
 #[test]
-fn hot_apply_rejects_non_local_hostname_tcp_server_records() {
+fn hot_apply_accepts_hostname_tcp_server_records() {
     let (tx, _rx) = tokio::sync::mpsc::channel(1);
     let bridge = test_bridge(tx);
 
-    let err = bridge
+    let applied = bridge
         .apply_interfaces(vec![tcp_server_record("listener", "example.invalid", 4242)])
-        .expect_err("non-local hostname tcp_server should require restart");
+        .expect("hostname tcp_server should hot-apply");
 
-    assert_eq!(err.kind(), io::ErrorKind::InvalidInput);
-    assert!(err.to_string().contains("loopback"));
+    assert_eq!(applied.len(), 1);
 }
 
 #[test]
-fn hot_apply_rejects_device_bound_tcp_server_records() {
+fn hot_apply_resolves_device_bound_tcp_server_records() {
+    let mut record = tcp_server_record("listener", "", 4242);
+    record.host = None;
+    record.settings = Some(json!({ "device": "eth0", "prefer_ipv6": true }));
+
+    let bind_addr = tcp_server_bind_addr_with_device_resolver(&record, |device, prefer_ipv6| {
+        assert_eq!(device, "eth0");
+        assert!(prefer_ipv6);
+        Ok("2001:db8::1".to_string())
+    })
+    .expect("device-bound tcp_server should resolve");
+
+    assert_eq!(bind_addr, "[2001:db8::1]:4242");
+}
+
+#[test]
+fn hot_apply_accepts_device_bound_tcp_server_with_explicit_host() {
     let (tx, _rx) = tokio::sync::mpsc::channel(1);
     let bridge = test_bridge(tx);
     let mut record = tcp_server_record("listener", "127.0.0.1", 4242);
     record.settings = Some(json!({ "device": "eth0" }));
 
-    let err =
-        bridge.apply_interfaces(vec![record]).expect_err("device-bound tcp_server should fail");
+    let applied = bridge
+        .apply_interfaces(vec![record])
+        .expect("device-bound tcp_server with explicit host should hot-apply");
 
-    assert_eq!(err.kind(), io::ErrorKind::InvalidInput);
-    assert!(err.to_string().contains("device-bound"));
+    assert_eq!(applied.len(), 1);
 }
 
 #[test]
-fn hot_apply_rejects_prefer_ipv6_tcp_server_records() {
+fn hot_apply_accepts_prefer_ipv6_tcp_server_records() {
     let (tx, _rx) = tokio::sync::mpsc::channel(1);
     let bridge = test_bridge(tx);
     let mut record = tcp_server_record("listener", "127.0.0.1", 4242);
     record.settings = Some(json!({ "prefer_ipv6": true }));
 
-    let err =
-        bridge.apply_interfaces(vec![record]).expect_err("prefer_ipv6 tcp_server should fail");
+    let applied =
+        bridge.apply_interfaces(vec![record]).expect("prefer_ipv6 tcp_server should hot-apply");
 
-    assert_eq!(err.kind(), io::ErrorKind::InvalidInput);
-    assert!(err.to_string().contains("prefer_ipv6"));
+    assert_eq!(applied.len(), 1);
 }
 
 #[test]

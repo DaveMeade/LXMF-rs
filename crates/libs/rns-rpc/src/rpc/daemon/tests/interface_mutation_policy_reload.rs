@@ -246,7 +246,7 @@
     }
 
     #[test]
-    fn reload_config_reports_device_udp_requires_restart_without_partial_apply() {
+    fn reload_config_hot_applies_device_udp() {
         let daemon = RpcDaemon::test_instance();
         let original_interfaces = vec![udp_interface("udp-device", "127.0.0.1", 4242)];
         daemon.replace_interfaces(original_interfaces.clone());
@@ -270,7 +270,16 @@
             ))
             .expect("reload_config response");
 
-        assert_reload_restart_required_without_apply(&daemon, &bridge, response, original_interfaces);
+        assert!(response.error.is_none(), "unexpected error: {response:?}");
+        let result = response.result.expect("reload result");
+        assert_eq!(result["hot_applied_interface_mutation"], json!(true));
+        let mut expected = udp_interface("udp-device", "127.0.0.1", 4242);
+        expected.settings = Some(json!({ "device": "eth0" }));
+        assert_eq!(bridge.applied(), vec![vec![expected.clone()]]);
+        assert_eq!(
+            *daemon.interfaces.lock().expect("interfaces mutex poisoned"),
+            vec![expected]
+        );
     }
 
     #[test]
@@ -333,7 +342,7 @@
     }
 
     #[test]
-    fn reload_config_reports_prefer_ipv6_tcp_server_requires_restart_without_partial_apply() {
+    fn reload_config_hot_applies_prefer_ipv6_tcp_server() {
         let daemon = RpcDaemon::test_instance();
         daemon.replace_interfaces(vec![tcp_server_interface("listener", "127.0.0.1", 4242)]);
         let bridge = std::sync::Arc::new(RecordingInterfaceMutationBridge::new());
@@ -358,11 +367,14 @@
             ))
             .expect("reload_config response");
 
-        assert_restart_required(response);
-        assert!(bridge.applied().is_empty());
-
-        let interfaces = daemon.interfaces.lock().expect("interfaces mutex poisoned").clone();
-        assert_eq!(interfaces, vec![tcp_server_interface("listener", "127.0.0.1", 4242)]);
+        assert!(response.error.is_none(), "unexpected error: {response:?}");
+        let mut expected = tcp_server_interface("listener", "127.0.0.1", 4248);
+        expected.settings = Some(json!({ "prefer_ipv6": true }));
+        assert_eq!(bridge.applied(), vec![vec![expected.clone()]]);
+        assert_eq!(
+            *daemon.interfaces.lock().expect("interfaces mutex poisoned"),
+            vec![expected]
+        );
     }
 
     #[test]
@@ -488,9 +500,11 @@
     }
 
     #[test]
-    fn reload_config_reports_non_local_hostname_tcp_server_requires_restart() {
+    fn reload_config_hot_applies_hostname_tcp_server() {
         let daemon = RpcDaemon::test_instance();
         daemon.replace_interfaces(vec![tcp_server_interface("listener", "localhost", 4242)]);
+        let bridge = std::sync::Arc::new(RecordingInterfaceMutationBridge::new());
+        daemon.set_interface_mutation_bridge(bridge.clone());
 
         let response = daemon
             .handle_rpc(rpc_request(
@@ -510,7 +524,13 @@
             ))
             .expect("reload_config response");
 
-        assert_restart_required(response);
+        assert!(response.error.is_none(), "unexpected error: {response:?}");
+        let expected = tcp_server_interface("listener", "example.invalid", 4248);
+        assert_eq!(bridge.applied(), vec![vec![expected.clone()]]);
+        assert_eq!(
+            *daemon.interfaces.lock().expect("interfaces mutex poisoned"),
+            vec![expected]
+        );
     }
 
     #[test]

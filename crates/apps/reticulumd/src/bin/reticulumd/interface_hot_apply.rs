@@ -28,6 +28,10 @@ use interface_hot_apply_parts::record_hot_apply::{
     tcp_server_client_mtu, udp_bind_and_forward_addr, validate_hot_apply_uniqueness,
 };
 #[cfg(test)]
+use interface_hot_apply_parts::record_hot_apply::{
+    tcp_server_bind_addr_with_device_resolver, udp_bind_and_forward_addr_with_device_resolver,
+};
+#[cfg(test)]
 use interface_hot_apply_parts::tcp_runtime_refresh::refresh_hot_apply_tcp_listener_runtime_status_once;
 use interface_hot_apply_parts::tcp_runtime_refresh::{
     attach_hot_apply_tcp_listener_runtime_status,

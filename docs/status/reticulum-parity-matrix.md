@@ -1,6 +1,6 @@
 # Reticulum Parity Matrix
 
-Last reassessed: 2026-07-06
+Last reassessed: 2026-07-10
 
 This is the maintained row-level status for Python Reticulum compatibility.
 Repository-level posture and execution order live in
@@ -20,7 +20,7 @@ Workspace paths are used for navigation. Published package names are
 
 | Python surface | Rust surface | Status | Implemented baseline | Residual gap |
 | --- | --- | --- | --- | --- |
-| `RNS/Reticulum.py` | `crates/libs/rns-transport`, `crates/apps/reticulumd` | partial | Deployable daemon, configuration, propagation-node activation, persistence, RPC, graceful shutdown, unified legacy `status`/`daemon_status_ex` daemon runtime snapshot visibility, daemon/RPC runtime status for Reticulum path-table restore success or failure, Reticulum-style blackholed identity list/add/remove RPC state, multiple live interfaces, and runtime `set_interfaces`/`reload_config` hot-apply for TCP clients, explicit loopback and IPv4 wildcard TCP server listeners including `localhost` and `0.0.0.0`, and explicit UDP listener, peer, multicast-bind, and multicast-forward records. | Python runtime/config mutation remains wider for device-bound, non-local concrete listener, broader interface shapes, and persisted transport blackhole side effects; interface breadth remains wider. |
+| `RNS/Reticulum.py` | `crates/libs/rns-transport`, `crates/apps/reticulumd` | partial | Deployable daemon, configuration, propagation-node activation, persistence, RPC, graceful shutdown, unified legacy `status`/`daemon_status_ex` daemon runtime snapshot visibility, daemon/RPC runtime status for Reticulum path-table restore success or failure, Reticulum-style blackholed identity list/add/remove RPC state with restart-safe persistence and associated cached-path eviction, multiple live interfaces, and runtime `set_interfaces`/`reload_config` hot-apply for TCP clients, host-bound or device-bound TCP servers with IPv4/IPv6 preference, and explicit or device-bound UDP listener, peer, multicast-bind, and multicast-forward records. | Python runtime/config mutation remains wider across startup-only interface families; overall interface breadth remains wider. |
 | `RNS/Identity.py` | `crates/libs/rns-core` | done | Identity material, hashing, signing, encryption, recall, and key conversion. | No confirmed parity blocker. |
 | `RNS/Destination.py` | `crates/libs/rns-core`, `crates/libs/rns-transport` | done | Destination hashing, descriptors, announces, proof validation, ratchets, and known-key stability checks. | No confirmed parity blocker. |
 | `RNS/Packet.py` | `crates/libs/rns-core`, `crates/libs/rns-transport` | done | Framing, serialization, contexts, proofs, receipts, Python-default link proof context, and header semantics. | No confirmed parity blocker. |
@@ -31,7 +31,7 @@ Workspace paths are used for navigation. Published package names are
 | `RNS/Buffer.py` | `crates/libs/rns-core`, `crates/libs/rns-transport` | done | Packet buffers, readers/writers, and callback baseline. | No confirmed parity blocker. |
 | `RNS/Interfaces/*` | `crates/libs/rns-transport`, `crates/apps/reticulumd` | partial | TCP client/server, including Python-style TCP-over-I2P `i2p_tunneled` socket tuning for outbound clients and accepted server streams, TCP/Backbone client reconnect tunnel re-synthesis, TCP/Backbone listener runtime status refresh into daemon/RPC status with accept counters and latest accepted stream snapshot, Backbone TCP/HDLC listener/client compatibility with Backbone MTU defaults, Reticulum-style Backbone socket tuning for Backbone client and accepted listener streams (`TCP_NODELAY`, Linux/Android `SO_KEEPALIVE`, TCP keepalive idle/interval/count, and TCP user timeout), Backbone-only HDLC liveness keepalives/stale/read-timeout reconnects, and local slow-reader HDLC tx backpressure evidence paired with Python selector/epoll and live Python Reticulum `BackboneClientInterface` slow-reader probes plus focused live channel/link/request/resource roundtrips against the pinned Python reference, LocalInterface TCP-loopback listener/client-attach plus Unix filesystem and Linux/Android abstract AF_UNIX shared-instance listener/client-attach compatibility, including implicit shared local TCP sidecar coexistence with configured TCP/Backbone listeners, Unix client-attach reconnect after initial connect failures or later disconnects, TCP/Unix attach reconnect signals that re-synthesize tunnel state, and shared-instance one-hop transport wrapping, Pipe subprocess HDLC, UDP unicast/multicast with Python-style UDP `device` broadcast-address defaults and IPv4 broadcast socket sends, serial, KISS, AX.25 KISS, AutoInterface, LoRa/RNode with serial/TCP and feature-gated BLE radio-state query, blink, safe read/display/local-radio management through daemon RPC, guarded persistent/destructive RNode management through daemon RPC, feature-gated RNode BLE, VR-N76 KISS-over-BLE, the in-progress shared serial/TCP RNodeMulti baseline with nested vport virtual children plus startup probe validation for detect, firmware `>= 1.74`, platform, MCU, `CMD_INTERFACES`, configured hardware vports, selected-vport radio status bookkeeping, vport-aware transport and daemon/RPC management queueing through parent iface plus child `vport` selection, parent-level Python ID beacon fanout to outgoing subinterfaces, and live daemon/RPC `radio_status` refresh over the transport-side runtime schema with stream/probe state and last-error reporting, the in-progress shared-serial Weave WDCL/HDLC endpoint baseline with live daemon/RPC status refresh over the transport-side endpoint, display-frame, and CPU/task/memory stat schema, and the in-progress I2P SAM peer/connectable baseline with Python-compatible persisted private-destination key filenames, live daemon/RPC tunnel status refresh over the transport-side watchdog/counter schema, and real-SAM pair connected-peer evidence. | I2P full production evidence, full RNodeMulti prepared-host hardware validation/evidence, broader RNodeMulti production parity, Weave UI and hardware evidence, broad BLE/RNode management hardware matrix evidence, and broader prepared-host hardware evidence remain. |
 | `RNS/Discovery.py` | `crates/libs/rns-transport`, `crates/apps/reticulumd` | partial | Announce/path discovery plus live AutoInterface discovery and peer runtime, including Python-style final-init gating before daemon discovery datagrams can add peers or peer-data datagrams can create routes, and daemon `_runtime.auto.carrier_runtime` visibility for peer lifecycle jobs plus peer-data admitted/delivered/decode-failed/RX-closed outcomes. | Public bootstrap/discovery breadth and broader real-interface churn evidence remain narrower than Python. |
-| `RNS/Resolver.py` | `crates/libs/rns-transport`, `crates/apps/reticulumd` | partial | Resolver helpers, cached lookup behavior, restored path-table identity lookup from cached announces, cacheless path save filtering, Python-format stale path-table row suppression, missing cached announce skips for active and tunnel path-table restore with daemon bootstrap/status evidence, malformed cached announce skips for active and tunnel path-table restore, cached-announce destination mismatch skips for active and tunnel path-table restore, and daemon bootstrap visibility for restored Python-format path-cache material through `path_status`/already-known `request_path` RPC, persisted announce-identity lookup, plus `_runtime.reticulum.path_table_restore` status exist. | Full resolver/discovery surface parity is not established; public bootstrap fleet, long-running resolver soak, and external-client resolver behavior remain out of scope for this software slice. |
+| `RNS/Resolver.py` | `crates/libs/rns-transport`, `crates/apps/reticulumd` | done | The pinned Python surface contains only the intentionally no-op `resolve_identity`; the active Python-reference workflow probes that behavior. Rust additionally provides cache lookup, restored path-table identity lookup from cached announces, cacheless path save filtering, Python-format stale path-table row suppression, missing/malformed/mismatched cached-announce tolerance for active and tunnel restore, persisted announce-identity lookup, daemon `path_status`/already-known `request_path` visibility, and `_runtime.reticulum.path_table_restore` status. | No confirmed parity blocker. |
 | `RNS/Cryptography/*` | `crates/libs/rns-core` | done | Required Reticulum primitives used by identities, packets, links, and receipts. | No confirmed parity blocker. |
 | `RNS/Utilities/*` | `crates/apps/rns-tools` | partial | `rnx` is substantial; `rnsd` delegates to `reticulumd` with CLI coverage for `RETICULUMD_BIN`, forwarded args/output, and delegated success/failure status; `rnstatus-rs` reports local daemon/interface and propagation peer status over TCP or Unix-domain daemon RPC with JSON and human output, including configured endpoints for host/port, UDP target, Unix local socket, serial/KISS/RNode/Weave/VR-N76 devices, Pipe command, I2P SAM/peer count, and Auto group rows, plus Auto carrier/link-local, TCP/Backbone stream/listener, UDP, serial, KISS/AX.25 KISS, KISS TCP, BLE GATT, I2P, RNode/LoRa, RNodeMulti, Weave, and VR-N76 runtime summaries; `rnodeconf-rs` covers serial/TCP, feature-gated BLE, and RNodeMulti parent/vport RNode radio-state query, blink, safe read/display/local-radio commands, and guarded persistent/destructive management commands over daemon RPC; `rnpath-rs` validates destination hashes, calls daemon-backed `request_path` over TCP or Unix-domain daemon RPC, honors timeout/nonzero unresolved outcomes, supports scoped requests with `--on-iface`/`--tag-hex`, supports JSON/human status output with next-hop/interface metadata over software RPC, and is exercised by a local non-neighbor mesh daemon smoke through `rnx rnpath-smoke` including scoped/tagged refresh on the learned outgoing interface. | Full equivalents for retired `rncp`, `rnid`, `rnir`, `rnpkg`, and `rnprobe` remain absent; `rnodeconf-rs` is not a full Python `rnodeconf` equivalent; `rnstatus-rs` is local status only. |
 | `CRNS/*` | `crates/apps/rns-tools` | partial | Selected command workflows exist. | The Python command ecosystem is not reproduced. |
@@ -43,7 +43,9 @@ Workspace paths are used for navigation. Published package names are
   remains a separate strict-startup policy.
 - Legacy daemon RPC now exposes `next_hop`, `next_hop_if_name`,
   `first_hop_timeout`, and `link_count`, and tracks blackholed identity
-  list/add/remove state with Python-compatible malformed-input behavior.
+  list/add/remove state with Python-compatible malformed-input behavior and
+  restart-safe persistence of local entries and removals. Adding a blackhole
+  also evicts every cached path whose recalled announce identity matches it.
 - Shared-instance server/client/disabled state, final path-table flush, and
   path/tunnel restore skip accounting are visible through the daemon status
   surface and focused Rust regressions.
@@ -159,12 +161,14 @@ placeholders:
   operators. A software loopback smoke now proves Python-style alias parsing,
   strict startup, bound loopback status, and malformed-datagram
   `bytes_rx`/`decode_errors` telemetry without external network services.
-  Runtime interface mutation now hot-applies explicit loopback and IPv4
-  wildcard TCP server listeners, including `localhost` and `0.0.0.0`, plus explicit UDP listener, peer,
+  Runtime interface mutation now hot-applies host-bound and device-bound TCP
+  server listeners, including loopback, `localhost`, IPv4 wildcard, concrete
+  local addresses, hostnames, and device-selected IPv4/IPv6 addresses, plus explicit UDP listener, peer,
   multicast-bind, and multicast-forward records through `set_interfaces` and
   `reload_config`, while `device`-bound, non-local concrete, and broader TCP server
-  listener shapes, plus UDP `device`-bound, partial-target, and
-  out-of-range-target records, remain restart-required or invalid. Duplicate
+  startup-only interface families and UDP partial-target and out-of-range-target records remain
+  restart-required or invalid. Device-bound UDP records resolve Python-style
+  IPv4 broadcast defaults during hot-apply. Duplicate
   TCP server and UDP binds are rejected before mutation. Hot-applied explicit
   TCP server records attach live daemon/RPC `_runtime.tcp.listener_status`
   metadata, hot-applied explicit UDP records attach the runtime iface and
@@ -570,16 +574,13 @@ display/status payload, and operator-workflow combinations remains pending.
    cached remote path-response `PATH_RESPONSE`, same-destination
    `PATH_RESPONSE`/ordinary-announce ordering, roaming same-interface
    suppression, and passed-on rebroadcast completion slices.
-2. Complete resolver/bootstrap behavior beyond cache-only restored path-table
-   announce material, per-entry bad-cache tolerance, tunnel restored-cache
-   lookup, and shared-instance path-table persistence suppression.
-3. Capture broader prepared-host BLE/RNode lifecycle and safe-management
+2. Capture broader prepared-host BLE/RNode lifecycle and safe-management
    evidence across bearer, device, firmware, and radio combinations.
-4. Capture broader public I2P peer-set and long-running prepared-host evidence
+3. Capture broader public I2P peer-set and long-running prepared-host evidence
    before claiming complete outbound peer production parity.
-5. Capture broader RNodeMulti prepared-host hardware validation across device,
+4. Capture broader RNodeMulti prepared-host hardware validation across device,
    firmware, and radio combinations.
-6. Implement real utility equivalents only where product demand justifies them.
+5. Implement real utility equivalents only where product demand justifies them.
 
 ## Evidence
 
