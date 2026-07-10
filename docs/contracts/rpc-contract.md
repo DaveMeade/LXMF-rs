@@ -205,7 +205,11 @@ Startup policy notes:
 
 The following contract is mandatory in v1:
 
-1. `set_interfaces` accepts only legacy hot-apply kinds (`tcp_client`, `tcp_server`).
+1. `set_interfaces` accepts only legacy hot-apply kinds (`tcp_client`,
+   `tcp_server`, and `udp`) when each record is hot-apply safe. `tcp_server`
+   hot-apply is limited to loopback binds, `localhost`, and the IPv4 wildcard
+   bind `0.0.0.0`; `udp` hot-apply is limited to records without `device` and
+   without partial, out-of-range, or multicast forward targets.
 2. If any startup-only kind is present (`local`, `serial`, `ble_gatt`, `lora`, or unknown future kinds),
    the request is rejected atomically with:
    - `error.code = "CONFIG_RESTART_REQUIRED"`
@@ -213,8 +217,9 @@ The following contract is mandatory in v1:
    - details include operation and affected interface identifiers.
 3. No partial apply is allowed when rejection occurs.
 4. `reload_config` without params preserves legacy behavior and emits `config_reloaded`.
-5. `reload_config` with `interfaces` params hot-applies only when interface list length/order/kinds
-   remain legacy TCP-only; otherwise it returns the same restart-required error contract.
+5. `reload_config` with `interfaces` params hot-applies only when interface
+   list length/order/kinds remain legacy hot-apply compatible; otherwise it
+   returns the same restart-required error contract.
 
 ### Propagation
 - `propagation_status` (no params)

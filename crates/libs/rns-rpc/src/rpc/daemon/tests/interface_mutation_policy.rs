@@ -299,6 +299,40 @@
     }
 
     #[test]
+    fn set_interfaces_hot_applies_wildcard_tcp_server_records() {
+        let daemon = RpcDaemon::test_instance();
+        let bridge = std::sync::Arc::new(RecordingInterfaceMutationBridge::new());
+        daemon.set_interface_mutation_bridge(bridge.clone());
+
+        let response = daemon
+            .handle_rpc(rpc_request(
+                136,
+                "set_interfaces",
+                json!({
+                    "interfaces": [
+                        {
+                            "type": "tcp_server",
+                            "enabled": true,
+                            "host": "0.0.0.0",
+                            "port": 4242,
+                            "name": "listener"
+                        }
+                    ]
+                }),
+            ))
+            .expect("set_interfaces response");
+
+        assert!(response.error.is_none(), "unexpected error: {response:?}");
+        assert_eq!(
+            bridge.applied(),
+            vec![vec![tcp_server_interface("listener", "0.0.0.0", 4242)]]
+        );
+
+        let interfaces = daemon.interfaces.lock().expect("interfaces mutex poisoned").clone();
+        assert_eq!(interfaces, vec![tcp_server_interface("listener", "0.0.0.0", 4242)]);
+    }
+
+    #[test]
     fn set_interfaces_reports_non_local_hostname_tcp_server_requires_restart() {
         let daemon = RpcDaemon::test_instance();
 
@@ -403,7 +437,7 @@
                         {
                             "type": "tcp_server",
                             "enabled": true,
-                            "host": "127.0.0.1",
+                            "host": "localhost",
                             "port": 4242,
                             "name": "listener-b"
                         }
@@ -443,6 +477,38 @@
                 }),
             ))
             .expect_err("duplicate tcp_server IPv6 binds should be rejected");
+        assert_eq!(err.kind(), std::io::ErrorKind::InvalidInput);
+        assert!(err.to_string().contains("duplicate legacy tcp_server bind address"));
+    }
+
+    #[test]
+    fn set_interfaces_rejects_duplicate_wildcard_tcp_server_bind_addresses() {
+        let daemon = RpcDaemon::test_instance();
+
+        let err = daemon
+            .handle_rpc(rpc_request(
+                137,
+                "set_interfaces",
+                json!({
+                    "interfaces": [
+                        {
+                            "type": "tcp_server",
+                            "enabled": true,
+                            "host": "0.0.0.0",
+                            "port": 4242,
+                            "name": "listener-a"
+                        },
+                        {
+                            "type": "tcp_server",
+                            "enabled": true,
+                            "host": "127.0.0.1",
+                            "port": 4242,
+                            "name": "listener-b"
+                        }
+                    ]
+                }),
+            ))
+            .expect_err("duplicate tcp_server wildcard binds should be rejected");
         assert_eq!(err.kind(), std::io::ErrorKind::InvalidInput);
         assert!(err.to_string().contains("duplicate legacy tcp_server bind address"));
     }
@@ -979,6 +1045,47 @@
         let interfaces = daemon.interfaces.lock().expect("interfaces mutex poisoned").clone();
         assert_eq!(interfaces[0].kind, "tcp_server");
         assert_eq!(interfaces[0].host.as_deref(), Some("localhost"));
+        assert_eq!(interfaces[0].port, Some(4248));
+    }
+
+    #[test]
+    fn reload_config_hot_applies_wildcard_tcp_server_only_diff() {
+        let daemon = RpcDaemon::test_instance();
+        daemon.replace_interfaces(vec![tcp_server_interface("listener", "0.0.0.0", 4242)]);
+        let bridge = std::sync::Arc::new(RecordingInterfaceMutationBridge::new());
+        daemon.set_interface_mutation_bridge(bridge.clone());
+
+        let response = daemon
+            .handle_rpc(rpc_request(
+                138,
+                "reload_config",
+                json!({
+                    "interfaces": [
+                        {
+                            "type": "tcp_server",
+                            "enabled": true,
+                            "host": "0.0.0.0",
+                            "port": 4248,
+                            "name": "listener"
+                        }
+                    ]
+                }),
+            ))
+            .expect("reload_config response");
+
+        assert!(response.error.is_none(), "unexpected reload error: {response:?}");
+        let result = response.result.expect("result");
+        assert_eq!(result["reloaded"], json!(true));
+        assert_eq!(result["hot_applied_legacy_tcp_only"], json!(false));
+        assert_eq!(result["hot_applied_interface_mutation"], json!(true));
+        assert_eq!(
+            bridge.applied(),
+            vec![vec![tcp_server_interface("listener", "0.0.0.0", 4248)]]
+        );
+
+        let interfaces = daemon.interfaces.lock().expect("interfaces mutex poisoned").clone();
+        assert_eq!(interfaces[0].kind, "tcp_server");
+        assert_eq!(interfaces[0].host.as_deref(), Some("0.0.0.0"));
         assert_eq!(interfaces[0].port, Some(4248));
     }
 
