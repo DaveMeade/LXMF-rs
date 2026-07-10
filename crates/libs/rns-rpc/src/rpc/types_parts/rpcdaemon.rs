@@ -133,6 +133,10 @@ pub trait PathLookupBridge: Send + Sync {
             "path_found": path_found,
         }))
     }
+
+    fn link_count(&self) -> Result<usize, std::io::Error> {
+        Err(std::io::Error::other("link count bridge is not configured"))
+    }
 }
 
 pub trait RNodeManagementBridge: Send + Sync {

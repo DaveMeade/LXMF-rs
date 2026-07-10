@@ -60,6 +60,7 @@ impl RpcDaemon {
             | "get_outbound_stamp_cost"
             | "path_status"
             | "request_path"
+            | "link_count"
             | "announce_now"
             | "announce_received" => self.handle_rpc_legacy_misc(request),
             "rnode_management" | "weave_remote_display_control" => {

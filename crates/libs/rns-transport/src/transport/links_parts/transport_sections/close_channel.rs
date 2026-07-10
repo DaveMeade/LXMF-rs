@@ -198,6 +198,10 @@ impl Transport {
         self.handler.lock().await.path_table.get(address).is_some()
     }
 
+    pub async fn link_count(&self) -> usize {
+        self.handler.lock().await.link_table.len()
+    }
+
     pub async fn path_status(&self, address: &AddressHash) -> crate::transport::TransportPathStatus {
         let handler = self.handler.lock().await;
         if let Some(entry) = handler.path_table.get(address) {
