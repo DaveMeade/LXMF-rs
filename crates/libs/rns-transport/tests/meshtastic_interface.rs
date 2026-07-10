@@ -172,3 +172,76 @@ fn config_preserves_reference_preset_delays_and_index_wrap() {
     assert_eq!(MeshtasticInterfaceConfig::from_modem_preset(7).send_delay, Duration::from_secs(12));
     assert_eq!(MeshtasticInterfaceConfig::from_modem_preset(99).send_delay, Duration::from_secs(7));
 }
+
+#[test]
+fn deterministic_fault_corpus_recovers_32_loss_and_reordering_seeds() {
+    for seed in 0_u8..32 {
+        let config = MeshtasticInterfaceConfig {
+            max_payload_bytes: 32,
+            send_delay: Duration::ZERO,
+            ..MeshtasticInterfaceConfig::default()
+        };
+        let data = (0..(160 + usize::from(seed)))
+            .map(|index| (index as u8).wrapping_mul(31).wrapping_add(seed))
+            .collect::<Vec<_>>();
+        let mut sender = MeshtasticTunnel::new(config.clone());
+        let mut receiver = MeshtasticTunnel::new(config);
+        sender.queue_outgoing_packet(&data).expect("queue seeded packet");
+
+        let mut initial = Vec::new();
+        while let Some(frame) = sender.next_transmit() {
+            initial.push(frame);
+        }
+        assert!(initial.len() > 2);
+        // Keep the final marker in flight so the receiver can identify and
+        // request the missing non-final position.
+        let dropped = usize::from(seed) % (initial.len() - 1);
+        let mut delivered = initial
+            .into_iter()
+            .enumerate()
+            .filter_map(|(index, frame)| (index != dropped).then_some(frame))
+            .collect::<Vec<_>>();
+        if seed % 2 == 0 {
+            delivered.reverse();
+        } else {
+            let rotate = usize::from(seed) % delivered.len();
+            delivered.rotate_left(rotate);
+        }
+
+        let mut completed = None;
+        for frame in delivered {
+            completed = receiver
+                .process_received(MeshtasticReceivedFrame::new(22, &frame.payload))
+                .expect("accept reordered frame")
+                .or(completed);
+        }
+
+        for _ in 0..64 {
+            if completed.is_some() {
+                break;
+            }
+            let request = receiver.next_transmit().expect("request missing chunk");
+            sender
+                .process_received(MeshtasticReceivedFrame::new(22, &request.payload))
+                .expect("sender accepts retransmit request");
+            if let Some(retransmit) = sender.next_transmit() {
+                completed = receiver
+                    .process_received(MeshtasticReceivedFrame::new(22, &retransmit.payload))
+                    .expect("receiver accepts retransmit");
+            }
+        }
+
+        assert_eq!(completed.as_deref(), Some(data.as_slice()), "fault seed {seed}");
+    }
+}
+
+#[test]
+fn deterministic_fault_corpus_reports_corruption_and_unexpected_commands() {
+    let mut tunnel = MeshtasticTunnel::new(MeshtasticInterfaceConfig::default());
+
+    assert!(tunnel.process_received(MeshtasticReceivedFrame::new(7, b"REQ")).is_err());
+    assert!(tunnel.process_received(MeshtasticReceivedFrame::new(7, &[1])).is_err());
+    let status = tunnel.status();
+    assert_eq!(status.decode_errors, 2);
+    assert!(status.last_error.is_some());
+}

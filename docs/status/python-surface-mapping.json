@@ -75,6 +75,16 @@
       "evidence": ["unit", "simulated", "pinned-python"]
     },
     {
+      "pattern": "RNS.Interfaces.Meshtastic.*",
+      "implementation": "complete",
+      "rust_surface": [
+        "reticulum-rs-transport::iface::meshtastic",
+        "reticulumd::interfaces::meshtastic"
+      ],
+      "evidence": ["unit", "simulated", "hardware-unverified"],
+      "notes": "Daemon lifecycle uses an explicit deterministic loopback bearer; native device operation is not physically validated."
+    },
+    {
       "pattern": "RNS.Interfaces.*",
       "implementation": "partial",
       "rust_surface": ["reticulum-rs-transport::iface", "reticulumd::interfaces"],

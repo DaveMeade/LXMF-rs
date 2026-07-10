@@ -11405,11 +11405,12 @@
         "hardware-unverified"
       ],
       "id": "RNS.Interfaces.Meshtastic.daemon-lifecycle",
-      "implementation": "partial",
+      "implementation": "complete",
       "kind": "interface",
+      "notes": "Daemon lifecycle uses an explicit deterministic loopback bearer; native device operation is not physically validated.",
       "rust_surface": [
-        "reticulum-rs-transport::iface",
-        "reticulumd::interfaces"
+        "reticulum-rs-transport::iface::meshtastic",
+        "reticulumd::interfaces::meshtastic"
       ],
       "source": "software extension"
     },
@@ -23859,9 +23860,9 @@
     "includes": "public RNS/LXMF callables and committed manual product contracts"
   },
   "summary": {
-    "complete": 557,
+    "complete": 558,
     "not-applicable": 1,
-    "partial": 1107,
+    "partial": 1106,
     "total": 1665
   }
 }

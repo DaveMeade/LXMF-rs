@@ -225,6 +225,8 @@ placeholders:
   node/destination route learning, an injectable bearer handle, daemon config
   startup, runtime status refresh, and deterministic loopback simulation.
   Native serial/TCP/BLE device evidence remains hardware-unverified.
+  The software row is implementation-complete with a committed 32-seed loss
+  and reordering corpus plus malformed-command/error-state coverage.
 - Shared serial/TCP RNodeMulti baseline with nested vport subinterfaces,
   `CMD_SEL_INT` KISS vport selection, direct routing to virtual child
   interfaces, Python-style child enabled/interface-enabled handling, broadcast
