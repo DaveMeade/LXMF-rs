@@ -586,7 +586,11 @@ async fn hot_apply_spawns_udp_multicast_with_transport_peer_routing() {
         Vec::new(),
         Arc::downgrade(&daemon),
     );
-    let record = udp_record("udp-mcast", "239.255.0.1", 0);
+    let mut record = udp_record("udp-mcast", "127.0.0.1", 0);
+    record.settings = Some(json!({
+        "target_host": "239.255.0.1",
+        "target_port": 4242
+    }));
 
     let applied = bridge.apply_interfaces(vec![record]).expect("apply multicast udp");
     daemon.replace_interfaces(applied);
@@ -607,6 +611,10 @@ async fn hot_apply_spawns_udp_multicast_with_transport_peer_routing() {
     assert_eq!(
         runtime["interfaces"][0]["settings"]["_runtime"]["udp"]["status"]["role"].as_str(),
         Some("multicast")
+    );
+    assert_eq!(
+        runtime["interfaces"][0]["settings"]["_runtime"]["udp"]["status"]["forward_addr"].as_str(),
+        Some("239.255.0.1:4242")
     );
     assert_eq!(refresh.runtime_iface, runtime_iface);
 }

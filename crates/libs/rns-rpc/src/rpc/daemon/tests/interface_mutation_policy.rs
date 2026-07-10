@@ -31,6 +31,21 @@
         }
     }
 
+    fn udp_forward_interface(
+        name: &str,
+        host: &str,
+        port: u16,
+        target_host: &str,
+        target_port: u16,
+    ) -> InterfaceRecord {
+        let mut iface = udp_interface(name, host, port);
+        iface.settings = Some(json!({
+            "target_host": target_host,
+            "target_port": target_port
+        }));
+        iface
+    }
+
     struct RecordingInterfaceMutationBridge {
         applied: std::sync::Mutex<Vec<Vec<InterfaceRecord>>>,
     }
@@ -577,8 +592,10 @@
     }
 
     #[test]
-    fn set_interfaces_reports_multicast_udp_forward_target_requires_restart() {
+    fn set_interfaces_hot_applies_multicast_udp_forward_target() {
         let daemon = RpcDaemon::test_instance();
+        let bridge = std::sync::Arc::new(RecordingInterfaceMutationBridge::new());
+        daemon.set_interface_mutation_bridge(bridge.clone());
 
         let response = daemon
             .handle_rpc(rpc_request(
@@ -600,7 +617,17 @@
             ))
             .expect("set_interfaces response");
 
-        assert_restart_required(response);
+        assert!(response.error.is_none(), "unexpected error: {response:?}");
+        assert_eq!(
+            bridge.applied(),
+            vec![vec![udp_forward_interface(
+                "udp-peer",
+                "127.0.0.1",
+                4242,
+                "239.255.0.1",
+                4242
+            )]]
+        );
     }
 
     #[test]
@@ -832,9 +859,11 @@
     }
 
     #[test]
-    fn reload_config_reports_multicast_udp_forward_target_requires_restart() {
+    fn reload_config_hot_applies_multicast_udp_forward_target() {
         let daemon = RpcDaemon::test_instance();
         daemon.replace_interfaces(vec![udp_interface("udp-peer", "127.0.0.1", 4242)]);
+        let bridge = std::sync::Arc::new(RecordingInterfaceMutationBridge::new());
+        daemon.set_interface_mutation_bridge(bridge.clone());
 
         let response = daemon
             .handle_rpc(rpc_request(
@@ -856,7 +885,20 @@
             ))
             .expect("reload_config response");
 
-        assert_restart_required(response);
+        assert!(response.error.is_none(), "unexpected reload error: {response:?}");
+        let result = response.result.expect("result");
+        assert_eq!(result["hot_applied_legacy_tcp_only"], json!(false));
+        assert_eq!(result["hot_applied_interface_mutation"], json!(true));
+        assert_eq!(
+            bridge.applied(),
+            vec![vec![udp_forward_interface(
+                "udp-peer",
+                "127.0.0.1",
+                4242,
+                "239.255.0.1",
+                4242
+            )]]
+        );
     }
 
     #[test]

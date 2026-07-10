@@ -196,7 +196,7 @@ impl RpcDaemon {
         if target_port.is_some_and(|value| u16::try_from(value).is_err()) {
             return false;
         }
-        !Self::host_is_multicast(target_host)
+        true
     }
 
     fn legacy_udp_bind_addr(iface: &InterfaceRecord) -> Option<String> {
@@ -256,8 +256,4 @@ impl RpcDaemon {
         if host.eq_ignore_ascii_case("localhost") { "127.0.0.1" } else { host }
     }
 
-    fn host_is_multicast(host: Option<&str>) -> bool {
-        host.and_then(|value| value.parse::<std::net::IpAddr>().ok())
-            .is_some_and(|ip| ip.is_multicast())
-    }
 }

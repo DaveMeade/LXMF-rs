@@ -225,12 +225,6 @@ fn udp_forward_addr_result(record: &InterfaceRecord) -> Result<Option<String>, i
             ))
         }
     };
-    if host_is_multicast(host) {
-        return Err(io::Error::new(
-            io::ErrorKind::InvalidInput,
-            "udp hot-apply does not support multicast targets",
-        ));
-    }
     let port = u16::try_from(port).map_err(|_| {
         io::Error::new(io::ErrorKind::InvalidInput, "udp hot-apply target_port is out of range")
     })?;
@@ -242,7 +236,11 @@ pub(crate) fn mark_udp_record_runtime_status(
     runtime_iface: Option<AddressHash>,
 ) {
     if let Ok((bind_addr, forward_addr)) = udp_bind_and_forward_addr(record) {
-        let role = if record.host.as_deref().is_some_and(host_is_multicast) {
+        let forward_host =
+            setting_str(record, "target_host").or_else(|| setting_str(record, "forward_ip"));
+        let role = if record.host.as_deref().is_some_and(host_is_multicast)
+            || forward_host.is_some_and(host_is_multicast)
+        {
             "multicast"
         } else if forward_addr.is_some() {
             "peer"

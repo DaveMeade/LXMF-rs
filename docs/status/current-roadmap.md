@@ -442,16 +442,17 @@ Scoped release evidence is split as follows:
   network services. `set_interfaces` and `reload_config` now hot-apply explicit
   loopback TCP server listeners, including the local `localhost` hostname,
   alongside TCP clients and explicit UDP
-  listener, peer, and multicast-bind records, with tests proving
+  listener, peer, multicast-bind, and multicast-forward records, with tests proving
   `device`-bound, non-local, and broader TCP server listener shapes stay
-  restart-required or invalid, UDP `device`-bound, partial-target,
-  out-of-range-target, and multicast-forward shapes remain restart-required or
-  invalid, and duplicate TCP server or UDP binds are rejected before mutation.
+  restart-required or invalid, UDP `device`-bound, partial-target, and
+  out-of-range-target shapes remain restart-required or invalid, and duplicate
+  TCP server or UDP binds are rejected before mutation.
   Hot-applied explicit TCP server records attach live daemon/RPC
   `_runtime.tcp.listener_status` metadata, hot-applied explicit UDP records
   attach the runtime iface and refresh live daemon/RPC `_runtime.udp.status`
-  counters under focused software tests, and multicast-bind hot-apply goes
-  through the transport peer-routing helper instead of a bare UDP spawn. Serial
+  counters under focused software tests, and multicast-bind and
+  multicast-forward hot-apply go through the transport peer-routing helper
+  instead of a bare UDP spawn. Serial
   now refreshes live open/reconnect, HDLC frame, packet, byte, EOF, queue,
   decode, serialize, read, and write-error counters.
   KISS/AX.25 KISS and KISS TCP now refresh live packet, data-frame,

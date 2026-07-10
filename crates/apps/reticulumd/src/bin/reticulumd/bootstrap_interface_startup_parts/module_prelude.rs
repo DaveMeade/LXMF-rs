@@ -2153,7 +2153,14 @@ interfaces = [
         assert!(udp_status["bind_addr"].as_str().expect("bind").ends_with(":0"));
         assert_eq!(udp_status["forward_addr"].as_str(), Some("239.255.0.1:4242"));
         assert_eq!(udp_status["iface"].as_str(), Some(runtime_iface.to_string().as_str()));
-        assert!(seeded_hot_apply_interfaces.is_empty());
+        assert_eq!(seeded_hot_apply_interfaces.len(), 1);
+        assert_eq!(seeded_hot_apply_interfaces[0].0, "auto-style-multicast");
+        assert_eq!(
+            seeded_hot_apply_interfaces[0].1.name.as_deref(),
+            Some("auto-style-multicast")
+        );
+        assert_eq!(seeded_hot_apply_interfaces[0].1.kind, "udp");
+        assert_eq!(seeded_hot_apply_interfaces[0].2, udp_runtime_refreshes[0].runtime_iface);
     }
 
     #[tokio::test]
