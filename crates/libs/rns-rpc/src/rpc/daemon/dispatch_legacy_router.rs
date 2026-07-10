@@ -66,6 +66,8 @@ impl RpcDaemon {
             | "next_hop_if_name"
             | "first_hop_timeout"
             | "request_path"
+            | "drop_path"
+            | "drop_all_via"
             | "link_count"
             | "announce_now"
             | "announce_delivery"

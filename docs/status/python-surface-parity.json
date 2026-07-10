@@ -17186,11 +17186,11 @@
         "pinned-python"
       ],
       "id": "RNS.Reticulum.Reticulum.blackhole_identity",
-      "implementation": "partial",
+      "implementation": "complete",
       "kind": "method",
       "rust_surface": [
-        "reticulumd",
-        "reticulum-rs-rpc::RpcDaemon"
+        "reticulum-rs-rpc::RpcDaemon",
+        "reticulumd::bridge"
       ],
       "source": "Reticulum.py"
     },
@@ -17229,11 +17229,11 @@
         "pinned-python"
       ],
       "id": "RNS.Reticulum.Reticulum.drop_all_via",
-      "implementation": "partial",
+      "implementation": "complete",
       "kind": "method",
       "rust_surface": [
-        "reticulumd",
-        "reticulum-rs-rpc::RpcDaemon"
+        "reticulum-rs-rpc::drop_all_via",
+        "reticulum-rs-transport::Transport::expire_paths_via"
       ],
       "source": "Reticulum.py"
     },
@@ -17259,26 +17259,25 @@
         "pinned-python"
       ],
       "id": "RNS.Reticulum.Reticulum.drop_path",
-      "implementation": "partial",
+      "implementation": "complete",
       "kind": "method",
       "rust_surface": [
-        "reticulumd",
-        "reticulum-rs-rpc::RpcDaemon"
+        "reticulum-rs-rpc::drop_path",
+        "reticulum-rs-transport::Transport::expire_path"
       ],
       "source": "Reticulum.py"
     },
     {
       "evidence": [
         "unit",
-        "simulated",
-        "pinned-python"
+        "simulated"
       ],
       "id": "RNS.Reticulum.Reticulum.exit_handler",
-      "implementation": "partial",
+      "implementation": "complete",
       "kind": "method",
       "rust_surface": [
-        "reticulumd",
-        "reticulum-rs-rpc::RpcDaemon"
+        "reticulumd::main",
+        "reticulumd::announce_persistence"
       ],
       "source": "Reticulum.py"
     },
@@ -17289,10 +17288,9 @@
         "pinned-python"
       ],
       "id": "RNS.Reticulum.Reticulum.get_blackholed_identities",
-      "implementation": "partial",
+      "implementation": "complete",
       "kind": "method",
       "rust_surface": [
-        "reticulumd",
         "reticulum-rs-rpc::RpcDaemon"
       ],
       "source": "Reticulum.py"
@@ -17304,25 +17302,22 @@
         "pinned-python"
       ],
       "id": "RNS.Reticulum.Reticulum.get_first_hop_timeout",
-      "implementation": "partial",
+      "implementation": "complete",
       "kind": "method",
       "rust_surface": [
-        "reticulumd",
-        "reticulum-rs-rpc::RpcDaemon"
+        "reticulum-rs-rpc::path_status",
+        "reticulum-rs-transport::transport"
       ],
       "source": "Reticulum.py"
     },
     {
       "evidence": [
-        "unit",
-        "simulated",
-        "pinned-python"
+        "unit"
       ],
       "id": "RNS.Reticulum.Reticulum.get_instance",
-      "implementation": "partial",
+      "implementation": "complete",
       "kind": "method",
       "rust_surface": [
-        "reticulumd",
         "reticulum-rs-rpc::RpcDaemon"
       ],
       "source": "Reticulum.py"
@@ -17331,14 +17326,15 @@
       "evidence": [
         "unit",
         "simulated",
-        "pinned-python"
+        "pinned-python",
+        "hardware-unverified"
       ],
       "id": "RNS.Reticulum.Reticulum.get_interface_stats",
-      "implementation": "partial",
+      "implementation": "complete",
       "kind": "method",
       "rust_surface": [
-        "reticulumd",
-        "reticulum-rs-rpc::RpcDaemon"
+        "reticulum-rs-rpc::daemon_status_ex",
+        "rns-tools::rnstatus"
       ],
       "source": "Reticulum.py"
     },
@@ -17349,11 +17345,10 @@
         "pinned-python"
       ],
       "id": "RNS.Reticulum.Reticulum.get_link_count",
-      "implementation": "partial",
+      "implementation": "complete",
       "kind": "method",
       "rust_surface": [
-        "reticulumd",
-        "reticulum-rs-rpc::RpcDaemon"
+        "reticulum-rs-rpc::daemon_status_ex"
       ],
       "source": "Reticulum.py"
     },
@@ -17364,11 +17359,11 @@
         "pinned-python"
       ],
       "id": "RNS.Reticulum.Reticulum.get_next_hop",
-      "implementation": "partial",
+      "implementation": "complete",
       "kind": "method",
       "rust_surface": [
-        "reticulumd",
-        "reticulum-rs-rpc::RpcDaemon"
+        "reticulum-rs-rpc::path_status",
+        "reticulum-rs-transport::transport"
       ],
       "source": "Reticulum.py"
     },
@@ -17379,11 +17374,11 @@
         "pinned-python"
       ],
       "id": "RNS.Reticulum.Reticulum.get_next_hop_if_name",
-      "implementation": "partial",
+      "implementation": "complete",
       "kind": "method",
       "rust_surface": [
-        "reticulumd",
-        "reticulum-rs-rpc::RpcDaemon"
+        "reticulum-rs-rpc::path_status",
+        "reticulum-rs-transport::transport"
       ],
       "source": "Reticulum.py"
     },
@@ -17439,11 +17434,11 @@
         "pinned-python"
       ],
       "id": "RNS.Reticulum.Reticulum.get_path_table",
-      "implementation": "partial",
+      "implementation": "complete",
       "kind": "method",
       "rust_surface": [
-        "reticulumd",
-        "reticulum-rs-rpc::RpcDaemon"
+        "reticulum-rs-rpc::path_status",
+        "reticulum-rs-transport::reticulum_path_store"
       ],
       "source": "Reticulum.py"
     },
@@ -17465,30 +17460,28 @@
     {
       "evidence": [
         "unit",
-        "simulated",
-        "pinned-python"
+        "simulated"
       ],
       "id": "RNS.Reticulum.Reticulum.get_rpc_client",
-      "implementation": "partial",
+      "implementation": "complete",
       "kind": "method",
       "rust_surface": [
-        "reticulumd",
-        "reticulum-rs-rpc::RpcDaemon"
+        "lxmf-sdk::RpcBackendClient",
+        "lxmf-sdk::ZmqPipelineBackendClient"
       ],
       "source": "Reticulum.py"
     },
     {
       "evidence": [
         "unit",
-        "simulated",
         "pinned-python"
       ],
       "id": "RNS.Reticulum.Reticulum.halt_interface",
-      "implementation": "partial",
+      "implementation": "complete",
       "kind": "method",
+      "notes": "The pinned Python method is a no-op; Rust maps lifecycle mutation to typed interface replacement.",
       "rust_surface": [
-        "reticulumd",
-        "reticulum-rs-rpc::RpcDaemon"
+        "reticulum-rs-rpc::set_interfaces"
       ],
       "source": "Reticulum.py"
     },
@@ -17560,15 +17553,14 @@
     {
       "evidence": [
         "unit",
-        "simulated",
         "pinned-python"
       ],
       "id": "RNS.Reticulum.Reticulum.reload_interface",
-      "implementation": "partial",
+      "implementation": "complete",
       "kind": "method",
+      "notes": "The pinned Python method is a no-op; Rust provides additive runtime config reload.",
       "rust_surface": [
-        "reticulumd",
-        "reticulum-rs-rpc::RpcDaemon"
+        "reticulum-rs-rpc::reload_config"
       ],
       "source": "Reticulum.py"
     },
@@ -17601,29 +17593,27 @@
     {
       "evidence": [
         "unit",
-        "simulated",
         "pinned-python"
       ],
       "id": "RNS.Reticulum.Reticulum.resume_interface",
-      "implementation": "partial",
+      "implementation": "complete",
       "kind": "method",
+      "notes": "The pinned Python method is a no-op; Rust maps lifecycle mutation to typed interface replacement.",
       "rust_surface": [
-        "reticulumd",
-        "reticulum-rs-rpc::RpcDaemon"
+        "reticulum-rs-rpc::set_interfaces"
       ],
       "source": "Reticulum.py"
     },
     {
       "evidence": [
         "unit",
-        "simulated",
-        "pinned-python"
+        "simulated"
       ],
       "id": "RNS.Reticulum.Reticulum.rpc_loop",
-      "implementation": "partial",
+      "implementation": "complete",
       "kind": "method",
       "rust_surface": [
-        "reticulumd",
+        "reticulumd::rpc",
         "reticulum-rs-rpc::RpcDaemon"
       ],
       "source": "Reticulum.py"
@@ -17657,45 +17647,41 @@
     {
       "evidence": [
         "unit",
-        "simulated",
-        "pinned-python"
+        "simulated"
       ],
       "id": "RNS.Reticulum.Reticulum.sigint_handler",
-      "implementation": "partial",
+      "implementation": "complete",
       "kind": "method",
       "rust_surface": [
-        "reticulumd",
-        "reticulum-rs-rpc::RpcDaemon"
+        "reticulumd::main",
+        "reticulumd::announce_persistence"
       ],
       "source": "Reticulum.py"
     },
     {
       "evidence": [
         "unit",
-        "simulated",
-        "pinned-python"
+        "simulated"
       ],
       "id": "RNS.Reticulum.Reticulum.sigterm_handler",
-      "implementation": "partial",
+      "implementation": "complete",
       "kind": "method",
       "rust_surface": [
-        "reticulumd",
-        "reticulum-rs-rpc::RpcDaemon"
+        "reticulumd::main",
+        "reticulumd::announce_persistence"
       ],
       "source": "Reticulum.py"
     },
     {
       "evidence": [
         "unit",
-        "simulated",
         "pinned-python"
       ],
       "id": "RNS.Reticulum.Reticulum.transport_enabled",
-      "implementation": "partial",
+      "implementation": "complete",
       "kind": "method",
       "rust_surface": [
-        "reticulumd",
-        "reticulum-rs-rpc::RpcDaemon"
+        "reticulumd::config::DaemonConfig::reticulum_transport_enabled"
       ],
       "source": "Reticulum.py"
     },
@@ -17706,11 +17692,11 @@
         "pinned-python"
       ],
       "id": "RNS.Reticulum.Reticulum.unblackhole_identity",
-      "implementation": "partial",
+      "implementation": "complete",
       "kind": "method",
       "rust_surface": [
-        "reticulumd",
-        "reticulum-rs-rpc::RpcDaemon"
+        "reticulum-rs-rpc::RpcDaemon",
+        "reticulumd::bridge"
       ],
       "source": "Reticulum.py"
     },
@@ -23840,9 +23826,9 @@
     "includes": "public RNS/LXMF callables and committed manual product contracts"
   },
   "summary": {
-    "complete": 568,
+    "complete": 589,
     "not-applicable": 1,
-    "partial": 1096,
+    "partial": 1075,
     "total": 1665
   }
 }

@@ -100,6 +100,26 @@ impl PathLookupBridge for FailingPathLookupBridge {
     }
 }
 
+struct MutationPathLookupBridge;
+
+impl PathLookupBridge for MutationPathLookupBridge {
+    fn has_path(&self, _destination: &str) -> Result<bool, std::io::Error> {
+        Ok(true)
+    }
+
+    fn request_path(&self, _destination: &str) -> Result<(), std::io::Error> {
+        Ok(())
+    }
+
+    fn drop_path(&self, _destination: &str) -> Result<bool, std::io::Error> {
+        Ok(true)
+    }
+
+    fn drop_all_via(&self, _transport: &str) -> Result<usize, std::io::Error> {
+        Ok(3)
+    }
+}
+
 struct MetadataPathLookupBridge;
 
 impl PathLookupBridge for MetadataPathLookupBridge {
@@ -169,6 +189,25 @@ fn link_count_reports_missing_bridge() {
     let error = response.error.expect("missing bridge error");
     assert_eq!(error.code, "LINK_COUNT_UNAVAILABLE");
     assert!(response.result.is_none());
+}
+
+#[test]
+fn path_mutation_rpc_matches_python_drop_results() {
+    let daemon = RpcDaemon::test_instance();
+    daemon.set_path_lookup_bridge(Arc::new(MutationPathLookupBridge));
+    let destination = "00112233445566778899aabbccddeeff";
+
+    let dropped = daemon
+        .handle_rpc(rpc_request(14, "drop_path", json!({ "destination": destination })))
+        .expect("drop path response");
+    assert!(dropped.error.is_none());
+    assert_eq!(dropped.result, Some(json!({ "dropped": true })));
+
+    let dropped = daemon
+        .handle_rpc(rpc_request(15, "drop_all_via", json!({ "destination": destination })))
+        .expect("drop all via response");
+    assert!(dropped.error.is_none());
+    assert_eq!(dropped.result, Some(json!({ "dropped": 3 })));
 }
 
 #[test]

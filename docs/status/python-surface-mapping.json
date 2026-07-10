@@ -57,6 +57,105 @@
       "evidence": ["unit", "pinned-python"]
     },
     {
+      "pattern": "RNS.Reticulum.Reticulum.drop_path",
+      "implementation": "complete",
+      "rust_surface": ["reticulum-rs-rpc::drop_path", "reticulum-rs-transport::Transport::expire_path"],
+      "evidence": ["unit", "simulated", "pinned-python"]
+    },
+    {
+      "pattern": "RNS.Reticulum.Reticulum.drop_all_via",
+      "implementation": "complete",
+      "rust_surface": ["reticulum-rs-rpc::drop_all_via", "reticulum-rs-transport::Transport::expire_paths_via"],
+      "evidence": ["unit", "simulated", "pinned-python"]
+    },
+    {
+      "pattern": "RNS.Reticulum.Reticulum.rpc_loop",
+      "implementation": "complete",
+      "rust_surface": ["reticulumd::rpc", "reticulum-rs-rpc::RpcDaemon"],
+      "evidence": ["unit", "simulated"]
+    },
+    {
+      "pattern": "RNS.Reticulum.Reticulum.*blackhole_identity",
+      "implementation": "complete",
+      "rust_surface": ["reticulum-rs-rpc::RpcDaemon", "reticulumd::bridge"],
+      "evidence": ["unit", "simulated", "pinned-python"]
+    },
+    {
+      "pattern": "RNS.Reticulum.Reticulum.get_blackholed_identities",
+      "implementation": "complete",
+      "rust_surface": ["reticulum-rs-rpc::RpcDaemon"],
+      "evidence": ["unit", "simulated", "pinned-python"]
+    },
+    {
+      "pattern": "RNS.Reticulum.Reticulum.get_*hop*",
+      "implementation": "complete",
+      "rust_surface": ["reticulum-rs-rpc::path_status", "reticulum-rs-transport::transport"],
+      "evidence": ["unit", "simulated", "pinned-python"]
+    },
+    {
+      "pattern": "RNS.Reticulum.Reticulum.get_link_count",
+      "implementation": "complete",
+      "rust_surface": ["reticulum-rs-rpc::daemon_status_ex"],
+      "evidence": ["unit", "simulated", "pinned-python"]
+    },
+    {
+      "pattern": "RNS.Reticulum.Reticulum.get_interface_stats",
+      "implementation": "complete",
+      "rust_surface": ["reticulum-rs-rpc::daemon_status_ex", "rns-tools::rnstatus"],
+      "evidence": ["unit", "simulated", "pinned-python", "hardware-unverified"]
+    },
+    {
+      "pattern": "RNS.Reticulum.Reticulum.get_path_table",
+      "implementation": "complete",
+      "rust_surface": ["reticulum-rs-rpc::path_status", "reticulum-rs-transport::reticulum_path_store"],
+      "evidence": ["unit", "simulated", "pinned-python"]
+    },
+    {
+      "pattern": "RNS.Reticulum.Reticulum.*handler",
+      "implementation": "complete",
+      "rust_surface": ["reticulumd::main", "reticulumd::announce_persistence"],
+      "evidence": ["unit", "simulated"]
+    },
+    {
+      "pattern": "RNS.Reticulum.Reticulum.get_instance",
+      "implementation": "complete",
+      "rust_surface": ["reticulum-rs-rpc::RpcDaemon"],
+      "evidence": ["unit"]
+    },
+    {
+      "pattern": "RNS.Reticulum.Reticulum.get_rpc_client",
+      "implementation": "complete",
+      "rust_surface": ["lxmf-sdk::RpcBackendClient", "lxmf-sdk::ZmqPipelineBackendClient"],
+      "evidence": ["unit", "simulated"]
+    },
+    {
+      "pattern": "RNS.Reticulum.Reticulum.halt_interface",
+      "implementation": "complete",
+      "rust_surface": ["reticulum-rs-rpc::set_interfaces"],
+      "evidence": ["unit", "pinned-python"],
+      "notes": "The pinned Python method is a no-op; Rust maps lifecycle mutation to typed interface replacement."
+    },
+    {
+      "pattern": "RNS.Reticulum.Reticulum.resume_interface",
+      "implementation": "complete",
+      "rust_surface": ["reticulum-rs-rpc::set_interfaces"],
+      "evidence": ["unit", "pinned-python"],
+      "notes": "The pinned Python method is a no-op; Rust maps lifecycle mutation to typed interface replacement."
+    },
+    {
+      "pattern": "RNS.Reticulum.Reticulum.reload_interface",
+      "implementation": "complete",
+      "rust_surface": ["reticulum-rs-rpc::reload_config"],
+      "evidence": ["unit", "pinned-python"],
+      "notes": "The pinned Python method is a no-op; Rust provides additive runtime config reload."
+    },
+    {
+      "pattern": "RNS.Reticulum.Reticulum.transport_enabled",
+      "implementation": "complete",
+      "rust_surface": ["reticulumd::config::DaemonConfig::reticulum_transport_enabled"],
+      "evidence": ["unit", "pinned-python"]
+    },
+    {
       "pattern": "RNS.Reticulum.Reticulum.link_mtu_discovery",
       "implementation": "complete",
       "rust_surface": ["reticulumd::config::ReticulumRuntimePolicy"],

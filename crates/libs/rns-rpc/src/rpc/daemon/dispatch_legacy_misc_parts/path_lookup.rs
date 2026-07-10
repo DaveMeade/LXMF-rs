@@ -151,6 +151,48 @@ fn first_hop_timeout_from_status(status_fields: &JsonValue) -> f64 {
 }
 
 impl RpcDaemon {
+    fn handle_rpc_legacy_path_mutation(
+        &self,
+        request: RpcRequest,
+    ) -> Result<RpcResponse, std::io::Error> {
+        let params = request.params.ok_or_else(|| {
+            std::io::Error::new(std::io::ErrorKind::InvalidInput, "missing params")
+        })?;
+        let parsed: PathLookupParams = serde_json::from_value(params)
+            .map_err(|err| std::io::Error::new(std::io::ErrorKind::InvalidInput, err))?;
+        let destination = normalize_destination_hash_param(&parsed.destination)?;
+        let Some(bridge) = self
+            .path_lookup_bridge
+            .lock()
+            .expect("path_lookup_bridge mutex poisoned")
+            .clone()
+        else {
+            return Ok(RpcResponse {
+                id: request.id,
+                result: None,
+                error: Some(RpcError::new(
+                    "PATH_MUTATION_UNAVAILABLE",
+                    "path mutation bridge is not configured",
+                )),
+            });
+        };
+        let result = if request.method == "drop_path" {
+            bridge.drop_path(&destination).map(|dropped| json!({ "dropped": dropped }))
+        } else {
+            bridge
+                .drop_all_via(&destination)
+                .map(|dropped| json!({ "dropped": dropped }))
+        };
+        match result {
+            Ok(result) => Ok(RpcResponse { id: request.id, result: Some(result), error: None }),
+            Err(error) => Ok(RpcResponse {
+                id: request.id,
+                result: None,
+                error: Some(RpcError::new("PATH_MUTATION_FAILED", error.to_string())),
+            }),
+        }
+    }
+
     fn handle_rpc_legacy_path_metadata(
         &self,
         request: RpcRequest,

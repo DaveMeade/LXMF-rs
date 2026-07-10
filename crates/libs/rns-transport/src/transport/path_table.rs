@@ -73,6 +73,12 @@ impl PathTable {
         self.map.remove(destination).is_some()
     }
 
+    pub fn expire_paths_via(&mut self, transport: &AddressHash) -> usize {
+        let before = self.map.len();
+        self.map.retain(|_, entry| entry.received_from != *transport);
+        before.saturating_sub(self.map.len())
+    }
+
     pub fn mark_path_unresponsive(&mut self, destination: &AddressHash) -> bool {
         let Some(entry) = self.map.get_mut(destination) else {
             return false;

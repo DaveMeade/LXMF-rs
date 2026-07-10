@@ -36,7 +36,6 @@ impl RpcDaemon {
                         false
                     }
                 };
-
                 let body = parsed.uri.trim_start_matches("lxm://");
                 let destination = first_n_chars(body, 32).unwrap_or_default();
 
@@ -215,6 +214,7 @@ impl RpcDaemon {
             "next_hop" | "next_hop_if_name" | "first_hop_timeout" => {
                 self.handle_rpc_legacy_path_metadata(request)
             }
+            "drop_path" | "drop_all_via" => self.handle_rpc_legacy_path_mutation(request),
             "request_path" => {
                 let params = request.params.ok_or_else(|| {
                     std::io::Error::new(std::io::ErrorKind::InvalidInput, "missing params")

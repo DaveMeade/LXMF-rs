@@ -144,6 +144,32 @@ impl PathLookupBridge for DaemonPathLookupBridge {
         })
     }
 
+    fn drop_path(&self, destination: &str) -> Result<bool, std::io::Error> {
+        let destination = Self::destination_hash(destination)?;
+        self.run_transport(move |transport| {
+            let runtime = tokio::runtime::Builder::new_current_thread()
+                .enable_all()
+                .build()
+                .map_err(|err| {
+                    std::io::Error::other(format!("failed to build path mutation runtime: {err}"))
+                })?;
+            Ok(runtime.block_on(async move { transport.expire_path(&destination).await }))
+        })
+    }
+
+    fn drop_all_via(&self, transport_hash: &str) -> Result<usize, std::io::Error> {
+        let transport_hash = Self::destination_hash(transport_hash)?;
+        self.run_transport(move |transport| {
+            let runtime = tokio::runtime::Builder::new_current_thread()
+                .enable_all()
+                .build()
+                .map_err(|err| {
+                    std::io::Error::other(format!("failed to build path mutation runtime: {err}"))
+                })?;
+            Ok(runtime.block_on(async move { transport.expire_paths_via(&transport_hash).await }))
+        })
+    }
+
     fn link_count(&self) -> Result<usize, std::io::Error> {
         self.run_transport(move |transport| {
             let runtime = tokio::runtime::Builder::new_current_thread()

@@ -143,6 +143,14 @@ pub trait PathLookupBridge: Send + Sync {
         Err(std::io::Error::other("link count bridge is not configured"))
     }
 
+    fn drop_path(&self, _destination: &str) -> Result<bool, std::io::Error> {
+        Err(std::io::Error::other("path mutation bridge is not configured"))
+    }
+
+    fn drop_all_via(&self, _transport: &str) -> Result<usize, std::io::Error> {
+        Err(std::io::Error::other("path mutation bridge is not configured"))
+    }
+
     fn remove_paths_for_identity(&self, _identity: &str) -> Result<usize, std::io::Error> {
         Ok(0)
     }

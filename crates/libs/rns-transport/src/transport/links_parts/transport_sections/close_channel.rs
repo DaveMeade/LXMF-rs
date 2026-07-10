@@ -223,6 +223,14 @@ impl Transport {
         }
     }
 
+    pub async fn expire_path(&self, destination: &AddressHash) -> bool {
+        self.handler.lock().await.path_table.expire_path(destination)
+    }
+
+    pub async fn expire_paths_via(&self, transport: &AddressHash) -> usize {
+        self.handler.lock().await.path_table.expire_paths_via(transport)
+    }
+
     pub async fn expire_paths_for_identity(&self, identity: &AddressHash) -> usize {
         let destinations = {
             let handler = self.handler.lock().await;
