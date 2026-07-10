@@ -16,6 +16,7 @@ pub(super) enum InboundLxmfDestination {
 pub(super) async fn resolve_resource_destination(
     transport: &Transport,
     link_id: &AddressHash,
+    local_delivery_destination: Option<[u8; 16]>,
 ) -> Option<InboundLxmfDestination> {
     if let Some(link) = transport.find_in_link(link_id).await {
         let guard = link.lock().await;
@@ -25,7 +26,7 @@ pub(super) async fn resolve_resource_destination(
     }
     if let Some(link) = transport.find_out_link(link_id).await {
         let guard = link.lock().await;
-        return lxmf_destination_from_desc(guard.destination());
+        return destination_for_outbound_link(guard.destination(), local_delivery_destination);
     }
     None
 }
@@ -39,22 +40,50 @@ pub(super) async fn resolve_packet_destination(
 ) -> Option<InboundLxmfDestination> {
     match payload_mode {
         ReceivedPayloadMode::DestinationStripped => {
-            resolve_link_packet_destination(transport, destination).await.or_else(|| {
-                if propagation::is_lxmf_propagation_destination(destination, control) {
-                    Some(InboundLxmfDestination::Propagation)
-                } else {
-                    Some(InboundLxmfDestination::Delivery(destination_hash(destination)))
+            if let Some(resolved) = resolve_link_packet_destination(transport, destination).await {
+                return Some(resolved);
+            }
+            if let Some(link) = transport.find_out_link(destination).await {
+                let guard = link.lock().await;
+                if let Some(resolved) =
+                    destination_for_outbound_link(guard.destination(), local_delivery_destination)
+                {
+                    return Some(resolved);
                 }
-            })
+            }
+            if propagation::is_lxmf_propagation_destination(destination, control) {
+                Some(InboundLxmfDestination::Propagation)
+            } else {
+                Some(InboundLxmfDestination::Delivery(destination_hash(destination)))
+            }
         }
         ReceivedPayloadMode::FullWire => {
-            resolve_link_packet_destination(transport, destination).await.or_else(|| {
-                local_delivery_destination
-                    .filter(|local| local.as_slice() == destination.as_slice())
-                    .map(InboundLxmfDestination::Delivery)
-            })
+            if let Some(resolved) = resolve_link_packet_destination(transport, destination).await {
+                return Some(resolved);
+            }
+            if let Some(link) = transport.find_out_link(destination).await {
+                let guard = link.lock().await;
+                if let Some(resolved) =
+                    destination_for_outbound_link(guard.destination(), local_delivery_destination)
+                {
+                    return Some(resolved);
+                }
+            }
+            local_delivery_destination
+                .filter(|local| local.as_slice() == destination.as_slice())
+                .map(InboundLxmfDestination::Delivery)
         }
     }
+}
+
+fn destination_for_outbound_link(
+    remote_destination: &DestinationDesc,
+    local_delivery_destination: Option<[u8; 16]>,
+) -> Option<InboundLxmfDestination> {
+    if is_lxmf_delivery_destination(remote_destination) {
+        return local_delivery_destination.map(InboundLxmfDestination::Delivery);
+    }
+    lxmf_destination_from_desc(remote_destination)
 }
 
 async fn resolve_link_packet_destination(
@@ -128,8 +157,9 @@ fn is_lxmf_propagation_link_destination(destination: &DestinationDesc) -> bool {
 #[cfg(test)]
 mod tests {
     use super::{
-        is_lxmf_delivery_destination, is_lxmf_propagation_link_destination,
-        should_skip_resolved_control_payload, InboundLxmfDestination,
+        destination_for_outbound_link, is_lxmf_delivery_destination,
+        is_lxmf_propagation_link_destination, should_skip_resolved_control_payload,
+        InboundLxmfDestination,
     };
     use rand_core::OsRng;
     use rns_transport::destination::{DestinationDesc, DestinationName};
@@ -182,5 +212,21 @@ mod tests {
             InboundLxmfDestination::Propagation,
             Some(PacketContext::Request)
         ));
+    }
+
+    #[test]
+    fn outbound_delivery_link_backchannel_resolves_to_local_delivery_destination() {
+        let remote = PrivateIdentity::new_from_rand(OsRng);
+        let remote_destination = DestinationDesc {
+            identity: *remote.as_identity(),
+            address_hash: *remote.address_hash(),
+            name: DestinationName::new("lxmf", "delivery"),
+        };
+        let local_destination = [7_u8; 16];
+
+        assert_eq!(
+            destination_for_outbound_link(&remote_destination, Some(local_destination)),
+            Some(InboundLxmfDestination::Delivery(local_destination))
+        );
     }
 }

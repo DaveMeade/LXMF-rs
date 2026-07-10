@@ -49,6 +49,10 @@ pub(super) fn spawn_inbound_worker(
         direct_backchannel_links,
     );
     tokio::spawn(async move {
+        let local_delivery_destination = routing::local_delivery_destination_hash(
+            resource_control.delivery_destination.as_ref(),
+        )
+        .await;
         let mut rx = transport.resource_events();
         loop {
             if let Ok(event) = rx.recv().await {
@@ -57,6 +61,7 @@ pub(super) fn spawn_inbound_worker(
                         if let Some(destination) = routing::resolve_resource_destination(
                             transport.as_ref(),
                             &event.link_id,
+                            local_delivery_destination,
                         )
                         .await
                         {

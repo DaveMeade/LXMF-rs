@@ -50,9 +50,10 @@ Workspace paths are used for navigation. Published package names are
 - `rnx` delivery discovery now follows durable `list_announces` state instead
   of treating delivery destinations as propagation peers. Mesh probes enable
   Reticulum forwarding and require every node to observe every delivery
-  destination before exercising delivery. A reverse-direction four-node
-  direct-delivery storage miss remains visible through the bounded soak
-  failure allowance.
+  destination before exercising delivery. Full-wire packets and resources
+  received over outbound LXMF delivery links resolve to the local destination,
+  preserving bidirectional direct-backchannel delivery in two-node and
+  multi-hop mesh runs.
 
 ## Interface Detail
 
