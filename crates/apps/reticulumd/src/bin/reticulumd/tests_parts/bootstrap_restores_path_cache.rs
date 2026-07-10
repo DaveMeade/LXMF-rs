@@ -412,6 +412,30 @@ fn bootstrap_reports_path_table_restore_error_in_daemon_status() {
     assert_eq!(restore_status["error"].as_str(), Some("decode path table"));
 }
 
+#[test]
+fn bootstrap_reports_tunnel_table_restore_error_in_daemon_status() {
+    let temp = TempDir::new().expect("temp dir");
+    let db_path = temp.path().join("reticulum.db");
+    fs::write(temp.path().join("tunnels"), b"not-msgpack-tunnel-table")
+        .expect("write corrupt tunnel table");
+    let runtime =
+        tokio::runtime::Builder::new_current_thread().enable_all().build().expect("runtime");
+
+    let context = runtime.block_on(async {
+        bootstrap::bootstrap(test_args(
+            db_path.clone(),
+            None,
+            Some("127.0.0.1:0".to_string()),
+            false,
+        ))
+        .await
+    });
+
+    let restore_status = path_table_restore_runtime_status(&context.daemon);
+    assert_eq!(restore_status["status"].as_str(), Some("error"));
+    assert_eq!(restore_status["error"].as_str(), Some("decode tunnel table"));
+}
+
 fn append_corrupt_cache_path_row(
     storage_path: &std::path::Path,
     destination: AddressHash,
