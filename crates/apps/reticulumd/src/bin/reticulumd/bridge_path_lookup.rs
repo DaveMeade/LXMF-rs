@@ -102,12 +102,27 @@ impl PathLookupBridge for DaemonPathLookupBridge {
                 .map_err(|err| {
                     std::io::Error::other(format!("failed to build path status runtime: {err}"))
                 })?;
-            let status = runtime.block_on(async move { transport.path_status(&destination).await });
+            let status_transport = transport.clone();
+            let status =
+                runtime.block_on(async move { status_transport.path_status(&destination).await });
+            let (interface_bitrate, interface_mtu) = runtime.block_on(async {
+                let Some(interface) = status.interface else {
+                    return (None, None);
+                };
+                let manager = transport.iface_manager();
+                let manager = manager.lock().await;
+                let bitrate = manager.announce_pacing(&interface).map(|(bitrate, _)| bitrate);
+                let mtu = manager.mtu(&interface).map(|value| value as u64);
+                (bitrate, mtu)
+            });
             Ok(json!({
                 "destination_hash": Self::hash_hex(status.destination),
                 "path_found": status.path_found,
                 "next_hop": status.next_hop.map(Self::hash_hex),
                 "interface": status.interface.map(Self::hash_hex),
+                "interface_name": status.interface.map(Self::hash_hex),
+                "interface_bitrate": interface_bitrate,
+                "interface_mtu": interface_mtu,
                 "hops": status.hops,
             }))
         })

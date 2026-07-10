@@ -212,6 +212,9 @@ impl RpcDaemon {
                     }),
                 }
             }
+            "next_hop" | "next_hop_if_name" | "first_hop_timeout" => {
+                self.handle_rpc_legacy_path_metadata(request)
+            }
             "request_path" => {
                 let params = request.params.ok_or_else(|| {
                     std::io::Error::new(std::io::ErrorKind::InvalidInput, "missing params")

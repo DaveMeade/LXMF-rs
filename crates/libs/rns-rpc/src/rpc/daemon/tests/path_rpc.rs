@@ -116,6 +116,8 @@ impl PathLookupBridge for MetadataPathLookupBridge {
             "path_found": true,
             "next_hop": "8899aabbccddeeff0011223344556677",
             "interface": "fedcba98765432100123456789abcdef",
+            "interface_name": "if-test",
+            "interface_bitrate": 1_000.0,
             "hops": 2,
         }))
     }
@@ -188,6 +190,98 @@ fn path_status_preserves_bridge_route_metadata() {
     assert_eq!(result["next_hop"].as_str(), Some("8899aabbccddeeff0011223344556677"));
     assert_eq!(result["interface"].as_str(), Some("fedcba98765432100123456789abcdef"));
     assert_eq!(result["hops"].as_u64(), Some(2));
+}
+
+#[test]
+fn next_hop_rpc_reports_python_shared_instance_next_hop() {
+    let daemon = RpcDaemon::test_instance();
+    daemon.set_path_lookup_bridge(Arc::new(MetadataPathLookupBridge));
+
+    let response = daemon
+        .handle_rpc(rpc_request(
+            12,
+            "next_hop",
+            json!({ "destination_hash": "00112233445566778899aabbccddeeff" }),
+        ))
+        .expect("next hop response");
+
+    assert!(response.error.is_none());
+    let result = response.result.expect("next hop result");
+    assert_eq!(result["next_hop"].as_str(), Some("8899aabbccddeeff0011223344556677"));
+    assert_eq!(result["path_found"].as_bool(), Some(true));
+}
+
+#[test]
+fn next_hop_if_name_rpc_prefers_bridge_interface_name_like_python() {
+    let daemon = RpcDaemon::test_instance();
+    daemon.set_path_lookup_bridge(Arc::new(MetadataPathLookupBridge));
+
+    let response = daemon
+        .handle_rpc(rpc_request(
+            13,
+            "next_hop_if_name",
+            json!({ "destination_hash": "00112233445566778899aabbccddeeff" }),
+        ))
+        .expect("next hop interface response");
+
+    assert!(response.error.is_none());
+    let result = response.result.expect("next hop interface result");
+    assert_eq!(result["next_hop_if_name"].as_str(), Some("if-test"));
+}
+
+#[test]
+fn first_hop_timeout_rpc_uses_python_default_plus_interface_latency() {
+    let daemon = RpcDaemon::test_instance();
+    daemon.set_path_lookup_bridge(Arc::new(MetadataPathLookupBridge));
+
+    let response = daemon
+        .handle_rpc(rpc_request(
+            14,
+            "first_hop_timeout",
+            json!({ "destination_hash": "00112233445566778899aabbccddeeff" }),
+        ))
+        .expect("first hop timeout response");
+
+    assert!(response.error.is_none());
+    let result = response.result.expect("first hop timeout result");
+    assert_eq!(result["first_hop_timeout"].as_f64(), Some(10.0));
+}
+
+#[test]
+fn next_hop_rpc_reports_null_for_unknown_path_like_python() {
+    let daemon = RpcDaemon::test_instance();
+    daemon.set_path_lookup_bridge(Arc::new(RecordingPathLookupBridge::new(false)));
+
+    let response = daemon
+        .handle_rpc(rpc_request(
+            15,
+            "next_hop",
+            json!({ "destination_hash": "00112233445566778899aabbccddeeff" }),
+        ))
+        .expect("next hop response");
+
+    assert!(response.error.is_none());
+    let result = response.result.expect("next hop result");
+    assert_eq!(result["next_hop"], JsonValue::Null);
+    assert_eq!(result["path_found"].as_bool(), Some(false));
+}
+
+#[test]
+fn first_hop_timeout_rpc_returns_python_default_without_latency() {
+    let daemon = RpcDaemon::test_instance();
+    daemon.set_path_lookup_bridge(Arc::new(RecordingPathLookupBridge::new(false)));
+
+    let response = daemon
+        .handle_rpc(rpc_request(
+            16,
+            "first_hop_timeout",
+            json!({ "destination_hash": "00112233445566778899aabbccddeeff" }),
+        ))
+        .expect("first hop timeout response");
+
+    assert!(response.error.is_none());
+    let result = response.result.expect("first hop timeout result");
+    assert_eq!(result["first_hop_timeout"].as_f64(), Some(6.0));
 }
 
 #[test]
