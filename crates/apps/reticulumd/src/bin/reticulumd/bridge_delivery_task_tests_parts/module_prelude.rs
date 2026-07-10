@@ -1,5 +1,7 @@
 use super::*;
 
+use crate::bridge::delivery_task::PreparedDeliveryPayload;
+
 use rand_core::OsRng;
 
 use rns_rpc::{MessageRecord, MessagesStore};
