@@ -135,6 +135,11 @@ Scoped release evidence is split as follows:
   are persisted for daemon announce-identity lookup, and daemon status reports
   `_runtime.reticulum.path_table_restore.status` as `ok` or `error` so corrupt
   `destination_table` state remains observable without making startup fatal.
+  The same daemon status payload now exposes
+  `_runtime.reticulum.path_table_restore.skipped` counters for per-reason
+  active/tunnel restore skips, including unmapped interfaces, expired rows,
+  missing or invalid cached announces, mismatched cached destinations, duplicate
+  tunnel packet hashes, and identity conflicts.
 - Reticulum path-table persistence now writes only routes with cached announce
   material and restore hardens Python-format active and tunnel path-table rows
   by ignoring stale/expired path rows, so restart bootstrap cannot revive

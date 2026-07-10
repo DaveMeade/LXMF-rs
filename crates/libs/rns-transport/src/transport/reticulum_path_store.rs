@@ -1,5 +1,7 @@
 use super::*;
-use crate::transport::reticulum_announce_cache::{CachedAnnounce, ReticulumAnnounceCache};
+use crate::transport::reticulum_announce_cache::{
+    CachedAnnounce, CachedAnnounceRestore, ReticulumAnnounceCache,
+};
 use std::collections::{HashMap, HashSet};
 use std::io;
 use std::path::Path;
@@ -9,6 +11,23 @@ use std::time::{SystemTime, UNIX_EPOCH};
 pub struct ReticulumPathTableRestoreReport {
     pub restored_active_paths: usize,
     pub restored_identities: Vec<RestoredReticulumPathIdentity>,
+    pub skipped: ReticulumPathTableRestoreSkipped,
+}
+
+#[derive(Clone, Debug, Default, Eq, PartialEq)]
+pub struct ReticulumPathTableRestoreSkipped {
+    pub active_unmapped_interface: usize,
+    pub active_expired: usize,
+    pub active_missing_cached_announce: usize,
+    pub active_invalid_cached_announce: usize,
+    pub active_mismatched_cached_announce: usize,
+    pub active_identity_conflict: usize,
+    pub tunnel_duplicate_packet_hash: usize,
+    pub tunnel_expired: usize,
+    pub tunnel_missing_cached_announce: usize,
+    pub tunnel_invalid_cached_announce: usize,
+    pub tunnel_mismatched_cached_announce: usize,
+    pub tunnel_identity_conflict: usize,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -108,6 +127,8 @@ impl Transport {
         let now = std::time::Instant::now();
         let now_unix_secs = now_unix_secs();
 
+        let mut report = ReticulumPathTableRestoreReport::default();
+
         let path_entries = match tokio::fs::read(&path).await {
             Ok(payload) => PathTable::decode_python_entries(&payload)
                 .map_err(|_| io::Error::new(io::ErrorKind::InvalidData, "decode path table"))?,
@@ -120,6 +141,7 @@ impl Transport {
             let iface_manager = self.iface_manager.lock().await;
             for mut entry in path_entries {
                 let Some(iface) = iface_manager.address_for_full_hash(&entry.interface_hash) else {
+                    report.skipped.active_unmapped_interface += 1;
                     continue;
                 };
                 entry.iface = iface;
@@ -130,10 +152,26 @@ impl Transport {
         let mut path_candidates = Vec::new();
         for entry in mapped_entries {
             if python_path_entry_expired(&entry, now_unix_secs) {
+                report.skipped.active_expired += 1;
                 continue;
             }
-            if let Some(cached) = announce_cache.restore(entry.packet_hash).await? {
-                path_candidates.push(PathRestoreCandidate { entry, cached });
+            match announce_cache.restore_classified(entry.packet_hash).await? {
+                CachedAnnounceRestore::Restored(cached) => {
+                    let cached = *cached;
+                    if cached.packet.destination != entry.destination
+                        || cached.destination.desc.address_hash != entry.destination
+                    {
+                        report.skipped.active_mismatched_cached_announce += 1;
+                    } else {
+                        path_candidates.push(PathRestoreCandidate { entry, cached });
+                    }
+                }
+                CachedAnnounceRestore::Missing => {
+                    report.skipped.active_missing_cached_announce += 1;
+                }
+                CachedAnnounceRestore::Invalid => {
+                    report.skipped.active_invalid_cached_announce += 1;
+                }
             }
         }
 
@@ -145,7 +183,9 @@ impl Transport {
             Err(err) => return Err(err),
         };
         for tunnel in &mut tunnels {
+            let before = tunnel.paths.len();
             tunnel.paths.retain(|path| !python_tunnel_path_entry_expired(path, now_unix_secs));
+            report.skipped.tunnel_expired += before.saturating_sub(tunnel.paths.len());
         }
         tunnels.retain(|entry| !entry.paths.is_empty());
 
@@ -153,24 +193,34 @@ impl Transport {
         for tunnel in &tunnels {
             for path in &tunnel.paths {
                 if tunnel_announces.contains_key(&path.packet_hash) {
+                    report.skipped.tunnel_duplicate_packet_hash += 1;
                     continue;
                 }
-                if let Some(cached) = announce_cache.restore(path.packet_hash).await? {
-                    if cached.packet.destination != path.destination
-                        || cached.destination.desc.address_hash != path.destination
-                    {
-                        continue;
+                match announce_cache.restore_classified(path.packet_hash).await? {
+                    CachedAnnounceRestore::Restored(cached) => {
+                        let cached = *cached;
+                        if cached.packet.destination != path.destination
+                            || cached.destination.desc.address_hash != path.destination
+                        {
+                            report.skipped.tunnel_mismatched_cached_announce += 1;
+                            continue;
+                        }
+                        let iface = path
+                            .interface_hash
+                            .map(|hash| AddressHash::new_from_hash(&hash))
+                            .unwrap_or(path.destination);
+                        tunnel_announces.insert(path.packet_hash, (cached, iface));
                     }
-                    let iface = path
-                        .interface_hash
-                        .map(|hash| AddressHash::new_from_hash(&hash))
-                        .unwrap_or(path.destination);
-                    tunnel_announces.insert(path.packet_hash, (cached, iface));
+                    CachedAnnounceRestore::Missing => {
+                        report.skipped.tunnel_missing_cached_announce += 1;
+                    }
+                    CachedAnnounceRestore::Invalid => {
+                        report.skipped.tunnel_invalid_cached_announce += 1;
+                    }
                 }
             }
         }
 
-        let mut report = ReticulumPathTableRestoreReport::default();
         let mut handler = self.handler.lock().await;
 
         for candidate in path_candidates {
@@ -180,6 +230,7 @@ impl Transport {
                 &candidate.cached.destination,
                 candidate.entry.destination,
             ) {
+                report.skipped.active_identity_conflict += 1;
                 continue;
             }
             let dest_hash = candidate.cached.destination.desc.address_hash;
@@ -205,6 +256,7 @@ impl Transport {
                 &cached.destination,
                 cached.packet.destination,
             ) {
+                report.skipped.tunnel_identity_conflict += 1;
                 continue;
             }
             let dest_hash = cached.destination.desc.address_hash;

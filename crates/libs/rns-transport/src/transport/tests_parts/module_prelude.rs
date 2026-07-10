@@ -669,7 +669,11 @@ async fn reticulum_path_table_restore_skips_when_connected_to_shared_instance() 
     let restored_iface = *restored.iface_manager().lock().await.new_channel(16).address();
     assert_eq!(restored_iface, iface, "test relies on deterministic iface hashes");
 
-    assert_eq!(restored.restore_reticulum_path_table(temp.path()).await.expect("restore"), 0);
+    let restore_report = restored
+        .restore_reticulum_path_table_report(temp.path())
+        .await
+        .expect("restore");
+    assert_eq!(restore_report.restored_active_paths, 0);
     assert!(
         !restored.has_path(&destination).await,
         "shared-instance clients should not restore local path-table entries from storage"
@@ -718,7 +722,12 @@ async fn reticulum_path_table_restore_skips_expired_python_path_entries() {
     let restored_iface = *restored.iface_manager().lock().await.new_channel(16).address();
     assert_eq!(restored_iface, iface, "test relies on deterministic iface hashes");
 
-    assert_eq!(restored.restore_reticulum_path_table(temp.path()).await.expect("restore"), 0);
+    let restore_report = restored
+        .restore_reticulum_path_table_report(temp.path())
+        .await
+        .expect("restore");
+    assert_eq!(restore_report.restored_active_paths, 0);
+    assert_eq!(restore_report.skipped.active_expired, 1);
     assert!(
         !restored.has_path(&destination).await,
         "expired Python path-table entry must not restore stale route state"
@@ -940,7 +949,12 @@ async fn reticulum_tunnel_table_restore_skips_expired_python_tunnel_paths() {
         restored.iface_manager().lock().await.full_hash(&restored_iface).expect("iface hash");
     assert_eq!(restored_iface_hash, iface_hash, "test relies on deterministic iface hashes");
 
-    assert_eq!(restored.restore_reticulum_path_table(temp.path()).await.expect("restore"), 0);
+    let restore_report = restored
+        .restore_reticulum_path_table_report(temp.path())
+        .await
+        .expect("restore");
+    assert_eq!(restore_report.restored_active_paths, 0);
+    assert_eq!(restore_report.skipped.tunnel_expired, 1);
 
     let tunnel_synth =
         super::tunnels::synthesize_tunnel_packet(&tunnel_identity, restored_iface_hash);

@@ -68,7 +68,10 @@ mod reticulum_announce_cache;
 mod reticulum_path_store;
 mod tunnels;
 
-pub use reticulum_path_store::{RestoredReticulumPathIdentity, ReticulumPathTableRestoreReport};
+pub use reticulum_path_store::{
+    RestoredReticulumPathIdentity, ReticulumPathTableRestoreReport,
+    ReticulumPathTableRestoreSkipped,
+};
 
 pub mod test_bridge {
     use std::cell::RefCell;
