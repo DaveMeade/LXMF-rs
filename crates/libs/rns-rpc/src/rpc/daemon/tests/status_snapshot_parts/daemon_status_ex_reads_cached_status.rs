@@ -215,10 +215,93 @@ fn assert_status_snapshot_fields(result: &JsonValue) {
     assert_eq!(result["stamp_policy"]["target_cost"].as_u64(), Some(11));
     assert_eq!(result["stamp_policy"]["flexibility"].as_u64(), Some(3));
     assert_eq!(result["stamp_policy"]["enforce"].as_bool(), Some(true));
+    assert_eq!(result["reticulum"]["shared_instance"]["mode"].as_str(), Some("disabled"));
+    assert_eq!(
+        result["reticulum"]["shared_instance"]["share_instance"].as_bool(),
+        Some(false)
+    );
+    assert_eq!(
+        result["reticulum"]["shared_instance"]["is_shared_instance"].as_bool(),
+        Some(false)
+    );
+    assert_eq!(
+        result["reticulum"]["shared_instance"]["is_connected_to_shared_instance"].as_bool(),
+        Some(false)
+    );
     assert!(
         result["capabilities"].as_array().is_some_and(|values| values.iter().any(|value| value == "daemon_status_ex")),
         "status snapshot should include capability list: {result}"
     );
+}
+
+#[test]
+fn daemon_status_ex_reports_active_shared_instance_server() {
+    let daemon = RpcDaemon::test_instance();
+    daemon.replace_interfaces(vec![InterfaceRecord {
+        kind: "local".to_string(),
+        enabled: true,
+        host: Some("127.0.0.1".to_string()),
+        port: Some(37428),
+        name: Some("shared-instance".to_string()),
+        settings: Some(json!({
+            "shared_instance_type": "tcp",
+            "port": 37428,
+            "_runtime": {
+                "startup_status": "active",
+                "iface": "/00112233445566778899aabbccddeeff"
+            }
+        })),
+    }]);
+
+    let response = daemon
+        .handle_rpc(RpcRequest { id: 16, method: "daemon_status_ex".to_string(), params: None })
+        .expect("daemon status")
+        .result
+        .expect("daemon status result");
+    let shared = &response["reticulum"]["shared_instance"];
+
+    assert_eq!(shared["mode"].as_str(), Some("server"));
+    assert_eq!(shared["share_instance"].as_bool(), Some(true));
+    assert_eq!(shared["is_shared_instance"].as_bool(), Some(true));
+    assert_eq!(shared["is_connected_to_shared_instance"].as_bool(), Some(false));
+    assert_eq!(shared["shared_instance_type"].as_str(), Some("tcp"));
+    assert_eq!(shared["endpoint"].as_str(), Some("tcp://127.0.0.1:37428"));
+    assert_eq!(shared["interface_name"].as_str(), Some("shared-instance"));
+}
+
+#[test]
+fn daemon_status_ex_reports_attached_shared_instance_client() {
+    let daemon = RpcDaemon::test_instance();
+    daemon.replace_interfaces(vec![InterfaceRecord {
+        kind: "local_client".to_string(),
+        enabled: true,
+        host: None,
+        port: None,
+        name: Some("local-client".to_string()),
+        settings: Some(json!({
+            "shared_instance_type": "unix",
+            "socket_path": "/tmp/reticulum.sock",
+            "_runtime": {
+                "startup_status": "attached",
+                "iface": "/ffeeddccbbaa99887766554433221100"
+            }
+        })),
+    }]);
+
+    let response = daemon
+        .handle_rpc(RpcRequest { id: 17, method: "daemon_status_ex".to_string(), params: None })
+        .expect("daemon status")
+        .result
+        .expect("daemon status result");
+    let shared = &response["reticulum"]["shared_instance"];
+
+    assert_eq!(shared["mode"].as_str(), Some("client"));
+    assert_eq!(shared["share_instance"].as_bool(), Some(false));
+    assert_eq!(shared["is_shared_instance"].as_bool(), Some(false));
+    assert_eq!(shared["is_connected_to_shared_instance"].as_bool(), Some(true));
+    assert_eq!(shared["shared_instance_type"].as_str(), Some("unix"));
+    assert_eq!(shared["endpoint"].as_str(), Some("/tmp/reticulum.sock"));
+    assert_eq!(shared["interface_name"].as_str(), Some("local-client"));
 }
 
 #[test]

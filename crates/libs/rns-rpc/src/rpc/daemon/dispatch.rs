@@ -194,12 +194,66 @@ impl RpcDaemon {
             "message_count": message_count,
             "interface_count": snapshot.interfaces.len(),
             "interfaces": snapshot.interfaces,
+            "reticulum": {
+                "shared_instance": Self::shared_instance_status(&snapshot.interfaces),
+            },
             "delivery_policy": snapshot.delivery_policy,
             "propagation": snapshot.propagation,
             "stamp_policy": snapshot.stamp_policy,
             "delivery_pipeline": self.outbound_bridge.as_ref().and_then(|bridge| bridge.delivery_pipeline_status()),
             "capabilities": Self::capabilities(),
         }))
+    }
+
+    fn shared_instance_status(interfaces: &[InterfaceRecord]) -> JsonValue {
+        let mut selected: Option<(usize, &InterfaceRecord)> = None;
+        for record in interfaces {
+            let priority = shared_instance_priority(record);
+            if priority == 0 {
+                continue;
+            }
+            if selected.is_none_or(|(current, _)| priority > current) {
+                selected = Some((priority, record));
+            }
+        }
+
+        let Some((_priority, record)) = selected else {
+            return json!({
+                "mode": "disabled",
+                "share_instance": false,
+                "is_shared_instance": false,
+                "is_connected_to_shared_instance": false,
+                "shared_instance_type": JsonValue::Null,
+                "endpoint": JsonValue::Null,
+                "interface_name": JsonValue::Null,
+            });
+        };
+
+        let startup_status = interface_runtime_str(record, "startup_status");
+        let is_shared_instance = record.kind == "local" && startup_status == Some("active");
+        let is_connected_to_shared_instance = startup_status == Some("attached");
+        let configured = is_shared_instance_candidate(record);
+        let mode = if is_shared_instance {
+            "server"
+        } else if is_connected_to_shared_instance {
+            "client"
+        } else if configured {
+            "configured"
+        } else {
+            "disabled"
+        };
+        let shared_instance_type =
+            interface_setting_str(record, "shared_instance_type").unwrap_or("tcp");
+
+        json!({
+            "mode": mode,
+            "share_instance": is_shared_instance,
+            "is_shared_instance": is_shared_instance,
+            "is_connected_to_shared_instance": is_connected_to_shared_instance,
+            "shared_instance_type": shared_instance_type,
+            "endpoint": shared_instance_endpoint(record, shared_instance_type),
+            "interface_name": record.name.clone(),
+        })
     }
 
     pub(super) fn append_delivery_trace_to(
@@ -250,5 +304,65 @@ impl RpcDaemon {
 
     pub(super) fn append_delivery_trace(&self, message_id: &str, status: String) {
         Self::append_delivery_trace_to(&self.delivery_traces, message_id, status);
+    }
+}
+
+fn shared_instance_priority(record: &InterfaceRecord) -> usize {
+    if !is_shared_instance_candidate(record) {
+        return 0;
+    }
+
+    match interface_runtime_str(record, "startup_status") {
+        Some("active") if record.kind == "local" => 4,
+        Some("attached") => 3,
+        None if record.enabled => 2,
+        Some("failed") if record.enabled => 1,
+        _ => 0,
+    }
+}
+
+fn is_shared_instance_candidate(record: &InterfaceRecord) -> bool {
+    record.kind == "local" || record.kind == "local_client"
+}
+
+fn interface_runtime_str<'a>(record: &'a InterfaceRecord, key: &str) -> Option<&'a str> {
+    record
+        .settings
+        .as_ref()
+        .and_then(|settings| settings.get("_runtime"))
+        .and_then(|runtime| runtime.get(key))
+        .and_then(JsonValue::as_str)
+}
+
+fn interface_setting<'a>(record: &'a InterfaceRecord, key: &str) -> Option<&'a JsonValue> {
+    record.settings.as_ref().and_then(|settings| settings.get(key))
+}
+
+fn interface_setting_str<'a>(record: &'a InterfaceRecord, key: &str) -> Option<&'a str> {
+    interface_setting(record, key).and_then(JsonValue::as_str)
+}
+
+fn interface_setting_u64(record: &InterfaceRecord, key: &str) -> Option<u64> {
+    interface_setting(record, key).and_then(JsonValue::as_u64)
+}
+
+fn shared_instance_endpoint(record: &InterfaceRecord, shared_instance_type: &str) -> JsonValue {
+    match shared_instance_type {
+        "unix" => interface_setting_str(record, "socket_path")
+            .or_else(|| interface_setting_str(record, "instance_name"))
+            .map_or(JsonValue::Null, |endpoint| json!(endpoint)),
+        _ => {
+            let Some(port) =
+                record.port.map(u64::from).or_else(|| interface_setting_u64(record, "port"))
+            else {
+                return JsonValue::Null;
+            };
+            let host = record
+                .host
+                .as_deref()
+                .or_else(|| interface_setting_str(record, "host"))
+                .unwrap_or(if record.kind == "local" { "0.0.0.0" } else { "127.0.0.1" });
+            json!(format!("tcp://{host}:{port}"))
+        }
     }
 }
