@@ -523,6 +523,7 @@ fn select_tcp_server_bind_uses_single_enabled_interface_when_transport_not_set()
         display_name: None,
         announce_capabilities: Vec::new(),
         propagation_node: None,
+        panic_on_interface_error: false,
         interfaces: vec![InterfaceConfig {
             kind: "tcp_server".to_string(),
             enabled: Some(true),
@@ -546,6 +547,7 @@ fn select_tcp_server_bind_uses_single_backbone_listener_when_transport_not_set()
         display_name: None,
         announce_capabilities: Vec::new(),
         propagation_node: None,
+        panic_on_interface_error: false,
         interfaces: vec![InterfaceConfig {
             kind: "backbone".to_string(),
             enabled: Some(true),
@@ -593,6 +595,7 @@ fn select_tcp_server_bind_uses_single_local_listener_when_transport_not_set() {
         display_name: None,
         announce_capabilities: Vec::new(),
         propagation_node: None,
+        panic_on_interface_error: false,
         interfaces: vec![InterfaceConfig {
             kind: "local".to_string(),
             enabled: Some(true),
@@ -618,6 +621,7 @@ fn select_tcp_server_bind_ignores_unix_local_listener() {
         display_name: None,
         announce_capabilities: Vec::new(),
         propagation_node: None,
+        panic_on_interface_error: false,
         interfaces: vec![InterfaceConfig {
             kind: "local".to_string(),
             enabled: Some(true),
@@ -644,6 +648,7 @@ fn select_tcp_server_bind_attaches_local_listener_when_port_in_use() {
         display_name: None,
         announce_capabilities: Vec::new(),
         propagation_node: None,
+        panic_on_interface_error: false,
         interfaces: vec![InterfaceConfig {
             kind: "local".to_string(),
             enabled: Some(true),
@@ -671,6 +676,7 @@ fn select_tcp_server_bind_prefers_transport_override() {
         display_name: None,
         announce_capabilities: Vec::new(),
         propagation_node: None,
+        panic_on_interface_error: false,
         interfaces: vec![
             InterfaceConfig {
                 kind: "tcp_server".to_string(),
@@ -701,6 +707,7 @@ fn select_tcp_server_bind_rejects_multiple_enabled_servers_without_override() {
         display_name: None,
         announce_capabilities: Vec::new(),
         propagation_node: None,
+        panic_on_interface_error: false,
         interfaces: vec![
             InterfaceConfig {
                 kind: "tcp_server".to_string(),
@@ -733,6 +740,7 @@ fn select_tcp_server_bind_allows_implicit_shared_local_with_tcp_server() {
         display_name: None,
         announce_capabilities: Vec::new(),
         propagation_node: None,
+        panic_on_interface_error: false,
         interfaces: vec![
             InterfaceConfig {
                 kind: "tcp_server".to_string(),

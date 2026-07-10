@@ -886,6 +886,7 @@ fn filters_enabled_tcp_clients() {
         display_name: None,
         announce_capabilities: Vec::new(),
         propagation_node: None,
+        panic_on_interface_error: false,
         interfaces: vec![
             InterfaceConfig {
                 kind: "tcp_client".into(),
@@ -915,6 +916,7 @@ fn filters_enabled_tcp_servers_with_default_host() {
         display_name: None,
         announce_capabilities: Vec::new(),
         propagation_node: None,
+        panic_on_interface_error: false,
         interfaces: vec![
             InterfaceConfig {
                 kind: "tcp_server".into(),
