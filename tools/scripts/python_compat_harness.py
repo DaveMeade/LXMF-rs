@@ -69,6 +69,15 @@ LOCAL_CARGO_TEST_CASES = {
         "transport_policy_evidence",
         "announce_rebroadcast_policy_uses_learned_next_hop_mode_at_transport_boundary",
     ],
+    "rns_announce_rate_target_transport_policy": [
+        "cargo",
+        "test",
+        "-p",
+        "reticulumd",
+        "--test",
+        "transport_policy_evidence",
+        "announce_rate_target_suppresses_rebroadcast_after_grace_at_transport_boundary",
+    ],
     "rns_unknown_announce_ingress_policy": [
         "cargo",
         "test",

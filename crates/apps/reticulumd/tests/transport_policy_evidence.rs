@@ -3,7 +3,8 @@ use rns_transport::destination::{DestinationName, SingleInputDestination};
 use rns_transport::hash::{AddressHash, ADDRESS_HASH_SIZE};
 use rns_transport::identity::PrivateIdentity;
 use rns_transport::iface::{
-    IfaceRole, IfaceSource, InterfaceChannel, InterfaceMode, RxMessage, TxMessage, TxMessageType,
+    IfaceRole, IfaceSource, InterfaceChannel, InterfaceMode, InterfaceSharedConfig, RxMessage,
+    TxMessage, TxMessageType,
 };
 use rns_transport::packet::{HeaderType, Packet, PacketContext, PropagationType};
 use rns_transport::transport::{Transport, TransportConfig};
@@ -60,6 +61,14 @@ fn assert_no_tx(channel: &mut InterfaceChannel, label: &str) {
     );
 }
 
+async fn assert_no_tx_within(channel: &mut InterfaceChannel, label: &str, duration: Duration) {
+    assert!(
+        timeout(duration, channel.tx_channel.recv()).await.is_err(),
+        "{label} should not receive transport output"
+    );
+    assert_no_tx(channel, label);
+}
+
 fn assert_ordinary_rebroadcast(message: &TxMessage, source: &Packet, learned_iface: AddressHash) {
     assert!(matches!(
         message.tx_type,
@@ -105,6 +114,12 @@ async fn learn_remote_announce(
     let destination = announce.destination;
     feed_iface_packet(iface, announce.clone()).await;
     wait_for_known_path(transport, &destination).await;
+    announce
+}
+
+fn fresh_announce(destination: &mut SingleInputDestination, hops: u8) -> Packet {
+    let mut announce = destination.announce(OsRng, None).expect("valid announce");
+    announce.header.hops = hops;
     announce
 }
 
@@ -181,6 +196,58 @@ async fn announce_rebroadcast_policy_uses_learned_next_hop_mode_at_transport_bou
     assert_ordinary_rebroadcast(&full_rebroadcast, &boundary_announce, *learned_boundary.address());
     assert_no_tx(&mut learned_boundary, "learned boundary ingress");
     assert_no_tx(&mut blocked_roaming, "roaming with boundary learned next-hop");
+}
+
+#[tokio::test]
+async fn announce_rate_target_suppresses_rebroadcast_after_grace_at_transport_boundary() {
+    let transport = retransmitting_transport("transport-announce-rate-target");
+    let learned_iface = new_probe_iface_with_mode(&transport, InterfaceMode::Full).await;
+    let mut boundary_iface = new_probe_iface_with_mode(&transport, InterfaceMode::Boundary).await;
+    {
+        let manager = transport.iface_manager();
+        let mut manager = manager.lock().await;
+        assert!(manager.set_shared_config(
+            *learned_iface.address(),
+            InterfaceSharedConfig {
+                announce_rate_target: Some(1),
+                announce_rate_grace: Some(1),
+                announce_rate_penalty: Some(0),
+                ..Default::default()
+            },
+        ));
+    }
+    let mut remote_destination = SingleInputDestination::new(
+        PrivateIdentity::new_from_rand(OsRng),
+        DestinationName::new("lxmf", "announce-rate-target"),
+    );
+
+    let first_announce = fresh_announce(&mut remote_destination, 2);
+    let destination = first_announce.destination;
+    feed_iface_packet(&learned_iface, first_announce.clone()).await;
+    wait_for_known_path(&transport, &destination).await;
+    let first = recv_tx(&mut boundary_iface, "first announce-rate rebroadcast").await;
+    assert_ordinary_rebroadcast(&first, &first_announce, *learned_iface.address());
+
+    let second_announce = fresh_announce(&mut remote_destination, 2);
+    feed_iface_packet(&learned_iface, second_announce.clone()).await;
+    let second = recv_tx(&mut boundary_iface, "announce-rate rebroadcast within grace").await;
+    assert_ordinary_rebroadcast(&second, &second_announce, *learned_iface.address());
+
+    let third_announce = fresh_announce(&mut remote_destination, 2);
+    feed_iface_packet(&learned_iface, third_announce).await;
+    assert_no_tx_within(
+        &mut boundary_iface,
+        "announce-rate rebroadcast after grace exceeded",
+        Duration::from_millis(200),
+    )
+    .await;
+
+    tokio::time::sleep(Duration::from_millis(1_100)).await;
+
+    let recovered_announce = fresh_announce(&mut remote_destination, 2);
+    feed_iface_packet(&learned_iface, recovered_announce.clone()).await;
+    let recovered = recv_tx(&mut boundary_iface, "announce-rate rebroadcast after penalty").await;
+    assert_ordinary_rebroadcast(&recovered, &recovered_announce, *learned_iface.address());
 }
 
 #[tokio::test]

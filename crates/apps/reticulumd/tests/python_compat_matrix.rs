@@ -175,6 +175,12 @@ fn python_compat_rns_announce_rebroadcast_transport_policy() {
 }
 
 #[test]
+#[ignore = "runs deterministic local announce-rate policy evidence through the compatibility harness"]
+fn python_compat_rns_announce_rate_target_transport_policy() {
+    run_case("rns_announce_rate_target_transport_policy");
+}
+
+#[test]
 #[ignore = "runs deterministic local unknown-announce ingress policy evidence through the compatibility harness"]
 fn python_compat_rns_unknown_announce_ingress_policy() {
     run_case("rns_unknown_announce_ingress_policy");
