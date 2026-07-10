@@ -285,7 +285,6 @@ pub(crate) fn run_delivery_mode(
     request_id: &mut u64,
 ) -> io::Result<()> {
     let label = mode_label(mode);
-    let content = format!("hello from rnx e2e ({label})");
     let max_attempts = if matches!(mode, DeliveryMode::Direct) { 4 } else { 1 };
 
     for attempt in 1..=max_attempts {
@@ -298,22 +297,26 @@ pub(crate) fn run_delivery_mode(
         }
 
         let message_id = format!("e2e-{}-{}", label, timestamp_millis());
+        let content = format!("hello from rnx e2e ({label}; {message_id})");
         let params = build_mode_send_params(
             &message_id,
             sender_destination,
             receiver_destination,
-            &content,
+            content.as_str(),
             mode,
         );
         let response = rpc_call(sender_rpc, *request_id, "send_message_v2", Some(params))?;
         ensure_rpc_ok(response, format!("send_message_v2 ({label})").as_str())?;
         *request_id = (*request_id).wrapping_add(1);
 
-        let delivered = poll_for_inbound_content(receiver_rpc, &content, timeout, *request_id)?;
+        let delivered =
+            poll_for_inbound_content(receiver_rpc, content.as_str(), timeout, *request_id)?;
         if !delivered {
             let trace_statuses = delivery_trace_statuses(sender_rpc, &message_id, *request_id)
                 .unwrap_or_else(|_| Vec::new());
-            if attempt < max_attempts {
+            let transport_reported_delivery =
+                trace_statuses.iter().any(|status| status == "delivered");
+            if attempt < max_attempts && !transport_reported_delivery {
                 *request_id = (*request_id).wrapping_add(1);
                 std::thread::sleep(Duration::from_millis(2000));
                 continue;

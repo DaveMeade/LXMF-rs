@@ -8,7 +8,7 @@ use std::time::{Duration, Instant};
 
 use rns_rpc::e2e_harness::{
     build_daemon_args, build_http_post, build_rpc_frame, is_ready_line, parse_http_response_body,
-    parse_rpc_frame, peer_present,
+    parse_rpc_frame,
 };
 
 const RPC_RATE_LIMIT_BACKOFF: Duration = Duration::from_secs(5);
@@ -228,26 +228,6 @@ pub(crate) fn poll_for_inbound_content(
     }
 }
 
-pub(crate) fn poll_for_any_peer(
-    rpc: &str,
-    timeout: Duration,
-    mut request_id: u64,
-    exclude_peer: Option<&str>,
-) -> io::Result<Option<String>> {
-    let deadline = Instant::now() + timeout;
-    loop {
-        let response = rpc_call(rpc, request_id, "list_peers", None)?;
-        request_id = request_id.wrapping_add(1);
-        if let Some(peer) = first_peer(&response, exclude_peer) {
-            return Ok(Some(peer));
-        }
-        if Instant::now() >= deadline {
-            return Ok(None);
-        }
-        std::thread::sleep(Duration::from_millis(200));
-    }
-}
-
 pub(crate) fn poll_for_peer(
     rpc: &str,
     expected_peer: &str,
@@ -256,9 +236,9 @@ pub(crate) fn poll_for_peer(
 ) -> io::Result<bool> {
     let deadline = Instant::now() + timeout;
     loop {
-        let response = rpc_call(rpc, request_id, "list_peers", None)?;
+        let response = rpc_call(rpc, request_id, "list_announces", None)?;
         request_id = request_id.wrapping_add(1);
-        if peer_present(&response, expected_peer) {
+        if announced_destination_present(&response, expected_peer) {
             return Ok(true);
         }
         if Instant::now() >= deadline {
@@ -268,17 +248,17 @@ pub(crate) fn poll_for_peer(
     }
 }
 
-fn first_peer(response: &rns_rpc::RpcResponse, exclude_peer: Option<&str>) -> Option<String> {
-    let result = response.result.as_ref()?;
-    let peers = result.get("peers")?.as_array()?;
-    peers.iter().find_map(|entry| {
-        let candidate = entry.get("peer").and_then(|value| value.as_str())?;
-        if Some(candidate) == exclude_peer {
-            None
-        } else {
-            Some(candidate.to_owned())
-        }
-    })
+fn announced_destination_present(response: &rns_rpc::RpcResponse, peer: &str) -> bool {
+    response
+        .result
+        .as_ref()
+        .and_then(|result| result.get("announces"))
+        .and_then(|announces| announces.as_array())
+        .is_some_and(|announces| {
+            announces
+                .iter()
+                .any(|entry| entry.get("peer").and_then(|value| value.as_str()) == Some(peer))
+        })
 }
 
 fn parse_delivery_destination_hash(line: &str) -> Option<String> {
@@ -324,4 +304,29 @@ pub(crate) fn cleanup_child(child: &mut Child, keep: bool) {
     }
     let _ = child.kill();
     let _ = child.wait();
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use serde_json::json;
+
+    fn announce_response(peers: &[&str]) -> rns_rpc::RpcResponse {
+        rns_rpc::RpcResponse {
+            id: 1,
+            result: Some(json!({
+                "announces": peers.iter().map(|peer| json!({ "peer": peer })).collect::<Vec<_>>()
+            })),
+            error: None,
+        }
+    }
+
+    #[test]
+    fn announce_discovery_finds_delivery_destinations_without_propagation_peering() {
+        let response = announce_response(&["delivery-a", "delivery-b"]);
+
+        assert!(announced_destination_present(&response, "delivery-a"));
+        assert!(announced_destination_present(&response, "delivery-b"));
+        assert!(!announced_destination_present(&response, "delivery-c"));
+    }
 }

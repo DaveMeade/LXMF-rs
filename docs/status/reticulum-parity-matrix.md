@@ -47,6 +47,12 @@ Workspace paths are used for navigation. Published package names are
 - Shared-instance server/client/disabled state, final path-table flush, and
   path/tunnel restore skip accounting are visible through the daemon status
   surface and focused Rust regressions.
+- `rnx` delivery discovery now follows durable `list_announces` state instead
+  of treating delivery destinations as propagation peers. Mesh probes enable
+  Reticulum forwarding and require every node to observe every delivery
+  destination before exercising delivery. A reverse-direction four-node
+  direct-delivery storage miss remains visible through the bounded soak
+  failure allowance.
 
 ## Interface Detail
 

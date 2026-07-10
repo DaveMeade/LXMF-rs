@@ -7,7 +7,7 @@ use std::process::Command as ProcessCommand;
 use std::time::Duration;
 
 use crate::harness::{
-    cleanup_child, derive_preferred_transport_port, ensure_rpc_ok, poll_for_any_peer, reserve_port,
+    cleanup_child, derive_preferred_transport_port, ensure_rpc_ok, poll_for_peer, reserve_port,
     rpc_call, spawn_daemon, wait_for_ready,
 };
 use crate::DeliveryMode;
@@ -290,15 +290,21 @@ fn wait_for_mesh_peer_visibility(
     request_id: &mut u64,
 ) -> io::Result<()> {
     for node in node_processes {
-        let discovered =
-            poll_for_any_peer(&node.rpc, timeout, *request_id, Some(&node.destination_hash))?;
-        if discovered.is_none() {
-            return Err(io::Error::new(
-                io::ErrorKind::TimedOut,
-                "mesh propagation failed: a node did not discover any peer",
-            ));
+        for expected in node_processes {
+            if expected.destination_hash == node.destination_hash {
+                continue;
+            }
+            if !poll_for_peer(&node.rpc, &expected.destination_hash, timeout, *request_id)? {
+                return Err(io::Error::new(
+                    io::ErrorKind::TimedOut,
+                    format!(
+                        "mesh propagation failed: node {} did not discover destination {}",
+                        node.destination_hash, expected.destination_hash
+                    ),
+                ));
+            }
+            *request_id = (*request_id).wrapping_add(1);
         }
-        *request_id = (*request_id).wrapping_add(1);
     }
     Ok(())
 }
@@ -474,21 +480,4 @@ impl MeshRuntime {
     }
 }
 
-fn build_mesh_client_config(node_index: usize, transport_ports: &[u16]) -> String {
-    let node_count = transport_ports.len();
-    let next = (node_index + 1) % node_count;
-    let previous = (node_index + node_count - 1) % node_count;
-    let mut neighbors = vec![next];
-    if previous != next {
-        neighbors.push(previous);
-    }
-
-    let mut config = String::new();
-    for neighbor in neighbors {
-        config.push_str(&format!(
-            "[[interfaces]]\ntype = \"tcp_client\"\nenabled = true\nhost = \"127.0.0.1\"\nport = {}\n\n",
-            transport_ports[neighbor]
-        ));
-    }
-    config
-}
+include!("scenario_mesh_config.rs");

@@ -43,7 +43,11 @@ single-destination policy mutators alongside the broader Python convenience
 surface, reuses identified direct backchannels, preserves delivery-trace and
 opportunistic packet metadata, and resolves conversation display names from
 durable delivery announces even when delivery announces are intentionally not
-promoted to propagation peers.
+promoted to propagation peers. The `rnx` soak harness now discovers delivery
+destinations from that durable announce surface, enables transport forwarding
+for mesh nodes, and requires full-mesh destination visibility before delivery;
+the existing soak failure budget continues to capture the remaining
+reverse-direction four-node direct-delivery storage miss.
 
 ## v0.7.0 SDK-First Release Focus
 
