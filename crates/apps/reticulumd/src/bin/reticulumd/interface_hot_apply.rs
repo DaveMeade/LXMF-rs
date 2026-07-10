@@ -1,5 +1,6 @@
 use rns_rpc::{InterfaceMutationBridge, InterfaceRecord, RpcDaemon};
 use rns_transport::hash::AddressHash;
+use rns_transport::iface::pipe::{PipeInterface, PipeRuntimeStatusHandle};
 use rns_transport::iface::tcp_client::TcpClient;
 use rns_transport::iface::tcp_server::{TcpListenerRuntimeStatusHandle, TcpServer};
 use rns_transport::iface::udp::{UdpInterface, UdpRuntimeStatusHandle};
@@ -13,12 +14,18 @@ use tokio::sync::mpsc::{channel, error::TrySendError, Receiver, Sender};
 use crate::bootstrap::{
     mark_interface_runtime_fields, mark_interface_runtime_managed, mark_interface_startup_status,
 };
+#[cfg(test)]
+use interface_hot_apply_parts::pipe_runtime_refresh::refresh_hot_apply_pipe_runtime_status_once;
+use interface_hot_apply_parts::pipe_runtime_refresh::{
+    attach_hot_apply_pipe_runtime_status, spawn_hot_apply_pipe_runtime_status_refresher,
+    HotApplyPipeRefresh,
+};
 use interface_hot_apply_parts::record_hot_apply::{
     apply_record_runtime_config, hot_apply_interface_key, hot_apply_interface_record_changed,
     hot_apply_interface_seed_key as record_hot_apply_interface_seed_key, interface_record_mode,
-    mark_tcp_server_record_runtime_status, mark_udp_record_runtime_status, tcp_endpoint,
-    tcp_server_bind_addr, tcp_server_client_mtu, udp_bind_and_forward_addr,
-    validate_hot_apply_uniqueness,
+    mark_pipe_record_runtime_status, mark_tcp_server_record_runtime_status,
+    mark_udp_record_runtime_status, pipe_adapter, tcp_endpoint, tcp_server_bind_addr,
+    tcp_server_client_mtu, udp_bind_and_forward_addr, validate_hot_apply_uniqueness,
 };
 #[cfg(test)]
 use interface_hot_apply_parts::tcp_runtime_refresh::refresh_hot_apply_tcp_listener_runtime_status_once;
@@ -43,9 +50,37 @@ pub(super) struct InterfaceHotApplyBridge {
     tcp_listener_refreshes: Arc<StdMutex<HashMap<String, HotApplyTcpListenerRefresh>>>,
     #[cfg(test)]
     udp_refreshes: Arc<StdMutex<HashMap<String, HotApplyUdpRefresh>>>,
+    #[cfg(test)]
+    pipe_refreshes: Arc<StdMutex<HashMap<String, HotApplyPipeRefresh>>>,
 }
 
 const INTERFACE_HOT_APPLY_QUEUE_CAPACITY: usize = 64;
+
+#[derive(Clone)]
+struct HotApplyRuntimeRefreshes {
+    tcp_listeners: Arc<StdMutex<HashMap<String, HotApplyTcpListenerRefresh>>>,
+    udp: Arc<StdMutex<HashMap<String, HotApplyUdpRefresh>>>,
+    pipe: Arc<StdMutex<HashMap<String, HotApplyPipeRefresh>>>,
+}
+
+impl HotApplyRuntimeRefreshes {
+    fn new() -> Self {
+        Self {
+            tcp_listeners: Arc::new(StdMutex::new(HashMap::new())),
+            udp: Arc::new(StdMutex::new(HashMap::new())),
+            pipe: Arc::new(StdMutex::new(HashMap::new())),
+        }
+    }
+
+    fn spawn_refreshers(&self, daemon: Weak<RpcDaemon>) {
+        spawn_hot_apply_tcp_listener_runtime_status_refresher(
+            daemon.clone(),
+            self.tcp_listeners.clone(),
+        );
+        spawn_hot_apply_udp_runtime_status_refresher(daemon.clone(), self.udp.clone());
+        spawn_hot_apply_pipe_runtime_status_refresher(daemon, self.pipe.clone());
+    }
+}
 
 impl InterfaceHotApplyBridge {
     #[cfg(test)]
@@ -80,30 +115,26 @@ impl InterfaceHotApplyBridge {
         daemon: Option<Weak<RpcDaemon>>,
     ) -> Self {
         let (tx, rx) = channel(INTERFACE_HOT_APPLY_QUEUE_CAPACITY);
-        let tcp_listener_refreshes = Arc::new(StdMutex::new(HashMap::new()));
-        let udp_refreshes = Arc::new(StdMutex::new(HashMap::new()));
+        let refreshes = HotApplyRuntimeRefreshes::new();
         if let Some(daemon) = daemon.clone() {
-            spawn_hot_apply_tcp_listener_runtime_status_refresher(
-                daemon.clone(),
-                tcp_listener_refreshes.clone(),
-            );
-            spawn_hot_apply_udp_runtime_status_refresher(daemon, udp_refreshes.clone());
+            refreshes.spawn_refreshers(daemon);
         }
         tokio::spawn(run_interface_mutation_worker(
             iface_manager,
             rx,
             seeded,
             transport.clone(),
-            tcp_listener_refreshes.clone(),
-            udp_refreshes.clone(),
+            refreshes.clone(),
             daemon,
         ));
         Self {
             tx,
             #[cfg(test)]
-            tcp_listener_refreshes,
+            tcp_listener_refreshes: refreshes.tcp_listeners,
             #[cfg(test)]
-            udp_refreshes,
+            udp_refreshes: refreshes.udp,
+            #[cfg(test)]
+            pipe_refreshes: refreshes.pipe,
         }
     }
 }
@@ -118,7 +149,7 @@ impl InterfaceMutationBridge for InterfaceHotApplyBridge {
             .iter()
             .cloned()
             .map(|mut record| {
-                if matches!(record.kind.as_str(), "tcp_client" | "tcp_server" | "udp")
+                if matches!(record.kind.as_str(), "tcp_client" | "tcp_server" | "udp" | "pipe")
                     && record.enabled
                 {
                     mark_interface_startup_status(&mut record, "spawned", None, None);
@@ -127,6 +158,7 @@ impl InterfaceMutationBridge for InterfaceHotApplyBridge {
                     match record.kind.as_str() {
                         "tcp_server" => mark_tcp_server_record_runtime_status(&mut record, None),
                         "udp" => mark_udp_record_runtime_status(&mut record, None),
+                        "pipe" => mark_pipe_record_runtime_status(&mut record, None),
                         _ => {}
                     }
                 }
@@ -163,8 +195,7 @@ async fn run_interface_mutation_worker(
     mut rx: Receiver<InterfaceHotApplyCommand>,
     seeded: Vec<(String, InterfaceRecord, AddressHash)>,
     transport: Option<Arc<Transport>>,
-    tcp_listener_refreshes: Arc<StdMutex<HashMap<String, HotApplyTcpListenerRefresh>>>,
-    udp_refreshes: Arc<StdMutex<HashMap<String, HotApplyUdpRefresh>>>,
+    refreshes: HotApplyRuntimeRefreshes,
     daemon: Option<Weak<RpcDaemon>>,
 ) {
     let mut managed = seeded
@@ -180,8 +211,7 @@ async fn run_interface_mutation_worker(
                     &mut managed,
                     interfaces,
                     transport.as_ref(),
-                    &tcp_listener_refreshes,
-                    &udp_refreshes,
+                    &refreshes,
                     daemon.as_ref(),
                 )
                 .await;
@@ -195,8 +225,7 @@ async fn apply_hot_apply_interface_records(
     managed: &mut HashMap<String, ManagedHotApplyInterface>,
     interfaces: Vec<InterfaceRecord>,
     transport: Option<&Arc<Transport>>,
-    tcp_listener_refreshes: &Arc<StdMutex<HashMap<String, HotApplyTcpListenerRefresh>>>,
-    udp_refreshes: &Arc<StdMutex<HashMap<String, HotApplyUdpRefresh>>>,
+    refreshes: &HotApplyRuntimeRefreshes,
     daemon: Option<&Weak<RpcDaemon>>,
 ) {
     let desired = interfaces
@@ -218,11 +247,13 @@ async fn apply_hot_apply_interface_records(
         };
         if should_remove {
             if let Some(current) = managed.remove(&key) {
-                tcp_listener_refreshes
+                refreshes
+                    .tcp_listeners
                     .lock()
                     .expect("tcp listener refresh mutex poisoned")
                     .remove(&key);
-                udp_refreshes.lock().expect("udp refresh mutex poisoned").remove(&key);
+                refreshes.udp.lock().expect("udp refresh mutex poisoned").remove(&key);
+                refreshes.pipe.lock().expect("pipe refresh mutex poisoned").remove(&key);
                 stop_hot_apply_interface(iface_manager, transport, current.address).await;
             }
         }
@@ -244,7 +275,8 @@ async fn apply_hot_apply_interface_records(
             match runtime_status {
                 Some(HotApplyRuntimeStatus::TcpListener(status)) => {
                     attach_hot_apply_tcp_listener_runtime_status(daemon, &record, address, &status);
-                    tcp_listener_refreshes
+                    refreshes
+                        .tcp_listeners
                         .lock()
                         .expect("tcp listener refresh mutex poisoned")
                         .insert(
@@ -261,9 +293,20 @@ async fn apply_hot_apply_interface_records(
                         status.iface = Some(address.to_string());
                     });
                     attach_hot_apply_udp_runtime_status(daemon, &record, address, &status);
-                    udp_refreshes.lock().expect("udp refresh mutex poisoned").insert(
+                    refreshes.udp.lock().expect("udp refresh mutex poisoned").insert(
                         key.clone(),
                         HotApplyUdpRefresh {
+                            record: record.clone(),
+                            runtime_iface: address,
+                            status,
+                        },
+                    );
+                }
+                Some(HotApplyRuntimeStatus::Pipe(status)) => {
+                    attach_hot_apply_pipe_runtime_status(daemon, &record, address, &status);
+                    refreshes.pipe.lock().expect("pipe refresh mutex poisoned").insert(
+                        key.clone(),
+                        HotApplyPipeRefresh {
                             record: record.clone(),
                             runtime_iface: address,
                             status,
@@ -280,6 +323,7 @@ async fn apply_hot_apply_interface_records(
 enum HotApplyRuntimeStatus {
     TcpListener(TcpListenerRuntimeStatusHandle),
     Udp(UdpRuntimeStatusHandle),
+    Pipe(PipeRuntimeStatusHandle),
 }
 
 pub(super) fn hot_apply_interface_seed_key(record: &InterfaceRecord) -> Option<String> {
@@ -356,6 +400,23 @@ async fn spawn_hot_apply_interface(
                     Some(HotApplyRuntimeStatus::Udp(status)),
                 )
             }
+        }
+        "pipe" => {
+            let adapter = match pipe_adapter(record) {
+                Ok(adapter) => adapter,
+                Err(error) => {
+                    log::warn!("[daemon] hot-apply pipe rejected invalid command: {error}");
+                    return None;
+                }
+            };
+            let status = adapter.runtime_status_handle();
+            let address = iface_manager.lock().await.spawn_as_with_mode(
+                adapter,
+                PipeInterface::spawn,
+                IfaceRole::Unicast,
+                mode,
+            );
+            (address, Some(HotApplyRuntimeStatus::Pipe(status)))
         }
         _ => return None,
     };

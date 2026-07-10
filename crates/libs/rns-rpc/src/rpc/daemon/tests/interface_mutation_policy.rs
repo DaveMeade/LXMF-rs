@@ -46,6 +46,17 @@
         iface
     }
 
+    fn pipe_interface(name: &str, command: &str) -> InterfaceRecord {
+        InterfaceRecord {
+            kind: "pipe".to_string(),
+            enabled: true,
+            host: None,
+            port: None,
+            name: Some(name.to_string()),
+            settings: Some(json!({ "command": command })),
+        }
+    }
+
     struct RecordingInterfaceMutationBridge {
         applied: std::sync::Mutex<Vec<Vec<InterfaceRecord>>>,
     }

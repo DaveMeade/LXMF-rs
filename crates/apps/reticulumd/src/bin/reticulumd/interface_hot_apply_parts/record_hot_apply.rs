@@ -1,10 +1,12 @@
 use rns_rpc::InterfaceRecord;
 use rns_transport::hash::AddressHash;
+use rns_transport::iface::pipe::PipeInterface;
 use rns_transport::iface::{InterfaceManager, InterfaceMode};
 use std::io;
+use std::time::Duration;
 
 use super::record_settings::interface_record_shared_config;
-use super::record_settings::{setting_bool, setting_str, setting_u64};
+use super::record_settings::{setting_bool, setting_f64, setting_str, setting_u64};
 
 pub(crate) fn validate_hot_apply_uniqueness(
     interfaces: &[InterfaceRecord],
@@ -59,6 +61,9 @@ pub(crate) fn validate_hot_apply_uniqueness(
                 ));
             }
         }
+        if record.kind == "pipe" && record.enabled {
+            pipe_adapter(record)?;
+        }
         let Some(key) = hot_apply_interface_key(record) else {
             continue;
         };
@@ -77,6 +82,7 @@ pub(crate) fn hot_apply_interface_key(record: &InterfaceRecord) -> Option<String
         "tcp_client" => tcp_interface_key(record),
         "tcp_server" => tcp_server_interface_key(record),
         "udp" => udp_interface_key(record),
+        "pipe" => pipe_interface_key(record),
         _ => None,
     }
 }
@@ -105,6 +111,12 @@ pub(crate) fn hot_apply_interface_seed_key(record: &InterfaceRecord) -> Option<S
         "udp" => {
             udp_bind_and_forward_addr(record).ok()?;
             udp_interface_key(record)
+        }
+        "pipe" => {
+            if record.enabled {
+                pipe_adapter(record).ok()?;
+            }
+            pipe_interface_key(record)
         }
         _ => None,
     }
@@ -147,6 +159,8 @@ pub(crate) fn hot_apply_interface_record_changed(
         || (current.kind == "tcp_server"
             && tcp_server_client_mtu(current) != tcp_server_client_mtu(next))
         || (current.kind == "udp" && udp_forward_addr(current) != udp_forward_addr(next))
+        || (current.kind == "pipe"
+            && pipe_runtime_signature(current) != pipe_runtime_signature(next))
 }
 
 pub(crate) fn tcp_endpoint(record: &InterfaceRecord) -> Option<String> {
@@ -317,6 +331,77 @@ pub(crate) fn mark_tcp_server_record_runtime_status(
             );
         });
     }
+}
+
+pub(crate) fn pipe_interface_key(record: &InterfaceRecord) -> Option<String> {
+    if record.kind != "pipe" {
+        return None;
+    }
+    if let Some(name) =
+        record.name.as_ref().map(|value| value.trim()).filter(|value| !value.is_empty())
+    {
+        return Some(name.to_string());
+    }
+    pipe_command(record).ok()
+}
+
+pub(crate) fn pipe_adapter(record: &InterfaceRecord) -> Result<PipeInterface, io::Error> {
+    let command = pipe_command(record)?;
+    PipeInterface::parse_command(command.as_str()).map_err(|err| {
+        io::Error::new(io::ErrorKind::InvalidInput, format!("pipe hot-apply {err}"))
+    })?;
+    let respawn_delay = pipe_respawn_delay(record)?;
+    Ok(PipeInterface::new(command)
+        .with_respawn_delay(respawn_delay)
+        .with_mtu(pipe_mtu(record).unwrap_or(PipeInterface::DEFAULT_MTU)))
+}
+
+pub(crate) fn mark_pipe_record_runtime_status(
+    record: &mut InterfaceRecord,
+    runtime_iface: Option<AddressHash>,
+) {
+    let Ok(adapter) = pipe_adapter(record) else {
+        return;
+    };
+    let iface = runtime_iface.map(|value| value.to_string());
+    crate::bootstrap::with_interface_runtime_metadata(record, |runtime| {
+        runtime.insert(
+            "pipe".to_string(),
+            serde_json::json!({
+                "status": adapter.runtime_status_json(),
+                "mtu": adapter.mtu_value(),
+                "iface": iface,
+            }),
+        );
+    });
+}
+
+fn pipe_runtime_signature(record: &InterfaceRecord) -> Option<(String, u64, usize)> {
+    let command = pipe_command(record).ok()?;
+    let respawn_millis = u64::try_from(pipe_respawn_delay(record).ok()?.as_millis()).ok()?;
+    let mtu = pipe_mtu(record).unwrap_or(PipeInterface::DEFAULT_MTU).max(256);
+    Some((command, respawn_millis, mtu))
+}
+
+fn pipe_command(record: &InterfaceRecord) -> Result<String, io::Error> {
+    setting_str(record, "command").map(ToOwned::to_owned).ok_or_else(|| {
+        io::Error::new(io::ErrorKind::InvalidInput, "pipe hot-apply requires command")
+    })
+}
+
+fn pipe_respawn_delay(record: &InterfaceRecord) -> Result<Duration, io::Error> {
+    let delay = setting_f64(record, "respawn_delay").unwrap_or(5.0);
+    if delay < 0.0 || !delay.is_finite() {
+        return Err(io::Error::new(
+            io::ErrorKind::InvalidInput,
+            "pipe hot-apply respawn_delay must be finite and >= 0",
+        ));
+    }
+    Ok(Duration::from_secs_f64(delay))
+}
+
+fn pipe_mtu(record: &InterfaceRecord) -> Option<usize> {
+    setting_u64(record, "mtu").and_then(|value| usize::try_from(value).ok())
 }
 
 fn host_is_multicast(host: &str) -> bool {
