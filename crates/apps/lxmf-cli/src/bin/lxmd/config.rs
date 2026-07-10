@@ -190,6 +190,7 @@ fn apply_single_toml_config(
     if let Some(rpc) = config.rpc.listen {
         effective.rpc = rpc;
     }
+    let enable_transport = config.transport.listen.is_some();
     if let Some(transport) = config.transport.listen {
         effective.transport = Some(transport);
     }
@@ -231,7 +232,11 @@ fn apply_single_toml_config(
     effective.python_compat.delivery_transfer_max_kb =
         config.lxmf.delivery_transfer_max_accepted_size;
 
-    write_generated_reticulumd_config(paths.generated_rnsconfig.as_path(), &config.interfaces)?;
+    write_generated_reticulumd_config(
+        paths.generated_rnsconfig.as_path(),
+        &config.interfaces,
+        enable_transport,
+    )?;
     Ok(())
 }
 
@@ -246,8 +251,9 @@ fn resolve_config_path(value: Option<&Path>, config_path: &Path, default: &Path)
 pub(crate) fn write_generated_reticulumd_config(
     output_path: &Path,
     interfaces: &[crate::SingleTomlInterface],
+    enable_transport: bool,
 ) -> Result<(), String> {
-    let mut output = String::new();
+    let mut output = format!("[reticulum]\nenable_transport = {enable_transport}\n\n");
     for interface in interfaces {
         if !interface.enabled {
             continue;

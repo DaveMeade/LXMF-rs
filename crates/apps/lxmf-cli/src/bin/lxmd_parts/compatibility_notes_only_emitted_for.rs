@@ -199,6 +199,7 @@ port = 4242
         let generated = temp.path().join(super::GENERATED_RETICULUMD_CONFIG);
         let generated_contents =
             fs::read_to_string(&generated).expect("generated reticulum config");
+        assert!(generated_contents.contains("enable_transport = true"));
         assert!(generated_contents.contains("host = \"rmap.world\""));
         assert!(generated_contents.contains("port = 4242"));
     }

@@ -14,10 +14,16 @@ pub(crate) fn apply_python_config_file(
         .map_err(|err| format!("failed to read {}: {err}", paths.config_file.display()))?;
     let sections = parse_python_lxmd_config(&contents);
     let interfaces = parse_python_reticulum_interfaces(&contents);
-    if !interfaces.is_empty() {
+    let enable_transport = sections
+        .get("reticulum")
+        .and_then(|reticulum| reticulum.get("enable_transport"))
+        .and_then(|value| parse_python_bool(value).ok().flatten())
+        .unwrap_or(false);
+    if !interfaces.is_empty() || enable_transport {
         super::config::write_generated_reticulumd_config(
             paths.generated_rnsconfig.as_path(),
             &interfaces,
+            enable_transport,
         )?;
         effective.rnsconfig = Some(paths.generated_rnsconfig.clone());
     }
