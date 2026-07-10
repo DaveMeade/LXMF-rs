@@ -147,6 +147,9 @@ Scoped release evidence is split as follows:
   material and restore hardens Python-format active and tunnel path-table rows
   by ignoring stale/expired path rows, so restart bootstrap cannot revive
   resolver routes without usable identity/cache material.
+- Graceful `reticulumd` shutdown now forces a final Reticulum path-table
+  persistence pass, so recently learned announce/path state does not rely on
+  the debounce worker firing before process exit.
 - Reticulum path-table restore now treats active and tunnel path-table rows
   with missing cached announce files, active and tunnel path-table rows with
   malformed cached announce files, and active/tunnel rows whose cached announce

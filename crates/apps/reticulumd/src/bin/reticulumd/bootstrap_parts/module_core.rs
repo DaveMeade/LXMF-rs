@@ -14,6 +14,8 @@ use crate::bridge_rnode_management::{
 };
 use crate::bridge_weave_control::{DaemonWeaveControlBinding, DaemonWeaveDisplayControlBridge};
 
+use crate::announce_persistence::PathTablePersistenceContext;
+
 use rns_rpc::{
     AnnounceBridge, InterfaceRecord, MessagesStore, OutboundBridge, RemoteControlBridge,
     RpcDaemon, RpcRequest,
@@ -62,6 +64,7 @@ pub(super) struct BootstrapContext {
     pub(super) rpc_unix: Option<PathBuf>,
     pub(super) daemon: Arc<RpcDaemon>,
     pub(super) rpc_tls: Option<RpcTlsConfig>,
+    pub(super) path_table_persistence: Option<PathTablePersistenceContext>,
 }
 
 const RECEIPT_EVENT_QUEUE_CAPACITY: usize = 1024;
@@ -440,7 +443,12 @@ pub(super) async fn bootstrap(args: Args) -> BootstrapContext {
         let _handle = daemon.clone().start_announce_scheduler_shared(args.announce_interval_secs);
     }
 
+    let mut path_table_persistence = None;
     if let Some(transport) = transport {
+        path_table_persistence = Some(PathTablePersistenceContext::new(
+            transport.clone(),
+            reticulum_storage_path.clone(),
+        ));
         spawn_inbound_worker(
             daemon.clone(),
             transport.clone(),
@@ -461,7 +469,7 @@ pub(super) async fn bootstrap(args: Args) -> BootstrapContext {
         spawn_announce_worker(daemon.clone(), transport, peer_crypto, Some(reticulum_storage_path));
     }
 
-    BootstrapContext { rpc_addr, rpc_unix, daemon, rpc_tls }
+    BootstrapContext { rpc_addr, rpc_unix, daemon, rpc_tls, path_table_persistence }
 }
 
 fn record_restored_path_identities(

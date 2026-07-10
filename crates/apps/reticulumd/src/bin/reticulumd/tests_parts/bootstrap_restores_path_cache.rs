@@ -1,4 +1,83 @@
 #[test]
+fn shutdown_flushes_reticulum_path_table_without_debounce_wait() {
+    let temp = TempDir::new().expect("temp dir");
+    let signer = PrivateIdentity::new_from_name("shutdown-path-table-flush");
+    let runtime =
+        tokio::runtime::Builder::new_current_thread().enable_all().build().expect("runtime");
+
+    runtime.block_on(async {
+        let transport_identity =
+            rns_transport::identity_bridge::to_transport_private_identity(&signer);
+        let mut config =
+            TransportConfig::new("shutdown-path-table-flush", &transport_identity, true);
+        config.set_retransmit(true);
+        let transport = Arc::new(Transport::new(config));
+        let iface_channel = transport.iface_manager().lock().await.new_channel(16);
+        let iface = *iface_channel.address();
+
+        let remote_identity =
+            rns_transport::identity::PrivateIdentity::new_from_rand(rand_core::OsRng);
+        let mut remote_destination = rns_transport::destination::SingleInputDestination::new(
+            remote_identity,
+            DestinationName::new("lxmf", "delivery"),
+        );
+        let announce = remote_destination
+            .announce(rand_core::OsRng, None)
+            .expect("valid announce packet");
+        let destination = announce.destination;
+        let packet_hash_hex = hex::encode(announce.hash().as_slice());
+
+        iface_channel
+            .rx_channel
+            .send(rns_transport::iface::RxMessage {
+                address: iface,
+                packet: announce,
+                source: rns_transport::iface::IfaceSource::None,
+            })
+            .await
+            .expect("seed announce");
+
+        for _ in 0..20 {
+            if transport.has_path(&destination).await {
+                break;
+            }
+            tokio::time::sleep(Duration::from_millis(25)).await;
+        }
+        assert!(
+            transport.has_path(&destination).await,
+            "transport should learn remote path before shutdown flush"
+        );
+        assert!(
+            !temp.path().join("destination_table").exists(),
+            "path table should not be written before explicit shutdown flush"
+        );
+
+        let context = crate::announce_persistence::PathTablePersistenceContext::new(
+            transport,
+            temp.path().to_path_buf(),
+        );
+        assert_eq!(
+            crate::announce_persistence::flush_reticulum_path_table(&context)
+                .await
+                .expect("shutdown path flush"),
+            1
+        );
+        assert!(
+            temp.path().join("destination_table").exists(),
+            "shutdown flush should write Reticulum-compatible destination_table"
+        );
+        assert!(
+            temp.path()
+                .join("cache")
+                .join("announces")
+                .join(packet_hash_hex)
+                .exists(),
+            "shutdown flush should write Reticulum-compatible announce cache"
+        );
+    });
+}
+
+#[test]
 fn bootstrap_restores_python_path_table_for_path_lookup_rpc() {
     let temp = TempDir::new().expect("temp dir");
     let db_path = temp.path().join("reticulum.db");
