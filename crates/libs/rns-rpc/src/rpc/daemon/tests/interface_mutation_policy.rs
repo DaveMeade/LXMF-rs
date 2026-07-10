@@ -240,6 +240,29 @@
     }
 
     #[test]
+    fn set_interfaces_hot_applies_empty_interface_set() {
+        let daemon = RpcDaemon::test_instance();
+        daemon.replace_interfaces(vec![tcp_server_interface("listener", "127.0.0.1", 4242)]);
+        let bridge = std::sync::Arc::new(RecordingInterfaceMutationBridge::new());
+        daemon.set_interface_mutation_bridge(bridge.clone());
+
+        let response = daemon
+            .handle_rpc(rpc_request(
+                28,
+                "set_interfaces",
+                json!({
+                    "interfaces": []
+                }),
+            ))
+            .expect("set_interfaces response");
+
+        assert!(response.error.is_none(), "unexpected error: {response:?}");
+        assert_eq!(response.result.expect("result")["updated"], json!(true));
+        assert_eq!(bridge.applied(), vec![Vec::<InterfaceRecord>::new()]);
+        assert!(daemon.interfaces.lock().expect("interfaces mutex poisoned").is_empty());
+    }
+
+    #[test]
     fn set_interfaces_reports_non_loopback_tcp_server_requires_restart() {
         let daemon = RpcDaemon::test_instance();
 

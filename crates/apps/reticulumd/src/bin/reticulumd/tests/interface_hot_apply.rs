@@ -220,6 +220,59 @@ async fn hot_apply_spawns_tcp_server_wildcard_listener() {
 }
 
 #[tokio::test(flavor = "current_thread")]
+async fn hot_apply_removes_tcp_server_when_disabled_closes_listener() {
+    let reserved = TcpListener::bind("127.0.0.1:0").await.expect("reserve listener port");
+    let port = reserved.local_addr().expect("reserved listener addr").port();
+    drop(reserved);
+    let iface_manager = Arc::new(tokio::sync::Mutex::new(InterfaceManager::new(8)));
+    let mut managed = HashMap::new();
+    let refreshes = udp_refreshes();
+    let tcp_refreshes = tcp_listener_refreshes();
+
+    apply_hot_apply_interface_records(
+        &iface_manager,
+        &mut managed,
+        vec![tcp_server_record("listener", "127.0.0.1", port)],
+        None,
+        &tcp_refreshes,
+        &refreshes,
+        None,
+    )
+    .await;
+
+    let address = managed.get("listener").expect("managed tcp_server").address;
+    assert!(tcp_refreshes
+        .lock()
+        .expect("tcp listener refresh mutex poisoned")
+        .contains_key("listener"));
+    let stream = wait_for_tcp_server_connect("127.0.0.1", port).await;
+    drop(stream);
+
+    let mut disabled = tcp_server_record("listener", "127.0.0.1", port);
+    disabled.enabled = false;
+    apply_hot_apply_interface_records(
+        &iface_manager,
+        &mut managed,
+        vec![disabled],
+        None,
+        &tcp_refreshes,
+        &refreshes,
+        None,
+    )
+    .await;
+
+    assert!(managed.is_empty());
+    assert!(!tcp_refreshes
+        .lock()
+        .expect("tcp listener refresh mutex poisoned")
+        .contains_key("listener"));
+    let manager = iface_manager.lock().await;
+    assert_eq!(manager.role(&address), None);
+    drop(manager);
+    wait_for_tcp_server_rejects_connect("127.0.0.1", port).await;
+}
+
+#[tokio::test(flavor = "current_thread")]
 async fn hot_apply_spawns_tcp_client_with_record_runtime_settings() {
     let iface_manager = Arc::new(tokio::sync::Mutex::new(InterfaceManager::new(8)));
     let mut managed = HashMap::new();

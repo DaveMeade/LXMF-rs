@@ -3,7 +3,7 @@ impl InterfaceManager {
         let (rx_send, rx_recv) = InterfaceChannel::make_rx_channel(rx_cap);
         let rx_recv = Arc::new(tokio::sync::Mutex::new(rx_recv));
 
-        Self { counter: 0, rx_recv, rx_send, cancel: CancellationToken::new(), ifaces: Vec::new() }
+        Self { counter: 0, rx_recv, rx_send, ifaces: Vec::new() }
     }
 
     pub fn new_channel(&mut self, tx_cap: usize) -> InterfaceChannel {
@@ -83,8 +83,9 @@ impl InterfaceManager {
         let mtu = inner.configured_mtu();
         let channel =
             self.new_channel_with_role_mode_mtu(DEFAULT_IFACE_TX_QUEUE_CAPACITY, role, mode, mtu);
+        let cancel = channel.stop.clone();
         let inner = Arc::new(Mutex::new(inner));
-        InterfaceContext::<T> { inner: inner.clone(), channel, cancel: self.cancel.clone() }
+        InterfaceContext::<T> { inner: inner.clone(), channel, cancel }
     }
 
     pub fn spawn<T: Interface, F, R>(&mut self, inner: T, worker: F) -> AddressHash

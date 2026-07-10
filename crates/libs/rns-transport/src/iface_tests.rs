@@ -60,6 +60,30 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn stop_interface_cancels_spawned_worker_context() {
+        struct TestInterface;
+
+        impl Interface for TestInterface {
+            fn mtu() -> usize {
+                64
+            }
+        }
+
+        let mut mgr = InterfaceManager::new(16);
+        let (tx, rx) = tokio::sync::oneshot::channel();
+        let address = mgr.spawn(TestInterface, |context| async move {
+            context.cancel.cancelled().await;
+            let _ = tx.send(());
+        });
+
+        assert!(mgr.stop_interface(address));
+        tokio::time::timeout(std::time::Duration::from_secs(1), rx)
+            .await
+            .expect("worker should observe interface stop")
+            .expect("worker should report stop");
+    }
+
+    #[tokio::test]
     async fn direct_packet_over_configured_mtu_is_not_queued() {
         let mut mgr = InterfaceManager::new(16);
         let mut rx = mgr
