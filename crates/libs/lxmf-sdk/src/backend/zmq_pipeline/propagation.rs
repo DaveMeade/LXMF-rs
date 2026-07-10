@@ -118,6 +118,66 @@ impl ZmqPipelineBackendClient {
         self.execute_propagation_envelope("app.propagation.delivery_policy.set", req)
     }
 
+    pub fn propagation_delivery_policy_allow(
+        &self,
+        destination: impl Into<String>,
+    ) -> Result<PropagationDeliveryPolicyResult, SdkError> {
+        let current = self.propagation_delivery_policy_get()?;
+        self.propagation_delivery_policy_set(
+            current.policy_state.request_with_allowed_destination(destination),
+        )
+    }
+
+    pub fn propagation_delivery_policy_disallow(
+        &self,
+        destination: &str,
+    ) -> Result<PropagationDeliveryPolicyResult, SdkError> {
+        let current = self.propagation_delivery_policy_get()?;
+        self.propagation_delivery_policy_set(
+            current.policy_state.request_without_allowed_destination(destination),
+        )
+    }
+
+    pub fn propagation_delivery_policy_ignore(
+        &self,
+        destination: impl Into<String>,
+    ) -> Result<PropagationDeliveryPolicyResult, SdkError> {
+        let current = self.propagation_delivery_policy_get()?;
+        self.propagation_delivery_policy_set(
+            current.policy_state.request_with_ignored_destination(destination),
+        )
+    }
+
+    pub fn propagation_delivery_policy_unignore(
+        &self,
+        destination: &str,
+    ) -> Result<PropagationDeliveryPolicyResult, SdkError> {
+        let current = self.propagation_delivery_policy_get()?;
+        self.propagation_delivery_policy_set(
+            current.policy_state.request_without_ignored_destination(destination),
+        )
+    }
+
+    pub fn propagation_delivery_policy_prioritise(
+        &self,
+        destination: impl Into<String>,
+    ) -> Result<PropagationDeliveryPolicyResult, SdkError> {
+        let current = self.propagation_delivery_policy_get()?;
+        self.propagation_delivery_policy_set(
+            current.policy_state.request_with_prioritised_destination(destination),
+        )
+    }
+
+    pub fn propagation_delivery_policy_unprioritise(
+        &self,
+        destination: &str,
+    ) -> Result<PropagationDeliveryPolicyResult, SdkError> {
+        let current = self.propagation_delivery_policy_get()?;
+        self.propagation_delivery_policy_set(
+            current.policy_state.request_without_prioritised_destination(destination),
+        )
+    }
+
     pub fn propagation_peer_maintenance(
         &self,
     ) -> Result<PropagationPeerMaintenanceResult, SdkError> {

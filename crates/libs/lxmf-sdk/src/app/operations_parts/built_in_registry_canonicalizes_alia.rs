@@ -32,6 +32,18 @@ mod tests {
                 .as_str(),
             "app.delivery.outbound_stamp_cost"
         );
+        assert_eq!(
+            registry.canonicalize("allow").expect("canonical id").as_str(),
+            "app.propagation.delivery_policy.allow"
+        );
+        assert_eq!(
+            registry.canonicalize("ignore_destination").expect("canonical id").as_str(),
+            "app.propagation.delivery_policy.ignore"
+        );
+        assert_eq!(
+            registry.canonicalize("unprioritise").expect("canonical id").as_str(),
+            "app.propagation.delivery_policy.unprioritise"
+        );
     }
 
     #[test]

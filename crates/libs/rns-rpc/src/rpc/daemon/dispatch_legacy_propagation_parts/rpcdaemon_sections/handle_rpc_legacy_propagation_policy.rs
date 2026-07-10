@@ -48,6 +48,92 @@ impl RpcDaemon {
                     error: None,
                 })
             }
+            "set_authentication" => {
+                let params = request.params.unwrap_or_else(|| json!({}));
+                let parsed: DeliveryPolicyAuthenticationParams = serde_json::from_value(params)
+                    .map_err(|err| std::io::Error::new(std::io::ErrorKind::InvalidInput, err))?;
+                let policy = {
+                    let mut guard = self.delivery_policy.lock().expect("policy mutex poisoned");
+                    if let Some(authentication_required) = parsed.authentication_required {
+                        guard.auth_required = authentication_required;
+                    }
+                    guard.clone()
+                };
+                self.update_daemon_status_snapshot(|snapshot| {
+                    snapshot.delivery_policy = policy.clone();
+                });
+
+                Ok(RpcResponse {
+                    id: request.id,
+                    result: Some(json!({ "policy": policy })),
+                    error: None,
+                })
+            }
+            "requires_authentication" => {
+                let policy = self.delivery_policy.lock().expect("policy mutex poisoned").clone();
+                Ok(RpcResponse {
+                    id: request.id,
+                    result: Some(json!({
+                        "auth_required": policy.auth_required,
+                        "policy": policy,
+                    })),
+                    error: None,
+                })
+            }
+            "allow"
+            | "disallow"
+            | "ignore_destination"
+            | "unignore_destination"
+            | "prioritise"
+            | "unprioritise" => {
+                let params = request.params.unwrap_or_else(|| json!({}));
+                let parsed: DeliveryPolicyHashMutationParams = serde_json::from_value(params)
+                    .map_err(|err| std::io::Error::new(std::io::ErrorKind::InvalidInput, err))?;
+                let destination = parsed
+                    .destination
+                    .as_deref()
+                    .map(normalize_policy_destination_hash)
+                    .transpose()?;
+                let policy = {
+                    let mut guard = self.delivery_policy.lock().expect("policy mutex poisoned");
+                    if let Some(destination) = destination.as_deref() {
+                        match request.method.as_str() {
+                            "allow" => {
+                                insert_policy_hash(&mut guard.allowed_destinations, destination)
+                            }
+                            "disallow" => {
+                                remove_policy_hash(&mut guard.allowed_destinations, destination)
+                            }
+                            "ignore_destination" => {
+                                insert_policy_hash(&mut guard.ignored_destinations, destination)
+                            }
+                            "unignore_destination" => {
+                                remove_policy_hash(&mut guard.ignored_destinations, destination)
+                            }
+                            "prioritise" => {
+                                insert_policy_hash(&mut guard.prioritised_destinations, destination)
+                            }
+                            "unprioritise" => {
+                                remove_policy_hash(&mut guard.prioritised_destinations, destination)
+                            }
+                            _ => unreachable!("delivery policy mutation route"),
+                        }
+                    }
+                    guard.clone()
+                };
+                self.update_daemon_status_snapshot(|snapshot| {
+                    snapshot.delivery_policy = policy.clone();
+                });
+
+                Ok(RpcResponse {
+                    id: request.id,
+                    result: Some(json!({
+                        "destination": destination,
+                        "policy": policy,
+                    })),
+                    error: None,
+                })
+            }
             "propagation_status" => {
                 let state =
                     self.propagation_state.lock().expect("propagation mutex poisoned").clone();
@@ -207,4 +293,31 @@ impl RpcDaemon {
             _ => unreachable!("legacy propagation policy route: {}", request.method),
         }
     }
+}
+
+fn normalize_policy_destination_hash(destination: &str) -> Result<String, std::io::Error> {
+    let destination = destination.trim();
+    let decoded = hex::decode(destination).map_err(|err| {
+        std::io::Error::new(
+            std::io::ErrorKind::InvalidInput,
+            format!("destination must be hex-encoded: {err}"),
+        )
+    })?;
+    if decoded.len() != 16 {
+        return Err(std::io::Error::new(
+            std::io::ErrorKind::InvalidInput,
+            "destination must decode to a 16-byte RNS destination hash",
+        ));
+    }
+    Ok(destination.to_ascii_lowercase())
+}
+
+fn insert_policy_hash(values: &mut Vec<String>, destination: &str) {
+    if !values.iter().any(|value| value.eq_ignore_ascii_case(destination)) {
+        values.push(destination.to_string());
+    }
+}
+
+fn remove_policy_hash(values: &mut Vec<String>, destination: &str) {
+    values.retain(|value| !value.eq_ignore_ascii_case(destination));
 }

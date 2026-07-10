@@ -6,6 +6,14 @@ impl RpcDaemon {
         match request.method.as_str() {
             "get_delivery_policy"
             | "set_delivery_policy"
+            | "set_authentication"
+            | "requires_authentication"
+            | "allow"
+            | "disallow"
+            | "ignore_destination"
+            | "unignore_destination"
+            | "prioritise"
+            | "unprioritise"
             | "propagation_status"
             | "propagation_peer_maintenance"
             | "propagation_enable" => self.handle_rpc_legacy_propagation_policy(request),
