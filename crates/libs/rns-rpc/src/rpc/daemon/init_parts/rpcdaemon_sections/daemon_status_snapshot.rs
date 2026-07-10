@@ -388,6 +388,14 @@ impl RpcDaemon {
                     record.peer
                 );
             }
+        } else if is_lxmf_propagation_aspect(aspect.as_deref()) {
+            let woken = self.wake_lxmf_propagated_outbound_for_announce(record.peer.as_str())?;
+            if woken > 0 {
+                log::debug!(
+                    "[daemon] propagation announce woke {woken} pending outbound message(s) for {}",
+                    record.peer
+                );
+            }
         }
 
         let event = RpcEvent {
