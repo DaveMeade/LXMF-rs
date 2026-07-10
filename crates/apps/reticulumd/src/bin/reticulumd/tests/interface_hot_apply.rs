@@ -860,6 +860,39 @@ fn hot_apply_rejects_partial_udp_forward_target() {
 }
 
 #[test]
+fn hot_apply_rejects_multicast_udp_forward_target() {
+    let (tx, _rx) = tokio::sync::mpsc::channel(1);
+    let bridge = test_bridge(tx);
+    let mut record = udp_record("udp-multicast-target", "127.0.0.1", 4242);
+    record.settings = Some(json!({
+        "target_host": "224.0.0.1",
+        "target_port": 4243
+    }));
+
+    let err = bridge.apply_interfaces(vec![record]).expect_err("multicast target should fail");
+
+    assert_eq!(err.kind(), io::ErrorKind::InvalidInput);
+    assert!(err.to_string().contains("multicast targets"));
+}
+
+#[test]
+fn hot_apply_rejects_out_of_range_udp_forward_target_port() {
+    let (tx, _rx) = tokio::sync::mpsc::channel(1);
+    let bridge = test_bridge(tx);
+    let mut record = udp_record("udp-target-port-range", "127.0.0.1", 4242);
+    record.settings = Some(json!({
+        "target_host": "127.0.0.1",
+        "target_port": 70_000
+    }));
+
+    let err =
+        bridge.apply_interfaces(vec![record]).expect_err("out-of-range target port should fail");
+
+    assert_eq!(err.kind(), io::ErrorKind::InvalidInput);
+    assert!(err.to_string().contains("target_port is out of range"));
+}
+
+#[test]
 fn hot_apply_rejects_device_bound_udp_records() {
     let (tx, _rx) = tokio::sync::mpsc::channel(1);
     let bridge = test_bridge(tx);
