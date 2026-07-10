@@ -1,6 +1,7 @@
 use super::bridge_helpers::{
     log_delivery_trace, opportunistic_payload, payload_preview, send_trace_detail,
 };
+use super::direct_backchannel::DirectBackchannelLinks;
 #[path = "bridge_announce.rs"]
 mod announce;
 #[path = "bridge_delivery_method.rs"]
@@ -95,6 +96,7 @@ pub(super) struct TransportBridge {
     receipt_map: Arc<Mutex<HashMap<String, String>>>,
     outbound_resource_map: OutboundResourceMap,
     outbound_propagation_link: Arc<tokio::sync::Mutex<Option<CachedPropagationLink>>>,
+    direct_backchannel_links: DirectBackchannelLinks,
     receipt_tx: tokio::sync::mpsc::Sender<ReceiptEvent>,
     delivery_scheduler: DeliveryScheduler,
 }
@@ -137,9 +139,14 @@ impl TransportBridge {
             receipt_map,
             outbound_resource_map,
             outbound_propagation_link: Arc::new(tokio::sync::Mutex::new(None)),
+            direct_backchannel_links: DirectBackchannelLinks::new(),
             receipt_tx,
             delivery_scheduler: DeliveryScheduler::spawn(DeliverySchedulerConfig::from_env()),
         }
+    }
+
+    pub(super) fn direct_backchannel_links(&self) -> DirectBackchannelLinks {
+        self.direct_backchannel_links.clone()
     }
 
     pub(super) fn set_daemon(&self, daemon: Arc<RpcDaemon>) {

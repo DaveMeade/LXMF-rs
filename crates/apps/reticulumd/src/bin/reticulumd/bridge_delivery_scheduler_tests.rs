@@ -123,6 +123,7 @@ async fn prepare_payload_builds_propagation_stamp_before_delivery_lane() {
         receipt_map: Arc::new(Mutex::new(HashMap::new())),
         outbound_resource_map: Arc::new(Mutex::new(HashMap::new())),
         outbound_propagation_link: Arc::new(tokio::sync::Mutex::new(None)),
+        direct_backchannel_links: DirectBackchannelLinks::new(),
         receipt_tx,
         message_id: message_id.to_string(),
         source_hash: [1u8; 16],

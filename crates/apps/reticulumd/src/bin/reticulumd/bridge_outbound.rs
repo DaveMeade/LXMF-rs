@@ -151,6 +151,7 @@ impl OutboundBridge for TransportBridge {
             receipt_map: self.receipt_map.clone(),
             outbound_resource_map: self.outbound_resource_map.clone(),
             outbound_propagation_link: self.outbound_propagation_link.clone(),
+            direct_backchannel_links: self.direct_backchannel_links.clone(),
             receipt_tx: self.receipt_tx.clone(),
             message_id: record.id.clone(),
             source_hash: self.delivery_source_hash,

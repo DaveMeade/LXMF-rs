@@ -1,6 +1,7 @@
 use reticulum_daemon::receipt_bridge::ReceiptEvent;
 
 use crate::bridge::emit_receipt_event;
+use crate::direct_backchannel::{parse_link_identify_payload, DirectBackchannelLinks};
 
 use rns_rpc::{RpcDaemon, RpcRequest};
 
@@ -33,6 +34,7 @@ pub(super) fn spawn_inbound_worker(
     daemon: Arc<RpcDaemon>,
     transport: Arc<Transport>,
     control: PropagationControlContext,
+    direct_backchannel_links: Option<DirectBackchannelLinks>,
     receipt_tx: tokio::sync::mpsc::Sender<ReceiptEvent>,
     outbound_resource_map: OutboundResourceMap,
 ) {
@@ -40,7 +42,12 @@ pub(super) fn spawn_inbound_worker(
         control::spawn_control_worker(daemon.clone(), transport.clone(), control.clone());
     }
     let resource_control = control.clone();
-    spawn_packet_inbound_worker(daemon.clone(), transport.clone(), control);
+    spawn_packet_inbound_worker(
+        daemon.clone(),
+        transport.clone(),
+        control,
+        direct_backchannel_links,
+    );
     tokio::spawn(async move {
         let mut rx = transport.resource_events();
         loop {
@@ -262,6 +269,7 @@ fn spawn_packet_inbound_worker(
     daemon: Arc<RpcDaemon>,
     transport: Arc<Transport>,
     control: PropagationControlContext,
+    direct_backchannel_links: Option<DirectBackchannelLinks>,
 ) {
     let daemon_inbound = daemon;
     let inbound_transport = transport;
@@ -328,6 +336,29 @@ fn spawn_packet_inbound_worker(
                             continue;
                         }
                         InboundLxmfDestination::Delivery(destination) => {
+                            if event.context == Some(PacketContext::LinkIdentify) {
+                                if let Some(backchannel_links) = direct_backchannel_links.as_ref() {
+                                    match parse_link_identify_payload(data, &event.destination) {
+                                        Ok(identity) => {
+                                            backchannel_links
+                                                .record_identified_link(&identity, event.destination);
+                                            log::debug!(
+                                                "[daemon-rx] direct backchannel available destination={} link={}",
+                                                identity.address_hash,
+                                                event.destination
+                                            );
+                                        }
+                                        Err(err) => {
+                                            log::warn!(
+                                                "[daemon-rx] invalid direct backchannel identify link={} err={}",
+                                                event.destination,
+                                                err
+                                            );
+                                        }
+                                    }
+                                }
+                                continue;
+                            }
                             delivery_events::accept_delivery_packet(
                                 daemon_inbound.as_ref(),
                                 inbound_transport.as_ref(),
