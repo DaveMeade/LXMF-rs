@@ -964,6 +964,10 @@ Scoped release evidence is split as follows:
   `status_state`, covering lifecycle state, selected node/peer, queue depth,
   failure kind, timeout/access-denied classification, retry count, next sync
   attempt, and last error while preserving raw status JSON.
+- `PropagationRemoteStatusResult` now also projects Python-shaped
+  `/pn/get/stats` payloads into typed `stats`, covering message-store counts,
+  bytes, limits, client served/received counters, unpeered counters, peer
+  counts, and router cost/limit fields while preserving raw status JSON.
 - `PropagationRemoteTransferResult` now projects remote fetch/download result
   and propagation lifecycle payloads into typed `transfer_state`, covering
   sync/postpone status, imported IDs/counts, transferred bytes, progress, and

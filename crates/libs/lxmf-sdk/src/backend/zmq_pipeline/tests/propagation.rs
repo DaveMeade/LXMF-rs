@@ -149,7 +149,29 @@ fn propagation_remote_lifecycle_uses_zmq_sdk_envelopes_and_preserves_raw_state()
                             "access_denied": true,
                             "retry_count": 2,
                             "next_sync_attempt": 1_700_000_900,
-                            "last_sync_error": "previous timeout"
+                            "last_sync_error": "previous timeout",
+                            "delivery_limit": 1000,
+                            "propagation_limit": 256,
+                            "sync_limit": 10240,
+                            "target_stamp_cost": 16,
+                            "stamp_cost_flexibility": 3,
+                            "peering_cost": 18,
+                            "max_peering_cost": 26,
+                            "messagestore": {
+                                "count": 5,
+                                "bytes": 4096,
+                                "limit": 1_000_000
+                            },
+                            "clients": {
+                                "client_propagation_messages_received": 7,
+                                "client_propagation_messages_served": 11
+                            },
+                            "unpeered_propagation_incoming": 13,
+                            "unpeered_propagation_rx_bytes": 2048,
+                            "static_peers": 2,
+                            "discovered_peers": 3,
+                            "total_peers": 5,
+                            "max_peers": 20
                         }
                     }
                 }
@@ -375,6 +397,24 @@ fn propagation_remote_lifecycle_uses_zmq_sdk_envelopes_and_preserves_raw_state()
     assert_eq!(status.status_state.retry_count, 2);
     assert_eq!(status.status_state.next_sync_attempt, Some(1_700_000_900));
     assert_eq!(status.status_state.last_sync_error.as_deref(), Some("previous timeout"));
+    assert_eq!(status.stats.messagestore.count, Some(5));
+    assert_eq!(status.stats.messagestore.bytes, Some(4096));
+    assert_eq!(status.stats.messagestore.limit, Some(1_000_000));
+    assert_eq!(status.stats.clients.received, Some(7));
+    assert_eq!(status.stats.clients.served, Some(11));
+    assert_eq!(status.stats.peers.unpeered_incoming, Some(13));
+    assert_eq!(status.stats.peers.unpeered_rx_bytes, Some(2048));
+    assert_eq!(status.stats.peers.static_peers, Some(2));
+    assert_eq!(status.stats.peers.discovered_peers, Some(3));
+    assert_eq!(status.stats.peers.total_peers, Some(5));
+    assert_eq!(status.stats.peers.max_peers, Some(20));
+    assert_eq!(status.stats.limits.delivery_limit, Some(1000));
+    assert_eq!(status.stats.limits.propagation_limit, Some(256));
+    assert_eq!(status.stats.limits.sync_limit, Some(10240));
+    assert_eq!(status.stats.limits.target_stamp_cost, Some(16));
+    assert_eq!(status.stats.limits.stamp_cost_flexibility, Some(3));
+    assert_eq!(status.stats.limits.peering_cost, Some(18));
+    assert_eq!(status.stats.limits.max_peering_cost, Some(26));
     assert_eq!(fetch.result["imported_ids"], json!(["id-a", "id-b"]));
     assert!(fetch.transfer_state.synced);
     assert_eq!(fetch.transfer_state.imported_count, 2);
