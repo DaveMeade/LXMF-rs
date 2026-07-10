@@ -16,6 +16,7 @@ pub struct DaemonConfig {
     pub announce_capabilities: Vec<String>,
     pub propagation_node: Option<PropagationNodeConfig>,
     pub panic_on_interface_error: bool,
+    pub reticulum_enable_transport: bool,
     pub interfaces: Vec<InterfaceConfig>,
 }
 
@@ -59,6 +60,11 @@ impl<'de> Deserialize<'de> for DaemonConfig {
                 .reticulum
                 .as_ref()
                 .and_then(|reticulum| reticulum.panic_on_interface_error)
+                .unwrap_or(false),
+            reticulum_enable_transport: raw
+                .reticulum
+                .as_ref()
+                .and_then(|reticulum| reticulum.enable_transport)
                 .unwrap_or(false),
             interfaces,
         })
