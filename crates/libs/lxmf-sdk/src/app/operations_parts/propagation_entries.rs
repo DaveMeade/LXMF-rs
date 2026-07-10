@@ -177,6 +177,22 @@ fn propagation_operation_entries() -> Vec<OperationEntry> {
         )
         .with_alias("unprioritise"),
         OperationEntry::new(
+            "app.propagation.control.allow",
+            "propagation",
+            OperationKind::Command,
+            TransportVariant::LegacyRpc,
+            "Allow one identity hash to issue propagation control commands.",
+        )
+        .with_alias("allow_control"),
+        OperationEntry::new(
+            "app.propagation.control.disallow",
+            "propagation",
+            OperationKind::Command,
+            TransportVariant::LegacyRpc,
+            "Remove one identity hash from the propagation control ACL.",
+        )
+        .with_alias("disallow_control"),
+        OperationEntry::new(
             "app.propagation.peer_maintenance",
             "propagation",
             OperationKind::Command,

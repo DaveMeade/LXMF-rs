@@ -36,6 +36,8 @@ impl RpcDaemon {
             | "unignore_destination"
             | "prioritise"
             | "unprioritise"
+            | "allow_control"
+            | "disallow_control"
             | "propagation_status"
             | "propagation_enable"
             | "propagation_ingest"

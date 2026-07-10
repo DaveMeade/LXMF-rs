@@ -36,6 +36,8 @@ fn operation_registry_uses_zmq_sdk_method_for_chat_peer_and_propagation_operatio
         "app.propagation.node.list",
         "app.propagation.status",
         "app.propagation.enable",
+        "app.propagation.control.allow",
+        "app.propagation.control.disallow",
         "app.propagation.delivery_policy.get",
         "app.propagation.delivery_policy.set",
         "app.propagation.delivery_policy.auth.set",

@@ -296,6 +296,101 @@ fn propagation_enable_updates_auth_required_policy() {
     assert_eq!(status["propagation"]["auth_required"].as_bool(), Some(true));
 }
 
+#[test]
+fn propagation_enable_updates_control_allowed_policy() {
+    let daemon = RpcDaemon::test_instance();
+
+    let response = daemon
+        .handle_rpc(rpc_request(
+            16,
+            "propagation_enable",
+            json!({
+                "enabled": true,
+                "control_allowed": [
+                    "AABBCCDDEEFF00112233445566778899",
+                    "aabbccddeeff00112233445566778899",
+                    "00112233445566778899AABBCCDDEEFF"
+                ],
+            }),
+        ))
+        .expect("enable propagation control policy");
+    assert!(response.error.is_none());
+    let result = response.result.expect("propagation enable result");
+    assert_eq!(
+        result["propagation"]["control_allowed"],
+        json!([
+            "aabbccddeeff00112233445566778899",
+            "00112233445566778899aabbccddeeff"
+        ])
+    );
+
+    let status = daemon
+        .handle_rpc(RpcRequest { id: 17, method: "propagation_status".to_string(), params: None })
+        .expect("propagation status")
+        .result
+        .expect("propagation status result");
+    assert_eq!(
+        status["propagation"]["control_allowed"],
+        json!([
+            "aabbccddeeff00112233445566778899",
+            "00112233445566778899aabbccddeeff"
+        ])
+    );
+}
+
+#[test]
+fn propagation_control_acl_mutators_are_idempotent() {
+    let daemon = RpcDaemon::test_instance();
+
+    for id in 18..=19 {
+        let response = daemon
+            .handle_rpc(rpc_request(
+                id,
+                "allow_control",
+                json!({ "identity_hash": "AABBCCDDEEFF00112233445566778899" }),
+            ))
+            .expect("allow control");
+        assert!(response.error.is_none());
+    }
+
+    let status = daemon
+        .handle_rpc(RpcRequest { id: 20, method: "propagation_status".to_string(), params: None })
+        .expect("propagation status")
+        .result
+        .expect("propagation status result");
+    assert_eq!(
+        status["propagation"]["control_allowed"],
+        json!(["aabbccddeeff00112233445566778899"])
+    );
+
+    for id in 21..=22 {
+        let response = daemon
+            .handle_rpc(rpc_request(
+                id,
+                "disallow_control",
+                json!({ "hash": "aabbccddeeff00112233445566778899" }),
+            ))
+            .expect("disallow control");
+        assert!(response.error.is_none());
+        assert_eq!(response.result.expect("result")["propagation"]["control_allowed"], json!([]));
+    }
+}
+
+#[test]
+fn propagation_control_acl_rejects_invalid_identity_hash() {
+    let daemon = RpcDaemon::test_instance();
+
+    let response = daemon
+        .handle_rpc(rpc_request(
+            23,
+            "allow_control",
+            json!({ "identity_hash": "abcd" }),
+        ))
+        .expect_err("invalid control hash should be rejected");
+    assert_eq!(response.kind(), std::io::ErrorKind::InvalidInput);
+    assert!(response.to_string().contains("16-byte"));
+}
+
 fn make_ready_propagation_peer(daemon: &RpcDaemon, peer_seed: u8) -> String {
     let peer = hex::encode([peer_seed; 16]);
     daemon

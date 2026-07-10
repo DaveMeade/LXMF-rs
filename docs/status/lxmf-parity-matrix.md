@@ -160,6 +160,10 @@ Workspace paths are used for navigation. `crates/libs/lxmf-core` publishes as
   offers.
 - Python-style propagation `auth_required` configuration is applied to the
   daemon propagation state and reported with the propagation peer policy.
+- Python-style propagation control ACL entries are normalised as 16-byte
+  identity hashes through `propagation_enable`, `allow_control`, and
+  `disallow_control`, then reported with propagation status and SDK recovery
+  state.
 - Offer responses support Python boolean and list forms, reject out-of-offer
   IDs, preserve no-transfer liveness, retain cumulative acceptance rates, and
   preserve peers and queues on retryable or otherwise unexpected numeric
@@ -614,8 +618,9 @@ Workspace paths are used for navigation. `crates/libs/lxmf-core` publishes as
   `timestamp`, so restart/recovery status callers can inspect daemon recovery
   freshness without parsing raw propagation JSON.
 - `PropagationRecoveryStateResult` now also exposes local propagation config
-  fields for `auth_required`, `static_peers`, and `sync_limit`, so status and
-  enable/config callers can verify recovery policy without raw propagation JSON.
+  fields for `auth_required`, `control_allowed`, `static_peers`, and
+  `sync_limit`, so status and enable/config callers can verify recovery policy
+  without raw propagation JSON.
 - `PropagationRecoveryStateResult` now also exposes propagation storage and
   transfer-limit config for `store_root`, `target_cost`,
   `message_storage_limit_mb`, and `propagation_limit`, keeping durable queue

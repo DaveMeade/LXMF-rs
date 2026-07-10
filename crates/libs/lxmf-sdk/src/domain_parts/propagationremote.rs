@@ -75,6 +75,8 @@ pub struct PropagationEnableRequest {
     pub peering_cost: Option<u32>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub remote_peering_cost_max: Option<u32>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub control_allowed: Option<Vec<String>>,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]

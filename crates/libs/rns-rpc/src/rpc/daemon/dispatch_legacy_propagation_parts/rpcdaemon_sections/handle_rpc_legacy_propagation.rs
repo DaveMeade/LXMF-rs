@@ -14,6 +14,8 @@ impl RpcDaemon {
             | "unignore_destination"
             | "prioritise"
             | "unprioritise"
+            | "allow_control"
+            | "disallow_control"
             | "propagation_status"
             | "propagation_peer_maintenance"
             | "propagation_enable" => self.handle_rpc_legacy_propagation_policy(request),

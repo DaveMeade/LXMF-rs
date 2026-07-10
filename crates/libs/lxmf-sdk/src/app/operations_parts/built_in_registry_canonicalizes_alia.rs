@@ -44,6 +44,17 @@ mod tests {
             registry.canonicalize("unprioritise").expect("canonical id").as_str(),
             "app.propagation.delivery_policy.unprioritise"
         );
+        assert_eq!(
+            registry.canonicalize("allow_control").expect("canonical propagation control id").as_str(),
+            "app.propagation.control.allow"
+        );
+        assert_eq!(
+            registry
+                .canonicalize("disallow_control")
+                .expect("canonical propagation control id")
+                .as_str(),
+            "app.propagation.control.disallow"
+        );
     }
 
     #[test]

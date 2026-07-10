@@ -161,6 +161,14 @@ struct PropagationEnableParams {
     peering_cost: Option<u32>,
     #[serde(default)]
     remote_peering_cost_max: Option<u32>,
+    #[serde(default)]
+    control_allowed: Option<Vec<String>>,
+}
+
+#[derive(Debug, Deserialize)]
+struct PropagationControlAclParams {
+    #[serde(alias = "identity", alias = "identity_hash", alias = "hash")]
+    identity_hash: String,
 }
 
 #[derive(Debug, Deserialize)]

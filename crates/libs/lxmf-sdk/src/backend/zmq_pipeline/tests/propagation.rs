@@ -804,7 +804,8 @@ fn propagation_local_lifecycle_uses_zmq_sdk_envelopes_and_preserves_policy_state
                             "from_static_only": true,
                             "retain_synced_on_node": false,
                             "peering_cost": 10,
-                            "remote_peering_cost_max": 20
+                            "remote_peering_cost_max": 20,
+                            "control_allowed": ["00112233445566778899aabbccddeeff"]
                         }
                     }
                 }
@@ -905,6 +906,7 @@ fn propagation_local_lifecycle_uses_zmq_sdk_envelopes_and_preserves_policy_state
             retain_synced_on_node: Some(false),
             peering_cost: Some(10),
             remote_peering_cost_max: Some(20),
+            control_allowed: Some(vec!["00112233445566778899aabbccddeeff".to_string()]),
         })
         .expect("propagation enable");
     let policy = client.propagation_delivery_policy_get().expect("delivery policy get");
@@ -945,6 +947,10 @@ fn propagation_local_lifecycle_uses_zmq_sdk_envelopes_and_preserves_policy_state
     assert_eq!(enabled.recovery_state.retain_synced_on_node, Some(false));
     assert_eq!(enabled.recovery_state.peering_cost, Some(10));
     assert_eq!(enabled.recovery_state.remote_peering_cost_max, Some(20));
+    assert_eq!(
+        enabled.recovery_state.control_allowed,
+        vec!["00112233445566778899aabbccddeeff".to_string()]
+    );
     assert_eq!(policy.policy["denied_destinations"], json!(["dest-deny"]));
     assert!(policy.policy_state.auth_required);
     assert_eq!(policy.policy_state.allowed_destinations, vec!["dest-allow".to_string()]);
@@ -1015,7 +1021,8 @@ fn propagation_local_lifecycle_uses_zmq_sdk_envelopes_and_preserves_policy_state
             "from_static_only": true,
             "retain_synced_on_node": false,
             "peering_cost": 10,
-            "remote_peering_cost_max": 20
+            "remote_peering_cost_max": 20,
+            "control_allowed": ["00112233445566778899aabbccddeeff"]
         })
     );
     assert_eq!(captured[2].params.as_ref().expect("params")["payload"], json!({}));

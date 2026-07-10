@@ -554,6 +554,9 @@ Scoped release evidence is split as follows:
   `propagation_enable` and the daemon propagation status, so node-level
   propagation auth policy is visible with the rest of the propagation peer
   policy.
+- Python-style propagation control ACL entries now reach `propagation_enable`,
+  `allow_control`, and `disallow_control` as normalised 16-byte identity hashes,
+  and are visible through propagation status plus typed SDK recovery state.
 - Local and remote peer-sync offer-response cleanup now preserves peers and
   propagation queues for retry on retryable or otherwise unexpected numeric
   responses, while still treating access denial and throttling as distinct
@@ -986,8 +989,9 @@ Scoped release evidence is split as follows:
   `timestamp`, so restart/recovery status callers can inspect daemon recovery
   freshness without parsing raw propagation JSON.
 - `PropagationRecoveryStateResult` now also exposes local propagation config
-  fields for `auth_required`, `static_peers`, and `sync_limit`, so status and
-  enable/config callers can verify recovery policy without raw propagation JSON.
+  fields for `auth_required`, `control_allowed`, `static_peers`, and
+  `sync_limit`, so status and enable/config callers can verify recovery policy
+  without raw propagation JSON.
 - `PropagationRecoveryStateResult` now also exposes propagation storage and
   transfer-limit config for `store_root`, `target_cost`,
   `message_storage_limit_mb`, and `propagation_limit`, keeping durable queue

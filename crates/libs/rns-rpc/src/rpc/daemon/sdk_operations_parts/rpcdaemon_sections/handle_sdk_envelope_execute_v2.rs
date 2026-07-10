@@ -68,6 +68,8 @@ impl RpcDaemon {
             | "unignore_destination"
             | "prioritise"
             | "unprioritise"
+            | "allow_control"
+            | "disallow_control"
             | "propagation_peer_maintenance"
             | "propagation_ingest"
             | "propagation_fetch" => parsed.payload,

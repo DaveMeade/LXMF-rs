@@ -6,6 +6,8 @@ include!("release_domains_parts/sdk_release_c_domain_methods_roundtr.rs");
 
 include!("release_domains_parts/sdk_policy_mutator_registry.rs");
 
+include!("release_domains_parts/sdk_propagation_control_acl_envelope.rs");
+
 include!("release_domains_parts/sdk_propagation_recovery_envelope.rs");
 
 include!("release_domains_parts/sdk_paper_decode_reports_ingest_meta.rs");
