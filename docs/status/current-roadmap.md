@@ -1183,6 +1183,10 @@ Scoped release evidence is split as follows:
 - Inbound propagation offers now validate every offered transient ID before
   applying any source-accounting marks, so malformed mixed offers cannot leave
   partial received/completed queue state behind.
+- Inbound propagation message-get requests now validate every wanted and have
+  transient ID instead of silently filtering malformed entries, so malformed
+  mixed `/get` lists cannot fetch or purge queue state behind the rejected
+  request.
 - Inbound propagation offers now deduplicate validated offered transient IDs
   before building wanted-ID responses or applying source-accounting marks, so a
   duplicate offer cannot request or account the same payload more than once.
