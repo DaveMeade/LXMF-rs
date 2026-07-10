@@ -58,6 +58,71 @@ fn announce_received_parses_delivery_stamp_cost_from_python_app_data() {
 }
 
 #[test]
+fn delivery_announce_does_not_create_propagation_peer_or_queue_entries() {
+    let daemon = RpcDaemon::test_instance();
+    let peer = "bb".repeat(16);
+    daemon
+        .handle_rpc(rpc_request(
+            46,
+            "propagation_enable",
+            json!({
+                "enabled": true,
+                "autopeer": true,
+            }),
+        ))
+        .expect("enable propagation");
+    let entry = PropagationEntryRecord {
+        transient_id: "d1".repeat(32),
+        destination: "16".repeat(16),
+        payload_hex: "11".repeat(32),
+        received_at: 1_700_000_010,
+        size_bytes: 32,
+        stamp_value: None,
+    };
+    daemon.store.upsert_propagation_entry(&entry).expect("store entry");
+    let app_data = rmp_serde::to_vec_named(&MsgPackValue::Array(vec![
+        MsgPackValue::Binary(b"Delivery Only".to_vec()),
+        MsgPackValue::from(12),
+    ]))
+    .expect("encode app data");
+
+    let announce = daemon
+        .handle_rpc(rpc_request(
+            47,
+            "announce_received",
+            json!({
+                "peer": peer.as_str(),
+                "timestamp": 1_700_000_012i64,
+                "app_data_hex": hex::encode(app_data),
+                "aspect": "lxmf.delivery",
+                "hops": 1,
+            }),
+        ))
+        .expect("delivery announce");
+    assert!(announce.error.is_none());
+
+    assert_eq!(daemon.outbound_stamp_cost_for(peer.as_str()).expect("stamp cost lookup"), Some(12));
+    assert!(!daemon.peer_record_exists(peer.as_str(), false));
+    assert!(
+        daemon
+            .store
+            .list_peer_unhandled_propagation(peer.as_str())
+            .expect("pending propagation")
+            .is_empty()
+    );
+    let announce_event = daemon
+        .event_queue
+        .lock()
+        .expect("event queue")
+        .iter()
+        .find(|event| event.event_type == "announce_received")
+        .cloned()
+        .expect("announce event");
+    assert_eq!(announce_event.payload["aspect"], json!("lxmf.delivery"));
+    assert_eq!(announce_event.payload["stamp_cost"], json!(12));
+}
+
+#[test]
 fn announce_received_ignores_python_invalid_delivery_stamp_cost_from_app_data() {
     let daemon = RpcDaemon::test_instance();
     let app_data = rmp_serde::to_vec_named(&MsgPackValue::Array(vec![
