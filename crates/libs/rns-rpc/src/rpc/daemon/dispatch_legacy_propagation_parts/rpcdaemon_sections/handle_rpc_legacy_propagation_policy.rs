@@ -91,6 +91,40 @@ impl RpcDaemon {
                     error: None,
                 })
             }
+            "allow_destination" | "disallow_destination" | "prioritise_destination" => {
+                let params = request.params.ok_or_else(|| {
+                    std::io::Error::new(std::io::ErrorKind::InvalidInput, "missing params")
+                })?;
+                let parsed: DeliveryPolicyEntryParams = serde_json::from_value(params)
+                    .map_err(|err| std::io::Error::new(std::io::ErrorKind::InvalidInput, err))?;
+                let destination = normalize_policy_destination_hash(parsed.destination.as_str())?;
+
+                let policy = {
+                    let mut guard = self.delivery_policy.lock().expect("policy mutex poisoned");
+                    match request.method.as_str() {
+                        "allow_destination" => {
+                            insert_policy_hash(&mut guard.allowed_destinations, &destination)
+                        }
+                        "disallow_destination" => {
+                            remove_policy_hash(&mut guard.allowed_destinations, &destination)
+                        }
+                        "prioritise_destination" => {
+                            insert_policy_hash(&mut guard.prioritised_destinations, &destination)
+                        }
+                        _ => unreachable!("legacy propagation policy mutation route"),
+                    }
+                    guard.clone()
+                };
+                self.update_daemon_status_snapshot(|snapshot| {
+                    snapshot.delivery_policy = policy.clone();
+                });
+
+                Ok(RpcResponse {
+                    id: request.id,
+                    result: Some(json!({ "policy": policy })),
+                    error: None,
+                })
+            }
             "set_authentication" => {
                 let params = request.params.unwrap_or_else(|| json!({}));
                 let parsed: DeliveryPolicyAuthenticationParams = serde_json::from_value(params)

@@ -9,5 +9,8 @@ fn propagation_policy_method(method: &str) -> bool {
             | "unignore_destination"
             | "prioritise"
             | "unprioritise"
+            | "allow_destination"
+            | "disallow_destination"
+            | "prioritise_destination"
     )
 }

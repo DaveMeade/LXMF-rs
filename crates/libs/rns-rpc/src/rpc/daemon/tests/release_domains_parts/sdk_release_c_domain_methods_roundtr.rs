@@ -79,6 +79,15 @@ fn sdk_release_c_domain_methods_roundtrip() {
         .any(|entry| entry["id"] == json!("app.propagation.delivery_policy.set")));
     assert!(registry_entries
         .iter()
+        .any(|entry| entry["id"] == json!("app.propagation.delivery_policy.allow_destination")));
+    assert!(registry_entries.iter().any(|entry| {
+        entry["id"] == json!("app.propagation.delivery_policy.disallow_destination")
+    }));
+    assert!(registry_entries.iter().any(|entry| {
+        entry["id"] == json!("app.propagation.delivery_policy.prioritise_destination")
+    }));
+    assert!(registry_entries
+        .iter()
         .any(|entry| entry["id"] == json!("app.propagation.peer_maintenance")));
     assert!(registry_entries.iter().any(|entry| entry["id"] == json!("app.propagation.ingest")));
     assert!(registry_entries.iter().any(|entry| entry["id"] == json!("app.propagation.fetch")));
