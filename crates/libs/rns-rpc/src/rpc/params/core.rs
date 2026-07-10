@@ -72,6 +72,12 @@ struct AnnounceReceivedParams {
 }
 
 #[derive(Debug, Deserialize)]
+struct AnnounceDeliveryParams {
+    #[serde(alias = "destination", alias = "hash")]
+    destination_hash: String,
+}
+
+#[derive(Debug, Deserialize)]
 struct SetInterfacesParams {
     interfaces: Vec<InterfaceRecord>,
 }

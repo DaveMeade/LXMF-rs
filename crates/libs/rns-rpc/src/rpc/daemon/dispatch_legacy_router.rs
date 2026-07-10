@@ -62,6 +62,7 @@ impl RpcDaemon {
             | "request_path"
             | "link_count"
             | "announce_now"
+            | "announce_delivery"
             | "announce_received" => self.handle_rpc_legacy_misc(request),
             "rnode_management" | "weave_remote_display_control" => {
                 self.handle_rpc_legacy_misc(request)

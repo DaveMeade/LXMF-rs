@@ -1108,6 +1108,10 @@ Scoped release evidence is split as follows:
   `lxmf_bytes_hex`, stored/event identity, content, and metadata consistency,
   direct Curve25519 transport metadata, and verified signature metadata for
   both packet and resource delivery paths.
+- Python-style targeted local delivery announces now have focused daemon/RPC
+  coverage through `announce_delivery`: matching the local LXMF delivery hash
+  sends only the delivery announce bridge path, while non-local hashes are
+  rejected without firing broader propagation/control announce behavior.
 - Focused local propagated-delivery tests now also feed a real source announce
   through a transport interface channel before delivery, covering known-source
   propagated messages surface `signature_checked = true` with

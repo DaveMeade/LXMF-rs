@@ -409,6 +409,7 @@ impl RpcDaemon {
                     error: None,
                 })
             }
+            "announce_delivery" => self.handle_announce_delivery(request),
             "announce_received" => {
                 let params = request.params.ok_or_else(|| {
                     std::io::Error::new(std::io::ErrorKind::InvalidInput, "missing params")
@@ -492,3 +493,4 @@ impl RpcDaemon {
 }
 
 include!("dispatch_legacy_misc_parts/path_lookup.rs");
+include!("dispatch_legacy_misc_parts/announce_delivery.rs");
