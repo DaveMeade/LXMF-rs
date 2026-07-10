@@ -222,10 +222,18 @@ impl RpcDaemon {
         if iface.port.is_none() || Self::interface_setting_str(iface, "device").is_some() {
             return false;
         }
-        let target_host = Self::interface_setting_str(iface, "target_host")
-            .or_else(|| Self::interface_setting_str(iface, "forward_ip"));
+        let native_target_host = Self::interface_setting_str(iface, "target_host");
+        let forward_ip = Self::interface_setting_str(iface, "forward_ip");
+        let target_host = native_target_host.or(forward_ip);
         let target_port = Self::interface_setting_u64(iface, "target_port")
-            .or_else(|| Self::interface_setting_u64(iface, "forward_port"));
+            .or_else(|| Self::interface_setting_u64(iface, "forward_port"))
+            .or_else(|| {
+                if native_target_host.is_none() && forward_ip.is_some() {
+                    iface.port.map(u64::from)
+                } else {
+                    None
+                }
+            });
         if target_host.is_some() ^ target_port.is_some() {
             return false;
         }

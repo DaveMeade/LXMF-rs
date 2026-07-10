@@ -260,8 +260,18 @@ fn udp_forward_addr(record: &InterfaceRecord) -> Option<String> {
 }
 
 fn udp_forward_addr_result(record: &InterfaceRecord) -> Result<Option<String>, io::Error> {
-    let host = setting_str(record, "target_host").or_else(|| setting_str(record, "forward_ip"));
-    let port = setting_u64(record, "target_port").or_else(|| setting_u64(record, "forward_port"));
+    let target_host = setting_str(record, "target_host");
+    let forward_ip = setting_str(record, "forward_ip");
+    let host = target_host.or(forward_ip);
+    let port = setting_u64(record, "target_port")
+        .or_else(|| setting_u64(record, "forward_port"))
+        .or_else(|| {
+            if target_host.is_none() && forward_ip.is_some() {
+                record.port.map(u64::from)
+            } else {
+                None
+            }
+        });
     let (host, port) = match (host, port) {
         (Some(host), Some(port)) => (host, port),
         (None, None) => return Ok(None),
