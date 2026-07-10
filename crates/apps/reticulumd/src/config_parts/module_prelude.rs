@@ -75,6 +75,8 @@ impl<'de> Deserialize<'de> for DaemonConfig {
 #[allow(dead_code)]
 struct ReticulumConfigRaw {
     #[serde(default)]
+    enable_transport: Option<bool>,
+    #[serde(default)]
     share_instance: Option<bool>,
     #[serde(default)]
     shared_instance_type: Option<String>,
@@ -449,6 +451,10 @@ impl DaemonConfig {
         let contents = fs::read_to_string(path)?;
         Self::from_toml(&contents)
             .map_err(|err| std::io::Error::new(std::io::ErrorKind::InvalidData, err))
+    }
+
+    pub fn reticulum_transport_enabled(&self) -> bool {
+        self.reticulum_enable_transport
     }
 
     pub fn enabled_tcp_clients(&self) -> Vec<&InterfaceConfig> {

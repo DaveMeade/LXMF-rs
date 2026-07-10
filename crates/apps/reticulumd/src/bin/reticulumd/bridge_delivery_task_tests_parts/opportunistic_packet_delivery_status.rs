@@ -43,6 +43,7 @@ async fn opportunistic_packet_delivery_reports_status_hash_and_bytes() {
         receipt_map: receipt_map.clone(),
         outbound_resource_map: Arc::new(Mutex::new(HashMap::new())),
         outbound_propagation_link: Arc::new(tokio::sync::Mutex::new(None)),
+        direct_backchannel_links: DirectBackchannelLinks::new(),
         receipt_tx,
         message_id: message_id.to_string(),
         source_hash: [1u8; 16],

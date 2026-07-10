@@ -125,6 +125,17 @@ async fn wait_for_tcp_server_connect(host: &str, port: u16) -> TcpStream {
     panic!("tcp_server hot-apply listener did not accept connections: {last_error:?}");
 }
 
+async fn wait_for_tcp_server_rejects_connect(host: &str, port: u16) {
+    let endpoint = format!("{host}:{port}");
+    for _ in 0..40 {
+        if TcpStream::connect(&endpoint).await.is_err() {
+            return;
+        }
+        tokio::time::sleep(Duration::from_millis(25)).await;
+    }
+    panic!("tcp_server hot-apply listener still accepted connections after removal");
+}
+
 #[tokio::test(flavor = "current_thread")]
 async fn hot_apply_spawns_tcp_client_connections() {
     let listener = TcpListener::bind("127.0.0.1:0").await.expect("bind listener");
@@ -254,22 +265,21 @@ async fn hot_apply_removes_tcp_server_when_disabled_closes_listener() {
     drop(reserved);
     let iface_manager = Arc::new(tokio::sync::Mutex::new(InterfaceManager::new(8)));
     let mut managed = HashMap::new();
-    let refreshes = udp_refreshes();
-    let tcp_refreshes = tcp_listener_refreshes();
+    let refreshes = runtime_refreshes();
 
     apply_hot_apply_interface_records(
         &iface_manager,
         &mut managed,
         vec![tcp_server_record("listener", "127.0.0.1", port)],
         None,
-        &tcp_refreshes,
         &refreshes,
         None,
     )
     .await;
 
     let address = managed.get("listener").expect("managed tcp_server").address;
-    assert!(tcp_refreshes
+    assert!(refreshes
+        .tcp_listeners
         .lock()
         .expect("tcp listener refresh mutex poisoned")
         .contains_key("listener"));
@@ -283,14 +293,14 @@ async fn hot_apply_removes_tcp_server_when_disabled_closes_listener() {
         &mut managed,
         vec![disabled],
         None,
-        &tcp_refreshes,
         &refreshes,
         None,
     )
     .await;
 
     assert!(managed.is_empty());
-    assert!(!tcp_refreshes
+    assert!(!refreshes
+        .tcp_listeners
         .lock()
         .expect("tcp listener refresh mutex poisoned")
         .contains_key("listener"));
