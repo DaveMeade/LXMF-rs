@@ -131,8 +131,16 @@ fn maps_inbound_success_to_typed_details() {
                     "fields": {
                         "_lxmf": {
                             "signature_checked": true,
+                            "signature_valid": true,
                             "signature_status": "verified",
-                            "stamp_status": "accepted"
+                            "stamp_checked": true,
+                            "stamp_valid": true,
+                            "stamp_status": "accepted",
+                            "propagation_stamp_checked": true,
+                            "propagation_stamp_valid": false,
+                            "method": 2,
+                            "transport_encrypted": true,
+                            "transport_encryption": "Curve25519"
                         }
                     }
                 }
@@ -152,8 +160,16 @@ fn maps_inbound_success_to_typed_details() {
     assert_eq!(details.lxmf_bytes_hex.as_deref(), Some("aabbcc"));
     assert_eq!(details.receipt_status.as_deref(), Some("received"));
     assert_eq!(details.signature_checked, Some(true));
+    assert_eq!(details.signature_valid, Some(true));
     assert_eq!(details.signature_status.as_deref(), Some("verified"));
+    assert_eq!(details.stamp_checked, Some(true));
+    assert_eq!(details.stamp_valid, Some(true));
     assert_eq!(details.stamp_status.as_deref(), Some("accepted"));
+    assert_eq!(details.propagation_stamp_checked, Some(true));
+    assert_eq!(details.propagation_stamp_valid, Some(false));
+    assert_eq!(details.method, Some(2));
+    assert_eq!(details.transport_encrypted, Some(true));
+    assert_eq!(details.transport_encryption.as_deref(), Some("Curve25519"));
 }
 
 #[test]
@@ -164,6 +180,9 @@ fn maps_inbound_drop_to_typed_details() {
             json!({
                 "reason": "payload_too_short",
                 "delivery_kind": "propagation",
+                "operation": "propagation_remote_fetch",
+                "transient_id": "transient-drop-1",
+                "peer": "peer-drop-source",
                 "raw_destination_hash": "sha256:raw",
                 "resolved_destination_hash": "sha256:resolved",
                 "source_hash": "sha256:source",
@@ -179,10 +198,13 @@ fn maps_inbound_drop_to_typed_details() {
 
     assert!(matches!(mapped.kind, EventKind::InboundMessageDropped));
     assert_eq!(mapped.metadata.message_id.as_deref(), Some("msg-drop-1"));
-    assert_eq!(mapped.metadata.peer_id.as_deref(), Some("sha256:source"));
+    assert_eq!(mapped.metadata.peer_id.as_deref(), Some("peer-drop-source"));
     let details = mapped.inbound_drop_details().expect("drop details");
     assert_eq!(details.reason.as_deref(), Some("payload_too_short"));
     assert_eq!(details.delivery_kind.as_deref(), Some("propagation"));
+    assert_eq!(details.operation.as_deref(), Some("propagation_remote_fetch"));
+    assert_eq!(details.transient_id.as_deref(), Some("transient-drop-1"));
+    assert_eq!(details.peer.as_deref(), Some("peer-drop-source"));
     assert_eq!(details.raw_destination_hash.as_deref(), Some("sha256:raw"));
     assert_eq!(details.resolved_destination_hash.as_deref(), Some("sha256:resolved"));
     assert_eq!(details.source_hash.as_deref(), Some("sha256:source"));
@@ -230,7 +252,8 @@ fn maps_receipt_event_to_lifecycle_details() {
                 "packet_hash": "packet-1",
                 "resource_hash": "resource-1",
                 "bytes": 128,
-                "link_id": "link-1"
+                "link_id": "link-1",
+                "stage": "transport_receipt"
             }),
         ),
         "desktop_default",
@@ -249,4 +272,5 @@ fn maps_receipt_event_to_lifecycle_details() {
     assert_eq!(details.resource_hash.as_deref(), Some("resource-1"));
     assert_eq!(details.bytes, Some(128));
     assert_eq!(details.link_id.as_deref(), Some("link-1"));
+    assert_eq!(details.stage.as_deref(), Some("transport_receipt"));
 }

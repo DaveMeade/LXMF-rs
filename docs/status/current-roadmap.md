@@ -1043,9 +1043,17 @@ Scoped release evidence is split as follows:
 - The native SDK app event mapper now projects inbound delivery, receipt, and
   drop payloads into typed helpers on the existing event path, preserving
   message IDs, source/destination hashes, raw LXMF bytes, delivery kind,
-  receipt status, signature/stamp metadata, drop reason, and lifecycle state
-  without requiring REM/RCH clients to parse raw event JSON for normal message
-  and status UI.
+  receipt status, signature/stamp metadata, drop reason, remote propagation
+  operation/transient/peer context, and lifecycle state without requiring
+  REM/RCH clients to parse raw event JSON for normal message and status UI.
+- Typed inbound message helpers now expose the richer handler metadata already
+  carried in raw inbound events: signature validity, stamp validity,
+  propagation stamp validity, LXMF method, and direct transport encryption
+  fields.
+- Receipt lifecycle events now preserve handler/bridge stage provenance in the
+  pollable SDK payload and typed app lifecycle helper, so transport-origin
+  delivery receipts can be distinguished from other receipt publishers without
+  raw JSON parsing.
 - RPC-layer propagation rejects for ignored destination hashes now emit bounded
   `inbound_dropped` events before returning `PermissionDenied` from
   `propagation_ingest` and remote fetch/download/sync imports. The events use
