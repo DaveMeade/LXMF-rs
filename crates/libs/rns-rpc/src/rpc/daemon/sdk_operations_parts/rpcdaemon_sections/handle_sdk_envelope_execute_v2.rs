@@ -52,6 +52,7 @@ impl RpcDaemon {
             | "propagation_remote_unpeer"
             | "propagation_acknowledge_sync_completion"
             | "get_outbound_propagation_cost"
+            | "get_outbound_stamp_cost"
             | "get_outbound_propagation_node"
             | "set_outbound_propagation_node"
             | "list_propagation_nodes"

@@ -174,6 +174,12 @@ struct StampPolicySetParams {
 }
 
 #[derive(Debug, Deserialize)]
+struct OutboundStampCostParams {
+    #[serde(alias = "destination_hash", alias = "hash")]
+    destination: String,
+}
+
+#[derive(Debug, Deserialize)]
 struct TicketGenerateParams {
     destination: String,
     #[serde(default)]

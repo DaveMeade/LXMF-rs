@@ -1,6 +1,7 @@
 #[test]
 fn announce_received_parses_delivery_stamp_cost_from_python_app_data() {
     let daemon = RpcDaemon::test_instance();
+    let destination = "00112233445566778899aabbccddeeff";
     let app_data = rmp_serde::to_vec_named(&MsgPackValue::Array(vec![
         MsgPackValue::Binary(b"Peer Stamp".to_vec()),
         MsgPackValue::from(22),
@@ -12,7 +13,7 @@ fn announce_received_parses_delivery_stamp_cost_from_python_app_data() {
             45,
             "announce_received",
             json!({
-                "peer": "peer-delivery-stamp",
+                "peer": destination,
                 "timestamp": 1_700_000_012i64,
                 "app_data_hex": hex::encode(app_data),
                 "aspect": "lxmf.delivery",
@@ -22,9 +23,38 @@ fn announce_received_parses_delivery_stamp_cost_from_python_app_data() {
     assert!(announce.error.is_none());
 
     assert_eq!(
-        daemon.outbound_stamp_cost_for("peer-delivery-stamp").expect("stamp cost lookup"),
+        daemon.outbound_stamp_cost_for(destination).expect("stamp cost lookup"),
         Some(22)
     );
+
+    let queried = daemon
+        .handle_rpc(rpc_request(
+            46,
+            "get_outbound_stamp_cost",
+            json!({ "destination_hash": destination }),
+        ))
+        .expect("query outbound stamp cost");
+    assert!(queried.error.is_none());
+    let result = queried.result.expect("query result");
+    assert_eq!(result["destination"].as_str(), Some(destination));
+    assert_eq!(result["stamp_cost"].as_u64(), Some(22));
+
+    let envelope = daemon
+        .handle_rpc(rpc_request(
+            47,
+            "sdk_envelope_execute_v2",
+            json!({
+                "operation_id": "get_outbound_stamp_cost",
+                "kind": "query",
+                "payload": { "destination": destination },
+            }),
+        ))
+        .expect("query outbound stamp cost through sdk envelope");
+    assert!(envelope.error.is_none());
+    let response = envelope.result.expect("envelope result")["response"].clone();
+    assert_eq!(response["operation_id"].as_str(), Some("app.delivery.outbound_stamp_cost"));
+    assert_eq!(response["payload"]["destination"].as_str(), Some(destination));
+    assert_eq!(response["payload"]["stamp_cost"].as_u64(), Some(22));
 }
 
 #[test]

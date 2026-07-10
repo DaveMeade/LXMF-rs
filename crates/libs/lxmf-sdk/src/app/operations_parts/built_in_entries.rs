@@ -469,6 +469,14 @@ fn built_in_entries() -> Vec<OperationEntry> {
             "Resolve the runtime delivery destination hash.",
         )
         .with_alias("status"),
+        OperationEntry::new(
+            "app.delivery.outbound_stamp_cost",
+            "delivery",
+            OperationKind::Query,
+            TransportVariant::LegacyRpc,
+            "Return the cached outbound delivery stamp cost for one destination.",
+        )
+        .with_alias("get_outbound_stamp_cost"),
     ]
     ]
     .concat()
