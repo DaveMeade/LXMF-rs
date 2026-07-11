@@ -4,7 +4,7 @@ use reticulum_daemon::announce_names::{
     normalize_capabilities, normalize_display_name, PropagationNodeAnnounceConfig,
 };
 
-use reticulum_daemon::config::{DaemonConfig, InterfaceConfig};
+use reticulum_daemon::config::{DaemonConfig, InterfaceConfig, ReticulumRuntimePolicy};
 
 use reticulum_daemon::identity_store::load_or_create_identity;
 
@@ -292,7 +292,18 @@ pub(super) async fn bootstrap(args: Args) -> BootstrapContext {
     configure_startup_rpc_token_auth(&args, daemon.as_ref());
     enforce_rpc_bind_security(rpc_addr.as_ref(), rpc_tls.as_ref(), daemon.as_ref());
     if let Some(transport) = transport.as_ref() {
-        daemon.set_path_lookup_bridge(Arc::new(DaemonPathLookupBridge::new(transport.clone())));
+        let discovery_sources = args
+            .config
+            .as_ref()
+            .and_then(|path| std::fs::read_to_string(path).ok())
+            .and_then(|input| ReticulumRuntimePolicy::from_toml(&input).ok())
+            .map(|policy| policy.interface_discovery_sources)
+            .unwrap_or_default();
+        daemon.set_path_lookup_bridge(Arc::new(DaemonPathLookupBridge::with_discovery_store(
+            transport.clone(),
+            &reticulum_storage_path,
+            discovery_sources,
+        )));
         daemon.set_interface_mutation_bridge(Arc::new(
             InterfaceHotApplyBridge::spawn_with_transport_and_daemon(
                 transport.clone(),

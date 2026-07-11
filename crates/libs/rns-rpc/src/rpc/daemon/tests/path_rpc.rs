@@ -143,6 +143,44 @@ impl PathLookupBridge for MetadataPathLookupBridge {
     }
 }
 
+struct RuntimeManagementBridge;
+
+impl PathLookupBridge for RuntimeManagementBridge {
+    fn has_path(&self, _destination: &str) -> Result<bool, std::io::Error> {
+        Ok(false)
+    }
+
+    fn request_path(&self, _destination: &str) -> Result<(), std::io::Error> {
+        Ok(())
+    }
+
+    fn drop_announce_queues(&self) -> Result<usize, std::io::Error> {
+        Ok(4)
+    }
+
+    fn rate_table(&self) -> Result<JsonValue, std::io::Error> {
+        Ok(json!([{
+            "hash": "00112233445566778899aabbccddeeff",
+            "last": 10.0,
+            "rate_violations": 2,
+            "blocked_until": 20.0,
+            "timestamps": [9.0, 10.0],
+        }]))
+    }
+
+    fn packet_signal(&self, _packet_hash: &str) -> Result<JsonValue, std::io::Error> {
+        Ok(json!({ "rssi": -61.0, "snr": 7.5, "q": 88.0 }))
+    }
+
+    fn discovered_interfaces(&self) -> Result<JsonValue, std::io::Error> {
+        Ok(json!([{
+            "type": "BackboneInterface",
+            "status": "available",
+            "status_code": 1000,
+        }]))
+    }
+}
+
 #[test]
 fn path_status_reports_known_path() {
     let daemon = RpcDaemon::test_instance();
@@ -208,6 +246,44 @@ fn path_mutation_rpc_matches_python_drop_results() {
         .expect("drop all via response");
     assert!(dropped.error.is_none());
     assert_eq!(dropped.result, Some(json!({ "dropped": 3 })));
+}
+
+#[test]
+fn runtime_management_rpc_matches_python_result_shapes() {
+    let daemon = RpcDaemon::test_instance();
+    daemon.set_path_lookup_bridge(Arc::new(RuntimeManagementBridge));
+
+    let dropped = daemon
+        .handle_rpc(rpc_request(16, "drop_announce_queues", json!({})))
+        .expect("drop announce queues response");
+    assert_eq!(dropped.result, Some(json!({ "dropped": 4 })));
+
+    let rate_table = daemon
+        .handle_rpc(rpc_request(17, "get_rate_table", json!({})))
+        .expect("rate table response");
+    let rows = rate_table.result.expect("rate table");
+    assert_eq!(rows[0]["rate_violations"].as_u64(), Some(2));
+    assert_eq!(rows[0]["timestamps"].as_array().map(Vec::len), Some(2));
+
+    let discovered = daemon
+        .handle_rpc(rpc_request(19, "discovered_interfaces", json!({})))
+        .expect("discovered interfaces response")
+        .result
+        .expect("discovered interfaces");
+    assert_eq!(discovered[0]["status"].as_str(), Some("available"));
+
+    for (method, expected) in
+        [("get_packet_rssi", -61.0), ("get_packet_snr", 7.5), ("get_packet_q", 88.0)]
+    {
+        let response = daemon
+            .handle_rpc(rpc_request(
+                18,
+                method,
+                json!({ "packet_hash": "00".repeat(32) }),
+            ))
+            .expect("packet signal response");
+        assert_eq!(response.result.and_then(|value| value.as_f64()), Some(expected));
+    }
 }
 
 #[test]

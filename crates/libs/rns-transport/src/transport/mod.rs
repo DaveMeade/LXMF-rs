@@ -8,7 +8,7 @@ use path_requests::PathRequests;
 use path_requests::TagBytes;
 use path_table::PathTable;
 use rand_core::OsRng;
-use std::collections::HashMap;
+use std::collections::{HashMap, VecDeque};
 use std::path::PathBuf;
 use std::time::Duration;
 use tokio::time;
@@ -67,6 +67,8 @@ mod path_table;
 mod reticulum_announce_cache;
 mod reticulum_path_store;
 mod tunnels;
+
+pub use announce_limits::AnnounceRateTableEntry;
 
 pub use reticulum_path_store::{
     RestoredReticulumPathIdentity, ReticulumPathTableRestoreReport,
@@ -220,6 +222,7 @@ pub(crate) struct TransportHandler {
     single_out_destinations: HashMap<AddressHash, Arc<Mutex<SingleOutputDestination>>>,
 
     announce_limits: AnnounceLimits,
+    packet_signal_cache: VecDeque<(Hash, PacketSignal)>,
 
     out_links: HashMap<AddressHash, Arc<Mutex<Link>>>,
     in_links: HashMap<AddressHash, Arc<Mutex<Link>>>,
@@ -273,6 +276,13 @@ pub struct Transport {
     handler: Arc<Mutex<TransportHandler>>,
     iface_manager: Arc<Mutex<InterfaceManager>>,
     cancel: CancellationToken,
+}
+
+#[derive(Debug, Clone, Copy, Default, PartialEq)]
+pub struct PacketSignal {
+    pub rssi: Option<f64>,
+    pub snr: Option<f64>,
+    pub q: Option<f64>,
 }
 
 #[derive(Clone)]

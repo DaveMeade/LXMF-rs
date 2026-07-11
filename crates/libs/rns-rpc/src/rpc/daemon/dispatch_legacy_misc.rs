@@ -12,20 +12,17 @@ impl RpcDaemon {
                 })?;
                 let parsed: PaperIngestUriParams = serde_json::from_value(params)
                     .map_err(|err| std::io::Error::new(std::io::ErrorKind::InvalidInput, err))?;
-
                 if !parsed.uri.starts_with("lxm://") {
                     return Err(std::io::Error::new(
                         std::io::ErrorKind::InvalidInput,
                         "paper URI must start with lxm://",
                     ));
                 }
-
                 let transient_id = {
                     let mut hasher = Sha256::new();
                     hasher.update(parsed.uri.as_bytes());
                     encode_hex(hasher.finalize())
                 };
-
                 let duplicate = {
                     let mut guard =
                         self.paper_ingest_seen.lock().expect("paper ingest mutex poisoned");
@@ -38,7 +35,6 @@ impl RpcDaemon {
                 };
                 let body = parsed.uri.trim_start_matches("lxm://");
                 let destination = first_n_chars(body, 32).unwrap_or_default();
-
                 Ok(RpcResponse {
                     id: request.id,
                     result: Some(json!({
@@ -64,7 +60,6 @@ impl RpcDaemon {
                 })?;
                 let parsed: StampPolicySetParams = serde_json::from_value(params)
                     .map_err(|err| std::io::Error::new(std::io::ErrorKind::InvalidInput, err))?;
-
                 let policy = {
                     let mut guard = self.stamp_policy.lock().expect("stamp mutex poisoned");
                     if let Some(value) = parsed.target_cost {
@@ -81,7 +76,6 @@ impl RpcDaemon {
                 self.update_daemon_status_snapshot(|snapshot| {
                     snapshot.stamp_policy = policy.clone();
                 });
-
                 Ok(RpcResponse {
                     id: request.id,
                     result: Some(json!({ "stamp_policy": policy })),
@@ -215,6 +209,12 @@ impl RpcDaemon {
                 self.handle_rpc_legacy_path_metadata(request)
             }
             "drop_path" | "drop_all_via" => self.handle_rpc_legacy_path_mutation(request),
+            "drop_announce_queues"
+            | "get_rate_table"
+            | "discovered_interfaces"
+            | "get_packet_rssi"
+            | "get_packet_snr"
+            | "get_packet_q" => self.handle_rpc_legacy_runtime_management(request),
             "request_path" => {
                 let params = request.params.ok_or_else(|| {
                     std::io::Error::new(std::io::ErrorKind::InvalidInput, "missing params")

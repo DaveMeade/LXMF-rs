@@ -69,6 +69,26 @@
       "evidence": ["unit", "simulated", "pinned-python"]
     },
     {
+      "pattern": "RNS.Reticulum.Reticulum.drop_announce_queues",
+      "implementation": "complete",
+      "rust_surface": ["reticulum-rs-rpc::drop_announce_queues", "reticulum-rs-transport::Transport::drop_announce_queues"],
+      "evidence": ["unit", "simulated", "pinned-python"]
+    },
+    {
+      "pattern": "RNS.Reticulum.Reticulum.get_rate_table",
+      "implementation": "complete",
+      "rust_surface": ["reticulum-rs-rpc::get_rate_table", "reticulum-rs-transport::Transport::announce_rate_table"],
+      "evidence": ["unit", "simulated", "pinned-python"],
+      "notes": "Retains Python's maximum of 16 timestamps per destination."
+    },
+    {
+      "pattern": "RNS.Reticulum.Reticulum.get_packet_*",
+      "implementation": "complete",
+      "rust_surface": ["reticulum-rs-rpc::get_packet_rssi/get_packet_snr/get_packet_q", "reticulum-rs-transport::Transport::packet_signal"],
+      "evidence": ["unit", "simulated", "pinned-python"],
+      "notes": "Uses Python's 512-entry FIFO retention limit and latest-value lookup."
+    },
+    {
       "pattern": "RNS.Reticulum.Reticulum.rpc_loop",
       "implementation": "complete",
       "rust_surface": ["reticulumd::rpc", "reticulum-rs-rpc::RpcDaemon"],
@@ -214,6 +234,19 @@
       "implementation": "complete",
       "rust_surface": ["reticulumd::config::ReticulumRuntimePolicy"],
       "evidence": ["unit", "pinned-python"]
+    },
+    {
+      "pattern": "RNS.Reticulum.Reticulum.discovered_interfaces",
+      "implementation": "complete",
+      "rust_surface": ["reticulum-rs-rpc::discovered_interfaces", "reticulum-rs-transport::discovery::InterfaceDiscoveryStore"],
+      "evidence": ["unit", "simulated", "pinned-python"],
+      "notes": "Implements Python-compatible persistence, source/type/endpoint filtering, age status transitions, seven-day expiry, and result ordering."
+    },
+    {
+      "pattern": "RNS.Reticulum.Reticulum",
+      "implementation": "complete",
+      "rust_surface": ["reticulumd", "reticulum-rs-rpc::RpcDaemon", "reticulum-rs-transport::Transport"],
+      "evidence": ["unit", "simulated", "pinned-python"]
     },
     {
       "pattern": "RNS.Reticulum.*",

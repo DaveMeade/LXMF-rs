@@ -151,6 +151,22 @@ pub trait PathLookupBridge: Send + Sync {
         Err(std::io::Error::other("path mutation bridge is not configured"))
     }
 
+    fn drop_announce_queues(&self) -> Result<usize, std::io::Error> {
+        Err(std::io::Error::other("announce queue bridge is not configured"))
+    }
+
+    fn rate_table(&self) -> Result<JsonValue, std::io::Error> {
+        Err(std::io::Error::other("rate table bridge is not configured"))
+    }
+
+    fn packet_signal(&self, _packet_hash: &str) -> Result<JsonValue, std::io::Error> {
+        Err(std::io::Error::other("packet signal bridge is not configured"))
+    }
+
+    fn discovered_interfaces(&self) -> Result<JsonValue, std::io::Error> {
+        Err(std::io::Error::other("interface discovery bridge is not configured"))
+    }
+
     fn remove_paths_for_identity(&self, _identity: &str) -> Result<usize, std::io::Error> {
         Ok(0)
     }

@@ -17171,11 +17171,12 @@
         "pinned-python"
       ],
       "id": "RNS.Reticulum.Reticulum",
-      "implementation": "partial",
+      "implementation": "complete",
       "kind": "class",
       "rust_surface": [
         "reticulumd",
-        "reticulum-rs-rpc::RpcDaemon"
+        "reticulum-rs-rpc::RpcDaemon",
+        "reticulum-rs-transport::Transport"
       ],
       "source": "Reticulum.py"
     },
@@ -17214,11 +17215,12 @@
         "pinned-python"
       ],
       "id": "RNS.Reticulum.Reticulum.discovered_interfaces",
-      "implementation": "partial",
+      "implementation": "complete",
       "kind": "method",
+      "notes": "Implements Python-compatible persistence, source/type/endpoint filtering, age status transitions, seven-day expiry, and result ordering.",
       "rust_surface": [
-        "reticulumd",
-        "reticulum-rs-rpc::RpcDaemon"
+        "reticulum-rs-rpc::discovered_interfaces",
+        "reticulum-rs-transport::discovery::InterfaceDiscoveryStore"
       ],
       "source": "Reticulum.py"
     },
@@ -17244,11 +17246,11 @@
         "pinned-python"
       ],
       "id": "RNS.Reticulum.Reticulum.drop_announce_queues",
-      "implementation": "partial",
+      "implementation": "complete",
       "kind": "method",
       "rust_surface": [
-        "reticulumd",
-        "reticulum-rs-rpc::RpcDaemon"
+        "reticulum-rs-rpc::drop_announce_queues",
+        "reticulum-rs-transport::Transport::drop_announce_queues"
       ],
       "source": "Reticulum.py"
     },
@@ -17389,11 +17391,12 @@
         "pinned-python"
       ],
       "id": "RNS.Reticulum.Reticulum.get_packet_q",
-      "implementation": "partial",
+      "implementation": "complete",
       "kind": "method",
+      "notes": "Uses Python's 512-entry FIFO retention limit and latest-value lookup.",
       "rust_surface": [
-        "reticulumd",
-        "reticulum-rs-rpc::RpcDaemon"
+        "reticulum-rs-rpc::get_packet_rssi/get_packet_snr/get_packet_q",
+        "reticulum-rs-transport::Transport::packet_signal"
       ],
       "source": "Reticulum.py"
     },
@@ -17404,11 +17407,12 @@
         "pinned-python"
       ],
       "id": "RNS.Reticulum.Reticulum.get_packet_rssi",
-      "implementation": "partial",
+      "implementation": "complete",
       "kind": "method",
+      "notes": "Uses Python's 512-entry FIFO retention limit and latest-value lookup.",
       "rust_surface": [
-        "reticulumd",
-        "reticulum-rs-rpc::RpcDaemon"
+        "reticulum-rs-rpc::get_packet_rssi/get_packet_snr/get_packet_q",
+        "reticulum-rs-transport::Transport::packet_signal"
       ],
       "source": "Reticulum.py"
     },
@@ -17419,11 +17423,12 @@
         "pinned-python"
       ],
       "id": "RNS.Reticulum.Reticulum.get_packet_snr",
-      "implementation": "partial",
+      "implementation": "complete",
       "kind": "method",
+      "notes": "Uses Python's 512-entry FIFO retention limit and latest-value lookup.",
       "rust_surface": [
-        "reticulumd",
-        "reticulum-rs-rpc::RpcDaemon"
+        "reticulum-rs-rpc::get_packet_rssi/get_packet_snr/get_packet_q",
+        "reticulum-rs-transport::Transport::packet_signal"
       ],
       "source": "Reticulum.py"
     },
@@ -17449,11 +17454,12 @@
         "pinned-python"
       ],
       "id": "RNS.Reticulum.Reticulum.get_rate_table",
-      "implementation": "partial",
+      "implementation": "complete",
       "kind": "method",
+      "notes": "Retains Python's maximum of 16 timestamps per destination.",
       "rust_surface": [
-        "reticulumd",
-        "reticulum-rs-rpc::RpcDaemon"
+        "reticulum-rs-rpc::get_rate_table",
+        "reticulum-rs-transport::Transport::announce_rate_table"
       ],
       "source": "Reticulum.py"
     },
@@ -23826,9 +23832,9 @@
     "includes": "public RNS/LXMF callables and committed manual product contracts"
   },
   "summary": {
-    "complete": 589,
+    "complete": 596,
     "not-applicable": 1,
-    "partial": 1075,
+    "partial": 1068,
     "total": 1665
   }
 }

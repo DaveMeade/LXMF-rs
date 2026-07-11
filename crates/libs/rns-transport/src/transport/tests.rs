@@ -23,3 +23,5 @@ include!("tests_parts/unicast_iface_for_source_returns_non.rs");
 include!("tests_parts/inbound_link_request_registers_unicast.rs");
 
 include!("tests_parts/blackhole_path_eviction.rs");
+
+include!("tests_parts/reticulum_runtime_management.rs");

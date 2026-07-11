@@ -66,6 +66,7 @@ impl Transport {
             single_in_destination_app_data: HashMap::new(),
             single_out_destinations: HashMap::new(),
             announce_limits: AnnounceLimits::new(),
+            packet_signal_cache: VecDeque::new(),
             out_links: HashMap::new(),
             in_links: HashMap::new(),
             packet_cache: Mutex::new(PacketCache::new()),

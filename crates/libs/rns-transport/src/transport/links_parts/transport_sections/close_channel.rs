@@ -231,6 +231,35 @@ impl Transport {
         self.handler.lock().await.path_table.expire_paths_via(transport)
     }
 
+    pub async fn drop_announce_queues(&self) -> usize {
+        self.iface_manager.lock().await.drop_announce_queues()
+    }
+
+    pub async fn announce_rate_table(&self) -> Vec<crate::transport::AnnounceRateTableEntry> {
+        self.handler.lock().await.announce_limits.rate_table()
+    }
+
+    /// Records per-packet radio metadata for local-client management queries.
+    /// Entries use Python Reticulum's 512-item FIFO retention limit.
+    pub async fn record_packet_signal(&self, packet_hash: Hash, signal: PacketSignal) {
+        let mut handler = self.handler.lock().await;
+        handler.packet_signal_cache.push_back((packet_hash, signal));
+        while handler.packet_signal_cache.len() > 512 {
+            handler.packet_signal_cache.pop_front();
+        }
+    }
+
+    pub async fn packet_signal(&self, packet_hash: &Hash) -> Option<PacketSignal> {
+        self.handler
+            .lock()
+            .await
+            .packet_signal_cache
+            .iter()
+            .rev()
+            .find(|(hash, _)| hash == packet_hash)
+            .map(|(_, signal)| *signal)
+    }
+
     pub async fn expire_paths_for_identity(&self, identity: &AddressHash) -> usize {
         let destinations = {
             let handler = self.handler.lock().await;

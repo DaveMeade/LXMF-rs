@@ -9,6 +9,7 @@ use tokio::time::Instant;
 use crate::hash::AddressHash;
 use crate::iface::{IfaceSource, InterfaceSharedConfig};
 use crate::packet::{Packet, PacketContext};
+use crate::ratchets::now_secs;
 
 #[derive(Clone)]
 pub struct AnnounceRateLimit {
@@ -224,8 +225,20 @@ impl AnnounceLimitEntry {
 #[derive(Clone)]
 struct AnnounceRateTargetEntry {
     last: Instant,
+    last_epoch: f64,
     rate_violations: u64,
     blocked_until: Instant,
+    blocked_until_epoch: f64,
+    timestamps: VecDeque<f64>,
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub struct AnnounceRateTableEntry {
+    pub destination: AddressHash,
+    pub last: f64,
+    pub rate_violations: u64,
+    pub blocked_until: f64,
+    pub timestamps: Vec<f64>,
 }
 
 pub struct ReleasedAnnounce {
@@ -403,14 +416,27 @@ impl AnnounceLimits {
 
         let Entry::Occupied(mut entry) = self.announce_rate_targets.entry(packet.destination)
         else {
+            let epoch = now_secs();
             self.announce_rate_targets.insert(
                 packet.destination,
-                AnnounceRateTargetEntry { last: now, rate_violations: 0, blocked_until: now },
+                AnnounceRateTargetEntry {
+                    last: now,
+                    last_epoch: epoch,
+                    rate_violations: 0,
+                    blocked_until: now,
+                    blocked_until_epoch: 0.0,
+                    timestamps: VecDeque::from([epoch]),
+                },
             );
             return false;
         };
 
         let entry = entry.get_mut();
+        let epoch = now_secs();
+        entry.timestamps.push_back(epoch);
+        while entry.timestamps.len() > 16 {
+            entry.timestamps.pop_front();
+        }
         if now <= entry.blocked_until {
             return true;
         }
@@ -424,11 +450,27 @@ impl AnnounceLimits {
 
         if entry.rate_violations > grace {
             entry.blocked_until = entry.last + target + penalty;
+            entry.blocked_until_epoch =
+                entry.last_epoch + target.as_secs_f64() + penalty.as_secs_f64();
             true
         } else {
             entry.last = now;
+            entry.last_epoch = epoch;
             false
         }
+    }
+
+    pub fn rate_table(&self) -> Vec<AnnounceRateTableEntry> {
+        self.announce_rate_targets
+            .iter()
+            .map(|(destination, entry)| AnnounceRateTableEntry {
+                destination: *destination,
+                last: entry.last_epoch,
+                rate_violations: entry.rate_violations,
+                blocked_until: entry.blocked_until_epoch,
+                timestamps: entry.timestamps.iter().copied().collect(),
+            })
+            .collect()
     }
 
     pub fn release_ready(&mut self) -> Vec<ReleasedAnnounce> {
@@ -841,6 +883,37 @@ mod tests {
             &config,
             now + Duration::from_secs(92),
         ));
+
+        let rows = limits.rate_table();
+        assert_eq!(rows.len(), 1);
+        assert_eq!(rows[0].destination, destination);
+        assert_eq!(rows[0].rate_violations, 1);
+        assert_eq!(rows[0].timestamps.len(), 5);
+        assert!(rows[0].last > 0.0);
+        assert!(rows[0].blocked_until > rows[0].last);
+    }
+
+    #[test]
+    fn announce_rate_table_retains_python_timestamp_limit() {
+        let mut limits = AnnounceLimits::new();
+        let destination = AddressHash::new([0x43; crate::hash::ADDRESS_HASH_SIZE]);
+        let packet = announce_packet(destination, 1);
+        let config = InterfaceSharedConfig {
+            announce_rate_target: Some(60),
+            announce_rate_grace: Some(u64::MAX),
+            ..Default::default()
+        };
+        let now = Instant::now();
+
+        for offset in 0..20 {
+            limits.should_suppress_rebroadcast_at(
+                &packet,
+                &config,
+                now + Duration::from_secs(offset),
+            );
+        }
+
+        assert_eq!(limits.rate_table()[0].timestamps.len(), 16);
     }
 
     #[test]

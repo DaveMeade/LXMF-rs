@@ -21,6 +21,11 @@ struct RecordReceiptParams {
 }
 
 #[derive(Debug, Deserialize)]
+struct PacketHashParams {
+    packet_hash: String,
+}
+
+#[derive(Debug, Deserialize)]
 struct ReceiveMessageParams {
     id: String,
     source: String,

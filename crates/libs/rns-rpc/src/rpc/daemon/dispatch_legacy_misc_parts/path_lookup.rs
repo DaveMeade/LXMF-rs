@@ -256,4 +256,91 @@ impl RpcDaemon {
 
         Ok(RpcResponse { id: request.id, result: Some(result), error: None })
     }
+
+    fn handle_rpc_legacy_drop_announce_queues(
+        &self,
+        request: RpcRequest,
+    ) -> Result<RpcResponse, std::io::Error> {
+        self.with_runtime_management_bridge(request.id, |bridge| {
+            bridge.drop_announce_queues().map(|dropped| json!({ "dropped": dropped }))
+        })
+    }
+
+    fn handle_rpc_legacy_runtime_management(
+        &self,
+        request: RpcRequest,
+    ) -> Result<RpcResponse, std::io::Error> {
+        match request.method.as_str() {
+            "drop_announce_queues" => self.handle_rpc_legacy_drop_announce_queues(request),
+            "get_rate_table" => self.handle_rpc_legacy_rate_table(request),
+            "discovered_interfaces" => self.handle_rpc_legacy_discovered_interfaces(request),
+            "get_packet_rssi" | "get_packet_snr" | "get_packet_q" => {
+                self.handle_rpc_legacy_packet_signal(request)
+            }
+            _ => unreachable!("runtime management route: {}", request.method),
+        }
+    }
+
+    fn handle_rpc_legacy_rate_table(
+        &self,
+        request: RpcRequest,
+    ) -> Result<RpcResponse, std::io::Error> {
+        self.with_runtime_management_bridge(request.id, |bridge| bridge.rate_table())
+    }
+
+    fn handle_rpc_legacy_discovered_interfaces(
+        &self,
+        request: RpcRequest,
+    ) -> Result<RpcResponse, std::io::Error> {
+        self.with_runtime_management_bridge(request.id, |bridge| bridge.discovered_interfaces())
+    }
+
+    fn handle_rpc_legacy_packet_signal(
+        &self,
+        request: RpcRequest,
+    ) -> Result<RpcResponse, std::io::Error> {
+        let params = request.params.ok_or_else(|| {
+            std::io::Error::new(std::io::ErrorKind::InvalidInput, "missing params")
+        })?;
+        let parsed: PacketHashParams = serde_json::from_value(params)
+            .map_err(|err| std::io::Error::new(std::io::ErrorKind::InvalidInput, err))?;
+        let metric = request.method.strip_prefix("get_packet_").unwrap_or_default();
+        self.with_runtime_management_bridge(request.id, |bridge| {
+            let signal = bridge.packet_signal(&parsed.packet_hash)?;
+            Ok(signal.get(metric).cloned().unwrap_or(JsonValue::Null))
+        })
+    }
+
+    fn with_runtime_management_bridge<F>(
+        &self,
+        id: u64,
+        operation: F,
+    ) -> Result<RpcResponse, std::io::Error>
+    where
+        F: FnOnce(&dyn PathLookupBridge) -> Result<JsonValue, std::io::Error>,
+    {
+        let Some(bridge) = self
+            .path_lookup_bridge
+            .lock()
+            .expect("path_lookup_bridge mutex poisoned")
+            .clone()
+        else {
+            return Ok(RpcResponse {
+                id,
+                result: None,
+                error: Some(RpcError::new(
+                    "RUNTIME_MANAGEMENT_UNAVAILABLE",
+                    "runtime management bridge is not configured",
+                )),
+            });
+        };
+        match operation(bridge.as_ref()) {
+            Ok(result) => Ok(RpcResponse { id, result: Some(result), error: None }),
+            Err(error) => Ok(RpcResponse {
+                id,
+                result: None,
+                error: Some(RpcError::new("RUNTIME_MANAGEMENT_FAILED", error.to_string())),
+            }),
+        }
+    }
 }
