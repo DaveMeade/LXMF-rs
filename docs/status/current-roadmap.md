@@ -59,6 +59,10 @@ equivalents. `docs/status/python-surface-parity.json` is generated from the
 pinned references and `docs/status/python-surface-mapping.json`; CI rejects
 stale or unmapped entries.
 
+Current generated inventory: **1,664 implementation-complete, 0 partial, and
+1 provenance-backed not-applicable entry across 1,665 entries**. Release and
+documentation CI invoke the inventory with `--require-complete`.
+
 Implementation and evidence are independent. Hardware-capable interfaces may
 reach `implementation=complete` with deterministic simulation while retaining
 `evidence=hardware-unverified`. The release does not claim physical-device,
@@ -1395,62 +1399,21 @@ Scoped release evidence is split as follows:
 
 ## Remaining Release Blockers
 
-These are blockers to the v0.9.0 full software-parity claim. Every public
-manifest entry must be implementation-complete (or provenance-backed
-not-applicable) before release. Optional HIL remains a separate evidence axis
-and is not a release gate.
-
-1. **Interop breadth**
-   - Propagation router lifecycle now has dispatchable Python-reference cases
-     for remote status, Rust-to-Python fetch/download/sync, Python-origin
-     `/get` haves acknowledgement, and Python-origin `/offer` side effects.
-   - Columba release evidence is captured with
-     `tools/scripts/external-client-interop-gate.sh columba /home/pgiuseppe/Documents/columba`
-     against clean Columba `3738bd7834128023db491cca0876585b799de942`
-     (`v2.0.9-beta`), proving bidirectional direct LXMF delivery through the
-     current Python `event_bridge.py` backend adapter.
-   - Capture release evidence for Sideband and MeshChatX before making those
-     client-specific compatibility claims.
-2. **Reticulum behavioral breadth**
-   - Finish bootstrap/discovery, announce/path edge behavior, and broader runtime
-     mutation parity for startup-only interface families beyond the hot-applied
-     TCP client/server, UDP listener/peer/multicast, and Pipe surfaces.
-3. **Operational breadth**
-   - Add broader prepared-host hardware evidence across serial/TCP/BLE RNode
-     device, firmware, management, and radio combinations; ordinary
-     serial/TCP/BLE RNode now has an opt-in prepared-host smoke gate with
-     bearer-scoped lifecycle plus safe-management dispatch reports and a
-     software-only BLE fallback/management smoke report. LocalInterface #384
-     and RNode BLE #385 now have an executable audit at
-     `target/reticulum-interface-parity-audit/report.json`; strict
-     `--require-full` mode remains incomplete until serial, TCP/Wi-Fi, and BLE
-     prepared-host RNode hardware reports are present. The
-     `reticulum-interface-hil-matrix.sh` runner is the collection path for that
-     hardware matrix, and its artifact manifest can be passed back through
-     `RNODE_HIL_ARTIFACT_MANIFEST` for strict SHA-256 verification.
-   - Capture broader RNodeMulti prepared-host hardware validation/evidence
-     across device, firmware, and radio combinations before treating that
-     family as production-complete.
-   - Capture broader public I2P peer-set and long-running prepared-host
-     evidence, and implement utility commands where product demand justifies
-     them.
-   - Capture broader prepared-host Weave hardware evidence before treating that
-     family as production-complete.
+There are no remaining software-manifest blockers. Promotion is now gated by
+the reproducible build, package, API, security, simulator, pinned-Python, and
+release checks. Physical radio/BLE/serial devices, public I2P, public networks,
+and Sideband/MeshChatX/Columba claims remain separate optional evidence tracks
+and do not block v0.9.0.
 
 ## Active Execution Order
 
-1. Keep the generated surface inventory current and reduce its partial count
-   without weakening mappings.
-2. Complete segmented resources and remaining RNS runtime, transport, and
-   discovery behavior with pinned-Python state traces.
-3. Complete every interface lifecycle with deterministic emulators and the
-   fixed fault corpus, retaining hardware-unverified evidence labels.
-4. Close `LXMRouter` and handler gaps through the shared typed `SdkBackend`
-   contract.
-5. Complete official utility binaries, aliases, protocols, outputs, and exit
-   codes in isolated software meshes.
-6. Require zero software-manifest gaps, run all release gates, publish
-   `v0.9.0-rc.1`, and promote the exact passing RC SHA to `v0.9.0`.
+1. Run formatting, all-feature Clippy, workspace tests, boundaries,
+   architecture, module-size, security, API, interop, and reproducible-build
+   gates.
+2. Align every public crate and binary to `0.9.0` and prepare release notes.
+3. Publish `v0.9.0-rc.1` from the exact passing SHA with simulation artifacts.
+4. Promote that exact SHA to `v0.9.0`, publish packages and platform bundles,
+   and verify remote tags, registries, checksums, and support wording.
 
 ## Verification Baseline
 

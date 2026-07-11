@@ -8,7 +8,7 @@ fn run_ci_stage(stage: CiStage, timeout_secs: Option<u64>) -> Result<()> {
         CiStage::TestIntegration => run("cargo", &["test", "--workspace", "--tests"]),
         CiStage::Doc => {
             run("cargo", &["doc", "--workspace", "--no-deps", "--lib"])?;
-            run_python_surface_parity_check(false)
+            run_python_surface_parity_check(true)
         }
         CiStage::Security => {
             run_cargo_deny_policy_check()?;
@@ -103,7 +103,7 @@ fn run_release_check() -> Result<()> {
     run_pr_core_ci()?;
     run_correctness_check()?;
     run("cargo", &["doc", "--workspace", "--no-deps", "--lib"])?;
-    run_python_surface_parity_check(false)?;
+    run_python_surface_parity_check(true)?;
     run_sdk_docs_check()?;
     run_sdk_cookbook_check()?;
     run_sdk_ergonomics_check()?;

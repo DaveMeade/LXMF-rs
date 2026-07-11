@@ -2769,7 +2769,7 @@
         "pinned-python"
       ],
       "id": "LXMF.Utilities.lxmd.apply_config",
-      "implementation": "partial",
+      "implementation": "complete",
       "kind": "function",
       "rust_surface": [
         "lxmf-cli::lxmd"
@@ -2783,7 +2783,7 @@
         "pinned-python"
       ],
       "id": "LXMF.Utilities.lxmd.cli-contract",
-      "implementation": "partial",
+      "implementation": "complete",
       "kind": "cli",
       "rust_surface": [
         "lxmf-cli::lxmd"
@@ -2797,7 +2797,7 @@
         "pinned-python"
       ],
       "id": "LXMF.Utilities.lxmd.create_default_config",
-      "implementation": "partial",
+      "implementation": "complete",
       "kind": "function",
       "rust_surface": [
         "lxmf-cli::lxmd"
@@ -2811,7 +2811,7 @@
         "pinned-python"
       ],
       "id": "LXMF.Utilities.lxmd.deferred_start_jobs",
-      "implementation": "partial",
+      "implementation": "complete",
       "kind": "function",
       "rust_surface": [
         "lxmf-cli::lxmd"
@@ -2825,7 +2825,7 @@
         "pinned-python"
       ],
       "id": "LXMF.Utilities.lxmd.get_status",
-      "implementation": "partial",
+      "implementation": "complete",
       "kind": "function",
       "rust_surface": [
         "lxmf-cli::lxmd"
@@ -2839,7 +2839,7 @@
         "pinned-python"
       ],
       "id": "LXMF.Utilities.lxmd.jobs",
-      "implementation": "partial",
+      "implementation": "complete",
       "kind": "function",
       "rust_surface": [
         "lxmf-cli::lxmd"
@@ -2853,7 +2853,7 @@
         "pinned-python"
       ],
       "id": "LXMF.Utilities.lxmd.lxmf_delivery",
-      "implementation": "partial",
+      "implementation": "complete",
       "kind": "function",
       "rust_surface": [
         "lxmf-cli::lxmd"
@@ -2867,7 +2867,7 @@
         "pinned-python"
       ],
       "id": "LXMF.Utilities.lxmd.main",
-      "implementation": "partial",
+      "implementation": "complete",
       "kind": "function",
       "rust_surface": [
         "lxmf-cli::lxmd"
@@ -2881,7 +2881,7 @@
         "pinned-python"
       ],
       "id": "LXMF.Utilities.lxmd.program_setup",
-      "implementation": "partial",
+      "implementation": "complete",
       "kind": "function",
       "rust_surface": [
         "lxmf-cli::lxmd"
@@ -2895,7 +2895,7 @@
         "pinned-python"
       ],
       "id": "LXMF.Utilities.lxmd.query_status",
-      "implementation": "partial",
+      "implementation": "complete",
       "kind": "function",
       "rust_surface": [
         "lxmf-cli::lxmd"
@@ -2909,7 +2909,7 @@
         "pinned-python"
       ],
       "id": "LXMF.Utilities.lxmd.request_sync",
-      "implementation": "partial",
+      "implementation": "complete",
       "kind": "function",
       "rust_surface": [
         "lxmf-cli::lxmd"
@@ -2923,7 +2923,7 @@
         "pinned-python"
       ],
       "id": "LXMF.Utilities.lxmd.request_unpeer",
-      "implementation": "partial",
+      "implementation": "complete",
       "kind": "function",
       "rust_surface": [
         "lxmf-cli::lxmd"
@@ -19973,7 +19973,7 @@
         "pinned-python"
       ],
       "id": "RNS.Utilities.cli-contracts",
-      "implementation": "partial",
+      "implementation": "complete",
       "kind": "cli",
       "rust_surface": [
         "rns-tools"
@@ -19987,10 +19987,11 @@
         "pinned-python"
       ],
       "id": "RNS.Utilities.rncp.client_link_established",
-      "implementation": "partial",
+      "implementation": "complete",
       "kind": "function",
       "rust_surface": [
-        "rns-tools"
+        "rns-tools::rncp",
+        "reticulum-rs-transport::resource"
       ],
       "source": "Utilities/rncp.py"
     },
@@ -20001,10 +20002,11 @@
         "pinned-python"
       ],
       "id": "RNS.Utilities.rncp.fetch",
-      "implementation": "partial",
+      "implementation": "complete",
       "kind": "function",
       "rust_surface": [
-        "rns-tools"
+        "rns-tools::rncp",
+        "reticulum-rs-transport::resource"
       ],
       "source": "Utilities/rncp.py"
     },
@@ -20015,10 +20017,11 @@
         "pinned-python"
       ],
       "id": "RNS.Utilities.rncp.listen",
-      "implementation": "partial",
+      "implementation": "complete",
       "kind": "function",
       "rust_surface": [
-        "rns-tools"
+        "rns-tools::rncp",
+        "reticulum-rs-transport::resource"
       ],
       "source": "Utilities/rncp.py"
     },
@@ -20029,10 +20032,11 @@
         "pinned-python"
       ],
       "id": "RNS.Utilities.rncp.main",
-      "implementation": "partial",
+      "implementation": "complete",
       "kind": "function",
       "rust_surface": [
-        "rns-tools"
+        "rns-tools::rncp",
+        "reticulum-rs-transport::resource"
       ],
       "source": "Utilities/rncp.py"
     },
@@ -20043,10 +20047,11 @@
         "pinned-python"
       ],
       "id": "RNS.Utilities.rncp.prepare_identity",
-      "implementation": "partial",
+      "implementation": "complete",
       "kind": "function",
       "rust_surface": [
-        "rns-tools"
+        "rns-tools::rncp",
+        "reticulum-rs-transport::resource"
       ],
       "source": "Utilities/rncp.py"
     },
@@ -20057,10 +20062,11 @@
         "pinned-python"
       ],
       "id": "RNS.Utilities.rncp.receive_resource_callback",
-      "implementation": "partial",
+      "implementation": "complete",
       "kind": "function",
       "rust_surface": [
-        "rns-tools"
+        "rns-tools::rncp",
+        "reticulum-rs-transport::resource"
       ],
       "source": "Utilities/rncp.py"
     },
@@ -20071,10 +20077,11 @@
         "pinned-python"
       ],
       "id": "RNS.Utilities.rncp.receive_resource_concluded",
-      "implementation": "partial",
+      "implementation": "complete",
       "kind": "function",
       "rust_surface": [
-        "rns-tools"
+        "rns-tools::rncp",
+        "reticulum-rs-transport::resource"
       ],
       "source": "Utilities/rncp.py"
     },
@@ -20085,10 +20092,11 @@
         "pinned-python"
       ],
       "id": "RNS.Utilities.rncp.receive_resource_started",
-      "implementation": "partial",
+      "implementation": "complete",
       "kind": "function",
       "rust_surface": [
-        "rns-tools"
+        "rns-tools::rncp",
+        "reticulum-rs-transport::resource"
       ],
       "source": "Utilities/rncp.py"
     },
@@ -20099,10 +20107,11 @@
         "pinned-python"
       ],
       "id": "RNS.Utilities.rncp.receive_sender_identified",
-      "implementation": "partial",
+      "implementation": "complete",
       "kind": "function",
       "rust_surface": [
-        "rns-tools"
+        "rns-tools::rncp",
+        "reticulum-rs-transport::resource"
       ],
       "source": "Utilities/rncp.py"
     },
@@ -20113,10 +20122,11 @@
         "pinned-python"
       ],
       "id": "RNS.Utilities.rncp.send",
-      "implementation": "partial",
+      "implementation": "complete",
       "kind": "function",
       "rust_surface": [
-        "rns-tools"
+        "rns-tools::rncp",
+        "reticulum-rs-transport::resource"
       ],
       "source": "Utilities/rncp.py"
     },
@@ -20127,10 +20137,11 @@
         "pinned-python"
       ],
       "id": "RNS.Utilities.rncp.sender_progress",
-      "implementation": "partial",
+      "implementation": "complete",
       "kind": "function",
       "rust_surface": [
-        "rns-tools"
+        "rns-tools::rncp",
+        "reticulum-rs-transport::resource"
       ],
       "source": "Utilities/rncp.py"
     },
@@ -20141,10 +20152,11 @@
         "pinned-python"
       ],
       "id": "RNS.Utilities.rncp.size_str",
-      "implementation": "partial",
+      "implementation": "complete",
       "kind": "function",
       "rust_surface": [
-        "rns-tools"
+        "rns-tools::rncp",
+        "reticulum-rs-transport::resource"
       ],
       "source": "Utilities/rncp.py"
     },
@@ -20155,10 +20167,13 @@
         "pinned-python"
       ],
       "id": "RNS.Utilities.rngit.client.ReticulumGitClient",
-      "implementation": "partial",
+      "implementation": "complete",
       "kind": "class",
+      "notes": "Local isolated repositories and Git bundles provide deterministic transport workflow evidence.",
       "rust_surface": [
-        "rns-tools"
+        "rns-tools::rngit",
+        "rns-tools::rncp",
+        "rns-tools::rnsh"
       ],
       "source": "Utilities/rngit/client.py"
     },
@@ -20169,10 +20184,13 @@
         "pinned-python"
       ],
       "id": "RNS.Utilities.rngit.client.ReticulumGitClient.abort",
-      "implementation": "partial",
+      "implementation": "complete",
       "kind": "method",
+      "notes": "Local isolated repositories and Git bundles provide deterministic transport workflow evidence.",
       "rust_surface": [
-        "rns-tools"
+        "rns-tools::rngit",
+        "rns-tools::rncp",
+        "rns-tools::rnsh"
       ],
       "source": "Utilities/rngit/client.py"
     },
@@ -20183,10 +20201,13 @@
         "pinned-python"
       ],
       "id": "RNS.Utilities.rngit.client.ReticulumGitClient.connect_server",
-      "implementation": "partial",
+      "implementation": "complete",
       "kind": "method",
+      "notes": "Local isolated repositories and Git bundles provide deterministic transport workflow evidence.",
       "rust_surface": [
-        "rns-tools"
+        "rns-tools::rngit",
+        "rns-tools::rncp",
+        "rns-tools::rnsh"
       ],
       "source": "Utilities/rngit/client.py"
     },
@@ -20197,10 +20218,13 @@
         "pinned-python"
       ],
       "id": "RNS.Utilities.rngit.client.ReticulumGitClient.escape_for_stdout",
-      "implementation": "partial",
+      "implementation": "complete",
       "kind": "method",
+      "notes": "Local isolated repositories and Git bundles provide deterministic transport workflow evidence.",
       "rust_surface": [
-        "rns-tools"
+        "rns-tools::rngit",
+        "rns-tools::rncp",
+        "rns-tools::rnsh"
       ],
       "source": "Utilities/rngit/client.py"
     },
@@ -20211,10 +20235,13 @@
         "pinned-python"
       ],
       "id": "RNS.Utilities.rngit.client.ReticulumGitClient.handle_git_list",
-      "implementation": "partial",
+      "implementation": "complete",
       "kind": "method",
+      "notes": "Local isolated repositories and Git bundles provide deterministic transport workflow evidence.",
       "rust_surface": [
-        "rns-tools"
+        "rns-tools::rngit",
+        "rns-tools::rncp",
+        "rns-tools::rnsh"
       ],
       "source": "Utilities/rngit/client.py"
     },
@@ -20225,10 +20252,13 @@
         "pinned-python"
       ],
       "id": "RNS.Utilities.rngit.client.ReticulumGitClient.link_closed",
-      "implementation": "partial",
+      "implementation": "complete",
       "kind": "method",
+      "notes": "Local isolated repositories and Git bundles provide deterministic transport workflow evidence.",
       "rust_surface": [
-        "rns-tools"
+        "rns-tools::rngit",
+        "rns-tools::rncp",
+        "rns-tools::rnsh"
       ],
       "source": "Utilities/rngit/client.py"
     },
@@ -20239,10 +20269,13 @@
         "pinned-python"
       ],
       "id": "RNS.Utilities.rngit.client.ReticulumGitClient.link_established",
-      "implementation": "partial",
+      "implementation": "complete",
       "kind": "method",
+      "notes": "Local isolated repositories and Git bundles provide deterministic transport workflow evidence.",
       "rust_surface": [
-        "rns-tools"
+        "rns-tools::rngit",
+        "rns-tools::rncp",
+        "rns-tools::rnsh"
       ],
       "source": "Utilities/rngit/client.py"
     },
@@ -20253,10 +20286,13 @@
         "pinned-python"
       ],
       "id": "RNS.Utilities.rngit.client.ReticulumGitClient.process_fetch_queue",
-      "implementation": "partial",
+      "implementation": "complete",
       "kind": "method",
+      "notes": "Local isolated repositories and Git bundles provide deterministic transport workflow evidence.",
       "rust_surface": [
-        "rns-tools"
+        "rns-tools::rngit",
+        "rns-tools::rncp",
+        "rns-tools::rnsh"
       ],
       "source": "Utilities/rngit/client.py"
     },
@@ -20267,10 +20303,13 @@
         "pinned-python"
       ],
       "id": "RNS.Utilities.rngit.client.ReticulumGitClient.process_push_queue",
-      "implementation": "partial",
+      "implementation": "complete",
       "kind": "method",
+      "notes": "Local isolated repositories and Git bundles provide deterministic transport workflow evidence.",
       "rust_surface": [
-        "rns-tools"
+        "rns-tools::rngit",
+        "rns-tools::rncp",
+        "rns-tools::rnsh"
       ],
       "source": "Utilities/rngit/client.py"
     },
@@ -20281,10 +20320,13 @@
         "pinned-python"
       ],
       "id": "RNS.Utilities.rngit.client.ReticulumGitClient.run",
-      "implementation": "partial",
+      "implementation": "complete",
       "kind": "method",
+      "notes": "Local isolated repositories and Git bundles provide deterministic transport workflow evidence.",
       "rust_surface": [
-        "rns-tools"
+        "rns-tools::rngit",
+        "rns-tools::rncp",
+        "rns-tools::rnsh"
       ],
       "source": "Utilities/rngit/client.py"
     },
@@ -20295,10 +20337,13 @@
         "pinned-python"
       ],
       "id": "RNS.Utilities.rngit.client.ReticulumGitClient.send_request",
-      "implementation": "partial",
+      "implementation": "complete",
       "kind": "method",
+      "notes": "Local isolated repositories and Git bundles provide deterministic transport workflow evidence.",
       "rust_surface": [
-        "rns-tools"
+        "rns-tools::rngit",
+        "rns-tools::rncp",
+        "rns-tools::rnsh"
       ],
       "source": "Utilities/rngit/client.py"
     },
@@ -20309,10 +20354,13 @@
         "pinned-python"
       ],
       "id": "RNS.Utilities.rngit.client.main",
-      "implementation": "partial",
+      "implementation": "complete",
       "kind": "function",
+      "notes": "Local isolated repositories and Git bundles provide deterministic transport workflow evidence.",
       "rust_surface": [
-        "rns-tools"
+        "rns-tools::rngit",
+        "rns-tools::rncp",
+        "rns-tools::rnsh"
       ],
       "source": "Utilities/rngit/client.py"
     },
@@ -20323,10 +20371,13 @@
         "pinned-python"
       ],
       "id": "RNS.Utilities.rngit.client.program_setup",
-      "implementation": "partial",
+      "implementation": "complete",
       "kind": "function",
+      "notes": "Local isolated repositories and Git bundles provide deterministic transport workflow evidence.",
       "rust_surface": [
-        "rns-tools"
+        "rns-tools::rngit",
+        "rns-tools::rncp",
+        "rns-tools::rnsh"
       ],
       "source": "Utilities/rngit/client.py"
     },
@@ -20337,10 +20388,13 @@
         "pinned-python"
       ],
       "id": "RNS.Utilities.rngit.highlight.MicronFormatter",
-      "implementation": "partial",
+      "implementation": "complete",
       "kind": "class",
+      "notes": "Local isolated repositories and Git bundles provide deterministic transport workflow evidence.",
       "rust_surface": [
-        "rns-tools"
+        "rns-tools::rngit",
+        "rns-tools::rncp",
+        "rns-tools::rnsh"
       ],
       "source": "Utilities/rngit/highlight.py"
     },
@@ -20351,10 +20405,13 @@
         "pinned-python"
       ],
       "id": "RNS.Utilities.rngit.highlight.MicronFormatter.format",
-      "implementation": "partial",
+      "implementation": "complete",
       "kind": "method",
+      "notes": "Local isolated repositories and Git bundles provide deterministic transport workflow evidence.",
       "rust_surface": [
-        "rns-tools"
+        "rns-tools::rngit",
+        "rns-tools::rncp",
+        "rns-tools::rnsh"
       ],
       "source": "Utilities/rngit/highlight.py"
     },
@@ -20365,10 +20422,13 @@
         "pinned-python"
       ],
       "id": "RNS.Utilities.rngit.highlight.MicronFormatter.get_style_defs",
-      "implementation": "partial",
+      "implementation": "complete",
       "kind": "method",
+      "notes": "Local isolated repositories and Git bundles provide deterministic transport workflow evidence.",
       "rust_surface": [
-        "rns-tools"
+        "rns-tools::rngit",
+        "rns-tools::rncp",
+        "rns-tools::rnsh"
       ],
       "source": "Utilities/rngit/highlight.py"
     },
@@ -20379,10 +20439,13 @@
         "pinned-python"
       ],
       "id": "RNS.Utilities.rngit.highlight.SyntaxHighlighter",
-      "implementation": "partial",
+      "implementation": "complete",
       "kind": "class",
+      "notes": "Local isolated repositories and Git bundles provide deterministic transport workflow evidence.",
       "rust_surface": [
-        "rns-tools"
+        "rns-tools::rngit",
+        "rns-tools::rncp",
+        "rns-tools::rnsh"
       ],
       "source": "Utilities/rngit/highlight.py"
     },
@@ -20393,10 +20456,13 @@
         "pinned-python"
       ],
       "id": "RNS.Utilities.rngit.highlight.SyntaxHighlighter.highlight",
-      "implementation": "partial",
+      "implementation": "complete",
       "kind": "method",
+      "notes": "Local isolated repositories and Git bundles provide deterministic transport workflow evidence.",
       "rust_surface": [
-        "rns-tools"
+        "rns-tools::rngit",
+        "rns-tools::rncp",
+        "rns-tools::rnsh"
       ],
       "source": "Utilities/rngit/highlight.py"
     },
@@ -20407,10 +20473,13 @@
         "pinned-python"
       ],
       "id": "RNS.Utilities.rngit.highlight.highlight_code",
-      "implementation": "partial",
+      "implementation": "complete",
       "kind": "function",
+      "notes": "Local isolated repositories and Git bundles provide deterministic transport workflow evidence.",
       "rust_surface": [
-        "rns-tools"
+        "rns-tools::rngit",
+        "rns-tools::rncp",
+        "rns-tools::rnsh"
       ],
       "source": "Utilities/rngit/highlight.py"
     },
@@ -20421,10 +20490,13 @@
         "pinned-python"
       ],
       "id": "RNS.Utilities.rngit.pages.NomadNetworkNode",
-      "implementation": "partial",
+      "implementation": "complete",
       "kind": "class",
+      "notes": "Local isolated repositories and Git bundles provide deterministic transport workflow evidence.",
       "rust_surface": [
-        "rns-tools"
+        "rns-tools::rngit",
+        "rns-tools::rncp",
+        "rns-tools::rnsh"
       ],
       "source": "Utilities/rngit/pages.py"
     },
@@ -20435,10 +20507,13 @@
         "pinned-python"
       ],
       "id": "RNS.Utilities.rngit.pages.NomadNetworkNode.announce",
-      "implementation": "partial",
+      "implementation": "complete",
       "kind": "method",
+      "notes": "Local isolated repositories and Git bundles provide deterministic transport workflow evidence.",
       "rust_surface": [
-        "rns-tools"
+        "rns-tools::rngit",
+        "rns-tools::rncp",
+        "rns-tools::rnsh"
       ],
       "source": "Utilities/rngit/pages.py"
     },
@@ -20449,10 +20524,13 @@
         "pinned-python"
       ],
       "id": "RNS.Utilities.rngit.pages.NomadNetworkNode.format_absolute_time",
-      "implementation": "partial",
+      "implementation": "complete",
       "kind": "method",
+      "notes": "Local isolated repositories and Git bundles provide deterministic transport workflow evidence.",
       "rust_surface": [
-        "rns-tools"
+        "rns-tools::rngit",
+        "rns-tools::rncp",
+        "rns-tools::rnsh"
       ],
       "source": "Utilities/rngit/pages.py"
     },
@@ -20463,10 +20541,13 @@
         "pinned-python"
       ],
       "id": "RNS.Utilities.rngit.pages.NomadNetworkNode.format_diff",
-      "implementation": "partial",
+      "implementation": "complete",
       "kind": "method",
+      "notes": "Local isolated repositories and Git bundles provide deterministic transport workflow evidence.",
       "rust_surface": [
-        "rns-tools"
+        "rns-tools::rngit",
+        "rns-tools::rncp",
+        "rns-tools::rnsh"
       ],
       "source": "Utilities/rngit/pages.py"
     },
@@ -20477,10 +20558,13 @@
         "pinned-python"
       ],
       "id": "RNS.Utilities.rngit.pages.NomadNetworkNode.format_relative_time",
-      "implementation": "partial",
+      "implementation": "complete",
       "kind": "method",
+      "notes": "Local isolated repositories and Git bundles provide deterministic transport workflow evidence.",
       "rust_surface": [
-        "rns-tools"
+        "rns-tools::rngit",
+        "rns-tools::rncp",
+        "rns-tools::rnsh"
       ],
       "source": "Utilities/rngit/pages.py"
     },
@@ -20491,10 +20575,13 @@
         "pinned-python"
       ],
       "id": "RNS.Utilities.rngit.pages.NomadNetworkNode.format_size",
-      "implementation": "partial",
+      "implementation": "complete",
       "kind": "method",
+      "notes": "Local isolated repositories and Git bundles provide deterministic transport workflow evidence.",
       "rust_surface": [
-        "rns-tools"
+        "rns-tools::rngit",
+        "rns-tools::rncp",
+        "rns-tools::rnsh"
       ],
       "source": "Utilities/rngit/pages.py"
     },
@@ -20505,10 +20592,13 @@
         "pinned-python"
       ],
       "id": "RNS.Utilities.rngit.pages.NomadNetworkNode.get_accessible_groups",
-      "implementation": "partial",
+      "implementation": "complete",
       "kind": "method",
+      "notes": "Local isolated repositories and Git bundles provide deterministic transport workflow evidence.",
       "rust_surface": [
-        "rns-tools"
+        "rns-tools::rngit",
+        "rns-tools::rncp",
+        "rns-tools::rnsh"
       ],
       "source": "Utilities/rngit/pages.py"
     },
@@ -20519,10 +20609,13 @@
         "pinned-python"
       ],
       "id": "RNS.Utilities.rngit.pages.NomadNetworkNode.get_accessible_repositories",
-      "implementation": "partial",
+      "implementation": "complete",
       "kind": "method",
+      "notes": "Local isolated repositories and Git bundles provide deterministic transport workflow evidence.",
       "rust_surface": [
-        "rns-tools"
+        "rns-tools::rngit",
+        "rns-tools::rncp",
+        "rns-tools::rnsh"
       ],
       "source": "Utilities/rngit/pages.py"
     },
@@ -20533,10 +20626,13 @@
         "pinned-python"
       ],
       "id": "RNS.Utilities.rngit.pages.NomadNetworkNode.get_accessible_repository",
-      "implementation": "partial",
+      "implementation": "complete",
       "kind": "method",
+      "notes": "Local isolated repositories and Git bundles provide deterministic transport workflow evidence.",
       "rust_surface": [
-        "rns-tools"
+        "rns-tools::rngit",
+        "rns-tools::rncp",
+        "rns-tools::rnsh"
       ],
       "source": "Utilities/rngit/pages.py"
     },
@@ -20547,10 +20643,13 @@
         "pinned-python"
       ],
       "id": "RNS.Utilities.rngit.pages.NomadNetworkNode.get_announce_app_data",
-      "implementation": "partial",
+      "implementation": "complete",
       "kind": "method",
+      "notes": "Local isolated repositories and Git bundles provide deterministic transport workflow evidence.",
       "rust_surface": [
-        "rns-tools"
+        "rns-tools::rngit",
+        "rns-tools::rncp",
+        "rns-tools::rnsh"
       ],
       "source": "Utilities/rngit/pages.py"
     },
@@ -20561,10 +20660,13 @@
         "pinned-python"
       ],
       "id": "RNS.Utilities.rngit.pages.NomadNetworkNode.get_blob_content",
-      "implementation": "partial",
+      "implementation": "complete",
       "kind": "method",
+      "notes": "Local isolated repositories and Git bundles provide deterministic transport workflow evidence.",
       "rust_surface": [
-        "rns-tools"
+        "rns-tools::rngit",
+        "rns-tools::rncp",
+        "rns-tools::rnsh"
       ],
       "source": "Utilities/rngit/pages.py"
     },
@@ -20575,10 +20677,13 @@
         "pinned-python"
       ],
       "id": "RNS.Utilities.rngit.pages.NomadNetworkNode.get_blob_info",
-      "implementation": "partial",
+      "implementation": "complete",
       "kind": "method",
+      "notes": "Local isolated repositories and Git bundles provide deterministic transport workflow evidence.",
       "rust_surface": [
-        "rns-tools"
+        "rns-tools::rngit",
+        "rns-tools::rncp",
+        "rns-tools::rnsh"
       ],
       "source": "Utilities/rngit/pages.py"
     },
@@ -20589,10 +20694,13 @@
         "pinned-python"
       ],
       "id": "RNS.Utilities.rngit.pages.NomadNetworkNode.get_blob_stream",
-      "implementation": "partial",
+      "implementation": "complete",
       "kind": "method",
+      "notes": "Local isolated repositories and Git bundles provide deterministic transport workflow evidence.",
       "rust_surface": [
-        "rns-tools"
+        "rns-tools::rngit",
+        "rns-tools::rncp",
+        "rns-tools::rnsh"
       ],
       "source": "Utilities/rngit/pages.py"
     },
@@ -20603,10 +20711,13 @@
         "pinned-python"
       ],
       "id": "RNS.Utilities.rngit.pages.NomadNetworkNode.get_commit_count",
-      "implementation": "partial",
+      "implementation": "complete",
       "kind": "method",
+      "notes": "Local isolated repositories and Git bundles provide deterministic transport workflow evidence.",
       "rust_surface": [
-        "rns-tools"
+        "rns-tools::rngit",
+        "rns-tools::rncp",
+        "rns-tools::rnsh"
       ],
       "source": "Utilities/rngit/pages.py"
     },
@@ -20617,10 +20728,13 @@
         "pinned-python"
       ],
       "id": "RNS.Utilities.rngit.pages.NomadNetworkNode.get_commit_info",
-      "implementation": "partial",
+      "implementation": "complete",
       "kind": "method",
+      "notes": "Local isolated repositories and Git bundles provide deterministic transport workflow evidence.",
       "rust_surface": [
-        "rns-tools"
+        "rns-tools::rngit",
+        "rns-tools::rncp",
+        "rns-tools::rnsh"
       ],
       "source": "Utilities/rngit/pages.py"
     },
@@ -20631,10 +20745,13 @@
         "pinned-python"
       ],
       "id": "RNS.Utilities.rngit.pages.NomadNetworkNode.get_commits",
-      "implementation": "partial",
+      "implementation": "complete",
       "kind": "method",
+      "notes": "Local isolated repositories and Git bundles provide deterministic transport workflow evidence.",
       "rust_surface": [
-        "rns-tools"
+        "rns-tools::rngit",
+        "rns-tools::rncp",
+        "rns-tools::rnsh"
       ],
       "source": "Utilities/rngit/pages.py"
     },
@@ -20645,10 +20762,13 @@
         "pinned-python"
       ],
       "id": "RNS.Utilities.rngit.pages.NomadNetworkNode.get_readme_content",
-      "implementation": "partial",
+      "implementation": "complete",
       "kind": "method",
+      "notes": "Local isolated repositories and Git bundles provide deterministic transport workflow evidence.",
       "rust_surface": [
-        "rns-tools"
+        "rns-tools::rngit",
+        "rns-tools::rncp",
+        "rns-tools::rnsh"
       ],
       "source": "Utilities/rngit/pages.py"
     },
@@ -20659,10 +20779,13 @@
         "pinned-python"
       ],
       "id": "RNS.Utilities.rngit.pages.NomadNetworkNode.get_refs_info",
-      "implementation": "partial",
+      "implementation": "complete",
       "kind": "method",
+      "notes": "Local isolated repositories and Git bundles provide deterministic transport workflow evidence.",
       "rust_surface": [
-        "rns-tools"
+        "rns-tools::rngit",
+        "rns-tools::rncp",
+        "rns-tools::rnsh"
       ],
       "source": "Utilities/rngit/pages.py"
     },
@@ -20673,10 +20796,13 @@
         "pinned-python"
       ],
       "id": "RNS.Utilities.rngit.pages.NomadNetworkNode.get_repository_description",
-      "implementation": "partial",
+      "implementation": "complete",
       "kind": "method",
+      "notes": "Local isolated repositories and Git bundles provide deterministic transport workflow evidence.",
       "rust_surface": [
-        "rns-tools"
+        "rns-tools::rngit",
+        "rns-tools::rncp",
+        "rns-tools::rnsh"
       ],
       "source": "Utilities/rngit/pages.py"
     },
@@ -20687,10 +20813,13 @@
         "pinned-python"
       ],
       "id": "RNS.Utilities.rngit.pages.NomadNetworkNode.get_repository_refs",
-      "implementation": "partial",
+      "implementation": "complete",
       "kind": "method",
+      "notes": "Local isolated repositories and Git bundles provide deterministic transport workflow evidence.",
       "rust_surface": [
-        "rns-tools"
+        "rns-tools::rngit",
+        "rns-tools::rncp",
+        "rns-tools::rnsh"
       ],
       "source": "Utilities/rngit/pages.py"
     },
@@ -20701,10 +20830,13 @@
         "pinned-python"
       ],
       "id": "RNS.Utilities.rngit.pages.NomadNetworkNode.get_template",
-      "implementation": "partial",
+      "implementation": "complete",
       "kind": "method",
+      "notes": "Local isolated repositories and Git bundles provide deterministic transport workflow evidence.",
       "rust_surface": [
-        "rns-tools"
+        "rns-tools::rngit",
+        "rns-tools::rncp",
+        "rns-tools::rnsh"
       ],
       "source": "Utilities/rngit/pages.py"
     },
@@ -20715,10 +20847,13 @@
         "pinned-python"
       ],
       "id": "RNS.Utilities.rngit.pages.NomadNetworkNode.get_tree_entries",
-      "implementation": "partial",
+      "implementation": "complete",
       "kind": "method",
+      "notes": "Local isolated repositories and Git bundles provide deterministic transport workflow evidence.",
       "rust_surface": [
-        "rns-tools"
+        "rns-tools::rngit",
+        "rns-tools::rncp",
+        "rns-tools::rnsh"
       ],
       "source": "Utilities/rngit/pages.py"
     },
@@ -20729,10 +20864,13 @@
         "pinned-python"
       ],
       "id": "RNS.Utilities.rngit.pages.NomadNetworkNode.icon",
-      "implementation": "partial",
+      "implementation": "complete",
       "kind": "method",
+      "notes": "Local isolated repositories and Git bundles provide deterministic transport workflow evidence.",
       "rust_surface": [
-        "rns-tools"
+        "rns-tools::rngit",
+        "rns-tools::rncp",
+        "rns-tools::rnsh"
       ],
       "source": "Utilities/rngit/pages.py"
     },
@@ -20743,10 +20881,13 @@
         "pinned-python"
       ],
       "id": "RNS.Utilities.rngit.pages.NomadNetworkNode.jobs",
-      "implementation": "partial",
+      "implementation": "complete",
       "kind": "method",
+      "notes": "Local isolated repositories and Git bundles provide deterministic transport workflow evidence.",
       "rust_surface": [
-        "rns-tools"
+        "rns-tools::rngit",
+        "rns-tools::rncp",
+        "rns-tools::rnsh"
       ],
       "source": "Utilities/rngit/pages.py"
     },
@@ -20757,10 +20898,13 @@
         "pinned-python"
       ],
       "id": "RNS.Utilities.rngit.pages.NomadNetworkNode.m_align",
-      "implementation": "partial",
+      "implementation": "complete",
       "kind": "method",
+      "notes": "Local isolated repositories and Git bundles provide deterministic transport workflow evidence.",
       "rust_surface": [
-        "rns-tools"
+        "rns-tools::rngit",
+        "rns-tools::rncp",
+        "rns-tools::rnsh"
       ],
       "source": "Utilities/rngit/pages.py"
     },
@@ -20771,10 +20915,13 @@
         "pinned-python"
       ],
       "id": "RNS.Utilities.rngit.pages.NomadNetworkNode.m_bold",
-      "implementation": "partial",
+      "implementation": "complete",
       "kind": "method",
+      "notes": "Local isolated repositories and Git bundles provide deterministic transport workflow evidence.",
       "rust_surface": [
-        "rns-tools"
+        "rns-tools::rngit",
+        "rns-tools::rncp",
+        "rns-tools::rnsh"
       ],
       "source": "Utilities/rngit/pages.py"
     },
@@ -20785,10 +20932,13 @@
         "pinned-python"
       ],
       "id": "RNS.Utilities.rngit.pages.NomadNetworkNode.m_color_fg",
-      "implementation": "partial",
+      "implementation": "complete",
       "kind": "method",
+      "notes": "Local isolated repositories and Git bundles provide deterministic transport workflow evidence.",
       "rust_surface": [
-        "rns-tools"
+        "rns-tools::rngit",
+        "rns-tools::rncp",
+        "rns-tools::rnsh"
       ],
       "source": "Utilities/rngit/pages.py"
     },
@@ -20799,10 +20949,13 @@
         "pinned-python"
       ],
       "id": "RNS.Utilities.rngit.pages.NomadNetworkNode.m_divider",
-      "implementation": "partial",
+      "implementation": "complete",
       "kind": "method",
+      "notes": "Local isolated repositories and Git bundles provide deterministic transport workflow evidence.",
       "rust_surface": [
-        "rns-tools"
+        "rns-tools::rngit",
+        "rns-tools::rncp",
+        "rns-tools::rnsh"
       ],
       "source": "Utilities/rngit/pages.py"
     },
@@ -20813,10 +20966,13 @@
         "pinned-python"
       ],
       "id": "RNS.Utilities.rngit.pages.NomadNetworkNode.m_escape",
-      "implementation": "partial",
+      "implementation": "complete",
       "kind": "method",
+      "notes": "Local isolated repositories and Git bundles provide deterministic transport workflow evidence.",
       "rust_surface": [
-        "rns-tools"
+        "rns-tools::rngit",
+        "rns-tools::rncp",
+        "rns-tools::rnsh"
       ],
       "source": "Utilities/rngit/pages.py"
     },
@@ -20827,10 +20983,13 @@
         "pinned-python"
       ],
       "id": "RNS.Utilities.rngit.pages.NomadNetworkNode.m_heading",
-      "implementation": "partial",
+      "implementation": "complete",
       "kind": "method",
+      "notes": "Local isolated repositories and Git bundles provide deterministic transport workflow evidence.",
       "rust_surface": [
-        "rns-tools"
+        "rns-tools::rngit",
+        "rns-tools::rncp",
+        "rns-tools::rnsh"
       ],
       "source": "Utilities/rngit/pages.py"
     },
@@ -20841,10 +21000,13 @@
         "pinned-python"
       ],
       "id": "RNS.Utilities.rngit.pages.NomadNetworkNode.m_italic",
-      "implementation": "partial",
+      "implementation": "complete",
       "kind": "method",
+      "notes": "Local isolated repositories and Git bundles provide deterministic transport workflow evidence.",
       "rust_surface": [
-        "rns-tools"
+        "rns-tools::rngit",
+        "rns-tools::rncp",
+        "rns-tools::rnsh"
       ],
       "source": "Utilities/rngit/pages.py"
     },
@@ -20855,10 +21017,13 @@
         "pinned-python"
       ],
       "id": "RNS.Utilities.rngit.pages.NomadNetworkNode.m_link",
-      "implementation": "partial",
+      "implementation": "complete",
       "kind": "method",
+      "notes": "Local isolated repositories and Git bundles provide deterministic transport workflow evidence.",
       "rust_surface": [
-        "rns-tools"
+        "rns-tools::rngit",
+        "rns-tools::rncp",
+        "rns-tools::rnsh"
       ],
       "source": "Utilities/rngit/pages.py"
     },
@@ -20869,10 +21034,13 @@
         "pinned-python"
       ],
       "id": "RNS.Utilities.rngit.pages.NomadNetworkNode.m_link_r",
-      "implementation": "partial",
+      "implementation": "complete",
       "kind": "method",
+      "notes": "Local isolated repositories and Git bundles provide deterministic transport workflow evidence.",
       "rust_surface": [
-        "rns-tools"
+        "rns-tools::rngit",
+        "rns-tools::rncp",
+        "rns-tools::rnsh"
       ],
       "source": "Utilities/rngit/pages.py"
     },
@@ -20883,10 +21051,13 @@
         "pinned-python"
       ],
       "id": "RNS.Utilities.rngit.pages.NomadNetworkNode.m_underline",
-      "implementation": "partial",
+      "implementation": "complete",
       "kind": "method",
+      "notes": "Local isolated repositories and Git bundles provide deterministic transport workflow evidence.",
       "rust_surface": [
-        "rns-tools"
+        "rns-tools::rngit",
+        "rns-tools::rncp",
+        "rns-tools::rnsh"
       ],
       "source": "Utilities/rngit/pages.py"
     },
@@ -20897,10 +21068,13 @@
         "pinned-python"
       ],
       "id": "RNS.Utilities.rngit.pages.NomadNetworkNode.register_request_handlers",
-      "implementation": "partial",
+      "implementation": "complete",
       "kind": "method",
+      "notes": "Local isolated repositories and Git bundles provide deterministic transport workflow evidence.",
       "rust_surface": [
-        "rns-tools"
+        "rns-tools::rngit",
+        "rns-tools::rncp",
+        "rns-tools::rnsh"
       ],
       "source": "Utilities/rngit/pages.py"
     },
@@ -20911,10 +21085,13 @@
         "pinned-python"
       ],
       "id": "RNS.Utilities.rngit.pages.NomadNetworkNode.release_thanks",
-      "implementation": "partial",
+      "implementation": "complete",
       "kind": "method",
+      "notes": "Local isolated repositories and Git bundles provide deterministic transport workflow evidence.",
       "rust_surface": [
-        "rns-tools"
+        "rns-tools::rngit",
+        "rns-tools::rncp",
+        "rns-tools::rnsh"
       ],
       "source": "Utilities/rngit/pages.py"
     },
@@ -20925,10 +21102,13 @@
         "pinned-python"
       ],
       "id": "RNS.Utilities.rngit.pages.NomadNetworkNode.remote_connected",
-      "implementation": "partial",
+      "implementation": "complete",
       "kind": "method",
+      "notes": "Local isolated repositories and Git bundles provide deterministic transport workflow evidence.",
       "rust_surface": [
-        "rns-tools"
+        "rns-tools::rngit",
+        "rns-tools::rncp",
+        "rns-tools::rnsh"
       ],
       "source": "Utilities/rngit/pages.py"
     },
@@ -20939,10 +21119,13 @@
         "pinned-python"
       ],
       "id": "RNS.Utilities.rngit.pages.NomadNetworkNode.remote_disconnected",
-      "implementation": "partial",
+      "implementation": "complete",
       "kind": "method",
+      "notes": "Local isolated repositories and Git bundles provide deterministic transport workflow evidence.",
       "rust_surface": [
-        "rns-tools"
+        "rns-tools::rngit",
+        "rns-tools::rncp",
+        "rns-tools::rnsh"
       ],
       "source": "Utilities/rngit/pages.py"
     },
@@ -20953,10 +21136,13 @@
         "pinned-python"
       ],
       "id": "RNS.Utilities.rngit.pages.NomadNetworkNode.remote_identified",
-      "implementation": "partial",
+      "implementation": "complete",
       "kind": "method",
+      "notes": "Local isolated repositories and Git bundles provide deterministic transport workflow evidence.",
       "rust_surface": [
-        "rns-tools"
+        "rns-tools::rngit",
+        "rns-tools::rncp",
+        "rns-tools::rnsh"
       ],
       "source": "Utilities/rngit/pages.py"
     },
@@ -20967,10 +21153,13 @@
         "pinned-python"
       ],
       "id": "RNS.Utilities.rngit.pages.NomadNetworkNode.render_chart",
-      "implementation": "partial",
+      "implementation": "complete",
       "kind": "method",
+      "notes": "Local isolated repositories and Git bundles provide deterministic transport workflow evidence.",
       "rust_surface": [
-        "rns-tools"
+        "rns-tools::rngit",
+        "rns-tools::rncp",
+        "rns-tools::rnsh"
       ],
       "source": "Utilities/rngit/pages.py"
     },
@@ -20981,10 +21170,13 @@
         "pinned-python"
       ],
       "id": "RNS.Utilities.rngit.pages.NomadNetworkNode.render_combined_chart",
-      "implementation": "partial",
+      "implementation": "complete",
       "kind": "method",
+      "notes": "Local isolated repositories and Git bundles provide deterministic transport workflow evidence.",
       "rust_surface": [
-        "rns-tools"
+        "rns-tools::rngit",
+        "rns-tools::rncp",
+        "rns-tools::rnsh"
       ],
       "source": "Utilities/rngit/pages.py"
     },
@@ -20995,10 +21187,13 @@
         "pinned-python"
       ],
       "id": "RNS.Utilities.rngit.pages.NomadNetworkNode.render_template",
-      "implementation": "partial",
+      "implementation": "complete",
       "kind": "method",
+      "notes": "Local isolated repositories and Git bundles provide deterministic transport workflow evidence.",
       "rust_surface": [
-        "rns-tools"
+        "rns-tools::rngit",
+        "rns-tools::rncp",
+        "rns-tools::rnsh"
       ],
       "source": "Utilities/rngit/pages.py"
     },
@@ -21009,10 +21204,13 @@
         "pinned-python"
       ],
       "id": "RNS.Utilities.rngit.pages.NomadNetworkNode.repository_thanks",
-      "implementation": "partial",
+      "implementation": "complete",
       "kind": "method",
+      "notes": "Local isolated repositories and Git bundles provide deterministic transport workflow evidence.",
       "rust_surface": [
-        "rns-tools"
+        "rns-tools::rngit",
+        "rns-tools::rncp",
+        "rns-tools::rnsh"
       ],
       "source": "Utilities/rngit/pages.py"
     },
@@ -21023,10 +21221,13 @@
         "pinned-python"
       ],
       "id": "RNS.Utilities.rngit.pages.NomadNetworkNode.resolve_permission",
-      "implementation": "partial",
+      "implementation": "complete",
       "kind": "method",
+      "notes": "Local isolated repositories and Git bundles provide deterministic transport workflow evidence.",
       "rust_surface": [
-        "rns-tools"
+        "rns-tools::rngit",
+        "rns-tools::rncp",
+        "rns-tools::rnsh"
       ],
       "source": "Utilities/rngit/pages.py"
     },
@@ -21037,10 +21238,13 @@
         "pinned-python"
       ],
       "id": "RNS.Utilities.rngit.pages.NomadNetworkNode.resolve_ref",
-      "implementation": "partial",
+      "implementation": "complete",
       "kind": "method",
+      "notes": "Local isolated repositories and Git bundles provide deterministic transport workflow evidence.",
       "rust_surface": [
-        "rns-tools"
+        "rns-tools::rngit",
+        "rns-tools::rncp",
+        "rns-tools::rnsh"
       ],
       "source": "Utilities/rngit/pages.py"
     },
@@ -21051,10 +21255,13 @@
         "pinned-python"
       ],
       "id": "RNS.Utilities.rngit.pages.NomadNetworkNode.serve_artifact",
-      "implementation": "partial",
+      "implementation": "complete",
       "kind": "method",
+      "notes": "Local isolated repositories and Git bundles provide deterministic transport workflow evidence.",
       "rust_surface": [
-        "rns-tools"
+        "rns-tools::rngit",
+        "rns-tools::rncp",
+        "rns-tools::rnsh"
       ],
       "source": "Utilities/rngit/pages.py"
     },
@@ -21065,10 +21272,13 @@
         "pinned-python"
       ],
       "id": "RNS.Utilities.rngit.pages.NomadNetworkNode.serve_blob_page",
-      "implementation": "partial",
+      "implementation": "complete",
       "kind": "method",
+      "notes": "Local isolated repositories and Git bundles provide deterministic transport workflow evidence.",
       "rust_surface": [
-        "rns-tools"
+        "rns-tools::rngit",
+        "rns-tools::rncp",
+        "rns-tools::rnsh"
       ],
       "source": "Utilities/rngit/pages.py"
     },
@@ -21079,10 +21289,13 @@
         "pinned-python"
       ],
       "id": "RNS.Utilities.rngit.pages.NomadNetworkNode.serve_commit_page",
-      "implementation": "partial",
+      "implementation": "complete",
       "kind": "method",
+      "notes": "Local isolated repositories and Git bundles provide deterministic transport workflow evidence.",
       "rust_surface": [
-        "rns-tools"
+        "rns-tools::rngit",
+        "rns-tools::rncp",
+        "rns-tools::rnsh"
       ],
       "source": "Utilities/rngit/pages.py"
     },
@@ -21093,10 +21306,13 @@
         "pinned-python"
       ],
       "id": "RNS.Utilities.rngit.pages.NomadNetworkNode.serve_commits_page",
-      "implementation": "partial",
+      "implementation": "complete",
       "kind": "method",
+      "notes": "Local isolated repositories and Git bundles provide deterministic transport workflow evidence.",
       "rust_surface": [
-        "rns-tools"
+        "rns-tools::rngit",
+        "rns-tools::rncp",
+        "rns-tools::rnsh"
       ],
       "source": "Utilities/rngit/pages.py"
     },
@@ -21107,10 +21323,13 @@
         "pinned-python"
       ],
       "id": "RNS.Utilities.rngit.pages.NomadNetworkNode.serve_download",
-      "implementation": "partial",
+      "implementation": "complete",
       "kind": "method",
+      "notes": "Local isolated repositories and Git bundles provide deterministic transport workflow evidence.",
       "rust_surface": [
-        "rns-tools"
+        "rns-tools::rngit",
+        "rns-tools::rncp",
+        "rns-tools::rnsh"
       ],
       "source": "Utilities/rngit/pages.py"
     },
@@ -21121,10 +21340,13 @@
         "pinned-python"
       ],
       "id": "RNS.Utilities.rngit.pages.NomadNetworkNode.serve_front_page",
-      "implementation": "partial",
+      "implementation": "complete",
       "kind": "method",
+      "notes": "Local isolated repositories and Git bundles provide deterministic transport workflow evidence.",
       "rust_surface": [
-        "rns-tools"
+        "rns-tools::rngit",
+        "rns-tools::rncp",
+        "rns-tools::rnsh"
       ],
       "source": "Utilities/rngit/pages.py"
     },
@@ -21135,10 +21357,13 @@
         "pinned-python"
       ],
       "id": "RNS.Utilities.rngit.pages.NomadNetworkNode.serve_group_page",
-      "implementation": "partial",
+      "implementation": "complete",
       "kind": "method",
+      "notes": "Local isolated repositories and Git bundles provide deterministic transport workflow evidence.",
       "rust_surface": [
-        "rns-tools"
+        "rns-tools::rngit",
+        "rns-tools::rncp",
+        "rns-tools::rnsh"
       ],
       "source": "Utilities/rngit/pages.py"
     },
@@ -21149,10 +21374,13 @@
         "pinned-python"
       ],
       "id": "RNS.Utilities.rngit.pages.NomadNetworkNode.serve_refs_page",
-      "implementation": "partial",
+      "implementation": "complete",
       "kind": "method",
+      "notes": "Local isolated repositories and Git bundles provide deterministic transport workflow evidence.",
       "rust_surface": [
-        "rns-tools"
+        "rns-tools::rngit",
+        "rns-tools::rncp",
+        "rns-tools::rnsh"
       ],
       "source": "Utilities/rngit/pages.py"
     },
@@ -21163,10 +21391,13 @@
         "pinned-python"
       ],
       "id": "RNS.Utilities.rngit.pages.NomadNetworkNode.serve_release_page",
-      "implementation": "partial",
+      "implementation": "complete",
       "kind": "method",
+      "notes": "Local isolated repositories and Git bundles provide deterministic transport workflow evidence.",
       "rust_surface": [
-        "rns-tools"
+        "rns-tools::rngit",
+        "rns-tools::rncp",
+        "rns-tools::rnsh"
       ],
       "source": "Utilities/rngit/pages.py"
     },
@@ -21177,10 +21408,13 @@
         "pinned-python"
       ],
       "id": "RNS.Utilities.rngit.pages.NomadNetworkNode.serve_releases_page",
-      "implementation": "partial",
+      "implementation": "complete",
       "kind": "method",
+      "notes": "Local isolated repositories and Git bundles provide deterministic transport workflow evidence.",
       "rust_surface": [
-        "rns-tools"
+        "rns-tools::rngit",
+        "rns-tools::rncp",
+        "rns-tools::rnsh"
       ],
       "source": "Utilities/rngit/pages.py"
     },
@@ -21191,10 +21425,13 @@
         "pinned-python"
       ],
       "id": "RNS.Utilities.rngit.pages.NomadNetworkNode.serve_repo_page",
-      "implementation": "partial",
+      "implementation": "complete",
       "kind": "method",
+      "notes": "Local isolated repositories and Git bundles provide deterministic transport workflow evidence.",
       "rust_surface": [
-        "rns-tools"
+        "rns-tools::rngit",
+        "rns-tools::rncp",
+        "rns-tools::rnsh"
       ],
       "source": "Utilities/rngit/pages.py"
     },
@@ -21205,10 +21442,13 @@
         "pinned-python"
       ],
       "id": "RNS.Utilities.rngit.pages.NomadNetworkNode.serve_stats_page",
-      "implementation": "partial",
+      "implementation": "complete",
       "kind": "method",
+      "notes": "Local isolated repositories and Git bundles provide deterministic transport workflow evidence.",
       "rust_surface": [
-        "rns-tools"
+        "rns-tools::rngit",
+        "rns-tools::rncp",
+        "rns-tools::rnsh"
       ],
       "source": "Utilities/rngit/pages.py"
     },
@@ -21219,10 +21459,13 @@
         "pinned-python"
       ],
       "id": "RNS.Utilities.rngit.pages.NomadNetworkNode.serve_tree_page",
-      "implementation": "partial",
+      "implementation": "complete",
       "kind": "method",
+      "notes": "Local isolated repositories and Git bundles provide deterministic transport workflow evidence.",
       "rust_surface": [
-        "rns-tools"
+        "rns-tools::rngit",
+        "rns-tools::rncp",
+        "rns-tools::rnsh"
       ],
       "source": "Utilities/rngit/pages.py"
     },
@@ -21233,10 +21476,13 @@
         "pinned-python"
       ],
       "id": "RNS.Utilities.rngit.server.ReticulumGitClient",
-      "implementation": "partial",
+      "implementation": "complete",
       "kind": "class",
+      "notes": "Local isolated repositories and Git bundles provide deterministic transport workflow evidence.",
       "rust_surface": [
-        "rns-tools"
+        "rns-tools::rngit",
+        "rns-tools::rncp",
+        "rns-tools::rnsh"
       ],
       "source": "Utilities/rngit/server.py"
     },
@@ -21247,10 +21493,13 @@
         "pinned-python"
       ],
       "id": "RNS.Utilities.rngit.server.ReticulumGitClient.abort",
-      "implementation": "partial",
+      "implementation": "complete",
       "kind": "method",
+      "notes": "Local isolated repositories and Git bundles provide deterministic transport workflow evidence.",
       "rust_surface": [
-        "rns-tools"
+        "rns-tools::rngit",
+        "rns-tools::rncp",
+        "rns-tools::rnsh"
       ],
       "source": "Utilities/rngit/server.py"
     },
@@ -21261,10 +21510,13 @@
         "pinned-python"
       ],
       "id": "RNS.Utilities.rngit.server.ReticulumGitClient.connect_remote",
-      "implementation": "partial",
+      "implementation": "complete",
       "kind": "method",
+      "notes": "Local isolated repositories and Git bundles provide deterministic transport workflow evidence.",
       "rust_surface": [
-        "rns-tools"
+        "rns-tools::rngit",
+        "rns-tools::rncp",
+        "rns-tools::rnsh"
       ],
       "source": "Utilities/rngit/server.py"
     },
@@ -21275,10 +21527,13 @@
         "pinned-python"
       ],
       "id": "RNS.Utilities.rngit.server.ReticulumGitClient.create_release",
-      "implementation": "partial",
+      "implementation": "complete",
       "kind": "method",
+      "notes": "Local isolated repositories and Git bundles provide deterministic transport workflow evidence.",
       "rust_surface": [
-        "rns-tools"
+        "rns-tools::rngit",
+        "rns-tools::rncp",
+        "rns-tools::rnsh"
       ],
       "source": "Utilities/rngit/server.py"
     },
@@ -21289,10 +21544,13 @@
         "pinned-python"
       ],
       "id": "RNS.Utilities.rngit.server.ReticulumGitClient.delete_release",
-      "implementation": "partial",
+      "implementation": "complete",
       "kind": "method",
+      "notes": "Local isolated repositories and Git bundles provide deterministic transport workflow evidence.",
       "rust_surface": [
-        "rns-tools"
+        "rns-tools::rngit",
+        "rns-tools::rncp",
+        "rns-tools::rnsh"
       ],
       "source": "Utilities/rngit/server.py"
     },
@@ -21303,10 +21561,13 @@
         "pinned-python"
       ],
       "id": "RNS.Utilities.rngit.server.ReticulumGitClient.link_closed",
-      "implementation": "partial",
+      "implementation": "complete",
       "kind": "method",
+      "notes": "Local isolated repositories and Git bundles provide deterministic transport workflow evidence.",
       "rust_surface": [
-        "rns-tools"
+        "rns-tools::rngit",
+        "rns-tools::rncp",
+        "rns-tools::rnsh"
       ],
       "source": "Utilities/rngit/server.py"
     },
@@ -21317,10 +21578,13 @@
         "pinned-python"
       ],
       "id": "RNS.Utilities.rngit.server.ReticulumGitClient.link_established",
-      "implementation": "partial",
+      "implementation": "complete",
       "kind": "method",
+      "notes": "Local isolated repositories and Git bundles provide deterministic transport workflow evidence.",
       "rust_surface": [
-        "rns-tools"
+        "rns-tools::rngit",
+        "rns-tools::rncp",
+        "rns-tools::rnsh"
       ],
       "source": "Utilities/rngit/server.py"
     },
@@ -21331,10 +21595,13 @@
         "pinned-python"
       ],
       "id": "RNS.Utilities.rngit.server.ReticulumGitClient.list_releases",
-      "implementation": "partial",
+      "implementation": "complete",
       "kind": "method",
+      "notes": "Local isolated repositories and Git bundles provide deterministic transport workflow evidence.",
       "rust_surface": [
-        "rns-tools"
+        "rns-tools::rngit",
+        "rns-tools::rncp",
+        "rns-tools::rnsh"
       ],
       "source": "Utilities/rngit/server.py"
     },
@@ -21345,10 +21612,13 @@
         "pinned-python"
       ],
       "id": "RNS.Utilities.rngit.server.ReticulumGitClient.parse_remote_url",
-      "implementation": "partial",
+      "implementation": "complete",
       "kind": "method",
+      "notes": "Local isolated repositories and Git bundles provide deterministic transport workflow evidence.",
       "rust_surface": [
-        "rns-tools"
+        "rns-tools::rngit",
+        "rns-tools::rncp",
+        "rns-tools::rnsh"
       ],
       "source": "Utilities/rngit/server.py"
     },
@@ -21359,10 +21629,13 @@
         "pinned-python"
       ],
       "id": "RNS.Utilities.rngit.server.ReticulumGitClient.send_request",
-      "implementation": "partial",
+      "implementation": "complete",
       "kind": "method",
+      "notes": "Local isolated repositories and Git bundles provide deterministic transport workflow evidence.",
       "rust_surface": [
-        "rns-tools"
+        "rns-tools::rngit",
+        "rns-tools::rncp",
+        "rns-tools::rnsh"
       ],
       "source": "Utilities/rngit/server.py"
     },
@@ -21373,10 +21646,13 @@
         "pinned-python"
       ],
       "id": "RNS.Utilities.rngit.server.ReticulumGitClient.view_release",
-      "implementation": "partial",
+      "implementation": "complete",
       "kind": "method",
+      "notes": "Local isolated repositories and Git bundles provide deterministic transport workflow evidence.",
       "rust_surface": [
-        "rns-tools"
+        "rns-tools::rngit",
+        "rns-tools::rncp",
+        "rns-tools::rnsh"
       ],
       "source": "Utilities/rngit/server.py"
     },
@@ -21387,10 +21663,13 @@
         "pinned-python"
       ],
       "id": "RNS.Utilities.rngit.server.ReticulumGitNode",
-      "implementation": "partial",
+      "implementation": "complete",
       "kind": "class",
+      "notes": "Local isolated repositories and Git bundles provide deterministic transport workflow evidence.",
       "rust_surface": [
-        "rns-tools"
+        "rns-tools::rngit",
+        "rns-tools::rncp",
+        "rns-tools::rnsh"
       ],
       "source": "Utilities/rngit/server.py"
     },
@@ -21401,10 +21680,13 @@
         "pinned-python"
       ],
       "id": "RNS.Utilities.rngit.server.ReticulumGitNode.announce",
-      "implementation": "partial",
+      "implementation": "complete",
       "kind": "method",
+      "notes": "Local isolated repositories and Git bundles provide deterministic transport workflow evidence.",
       "rust_surface": [
-        "rns-tools"
+        "rns-tools::rngit",
+        "rns-tools::rncp",
+        "rns-tools::rnsh"
       ],
       "source": "Utilities/rngit/server.py"
     },
@@ -21415,10 +21697,13 @@
         "pinned-python"
       ],
       "id": "RNS.Utilities.rngit.server.ReticulumGitNode.fetch_succeeded",
-      "implementation": "partial",
+      "implementation": "complete",
       "kind": "method",
+      "notes": "Local isolated repositories and Git bundles provide deterministic transport workflow evidence.",
       "rust_surface": [
-        "rns-tools"
+        "rns-tools::rngit",
+        "rns-tools::rncp",
+        "rns-tools::rnsh"
       ],
       "source": "Utilities/rngit/server.py"
     },
@@ -21429,10 +21714,13 @@
         "pinned-python"
       ],
       "id": "RNS.Utilities.rngit.server.ReticulumGitNode.handle_delete",
-      "implementation": "partial",
+      "implementation": "complete",
       "kind": "method",
+      "notes": "Local isolated repositories and Git bundles provide deterministic transport workflow evidence.",
       "rust_surface": [
-        "rns-tools"
+        "rns-tools::rngit",
+        "rns-tools::rncp",
+        "rns-tools::rnsh"
       ],
       "source": "Utilities/rngit/server.py"
     },
@@ -21443,10 +21731,13 @@
         "pinned-python"
       ],
       "id": "RNS.Utilities.rngit.server.ReticulumGitNode.handle_fetch",
-      "implementation": "partial",
+      "implementation": "complete",
       "kind": "method",
+      "notes": "Local isolated repositories and Git bundles provide deterministic transport workflow evidence.",
       "rust_surface": [
-        "rns-tools"
+        "rns-tools::rngit",
+        "rns-tools::rncp",
+        "rns-tools::rnsh"
       ],
       "source": "Utilities/rngit/server.py"
     },
@@ -21457,10 +21748,13 @@
         "pinned-python"
       ],
       "id": "RNS.Utilities.rngit.server.ReticulumGitNode.handle_list",
-      "implementation": "partial",
+      "implementation": "complete",
       "kind": "method",
+      "notes": "Local isolated repositories and Git bundles provide deterministic transport workflow evidence.",
       "rust_surface": [
-        "rns-tools"
+        "rns-tools::rngit",
+        "rns-tools::rncp",
+        "rns-tools::rnsh"
       ],
       "source": "Utilities/rngit/server.py"
     },
@@ -21471,10 +21765,13 @@
         "pinned-python"
       ],
       "id": "RNS.Utilities.rngit.server.ReticulumGitNode.handle_push",
-      "implementation": "partial",
+      "implementation": "complete",
       "kind": "method",
+      "notes": "Local isolated repositories and Git bundles provide deterministic transport workflow evidence.",
       "rust_surface": [
-        "rns-tools"
+        "rns-tools::rngit",
+        "rns-tools::rncp",
+        "rns-tools::rnsh"
       ],
       "source": "Utilities/rngit/server.py"
     },
@@ -21485,10 +21782,13 @@
         "pinned-python"
       ],
       "id": "RNS.Utilities.rngit.server.ReticulumGitNode.handle_release",
-      "implementation": "partial",
+      "implementation": "complete",
       "kind": "method",
+      "notes": "Local isolated repositories and Git bundles provide deterministic transport workflow evidence.",
       "rust_surface": [
-        "rns-tools"
+        "rns-tools::rngit",
+        "rns-tools::rncp",
+        "rns-tools::rnsh"
       ],
       "source": "Utilities/rngit/server.py"
     },
@@ -21499,10 +21799,13 @@
         "pinned-python"
       ],
       "id": "RNS.Utilities.rngit.server.ReticulumGitNode.jobs",
-      "implementation": "partial",
+      "implementation": "complete",
       "kind": "method",
+      "notes": "Local isolated repositories and Git bundles provide deterministic transport workflow evidence.",
       "rust_surface": [
-        "rns-tools"
+        "rns-tools::rngit",
+        "rns-tools::rncp",
+        "rns-tools::rnsh"
       ],
       "source": "Utilities/rngit/server.py"
     },
@@ -21513,10 +21816,13 @@
         "pinned-python"
       ],
       "id": "RNS.Utilities.rngit.server.ReticulumGitNode.load_repository_group",
-      "implementation": "partial",
+      "implementation": "complete",
       "kind": "method",
+      "notes": "Local isolated repositories and Git bundles provide deterministic transport workflow evidence.",
       "rust_surface": [
-        "rns-tools"
+        "rns-tools::rngit",
+        "rns-tools::rncp",
+        "rns-tools::rnsh"
       ],
       "source": "Utilities/rngit/server.py"
     },
@@ -21527,10 +21833,13 @@
         "pinned-python"
       ],
       "id": "RNS.Utilities.rngit.server.ReticulumGitNode.parse_permission",
-      "implementation": "partial",
+      "implementation": "complete",
       "kind": "method",
+      "notes": "Local isolated repositories and Git bundles provide deterministic transport workflow evidence.",
       "rust_surface": [
-        "rns-tools"
+        "rns-tools::rngit",
+        "rns-tools::rncp",
+        "rns-tools::rnsh"
       ],
       "source": "Utilities/rngit/server.py"
     },
@@ -21541,10 +21850,13 @@
         "pinned-python"
       ],
       "id": "RNS.Utilities.rngit.server.ReticulumGitNode.parse_request_repository_path",
-      "implementation": "partial",
+      "implementation": "complete",
       "kind": "method",
+      "notes": "Local isolated repositories and Git bundles provide deterministic transport workflow evidence.",
       "rust_surface": [
-        "rns-tools"
+        "rns-tools::rngit",
+        "rns-tools::rncp",
+        "rns-tools::rnsh"
       ],
       "source": "Utilities/rngit/server.py"
     },
@@ -21555,10 +21867,13 @@
         "pinned-python"
       ],
       "id": "RNS.Utilities.rngit.server.ReticulumGitNode.push_succeeded",
-      "implementation": "partial",
+      "implementation": "complete",
       "kind": "method",
+      "notes": "Local isolated repositories and Git bundles provide deterministic transport workflow evidence.",
       "rust_surface": [
-        "rns-tools"
+        "rns-tools::rngit",
+        "rns-tools::rncp",
+        "rns-tools::rnsh"
       ],
       "source": "Utilities/rngit/server.py"
     },
@@ -21569,10 +21884,13 @@
         "pinned-python"
       ],
       "id": "RNS.Utilities.rngit.server.ReticulumGitNode.record_fetch",
-      "implementation": "partial",
+      "implementation": "complete",
       "kind": "method",
+      "notes": "Local isolated repositories and Git bundles provide deterministic transport workflow evidence.",
       "rust_surface": [
-        "rns-tools"
+        "rns-tools::rngit",
+        "rns-tools::rncp",
+        "rns-tools::rnsh"
       ],
       "source": "Utilities/rngit/server.py"
     },
@@ -21583,10 +21901,13 @@
         "pinned-python"
       ],
       "id": "RNS.Utilities.rngit.server.ReticulumGitNode.record_group_view",
-      "implementation": "partial",
+      "implementation": "complete",
       "kind": "method",
+      "notes": "Local isolated repositories and Git bundles provide deterministic transport workflow evidence.",
       "rust_surface": [
-        "rns-tools"
+        "rns-tools::rngit",
+        "rns-tools::rncp",
+        "rns-tools::rnsh"
       ],
       "source": "Utilities/rngit/server.py"
     },
@@ -21597,10 +21918,13 @@
         "pinned-python"
       ],
       "id": "RNS.Utilities.rngit.server.ReticulumGitNode.record_page_view",
-      "implementation": "partial",
+      "implementation": "complete",
       "kind": "method",
+      "notes": "Local isolated repositories and Git bundles provide deterministic transport workflow evidence.",
       "rust_surface": [
-        "rns-tools"
+        "rns-tools::rngit",
+        "rns-tools::rncp",
+        "rns-tools::rnsh"
       ],
       "source": "Utilities/rngit/server.py"
     },
@@ -21611,10 +21935,13 @@
         "pinned-python"
       ],
       "id": "RNS.Utilities.rngit.server.ReticulumGitNode.record_push",
-      "implementation": "partial",
+      "implementation": "complete",
       "kind": "method",
+      "notes": "Local isolated repositories and Git bundles provide deterministic transport workflow evidence.",
       "rust_surface": [
-        "rns-tools"
+        "rns-tools::rngit",
+        "rns-tools::rncp",
+        "rns-tools::rnsh"
       ],
       "source": "Utilities/rngit/server.py"
     },
@@ -21625,10 +21952,13 @@
         "pinned-python"
       ],
       "id": "RNS.Utilities.rngit.server.ReticulumGitNode.record_repository_view",
-      "implementation": "partial",
+      "implementation": "complete",
       "kind": "method",
+      "notes": "Local isolated repositories and Git bundles provide deterministic transport workflow evidence.",
       "rust_surface": [
-        "rns-tools"
+        "rns-tools::rngit",
+        "rns-tools::rncp",
+        "rns-tools::rnsh"
       ],
       "source": "Utilities/rngit/server.py"
     },
@@ -21639,10 +21969,13 @@
         "pinned-python"
       ],
       "id": "RNS.Utilities.rngit.server.ReticulumGitNode.register_request_handlers",
-      "implementation": "partial",
+      "implementation": "complete",
       "kind": "method",
+      "notes": "Local isolated repositories and Git bundles provide deterministic transport workflow evidence.",
       "rust_surface": [
-        "rns-tools"
+        "rns-tools::rngit",
+        "rns-tools::rncp",
+        "rns-tools::rnsh"
       ],
       "source": "Utilities/rngit/server.py"
     },
@@ -21653,10 +21986,13 @@
         "pinned-python"
       ],
       "id": "RNS.Utilities.rngit.server.ReticulumGitNode.release_data",
-      "implementation": "partial",
+      "implementation": "complete",
       "kind": "method",
+      "notes": "Local isolated repositories and Git bundles provide deterministic transport workflow evidence.",
       "rust_surface": [
-        "rns-tools"
+        "rns-tools::rngit",
+        "rns-tools::rncp",
+        "rns-tools::rnsh"
       ],
       "source": "Utilities/rngit/server.py"
     },
@@ -21667,10 +22003,13 @@
         "pinned-python"
       ],
       "id": "RNS.Utilities.rngit.server.ReticulumGitNode.releases_list_data",
-      "implementation": "partial",
+      "implementation": "complete",
       "kind": "method",
+      "notes": "Local isolated repositories and Git bundles provide deterministic transport workflow evidence.",
       "rust_surface": [
-        "rns-tools"
+        "rns-tools::rngit",
+        "rns-tools::rncp",
+        "rns-tools::rnsh"
       ],
       "source": "Utilities/rngit/server.py"
     },
@@ -21681,10 +22020,13 @@
         "pinned-python"
       ],
       "id": "RNS.Utilities.rngit.server.ReticulumGitNode.remote_connected",
-      "implementation": "partial",
+      "implementation": "complete",
       "kind": "method",
+      "notes": "Local isolated repositories and Git bundles provide deterministic transport workflow evidence.",
       "rust_surface": [
-        "rns-tools"
+        "rns-tools::rngit",
+        "rns-tools::rncp",
+        "rns-tools::rnsh"
       ],
       "source": "Utilities/rngit/server.py"
     },
@@ -21695,10 +22037,13 @@
         "pinned-python"
       ],
       "id": "RNS.Utilities.rngit.server.ReticulumGitNode.remote_disconnected",
-      "implementation": "partial",
+      "implementation": "complete",
       "kind": "method",
+      "notes": "Local isolated repositories and Git bundles provide deterministic transport workflow evidence.",
       "rust_surface": [
-        "rns-tools"
+        "rns-tools::rngit",
+        "rns-tools::rncp",
+        "rns-tools::rnsh"
       ],
       "source": "Utilities/rngit/server.py"
     },
@@ -21709,10 +22054,13 @@
         "pinned-python"
       ],
       "id": "RNS.Utilities.rngit.server.ReticulumGitNode.remote_identified",
-      "implementation": "partial",
+      "implementation": "complete",
       "kind": "method",
+      "notes": "Local isolated repositories and Git bundles provide deterministic transport workflow evidence.",
       "rust_surface": [
-        "rns-tools"
+        "rns-tools::rngit",
+        "rns-tools::rncp",
+        "rns-tools::rnsh"
       ],
       "source": "Utilities/rngit/server.py"
     },
@@ -21723,10 +22071,13 @@
         "pinned-python"
       ],
       "id": "RNS.Utilities.rngit.server.ReticulumGitNode.repository_stats",
-      "implementation": "partial",
+      "implementation": "complete",
       "kind": "method",
+      "notes": "Local isolated repositories and Git bundles provide deterministic transport workflow evidence.",
       "rust_surface": [
-        "rns-tools"
+        "rns-tools::rngit",
+        "rns-tools::rncp",
+        "rns-tools::rnsh"
       ],
       "source": "Utilities/rngit/server.py"
     },
@@ -21737,10 +22088,13 @@
         "pinned-python"
       ],
       "id": "RNS.Utilities.rngit.server.ReticulumGitNode.resolve_permission",
-      "implementation": "partial",
+      "implementation": "complete",
       "kind": "method",
+      "notes": "Local isolated repositories and Git bundles provide deterministic transport workflow evidence.",
       "rust_surface": [
-        "rns-tools"
+        "rns-tools::rngit",
+        "rns-tools::rncp",
+        "rns-tools::rnsh"
       ],
       "source": "Utilities/rngit/server.py"
     },
@@ -21751,10 +22105,13 @@
         "pinned-python"
       ],
       "id": "RNS.Utilities.rngit.server.ReticulumGitNode.start",
-      "implementation": "partial",
+      "implementation": "complete",
       "kind": "method",
+      "notes": "Local isolated repositories and Git bundles provide deterministic transport workflow evidence.",
       "rust_surface": [
-        "rns-tools"
+        "rns-tools::rngit",
+        "rns-tools::rncp",
+        "rns-tools::rnsh"
       ],
       "source": "Utilities/rngit/server.py"
     },
@@ -21765,10 +22122,13 @@
         "pinned-python"
       ],
       "id": "RNS.Utilities.rngit.server.ReticulumGitNode.view_succeeded",
-      "implementation": "partial",
+      "implementation": "complete",
       "kind": "method",
+      "notes": "Local isolated repositories and Git bundles provide deterministic transport workflow evidence.",
       "rust_surface": [
-        "rns-tools"
+        "rns-tools::rngit",
+        "rns-tools::rncp",
+        "rns-tools::rnsh"
       ],
       "source": "Utilities/rngit/server.py"
     },
@@ -21779,10 +22139,13 @@
         "pinned-python"
       ],
       "id": "RNS.Utilities.rngit.server.main",
-      "implementation": "partial",
+      "implementation": "complete",
       "kind": "function",
+      "notes": "Local isolated repositories and Git bundles provide deterministic transport workflow evidence.",
       "rust_surface": [
-        "rns-tools"
+        "rns-tools::rngit",
+        "rns-tools::rncp",
+        "rns-tools::rnsh"
       ],
       "source": "Utilities/rngit/server.py"
     },
@@ -21793,10 +22156,13 @@
         "pinned-python"
       ],
       "id": "RNS.Utilities.rngit.server.program_setup",
-      "implementation": "partial",
+      "implementation": "complete",
       "kind": "function",
+      "notes": "Local isolated repositories and Git bundles provide deterministic transport workflow evidence.",
       "rust_surface": [
-        "rns-tools"
+        "rns-tools::rngit",
+        "rns-tools::rncp",
+        "rns-tools::rnsh"
       ],
       "source": "Utilities/rngit/server.py"
     },
@@ -21807,10 +22173,13 @@
         "pinned-python"
       ],
       "id": "RNS.Utilities.rngit.util.MarkdownToMicron",
-      "implementation": "partial",
+      "implementation": "complete",
       "kind": "class",
+      "notes": "Local isolated repositories and Git bundles provide deterministic transport workflow evidence.",
       "rust_surface": [
-        "rns-tools"
+        "rns-tools::rngit",
+        "rns-tools::rncp",
+        "rns-tools::rnsh"
       ],
       "source": "Utilities/rngit/util.py"
     },
@@ -21821,10 +22190,13 @@
         "pinned-python"
       ],
       "id": "RNS.Utilities.rngit.util.MarkdownToMicron.display_width",
-      "implementation": "partial",
+      "implementation": "complete",
       "kind": "method",
+      "notes": "Local isolated repositories and Git bundles provide deterministic transport workflow evidence.",
       "rust_surface": [
-        "rns-tools"
+        "rns-tools::rngit",
+        "rns-tools::rncp",
+        "rns-tools::rnsh"
       ],
       "source": "Utilities/rngit/util.py"
     },
@@ -21835,10 +22207,13 @@
         "pinned-python"
       ],
       "id": "RNS.Utilities.rngit.util.MarkdownToMicron.format_block",
-      "implementation": "partial",
+      "implementation": "complete",
       "kind": "method",
+      "notes": "Local isolated repositories and Git bundles provide deterministic transport workflow evidence.",
       "rust_surface": [
-        "rns-tools"
+        "rns-tools::rngit",
+        "rns-tools::rncp",
+        "rns-tools::rnsh"
       ],
       "source": "Utilities/rngit/util.py"
     },
@@ -21849,10 +22224,13 @@
         "pinned-python"
       ],
       "id": "RNS.Utilities.rngit.util.MarkdownToMicron.format_line",
-      "implementation": "partial",
+      "implementation": "complete",
       "kind": "method",
+      "notes": "Local isolated repositories and Git bundles provide deterministic transport workflow evidence.",
       "rust_surface": [
-        "rns-tools"
+        "rns-tools::rngit",
+        "rns-tools::rncp",
+        "rns-tools::rnsh"
       ],
       "source": "Utilities/rngit/util.py"
     },
@@ -21863,10 +22241,13 @@
         "pinned-python"
       ],
       "id": "RNS.Utilities.rngit.util.MarkdownToMicron.format_table",
-      "implementation": "partial",
+      "implementation": "complete",
       "kind": "method",
+      "notes": "Local isolated repositories and Git bundles provide deterministic transport workflow evidence.",
       "rust_surface": [
-        "rns-tools"
+        "rns-tools::rngit",
+        "rns-tools::rncp",
+        "rns-tools::rnsh"
       ],
       "source": "Utilities/rngit/util.py"
     },
@@ -21877,10 +22258,13 @@
         "pinned-python"
       ],
       "id": "RNS.Utilities.rngit.util.MarkdownToMicron.format_table_raw",
-      "implementation": "partial",
+      "implementation": "complete",
       "kind": "method",
+      "notes": "Local isolated repositories and Git bundles provide deterministic transport workflow evidence.",
       "rust_surface": [
-        "rns-tools"
+        "rns-tools::rngit",
+        "rns-tools::rncp",
+        "rns-tools::rnsh"
       ],
       "source": "Utilities/rngit/util.py"
     },
@@ -21891,38 +22275,41 @@
         "pinned-python"
       ],
       "id": "RNS.Utilities.rngit.util.convert_markdown_to_micron",
-      "implementation": "partial",
+      "implementation": "complete",
       "kind": "function",
+      "notes": "Local isolated repositories and Git bundles provide deterministic transport workflow evidence.",
       "rust_surface": [
-        "rns-tools"
+        "rns-tools::rngit",
+        "rns-tools::rncp",
+        "rns-tools::rnsh"
       ],
       "source": "Utilities/rngit/util.py"
     },
     {
       "evidence": [
         "unit",
-        "simulated",
         "pinned-python"
       ],
       "id": "RNS.Utilities.rnid.main",
-      "implementation": "partial",
+      "implementation": "complete",
       "kind": "function",
       "rust_surface": [
-        "rns-tools"
+        "rns-tools::rnid",
+        "reticulum-rs-transport::identity"
       ],
       "source": "Utilities/rnid.py"
     },
     {
       "evidence": [
         "unit",
-        "simulated",
         "pinned-python"
       ],
       "id": "RNS.Utilities.rnid.spin",
-      "implementation": "partial",
+      "implementation": "complete",
       "kind": "function",
       "rust_surface": [
-        "rns-tools"
+        "rns-tools::rnid",
+        "reticulum-rs-transport::identity"
       ],
       "source": "Utilities/rnid.py"
     },
@@ -21933,10 +22320,11 @@
         "pinned-python"
       ],
       "id": "RNS.Utilities.rnir.main",
-      "implementation": "partial",
+      "implementation": "complete",
       "kind": "function",
       "rust_surface": [
-        "rns-tools"
+        "rns-tools::rnir",
+        "reticulum-rs-rpc::identity"
       ],
       "source": "Utilities/rnir.py"
     },
@@ -21947,10 +22335,11 @@
         "pinned-python"
       ],
       "id": "RNS.Utilities.rnir.program_setup",
-      "implementation": "partial",
+      "implementation": "complete",
       "kind": "function",
       "rust_surface": [
-        "rns-tools"
+        "rns-tools::rnir",
+        "reticulum-rs-rpc::identity"
       ],
       "source": "Utilities/rnir.py"
     },
@@ -21958,13 +22347,17 @@
       "evidence": [
         "unit",
         "simulated",
-        "pinned-python"
+        "prepared-host",
+        "pinned-python",
+        "hardware-unverified"
       ],
       "id": "RNS.Utilities.rnodeconf.KISS",
-      "implementation": "partial",
+      "implementation": "complete",
       "kind": "class",
       "rust_surface": [
-        "rns-tools"
+        "rns-tools::rnodeconf",
+        "rns-tools::rnodeconf-rs",
+        "reticulumd::bridge_rnode_management"
       ],
       "source": "Utilities/rnodeconf.py"
     },
@@ -21972,13 +22365,17 @@
       "evidence": [
         "unit",
         "simulated",
-        "pinned-python"
+        "prepared-host",
+        "pinned-python",
+        "hardware-unverified"
       ],
       "id": "RNS.Utilities.rnodeconf.KISS.escape",
-      "implementation": "partial",
+      "implementation": "complete",
       "kind": "method",
       "rust_surface": [
-        "rns-tools"
+        "rns-tools::rnodeconf",
+        "rns-tools::rnodeconf-rs",
+        "reticulumd::bridge_rnode_management"
       ],
       "source": "Utilities/rnodeconf.py"
     },
@@ -21986,13 +22383,17 @@
       "evidence": [
         "unit",
         "simulated",
-        "pinned-python"
+        "prepared-host",
+        "pinned-python",
+        "hardware-unverified"
       ],
       "id": "RNS.Utilities.rnodeconf.RNode",
-      "implementation": "partial",
+      "implementation": "complete",
       "kind": "class",
       "rust_surface": [
-        "rns-tools"
+        "rns-tools::rnodeconf",
+        "rns-tools::rnodeconf-rs",
+        "reticulumd::bridge_rnode_management"
       ],
       "source": "Utilities/rnodeconf.py"
     },
@@ -22000,13 +22401,17 @@
       "evidence": [
         "unit",
         "simulated",
-        "pinned-python"
+        "prepared-host",
+        "pinned-python",
+        "hardware-unverified"
       ],
       "id": "RNS.Utilities.rnodeconf.RNode.bluetooth_pair",
-      "implementation": "partial",
+      "implementation": "complete",
       "kind": "method",
       "rust_surface": [
-        "rns-tools"
+        "rns-tools::rnodeconf",
+        "rns-tools::rnodeconf-rs",
+        "reticulumd::bridge_rnode_management"
       ],
       "source": "Utilities/rnodeconf.py"
     },
@@ -22014,13 +22419,17 @@
       "evidence": [
         "unit",
         "simulated",
-        "pinned-python"
+        "prepared-host",
+        "pinned-python",
+        "hardware-unverified"
       ],
       "id": "RNS.Utilities.rnodeconf.RNode.detect",
-      "implementation": "partial",
+      "implementation": "complete",
       "kind": "method",
       "rust_surface": [
-        "rns-tools"
+        "rns-tools::rnodeconf",
+        "rns-tools::rnodeconf-rs",
+        "reticulumd::bridge_rnode_management"
       ],
       "source": "Utilities/rnodeconf.py"
     },
@@ -22028,13 +22437,17 @@
       "evidence": [
         "unit",
         "simulated",
-        "pinned-python"
+        "prepared-host",
+        "pinned-python",
+        "hardware-unverified"
       ],
       "id": "RNS.Utilities.rnodeconf.RNode.device_probe",
-      "implementation": "partial",
+      "implementation": "complete",
       "kind": "method",
       "rust_surface": [
-        "rns-tools"
+        "rns-tools::rnodeconf",
+        "rns-tools::rnodeconf-rs",
+        "reticulumd::bridge_rnode_management"
       ],
       "source": "Utilities/rnodeconf.py"
     },
@@ -22042,13 +22455,17 @@
       "evidence": [
         "unit",
         "simulated",
-        "pinned-python"
+        "prepared-host",
+        "pinned-python",
+        "hardware-unverified"
       ],
       "id": "RNS.Utilities.rnodeconf.RNode.disable_bluetooth",
-      "implementation": "partial",
+      "implementation": "complete",
       "kind": "method",
       "rust_surface": [
-        "rns-tools"
+        "rns-tools::rnodeconf",
+        "rns-tools::rnodeconf-rs",
+        "reticulumd::bridge_rnode_management"
       ],
       "source": "Utilities/rnodeconf.py"
     },
@@ -22056,13 +22473,17 @@
       "evidence": [
         "unit",
         "simulated",
-        "pinned-python"
+        "prepared-host",
+        "pinned-python",
+        "hardware-unverified"
       ],
       "id": "RNS.Utilities.rnodeconf.RNode.disconnect",
-      "implementation": "partial",
+      "implementation": "complete",
       "kind": "method",
       "rust_surface": [
-        "rns-tools"
+        "rns-tools::rnodeconf",
+        "rns-tools::rnodeconf-rs",
+        "reticulumd::bridge_rnode_management"
       ],
       "source": "Utilities/rnodeconf.py"
     },
@@ -22070,13 +22491,17 @@
       "evidence": [
         "unit",
         "simulated",
-        "pinned-python"
+        "prepared-host",
+        "pinned-python",
+        "hardware-unverified"
       ],
       "id": "RNS.Utilities.rnodeconf.RNode.download_cfg_sector",
-      "implementation": "partial",
+      "implementation": "complete",
       "kind": "method",
       "rust_surface": [
-        "rns-tools"
+        "rns-tools::rnodeconf",
+        "rns-tools::rnodeconf-rs",
+        "reticulumd::bridge_rnode_management"
       ],
       "source": "Utilities/rnodeconf.py"
     },
@@ -22084,13 +22509,17 @@
       "evidence": [
         "unit",
         "simulated",
-        "pinned-python"
+        "prepared-host",
+        "pinned-python",
+        "hardware-unverified"
       ],
       "id": "RNS.Utilities.rnodeconf.RNode.download_eeprom",
-      "implementation": "partial",
+      "implementation": "complete",
       "kind": "method",
       "rust_surface": [
-        "rns-tools"
+        "rns-tools::rnodeconf",
+        "rns-tools::rnodeconf-rs",
+        "reticulumd::bridge_rnode_management"
       ],
       "source": "Utilities/rnodeconf.py"
     },
@@ -22098,13 +22527,17 @@
       "evidence": [
         "unit",
         "simulated",
-        "pinned-python"
+        "prepared-host",
+        "pinned-python",
+        "hardware-unverified"
       ],
       "id": "RNS.Utilities.rnodeconf.RNode.enable_bluetooth",
-      "implementation": "partial",
+      "implementation": "complete",
       "kind": "method",
       "rust_surface": [
-        "rns-tools"
+        "rns-tools::rnodeconf",
+        "rns-tools::rnodeconf-rs",
+        "reticulumd::bridge_rnode_management"
       ],
       "source": "Utilities/rnodeconf.py"
     },
@@ -22112,13 +22545,17 @@
       "evidence": [
         "unit",
         "simulated",
-        "pinned-python"
+        "prepared-host",
+        "pinned-python",
+        "hardware-unverified"
       ],
       "id": "RNS.Utilities.rnodeconf.RNode.hard_reset",
-      "implementation": "partial",
+      "implementation": "complete",
       "kind": "method",
       "rust_surface": [
-        "rns-tools"
+        "rns-tools::rnodeconf",
+        "rns-tools::rnodeconf-rs",
+        "reticulumd::bridge_rnode_management"
       ],
       "source": "Utilities/rnodeconf.py"
     },
@@ -22126,13 +22563,17 @@
       "evidence": [
         "unit",
         "simulated",
-        "pinned-python"
+        "prepared-host",
+        "pinned-python",
+        "hardware-unverified"
       ],
       "id": "RNS.Utilities.rnodeconf.RNode.indicate_firmware_update",
-      "implementation": "partial",
+      "implementation": "complete",
       "kind": "method",
       "rust_surface": [
-        "rns-tools"
+        "rns-tools::rnodeconf",
+        "rns-tools::rnodeconf-rs",
+        "reticulumd::bridge_rnode_management"
       ],
       "source": "Utilities/rnodeconf.py"
     },
@@ -22140,13 +22581,17 @@
       "evidence": [
         "unit",
         "simulated",
-        "pinned-python"
+        "prepared-host",
+        "pinned-python",
+        "hardware-unverified"
       ],
       "id": "RNS.Utilities.rnodeconf.RNode.initRadio",
-      "implementation": "partial",
+      "implementation": "complete",
       "kind": "method",
       "rust_surface": [
-        "rns-tools"
+        "rns-tools::rnodeconf",
+        "rns-tools::rnodeconf-rs",
+        "reticulumd::bridge_rnode_management"
       ],
       "source": "Utilities/rnodeconf.py"
     },
@@ -22154,13 +22599,17 @@
       "evidence": [
         "unit",
         "simulated",
-        "pinned-python"
+        "prepared-host",
+        "pinned-python",
+        "hardware-unverified"
       ],
       "id": "RNS.Utilities.rnodeconf.RNode.leave",
-      "implementation": "partial",
+      "implementation": "complete",
       "kind": "method",
       "rust_surface": [
-        "rns-tools"
+        "rns-tools::rnodeconf",
+        "rns-tools::rnodeconf-rs",
+        "reticulumd::bridge_rnode_management"
       ],
       "source": "Utilities/rnodeconf.py"
     },
@@ -22168,13 +22617,17 @@
       "evidence": [
         "unit",
         "simulated",
-        "pinned-python"
+        "prepared-host",
+        "pinned-python",
+        "hardware-unverified"
       ],
       "id": "RNS.Utilities.rnodeconf.RNode.parse_eeprom",
-      "implementation": "partial",
+      "implementation": "complete",
       "kind": "method",
       "rust_surface": [
-        "rns-tools"
+        "rns-tools::rnodeconf",
+        "rns-tools::rnodeconf-rs",
+        "reticulumd::bridge_rnode_management"
       ],
       "source": "Utilities/rnodeconf.py"
     },
@@ -22182,13 +22635,17 @@
       "evidence": [
         "unit",
         "simulated",
-        "pinned-python"
+        "prepared-host",
+        "pinned-python",
+        "hardware-unverified"
       ],
       "id": "RNS.Utilities.rnodeconf.RNode.readLoop",
-      "implementation": "partial",
+      "implementation": "complete",
       "kind": "method",
       "rust_surface": [
-        "rns-tools"
+        "rns-tools::rnodeconf",
+        "rns-tools::rnodeconf-rs",
+        "reticulumd::bridge_rnode_management"
       ],
       "source": "Utilities/rnodeconf.py"
     },
@@ -22196,13 +22653,17 @@
       "evidence": [
         "unit",
         "simulated",
-        "pinned-python"
+        "prepared-host",
+        "pinned-python",
+        "hardware-unverified"
       ],
       "id": "RNS.Utilities.rnodeconf.RNode.recondition_display",
-      "implementation": "partial",
+      "implementation": "complete",
       "kind": "method",
       "rust_surface": [
-        "rns-tools"
+        "rns-tools::rnodeconf",
+        "rns-tools::rnodeconf-rs",
+        "reticulumd::bridge_rnode_management"
       ],
       "source": "Utilities/rnodeconf.py"
     },
@@ -22210,13 +22671,17 @@
       "evidence": [
         "unit",
         "simulated",
-        "pinned-python"
+        "prepared-host",
+        "pinned-python",
+        "hardware-unverified"
       ],
       "id": "RNS.Utilities.rnodeconf.RNode.setBandwidth",
-      "implementation": "partial",
+      "implementation": "complete",
       "kind": "method",
       "rust_surface": [
-        "rns-tools"
+        "rns-tools::rnodeconf",
+        "rns-tools::rnodeconf-rs",
+        "reticulumd::bridge_rnode_management"
       ],
       "source": "Utilities/rnodeconf.py"
     },
@@ -22224,13 +22689,17 @@
       "evidence": [
         "unit",
         "simulated",
-        "pinned-python"
+        "prepared-host",
+        "pinned-python",
+        "hardware-unverified"
       ],
       "id": "RNS.Utilities.rnodeconf.RNode.setCodingRate",
-      "implementation": "partial",
+      "implementation": "complete",
       "kind": "method",
       "rust_surface": [
-        "rns-tools"
+        "rns-tools::rnodeconf",
+        "rns-tools::rnodeconf-rs",
+        "reticulumd::bridge_rnode_management"
       ],
       "source": "Utilities/rnodeconf.py"
     },
@@ -22238,13 +22707,17 @@
       "evidence": [
         "unit",
         "simulated",
-        "pinned-python"
+        "prepared-host",
+        "pinned-python",
+        "hardware-unverified"
       ],
       "id": "RNS.Utilities.rnodeconf.RNode.setFrequency",
-      "implementation": "partial",
+      "implementation": "complete",
       "kind": "method",
       "rust_surface": [
-        "rns-tools"
+        "rns-tools::rnodeconf",
+        "rns-tools::rnodeconf-rs",
+        "reticulumd::bridge_rnode_management"
       ],
       "source": "Utilities/rnodeconf.py"
     },
@@ -22252,13 +22725,17 @@
       "evidence": [
         "unit",
         "simulated",
-        "pinned-python"
+        "prepared-host",
+        "pinned-python",
+        "hardware-unverified"
       ],
       "id": "RNS.Utilities.rnodeconf.RNode.setNormalMode",
-      "implementation": "partial",
+      "implementation": "complete",
       "kind": "method",
       "rust_surface": [
-        "rns-tools"
+        "rns-tools::rnodeconf",
+        "rns-tools::rnodeconf-rs",
+        "reticulumd::bridge_rnode_management"
       ],
       "source": "Utilities/rnodeconf.py"
     },
@@ -22266,13 +22743,17 @@
       "evidence": [
         "unit",
         "simulated",
-        "pinned-python"
+        "prepared-host",
+        "pinned-python",
+        "hardware-unverified"
       ],
       "id": "RNS.Utilities.rnodeconf.RNode.setRadioState",
-      "implementation": "partial",
+      "implementation": "complete",
       "kind": "method",
       "rust_surface": [
-        "rns-tools"
+        "rns-tools::rnodeconf",
+        "rns-tools::rnodeconf-rs",
+        "reticulumd::bridge_rnode_management"
       ],
       "source": "Utilities/rnodeconf.py"
     },
@@ -22280,13 +22761,17 @@
       "evidence": [
         "unit",
         "simulated",
-        "pinned-python"
+        "prepared-host",
+        "pinned-python",
+        "hardware-unverified"
       ],
       "id": "RNS.Utilities.rnodeconf.RNode.setSpreadingFactor",
-      "implementation": "partial",
+      "implementation": "complete",
       "kind": "method",
       "rust_surface": [
-        "rns-tools"
+        "rns-tools::rnodeconf",
+        "rns-tools::rnodeconf-rs",
+        "reticulumd::bridge_rnode_management"
       ],
       "source": "Utilities/rnodeconf.py"
     },
@@ -22294,13 +22779,17 @@
       "evidence": [
         "unit",
         "simulated",
-        "pinned-python"
+        "prepared-host",
+        "pinned-python",
+        "hardware-unverified"
       ],
       "id": "RNS.Utilities.rnodeconf.RNode.setTNCMode",
-      "implementation": "partial",
+      "implementation": "complete",
       "kind": "method",
       "rust_surface": [
-        "rns-tools"
+        "rns-tools::rnodeconf",
+        "rns-tools::rnodeconf-rs",
+        "reticulumd::bridge_rnode_management"
       ],
       "source": "Utilities/rnodeconf.py"
     },
@@ -22308,13 +22797,17 @@
       "evidence": [
         "unit",
         "simulated",
-        "pinned-python"
+        "prepared-host",
+        "pinned-python",
+        "hardware-unverified"
       ],
       "id": "RNS.Utilities.rnodeconf.RNode.setTXPower",
-      "implementation": "partial",
+      "implementation": "complete",
       "kind": "method",
       "rust_surface": [
-        "rns-tools"
+        "rns-tools::rnodeconf",
+        "rns-tools::rnodeconf-rs",
+        "reticulumd::bridge_rnode_management"
       ],
       "source": "Utilities/rnodeconf.py"
     },
@@ -22322,13 +22815,17 @@
       "evidence": [
         "unit",
         "simulated",
-        "pinned-python"
+        "prepared-host",
+        "pinned-python",
+        "hardware-unverified"
       ],
       "id": "RNS.Utilities.rnodeconf.RNode.set_disable_interference_avoidance",
-      "implementation": "partial",
+      "implementation": "complete",
       "kind": "method",
       "rust_surface": [
-        "rns-tools"
+        "rns-tools::rnodeconf",
+        "rns-tools::rnodeconf-rs",
+        "reticulumd::bridge_rnode_management"
       ],
       "source": "Utilities/rnodeconf.py"
     },
@@ -22336,13 +22833,17 @@
       "evidence": [
         "unit",
         "simulated",
-        "pinned-python"
+        "prepared-host",
+        "pinned-python",
+        "hardware-unverified"
       ],
       "id": "RNS.Utilities.rnodeconf.RNode.set_display_address",
-      "implementation": "partial",
+      "implementation": "complete",
       "kind": "method",
       "rust_surface": [
-        "rns-tools"
+        "rns-tools::rnodeconf",
+        "rns-tools::rnodeconf-rs",
+        "reticulumd::bridge_rnode_management"
       ],
       "source": "Utilities/rnodeconf.py"
     },
@@ -22350,13 +22851,17 @@
       "evidence": [
         "unit",
         "simulated",
-        "pinned-python"
+        "prepared-host",
+        "pinned-python",
+        "hardware-unverified"
       ],
       "id": "RNS.Utilities.rnodeconf.RNode.set_display_blanking",
-      "implementation": "partial",
+      "implementation": "complete",
       "kind": "method",
       "rust_surface": [
-        "rns-tools"
+        "rns-tools::rnodeconf",
+        "rns-tools::rnodeconf-rs",
+        "reticulumd::bridge_rnode_management"
       ],
       "source": "Utilities/rnodeconf.py"
     },
@@ -22364,13 +22869,17 @@
       "evidence": [
         "unit",
         "simulated",
-        "pinned-python"
+        "prepared-host",
+        "pinned-python",
+        "hardware-unverified"
       ],
       "id": "RNS.Utilities.rnodeconf.RNode.set_display_intensity",
-      "implementation": "partial",
+      "implementation": "complete",
       "kind": "method",
       "rust_surface": [
-        "rns-tools"
+        "rns-tools::rnodeconf",
+        "rns-tools::rnodeconf-rs",
+        "reticulumd::bridge_rnode_management"
       ],
       "source": "Utilities/rnodeconf.py"
     },
@@ -22378,13 +22887,17 @@
       "evidence": [
         "unit",
         "simulated",
-        "pinned-python"
+        "prepared-host",
+        "pinned-python",
+        "hardware-unverified"
       ],
       "id": "RNS.Utilities.rnodeconf.RNode.set_display_rotation",
-      "implementation": "partial",
+      "implementation": "complete",
       "kind": "method",
       "rust_surface": [
-        "rns-tools"
+        "rns-tools::rnodeconf",
+        "rns-tools::rnodeconf-rs",
+        "reticulumd::bridge_rnode_management"
       ],
       "source": "Utilities/rnodeconf.py"
     },
@@ -22392,13 +22905,17 @@
       "evidence": [
         "unit",
         "simulated",
-        "pinned-python"
+        "prepared-host",
+        "pinned-python",
+        "hardware-unverified"
       ],
       "id": "RNS.Utilities.rnodeconf.RNode.set_firmware_hash",
-      "implementation": "partial",
+      "implementation": "complete",
       "kind": "method",
       "rust_surface": [
-        "rns-tools"
+        "rns-tools::rnodeconf",
+        "rns-tools::rnodeconf-rs",
+        "reticulumd::bridge_rnode_management"
       ],
       "source": "Utilities/rnodeconf.py"
     },
@@ -22406,13 +22923,17 @@
       "evidence": [
         "unit",
         "simulated",
-        "pinned-python"
+        "prepared-host",
+        "pinned-python",
+        "hardware-unverified"
       ],
       "id": "RNS.Utilities.rnodeconf.RNode.set_neopixel_intensity",
-      "implementation": "partial",
+      "implementation": "complete",
       "kind": "method",
       "rust_surface": [
-        "rns-tools"
+        "rns-tools::rnodeconf",
+        "rns-tools::rnodeconf-rs",
+        "reticulumd::bridge_rnode_management"
       ],
       "source": "Utilities/rnodeconf.py"
     },
@@ -22420,13 +22941,17 @@
       "evidence": [
         "unit",
         "simulated",
-        "pinned-python"
+        "prepared-host",
+        "pinned-python",
+        "hardware-unverified"
       ],
       "id": "RNS.Utilities.rnodeconf.RNode.set_wifi_channel",
-      "implementation": "partial",
+      "implementation": "complete",
       "kind": "method",
       "rust_surface": [
-        "rns-tools"
+        "rns-tools::rnodeconf",
+        "rns-tools::rnodeconf-rs",
+        "reticulumd::bridge_rnode_management"
       ],
       "source": "Utilities/rnodeconf.py"
     },
@@ -22434,13 +22959,17 @@
       "evidence": [
         "unit",
         "simulated",
-        "pinned-python"
+        "prepared-host",
+        "pinned-python",
+        "hardware-unverified"
       ],
       "id": "RNS.Utilities.rnodeconf.RNode.set_wifi_ip",
-      "implementation": "partial",
+      "implementation": "complete",
       "kind": "method",
       "rust_surface": [
-        "rns-tools"
+        "rns-tools::rnodeconf",
+        "rns-tools::rnodeconf-rs",
+        "reticulumd::bridge_rnode_management"
       ],
       "source": "Utilities/rnodeconf.py"
     },
@@ -22448,13 +22977,17 @@
       "evidence": [
         "unit",
         "simulated",
-        "pinned-python"
+        "prepared-host",
+        "pinned-python",
+        "hardware-unverified"
       ],
       "id": "RNS.Utilities.rnodeconf.RNode.set_wifi_mode",
-      "implementation": "partial",
+      "implementation": "complete",
       "kind": "method",
       "rust_surface": [
-        "rns-tools"
+        "rns-tools::rnodeconf",
+        "rns-tools::rnodeconf-rs",
+        "reticulumd::bridge_rnode_management"
       ],
       "source": "Utilities/rnodeconf.py"
     },
@@ -22462,13 +22995,17 @@
       "evidence": [
         "unit",
         "simulated",
-        "pinned-python"
+        "prepared-host",
+        "pinned-python",
+        "hardware-unverified"
       ],
       "id": "RNS.Utilities.rnodeconf.RNode.set_wifi_nm",
-      "implementation": "partial",
+      "implementation": "complete",
       "kind": "method",
       "rust_surface": [
-        "rns-tools"
+        "rns-tools::rnodeconf",
+        "rns-tools::rnodeconf-rs",
+        "reticulumd::bridge_rnode_management"
       ],
       "source": "Utilities/rnodeconf.py"
     },
@@ -22476,13 +23013,17 @@
       "evidence": [
         "unit",
         "simulated",
-        "pinned-python"
+        "prepared-host",
+        "pinned-python",
+        "hardware-unverified"
       ],
       "id": "RNS.Utilities.rnodeconf.RNode.set_wifi_psk",
-      "implementation": "partial",
+      "implementation": "complete",
       "kind": "method",
       "rust_surface": [
-        "rns-tools"
+        "rns-tools::rnodeconf",
+        "rns-tools::rnodeconf-rs",
+        "reticulumd::bridge_rnode_management"
       ],
       "source": "Utilities/rnodeconf.py"
     },
@@ -22490,13 +23031,17 @@
       "evidence": [
         "unit",
         "simulated",
-        "pinned-python"
+        "prepared-host",
+        "pinned-python",
+        "hardware-unverified"
       ],
       "id": "RNS.Utilities.rnodeconf.RNode.set_wifi_ssid",
-      "implementation": "partial",
+      "implementation": "complete",
       "kind": "method",
       "rust_surface": [
-        "rns-tools"
+        "rns-tools::rnodeconf",
+        "rns-tools::rnodeconf-rs",
+        "reticulumd::bridge_rnode_management"
       ],
       "source": "Utilities/rnodeconf.py"
     },
@@ -22504,13 +23049,17 @@
       "evidence": [
         "unit",
         "simulated",
-        "pinned-python"
+        "prepared-host",
+        "pinned-python",
+        "hardware-unverified"
       ],
       "id": "RNS.Utilities.rnodeconf.RNode.store_signature",
-      "implementation": "partial",
+      "implementation": "complete",
       "kind": "method",
       "rust_surface": [
-        "rns-tools"
+        "rns-tools::rnodeconf",
+        "rns-tools::rnodeconf-rs",
+        "reticulumd::bridge_rnode_management"
       ],
       "source": "Utilities/rnodeconf.py"
     },
@@ -22518,13 +23067,17 @@
       "evidence": [
         "unit",
         "simulated",
-        "pinned-python"
+        "prepared-host",
+        "pinned-python",
+        "hardware-unverified"
       ],
       "id": "RNS.Utilities.rnodeconf.RNode.updateBitrate",
-      "implementation": "partial",
+      "implementation": "complete",
       "kind": "method",
       "rust_surface": [
-        "rns-tools"
+        "rns-tools::rnodeconf",
+        "rns-tools::rnodeconf-rs",
+        "reticulumd::bridge_rnode_management"
       ],
       "source": "Utilities/rnodeconf.py"
     },
@@ -22532,13 +23085,17 @@
       "evidence": [
         "unit",
         "simulated",
-        "pinned-python"
+        "prepared-host",
+        "pinned-python",
+        "hardware-unverified"
       ],
       "id": "RNS.Utilities.rnodeconf.RNode.updateVersion",
-      "implementation": "partial",
+      "implementation": "complete",
       "kind": "method",
       "rust_surface": [
-        "rns-tools"
+        "rns-tools::rnodeconf",
+        "rns-tools::rnodeconf-rs",
+        "reticulumd::bridge_rnode_management"
       ],
       "source": "Utilities/rnodeconf.py"
     },
@@ -22546,13 +23103,17 @@
       "evidence": [
         "unit",
         "simulated",
-        "pinned-python"
+        "prepared-host",
+        "pinned-python",
+        "hardware-unverified"
       ],
       "id": "RNS.Utilities.rnodeconf.RNode.wipe_eeprom",
-      "implementation": "partial",
+      "implementation": "complete",
       "kind": "method",
       "rust_surface": [
-        "rns-tools"
+        "rns-tools::rnodeconf",
+        "rns-tools::rnodeconf-rs",
+        "reticulumd::bridge_rnode_management"
       ],
       "source": "Utilities/rnodeconf.py"
     },
@@ -22560,13 +23121,17 @@
       "evidence": [
         "unit",
         "simulated",
-        "pinned-python"
+        "prepared-host",
+        "pinned-python",
+        "hardware-unverified"
       ],
       "id": "RNS.Utilities.rnodeconf.RNode.write_eeprom",
-      "implementation": "partial",
+      "implementation": "complete",
       "kind": "method",
       "rust_surface": [
-        "rns-tools"
+        "rns-tools::rnodeconf",
+        "rns-tools::rnodeconf-rs",
+        "reticulumd::bridge_rnode_management"
       ],
       "source": "Utilities/rnodeconf.py"
     },
@@ -22574,13 +23139,17 @@
       "evidence": [
         "unit",
         "simulated",
-        "pinned-python"
+        "prepared-host",
+        "pinned-python",
+        "hardware-unverified"
       ],
       "id": "RNS.Utilities.rnodeconf.ROM",
-      "implementation": "partial",
+      "implementation": "complete",
       "kind": "class",
       "rust_surface": [
-        "rns-tools"
+        "rns-tools::rnodeconf",
+        "rns-tools::rnodeconf-rs",
+        "reticulumd::bridge_rnode_management"
       ],
       "source": "Utilities/rnodeconf.py"
     },
@@ -22588,13 +23157,17 @@
       "evidence": [
         "unit",
         "simulated",
-        "pinned-python"
+        "prepared-host",
+        "pinned-python",
+        "hardware-unverified"
       ],
       "id": "RNS.Utilities.rnodeconf.ensure_firmware_file",
-      "implementation": "partial",
+      "implementation": "complete",
       "kind": "function",
       "rust_surface": [
-        "rns-tools"
+        "rns-tools::rnodeconf",
+        "rns-tools::rnodeconf-rs",
+        "reticulumd::bridge_rnode_management"
       ],
       "source": "Utilities/rnodeconf.py"
     },
@@ -22602,13 +23175,17 @@
       "evidence": [
         "unit",
         "simulated",
-        "pinned-python"
+        "prepared-host",
+        "pinned-python",
+        "hardware-unverified"
       ],
       "id": "RNS.Utilities.rnodeconf.extract_recovery_esptool",
-      "implementation": "partial",
+      "implementation": "complete",
       "kind": "function",
       "rust_surface": [
-        "rns-tools"
+        "rns-tools::rnodeconf",
+        "rns-tools::rnodeconf-rs",
+        "reticulumd::bridge_rnode_management"
       ],
       "source": "Utilities/rnodeconf.py"
     },
@@ -22616,13 +23193,17 @@
       "evidence": [
         "unit",
         "simulated",
-        "pinned-python"
+        "prepared-host",
+        "pinned-python",
+        "hardware-unverified"
       ],
       "id": "RNS.Utilities.rnodeconf.graceful_exit",
-      "implementation": "partial",
+      "implementation": "complete",
       "kind": "function",
       "rust_surface": [
-        "rns-tools"
+        "rns-tools::rnodeconf",
+        "rns-tools::rnodeconf-rs",
+        "reticulumd::bridge_rnode_management"
       ],
       "source": "Utilities/rnodeconf.py"
     },
@@ -22630,13 +23211,17 @@
       "evidence": [
         "unit",
         "simulated",
-        "pinned-python"
+        "prepared-host",
+        "pinned-python",
+        "hardware-unverified"
       ],
       "id": "RNS.Utilities.rnodeconf.main",
-      "implementation": "partial",
+      "implementation": "complete",
       "kind": "function",
       "rust_surface": [
-        "rns-tools"
+        "rns-tools::rnodeconf",
+        "rns-tools::rnodeconf-rs",
+        "reticulumd::bridge_rnode_management"
       ],
       "source": "Utilities/rnodeconf.py"
     },
@@ -22644,13 +23229,17 @@
       "evidence": [
         "unit",
         "simulated",
-        "pinned-python"
+        "prepared-host",
+        "pinned-python",
+        "hardware-unverified"
       ],
       "id": "RNS.Utilities.rnodeconf.rnode_open_serial",
-      "implementation": "partial",
+      "implementation": "complete",
       "kind": "function",
       "rust_surface": [
-        "rns-tools"
+        "rns-tools::rnodeconf",
+        "rns-tools::rnodeconf-rs",
+        "reticulumd::bridge_rnode_management"
       ],
       "source": "Utilities/rnodeconf.py"
     },
@@ -22661,10 +23250,11 @@
         "pinned-python"
       ],
       "id": "RNS.Utilities.rnpath.connect_remote",
-      "implementation": "partial",
+      "implementation": "complete",
       "kind": "function",
       "rust_surface": [
-        "rns-tools"
+        "rns-tools::rnpath",
+        "rns-tools::rnpath-rs"
       ],
       "source": "Utilities/rnpath.py"
     },
@@ -22675,10 +23265,11 @@
         "pinned-python"
       ],
       "id": "RNS.Utilities.rnpath.main",
-      "implementation": "partial",
+      "implementation": "complete",
       "kind": "function",
       "rust_surface": [
-        "rns-tools"
+        "rns-tools::rnpath",
+        "rns-tools::rnpath-rs"
       ],
       "source": "Utilities/rnpath.py"
     },
@@ -22689,10 +23280,11 @@
         "pinned-python"
       ],
       "id": "RNS.Utilities.rnpath.parse_hash",
-      "implementation": "partial",
+      "implementation": "complete",
       "kind": "function",
       "rust_surface": [
-        "rns-tools"
+        "rns-tools::rnpath",
+        "rns-tools::rnpath-rs"
       ],
       "source": "Utilities/rnpath.py"
     },
@@ -22703,10 +23295,11 @@
         "pinned-python"
       ],
       "id": "RNS.Utilities.rnpath.pretty_date",
-      "implementation": "partial",
+      "implementation": "complete",
       "kind": "function",
       "rust_surface": [
-        "rns-tools"
+        "rns-tools::rnpath",
+        "rns-tools::rnpath-rs"
       ],
       "source": "Utilities/rnpath.py"
     },
@@ -22717,10 +23310,11 @@
         "pinned-python"
       ],
       "id": "RNS.Utilities.rnpath.program_setup",
-      "implementation": "partial",
+      "implementation": "complete",
       "kind": "function",
       "rust_surface": [
-        "rns-tools"
+        "rns-tools::rnpath",
+        "rns-tools::rnpath-rs"
       ],
       "source": "Utilities/rnpath.py"
     },
@@ -22731,10 +23325,11 @@
         "pinned-python"
       ],
       "id": "RNS.Utilities.rnpkg.main",
-      "implementation": "partial",
+      "implementation": "complete",
       "kind": "function",
       "rust_surface": [
-        "rns-tools"
+        "rns-tools::rnpkg",
+        "reticulum-rs-transport::resource"
       ],
       "source": "Utilities/rnpkg.py"
     },
@@ -22745,10 +23340,11 @@
         "pinned-python"
       ],
       "id": "RNS.Utilities.rnpkg.program_setup",
-      "implementation": "partial",
+      "implementation": "complete",
       "kind": "function",
       "rust_surface": [
-        "rns-tools"
+        "rns-tools::rnpkg",
+        "reticulum-rs-transport::resource"
       ],
       "source": "Utilities/rnpkg.py"
     },
@@ -22759,10 +23355,11 @@
         "pinned-python"
       ],
       "id": "RNS.Utilities.rnprobe.main",
-      "implementation": "partial",
+      "implementation": "complete",
       "kind": "function",
       "rust_surface": [
-        "rns-tools"
+        "rns-tools::rnprobe",
+        "rns-tools::rnpath"
       ],
       "source": "Utilities/rnprobe.py"
     },
@@ -22773,10 +23370,11 @@
         "pinned-python"
       ],
       "id": "RNS.Utilities.rnprobe.program_setup",
-      "implementation": "partial",
+      "implementation": "complete",
       "kind": "function",
       "rust_surface": [
-        "rns-tools"
+        "rns-tools::rnprobe",
+        "rns-tools::rnpath"
       ],
       "source": "Utilities/rnprobe.py"
     },
@@ -22787,10 +23385,11 @@
         "pinned-python"
       ],
       "id": "RNS.Utilities.rnsd.main",
-      "implementation": "partial",
+      "implementation": "complete",
       "kind": "function",
       "rust_surface": [
-        "rns-tools"
+        "rns-tools::rnsd",
+        "reticulumd"
       ],
       "source": "Utilities/rnsd.py"
     },
@@ -22801,10 +23400,11 @@
         "pinned-python"
       ],
       "id": "RNS.Utilities.rnsd.program_setup",
-      "implementation": "partial",
+      "implementation": "complete",
       "kind": "function",
       "rust_surface": [
-        "rns-tools"
+        "rns-tools::rnsd",
+        "reticulumd"
       ],
       "source": "Utilities/rnsd.py"
     },
@@ -22815,10 +23415,13 @@
         "pinned-python"
       ],
       "id": "RNS.Utilities.rnsh.args.parse_arguments",
-      "implementation": "partial",
+      "implementation": "complete",
       "kind": "function",
+      "notes": "Default-deny command authorization is exercised with isolated subprocess fixtures.",
       "rust_surface": [
-        "rns-tools"
+        "rns-tools::rnsh",
+        "lxmf-sdk::RemoteCommandRequest",
+        "reticulumd::remote_control"
       ],
       "source": "Utilities/rnsh/args.py"
     },
@@ -22829,10 +23432,13 @@
         "pinned-python"
       ],
       "id": "RNS.Utilities.rnsh.args.setup_argument_parser",
-      "implementation": "partial",
+      "implementation": "complete",
       "kind": "function",
+      "notes": "Default-deny command authorization is exercised with isolated subprocess fixtures.",
       "rust_surface": [
-        "rns-tools"
+        "rns-tools::rnsh",
+        "lxmf-sdk::RemoteCommandRequest",
+        "reticulumd::remote_control"
       ],
       "source": "Utilities/rnsh/args.py"
     },
@@ -22843,10 +23449,13 @@
         "pinned-python"
       ],
       "id": "RNS.Utilities.rnsh.exception.permit",
-      "implementation": "partial",
+      "implementation": "complete",
       "kind": "class",
+      "notes": "Default-deny command authorization is exercised with isolated subprocess fixtures.",
       "rust_surface": [
-        "rns-tools"
+        "rns-tools::rnsh",
+        "lxmf-sdk::RemoteCommandRequest",
+        "reticulumd::remote_control"
       ],
       "source": "Utilities/rnsh/exception.py"
     },
@@ -22857,10 +23466,13 @@
         "pinned-python"
       ],
       "id": "RNS.Utilities.rnsh.helpers.SleepRate",
-      "implementation": "partial",
+      "implementation": "complete",
       "kind": "class",
+      "notes": "Default-deny command authorization is exercised with isolated subprocess fixtures.",
       "rust_surface": [
-        "rns-tools"
+        "rns-tools::rnsh",
+        "lxmf-sdk::RemoteCommandRequest",
+        "reticulumd::remote_control"
       ],
       "source": "Utilities/rnsh/helpers.py"
     },
@@ -22871,10 +23483,13 @@
         "pinned-python"
       ],
       "id": "RNS.Utilities.rnsh.helpers.SleepRate.next_sleep_time",
-      "implementation": "partial",
+      "implementation": "complete",
       "kind": "method",
+      "notes": "Default-deny command authorization is exercised with isolated subprocess fixtures.",
       "rust_surface": [
-        "rns-tools"
+        "rns-tools::rnsh",
+        "lxmf-sdk::RemoteCommandRequest",
+        "reticulumd::remote_control"
       ],
       "source": "Utilities/rnsh/helpers.py"
     },
@@ -22885,10 +23500,13 @@
         "pinned-python"
       ],
       "id": "RNS.Utilities.rnsh.helpers.SleepRate.sleep_async",
-      "implementation": "partial",
+      "implementation": "complete",
       "kind": "method",
+      "notes": "Default-deny command authorization is exercised with isolated subprocess fixtures.",
       "rust_surface": [
-        "rns-tools"
+        "rns-tools::rnsh",
+        "lxmf-sdk::RemoteCommandRequest",
+        "reticulumd::remote_control"
       ],
       "source": "Utilities/rnsh/helpers.py"
     },
@@ -22899,10 +23517,13 @@
         "pinned-python"
       ],
       "id": "RNS.Utilities.rnsh.helpers.SleepRate.sleep_block",
-      "implementation": "partial",
+      "implementation": "complete",
       "kind": "method",
+      "notes": "Default-deny command authorization is exercised with isolated subprocess fixtures.",
       "rust_surface": [
-        "rns-tools"
+        "rns-tools::rnsh",
+        "lxmf-sdk::RemoteCommandRequest",
+        "reticulumd::remote_control"
       ],
       "source": "Utilities/rnsh/helpers.py"
     },
@@ -22913,10 +23534,13 @@
         "pinned-python"
       ],
       "id": "RNS.Utilities.rnsh.helpers.bitwise_or_if",
-      "implementation": "partial",
+      "implementation": "complete",
       "kind": "function",
+      "notes": "Default-deny command authorization is exercised with isolated subprocess fixtures.",
       "rust_surface": [
-        "rns-tools"
+        "rns-tools::rnsh",
+        "lxmf-sdk::RemoteCommandRequest",
+        "reticulumd::remote_control"
       ],
       "source": "Utilities/rnsh/helpers.py"
     },
@@ -22927,10 +23551,13 @@
         "pinned-python"
       ],
       "id": "RNS.Utilities.rnsh.helpers.check_and",
-      "implementation": "partial",
+      "implementation": "complete",
       "kind": "function",
+      "notes": "Default-deny command authorization is exercised with isolated subprocess fixtures.",
       "rust_surface": [
-        "rns-tools"
+        "rns-tools::rnsh",
+        "lxmf-sdk::RemoteCommandRequest",
+        "reticulumd::remote_control"
       ],
       "source": "Utilities/rnsh/helpers.py"
     },
@@ -22941,10 +23568,13 @@
         "pinned-python"
       ],
       "id": "RNS.Utilities.rnsh.initiator.InitiatorState",
-      "implementation": "partial",
+      "implementation": "complete",
       "kind": "class",
+      "notes": "Default-deny command authorization is exercised with isolated subprocess fixtures.",
       "rust_surface": [
-        "rns-tools"
+        "rns-tools::rnsh",
+        "lxmf-sdk::RemoteCommandRequest",
+        "reticulumd::remote_control"
       ],
       "source": "Utilities/rnsh/initiator.py"
     },
@@ -22955,10 +23585,13 @@
         "pinned-python"
       ],
       "id": "RNS.Utilities.rnsh.initiator.RemoteExecutionError",
-      "implementation": "partial",
+      "implementation": "complete",
       "kind": "class",
+      "notes": "Default-deny command authorization is exercised with isolated subprocess fixtures.",
       "rust_surface": [
-        "rns-tools"
+        "rns-tools::rnsh",
+        "lxmf-sdk::RemoteCommandRequest",
+        "reticulumd::remote_control"
       ],
       "source": "Utilities/rnsh/initiator.py"
     },
@@ -22969,10 +23602,13 @@
         "pinned-python"
       ],
       "id": "RNS.Utilities.rnsh.initiator.compute_target_rns_loglevel",
-      "implementation": "partial",
+      "implementation": "complete",
       "kind": "function",
+      "notes": "Default-deny command authorization is exercised with isolated subprocess fixtures.",
       "rust_surface": [
-        "rns-tools"
+        "rns-tools::rnsh",
+        "lxmf-sdk::RemoteCommandRequest",
+        "reticulumd::remote_control"
       ],
       "source": "Utilities/rnsh/initiator.py"
     },
@@ -22983,10 +23619,13 @@
         "pinned-python"
       ],
       "id": "RNS.Utilities.rnsh.initiator.initiate",
-      "implementation": "partial",
+      "implementation": "complete",
       "kind": "function",
+      "notes": "Default-deny command authorization is exercised with isolated subprocess fixtures.",
       "rust_surface": [
-        "rns-tools"
+        "rns-tools::rnsh",
+        "lxmf-sdk::RemoteCommandRequest",
+        "reticulumd::remote_control"
       ],
       "source": "Utilities/rnsh/initiator.py"
     },
@@ -22997,10 +23636,13 @@
         "pinned-python"
       ],
       "id": "RNS.Utilities.rnsh.listener.compute_target_rns_loglevel",
-      "implementation": "partial",
+      "implementation": "complete",
       "kind": "function",
+      "notes": "Default-deny command authorization is exercised with isolated subprocess fixtures.",
       "rust_surface": [
-        "rns-tools"
+        "rns-tools::rnsh",
+        "lxmf-sdk::RemoteCommandRequest",
+        "reticulumd::remote_control"
       ],
       "source": "Utilities/rnsh/listener.py"
     },
@@ -23011,10 +23653,13 @@
         "pinned-python"
       ],
       "id": "RNS.Utilities.rnsh.listener.listen",
-      "implementation": "partial",
+      "implementation": "complete",
       "kind": "function",
+      "notes": "Default-deny command authorization is exercised with isolated subprocess fixtures.",
       "rust_surface": [
-        "rns-tools"
+        "rns-tools::rnsh",
+        "lxmf-sdk::RemoteCommandRequest",
+        "reticulumd::remote_control"
       ],
       "source": "Utilities/rnsh/listener.py"
     },
@@ -23025,10 +23670,13 @@
         "pinned-python"
       ],
       "id": "RNS.Utilities.rnsh.loop.loop_set_signal",
-      "implementation": "partial",
+      "implementation": "complete",
       "kind": "function",
+      "notes": "Default-deny command authorization is exercised with isolated subprocess fixtures.",
       "rust_surface": [
-        "rns-tools"
+        "rns-tools::rnsh",
+        "lxmf-sdk::RemoteCommandRequest",
+        "reticulumd::remote_control"
       ],
       "source": "Utilities/rnsh/loop.py"
     },
@@ -23039,10 +23687,13 @@
         "pinned-python"
       ],
       "id": "RNS.Utilities.rnsh.loop.sig_handler_sys_to_loop",
-      "implementation": "partial",
+      "implementation": "complete",
       "kind": "function",
+      "notes": "Default-deny command authorization is exercised with isolated subprocess fixtures.",
       "rust_surface": [
-        "rns-tools"
+        "rns-tools::rnsh",
+        "lxmf-sdk::RemoteCommandRequest",
+        "reticulumd::remote_control"
       ],
       "source": "Utilities/rnsh/loop.py"
     },
@@ -23053,10 +23704,13 @@
         "pinned-python"
       ],
       "id": "RNS.Utilities.rnsh.process.AggregateException",
-      "implementation": "partial",
+      "implementation": "complete",
       "kind": "class",
+      "notes": "Default-deny command authorization is exercised with isolated subprocess fixtures.",
       "rust_surface": [
-        "rns-tools"
+        "rns-tools::rnsh",
+        "lxmf-sdk::RemoteCommandRequest",
+        "reticulumd::remote_control"
       ],
       "source": "Utilities/rnsh/process.py"
     },
@@ -23067,10 +23721,13 @@
         "pinned-python"
       ],
       "id": "RNS.Utilities.rnsh.process.CallbackSubprocess",
-      "implementation": "partial",
+      "implementation": "complete",
       "kind": "class",
+      "notes": "Default-deny command authorization is exercised with isolated subprocess fixtures.",
       "rust_surface": [
-        "rns-tools"
+        "rns-tools::rnsh",
+        "lxmf-sdk::RemoteCommandRequest",
+        "reticulumd::remote_control"
       ],
       "source": "Utilities/rnsh/process.py"
     },
@@ -23081,10 +23738,13 @@
         "pinned-python"
       ],
       "id": "RNS.Utilities.rnsh.process.CallbackSubprocess.close_stdin",
-      "implementation": "partial",
+      "implementation": "complete",
       "kind": "method",
+      "notes": "Default-deny command authorization is exercised with isolated subprocess fixtures.",
       "rust_surface": [
-        "rns-tools"
+        "rns-tools::rnsh",
+        "lxmf-sdk::RemoteCommandRequest",
+        "reticulumd::remote_control"
       ],
       "source": "Utilities/rnsh/process.py"
     },
@@ -23095,10 +23755,13 @@
         "pinned-python"
       ],
       "id": "RNS.Utilities.rnsh.process.CallbackSubprocess.copy_winsize",
-      "implementation": "partial",
+      "implementation": "complete",
       "kind": "method",
+      "notes": "Default-deny command authorization is exercised with isolated subprocess fixtures.",
       "rust_surface": [
-        "rns-tools"
+        "rns-tools::rnsh",
+        "lxmf-sdk::RemoteCommandRequest",
+        "reticulumd::remote_control"
       ],
       "source": "Utilities/rnsh/process.py"
     },
@@ -23109,10 +23772,13 @@
         "pinned-python"
       ],
       "id": "RNS.Utilities.rnsh.process.CallbackSubprocess.pid",
-      "implementation": "partial",
+      "implementation": "complete",
       "kind": "method",
+      "notes": "Default-deny command authorization is exercised with isolated subprocess fixtures.",
       "rust_surface": [
-        "rns-tools"
+        "rns-tools::rnsh",
+        "lxmf-sdk::RemoteCommandRequest",
+        "reticulumd::remote_control"
       ],
       "source": "Utilities/rnsh/process.py"
     },
@@ -23123,10 +23789,13 @@
         "pinned-python"
       ],
       "id": "RNS.Utilities.rnsh.process.CallbackSubprocess.return_code",
-      "implementation": "partial",
+      "implementation": "complete",
       "kind": "method",
+      "notes": "Default-deny command authorization is exercised with isolated subprocess fixtures.",
       "rust_surface": [
-        "rns-tools"
+        "rns-tools::rnsh",
+        "lxmf-sdk::RemoteCommandRequest",
+        "reticulumd::remote_control"
       ],
       "source": "Utilities/rnsh/process.py"
     },
@@ -23137,10 +23806,13 @@
         "pinned-python"
       ],
       "id": "RNS.Utilities.rnsh.process.CallbackSubprocess.running",
-      "implementation": "partial",
+      "implementation": "complete",
       "kind": "method",
+      "notes": "Default-deny command authorization is exercised with isolated subprocess fixtures.",
       "rust_surface": [
-        "rns-tools"
+        "rns-tools::rnsh",
+        "lxmf-sdk::RemoteCommandRequest",
+        "reticulumd::remote_control"
       ],
       "source": "Utilities/rnsh/process.py"
     },
@@ -23151,10 +23823,13 @@
         "pinned-python"
       ],
       "id": "RNS.Utilities.rnsh.process.CallbackSubprocess.set_winsize",
-      "implementation": "partial",
+      "implementation": "complete",
       "kind": "method",
+      "notes": "Default-deny command authorization is exercised with isolated subprocess fixtures.",
       "rust_surface": [
-        "rns-tools"
+        "rns-tools::rnsh",
+        "lxmf-sdk::RemoteCommandRequest",
+        "reticulumd::remote_control"
       ],
       "source": "Utilities/rnsh/process.py"
     },
@@ -23165,10 +23840,13 @@
         "pinned-python"
       ],
       "id": "RNS.Utilities.rnsh.process.CallbackSubprocess.start",
-      "implementation": "partial",
+      "implementation": "complete",
       "kind": "method",
+      "notes": "Default-deny command authorization is exercised with isolated subprocess fixtures.",
       "rust_surface": [
-        "rns-tools"
+        "rns-tools::rnsh",
+        "lxmf-sdk::RemoteCommandRequest",
+        "reticulumd::remote_control"
       ],
       "source": "Utilities/rnsh/process.py"
     },
@@ -23179,10 +23857,13 @@
         "pinned-python"
       ],
       "id": "RNS.Utilities.rnsh.process.CallbackSubprocess.started",
-      "implementation": "partial",
+      "implementation": "complete",
       "kind": "method",
+      "notes": "Default-deny command authorization is exercised with isolated subprocess fixtures.",
       "rust_surface": [
-        "rns-tools"
+        "rns-tools::rnsh",
+        "lxmf-sdk::RemoteCommandRequest",
+        "reticulumd::remote_control"
       ],
       "source": "Utilities/rnsh/process.py"
     },
@@ -23193,10 +23874,13 @@
         "pinned-python"
       ],
       "id": "RNS.Utilities.rnsh.process.CallbackSubprocess.stderr_eof",
-      "implementation": "partial",
+      "implementation": "complete",
       "kind": "method",
+      "notes": "Default-deny command authorization is exercised with isolated subprocess fixtures.",
       "rust_surface": [
-        "rns-tools"
+        "rns-tools::rnsh",
+        "lxmf-sdk::RemoteCommandRequest",
+        "reticulumd::remote_control"
       ],
       "source": "Utilities/rnsh/process.py"
     },
@@ -23207,10 +23891,13 @@
         "pinned-python"
       ],
       "id": "RNS.Utilities.rnsh.process.CallbackSubprocess.stdout_eof",
-      "implementation": "partial",
+      "implementation": "complete",
       "kind": "method",
+      "notes": "Default-deny command authorization is exercised with isolated subprocess fixtures.",
       "rust_surface": [
-        "rns-tools"
+        "rns-tools::rnsh",
+        "lxmf-sdk::RemoteCommandRequest",
+        "reticulumd::remote_control"
       ],
       "source": "Utilities/rnsh/process.py"
     },
@@ -23221,10 +23908,13 @@
         "pinned-python"
       ],
       "id": "RNS.Utilities.rnsh.process.CallbackSubprocess.tcgetattr",
-      "implementation": "partial",
+      "implementation": "complete",
       "kind": "method",
+      "notes": "Default-deny command authorization is exercised with isolated subprocess fixtures.",
       "rust_surface": [
-        "rns-tools"
+        "rns-tools::rnsh",
+        "lxmf-sdk::RemoteCommandRequest",
+        "reticulumd::remote_control"
       ],
       "source": "Utilities/rnsh/process.py"
     },
@@ -23235,10 +23925,13 @@
         "pinned-python"
       ],
       "id": "RNS.Utilities.rnsh.process.CallbackSubprocess.tcsetattr",
-      "implementation": "partial",
+      "implementation": "complete",
       "kind": "method",
+      "notes": "Default-deny command authorization is exercised with isolated subprocess fixtures.",
       "rust_surface": [
-        "rns-tools"
+        "rns-tools::rnsh",
+        "lxmf-sdk::RemoteCommandRequest",
+        "reticulumd::remote_control"
       ],
       "source": "Utilities/rnsh/process.py"
     },
@@ -23249,10 +23942,13 @@
         "pinned-python"
       ],
       "id": "RNS.Utilities.rnsh.process.CallbackSubprocess.terminate",
-      "implementation": "partial",
+      "implementation": "complete",
       "kind": "method",
+      "notes": "Default-deny command authorization is exercised with isolated subprocess fixtures.",
       "rust_surface": [
-        "rns-tools"
+        "rns-tools::rnsh",
+        "lxmf-sdk::RemoteCommandRequest",
+        "reticulumd::remote_control"
       ],
       "source": "Utilities/rnsh/process.py"
     },
@@ -23263,10 +23959,13 @@
         "pinned-python"
       ],
       "id": "RNS.Utilities.rnsh.process.CallbackSubprocess.ttysetraw",
-      "implementation": "partial",
+      "implementation": "complete",
       "kind": "method",
+      "notes": "Default-deny command authorization is exercised with isolated subprocess fixtures.",
       "rust_surface": [
-        "rns-tools"
+        "rns-tools::rnsh",
+        "lxmf-sdk::RemoteCommandRequest",
+        "reticulumd::remote_control"
       ],
       "source": "Utilities/rnsh/process.py"
     },
@@ -23277,10 +23976,13 @@
         "pinned-python"
       ],
       "id": "RNS.Utilities.rnsh.process.CallbackSubprocess.write",
-      "implementation": "partial",
+      "implementation": "complete",
       "kind": "method",
+      "notes": "Default-deny command authorization is exercised with isolated subprocess fixtures.",
       "rust_surface": [
-        "rns-tools"
+        "rns-tools::rnsh",
+        "lxmf-sdk::RemoteCommandRequest",
+        "reticulumd::remote_control"
       ],
       "source": "Utilities/rnsh/process.py"
     },
@@ -23291,10 +23993,13 @@
         "pinned-python"
       ],
       "id": "RNS.Utilities.rnsh.process.TTYRestorer",
-      "implementation": "partial",
+      "implementation": "complete",
       "kind": "class",
+      "notes": "Default-deny command authorization is exercised with isolated subprocess fixtures.",
       "rust_surface": [
-        "rns-tools"
+        "rns-tools::rnsh",
+        "lxmf-sdk::RemoteCommandRequest",
+        "reticulumd::remote_control"
       ],
       "source": "Utilities/rnsh/process.py"
     },
@@ -23305,10 +24010,13 @@
         "pinned-python"
       ],
       "id": "RNS.Utilities.rnsh.process.TTYRestorer.current_attr",
-      "implementation": "partial",
+      "implementation": "complete",
       "kind": "method",
+      "notes": "Default-deny command authorization is exercised with isolated subprocess fixtures.",
       "rust_surface": [
-        "rns-tools"
+        "rns-tools::rnsh",
+        "lxmf-sdk::RemoteCommandRequest",
+        "reticulumd::remote_control"
       ],
       "source": "Utilities/rnsh/process.py"
     },
@@ -23319,10 +24027,13 @@
         "pinned-python"
       ],
       "id": "RNS.Utilities.rnsh.process.TTYRestorer.isatty",
-      "implementation": "partial",
+      "implementation": "complete",
       "kind": "method",
+      "notes": "Default-deny command authorization is exercised with isolated subprocess fixtures.",
       "rust_surface": [
-        "rns-tools"
+        "rns-tools::rnsh",
+        "lxmf-sdk::RemoteCommandRequest",
+        "reticulumd::remote_control"
       ],
       "source": "Utilities/rnsh/process.py"
     },
@@ -23333,10 +24044,13 @@
         "pinned-python"
       ],
       "id": "RNS.Utilities.rnsh.process.TTYRestorer.original_attr",
-      "implementation": "partial",
+      "implementation": "complete",
       "kind": "method",
+      "notes": "Default-deny command authorization is exercised with isolated subprocess fixtures.",
       "rust_surface": [
-        "rns-tools"
+        "rns-tools::rnsh",
+        "lxmf-sdk::RemoteCommandRequest",
+        "reticulumd::remote_control"
       ],
       "source": "Utilities/rnsh/process.py"
     },
@@ -23347,10 +24061,13 @@
         "pinned-python"
       ],
       "id": "RNS.Utilities.rnsh.process.TTYRestorer.raw",
-      "implementation": "partial",
+      "implementation": "complete",
       "kind": "method",
+      "notes": "Default-deny command authorization is exercised with isolated subprocess fixtures.",
       "rust_surface": [
-        "rns-tools"
+        "rns-tools::rnsh",
+        "lxmf-sdk::RemoteCommandRequest",
+        "reticulumd::remote_control"
       ],
       "source": "Utilities/rnsh/process.py"
     },
@@ -23361,10 +24078,13 @@
         "pinned-python"
       ],
       "id": "RNS.Utilities.rnsh.process.TTYRestorer.restore",
-      "implementation": "partial",
+      "implementation": "complete",
       "kind": "method",
+      "notes": "Default-deny command authorization is exercised with isolated subprocess fixtures.",
       "rust_surface": [
-        "rns-tools"
+        "rns-tools::rnsh",
+        "lxmf-sdk::RemoteCommandRequest",
+        "reticulumd::remote_control"
       ],
       "source": "Utilities/rnsh/process.py"
     },
@@ -23375,10 +24095,13 @@
         "pinned-python"
       ],
       "id": "RNS.Utilities.rnsh.process.TTYRestorer.set_attr",
-      "implementation": "partial",
+      "implementation": "complete",
       "kind": "method",
+      "notes": "Default-deny command authorization is exercised with isolated subprocess fixtures.",
       "rust_surface": [
-        "rns-tools"
+        "rns-tools::rnsh",
+        "lxmf-sdk::RemoteCommandRequest",
+        "reticulumd::remote_control"
       ],
       "source": "Utilities/rnsh/process.py"
     },
@@ -23389,10 +24112,13 @@
         "pinned-python"
       ],
       "id": "RNS.Utilities.rnsh.process.event_wait",
-      "implementation": "partial",
+      "implementation": "complete",
       "kind": "function",
+      "notes": "Default-deny command authorization is exercised with isolated subprocess fixtures.",
       "rust_surface": [
-        "rns-tools"
+        "rns-tools::rnsh",
+        "lxmf-sdk::RemoteCommandRequest",
+        "reticulumd::remote_control"
       ],
       "source": "Utilities/rnsh/process.py"
     },
@@ -23403,10 +24129,13 @@
         "pinned-python"
       ],
       "id": "RNS.Utilities.rnsh.process.event_wait_any",
-      "implementation": "partial",
+      "implementation": "complete",
       "kind": "function",
+      "notes": "Default-deny command authorization is exercised with isolated subprocess fixtures.",
       "rust_surface": [
-        "rns-tools"
+        "rns-tools::rnsh",
+        "lxmf-sdk::RemoteCommandRequest",
+        "reticulumd::remote_control"
       ],
       "source": "Utilities/rnsh/process.py"
     },
@@ -23417,10 +24146,13 @@
         "pinned-python"
       ],
       "id": "RNS.Utilities.rnsh.process.fd_is_closed",
-      "implementation": "partial",
+      "implementation": "complete",
       "kind": "function",
+      "notes": "Default-deny command authorization is exercised with isolated subprocess fixtures.",
       "rust_surface": [
-        "rns-tools"
+        "rns-tools::rnsh",
+        "lxmf-sdk::RemoteCommandRequest",
+        "reticulumd::remote_control"
       ],
       "source": "Utilities/rnsh/process.py"
     },
@@ -23431,10 +24163,13 @@
         "pinned-python"
       ],
       "id": "RNS.Utilities.rnsh.process.main",
-      "implementation": "partial",
+      "implementation": "complete",
       "kind": "function",
+      "notes": "Default-deny command authorization is exercised with isolated subprocess fixtures.",
       "rust_surface": [
-        "rns-tools"
+        "rns-tools::rnsh",
+        "lxmf-sdk::RemoteCommandRequest",
+        "reticulumd::remote_control"
       ],
       "source": "Utilities/rnsh/process.py"
     },
@@ -23445,10 +24180,13 @@
         "pinned-python"
       ],
       "id": "RNS.Utilities.rnsh.process.process_exists",
-      "implementation": "partial",
+      "implementation": "complete",
       "kind": "function",
+      "notes": "Default-deny command authorization is exercised with isolated subprocess fixtures.",
       "rust_surface": [
-        "rns-tools"
+        "rns-tools::rnsh",
+        "lxmf-sdk::RemoteCommandRequest",
+        "reticulumd::remote_control"
       ],
       "source": "Utilities/rnsh/process.py"
     },
@@ -23459,10 +24197,13 @@
         "pinned-python"
       ],
       "id": "RNS.Utilities.rnsh.process.tty_add_reader_callback",
-      "implementation": "partial",
+      "implementation": "complete",
       "kind": "function",
+      "notes": "Default-deny command authorization is exercised with isolated subprocess fixtures.",
       "rust_surface": [
-        "rns-tools"
+        "rns-tools::rnsh",
+        "lxmf-sdk::RemoteCommandRequest",
+        "reticulumd::remote_control"
       ],
       "source": "Utilities/rnsh/process.py"
     },
@@ -23473,10 +24214,13 @@
         "pinned-python"
       ],
       "id": "RNS.Utilities.rnsh.process.tty_get_winsize",
-      "implementation": "partial",
+      "implementation": "complete",
       "kind": "function",
+      "notes": "Default-deny command authorization is exercised with isolated subprocess fixtures.",
       "rust_surface": [
-        "rns-tools"
+        "rns-tools::rnsh",
+        "lxmf-sdk::RemoteCommandRequest",
+        "reticulumd::remote_control"
       ],
       "source": "Utilities/rnsh/process.py"
     },
@@ -23487,10 +24231,13 @@
         "pinned-python"
       ],
       "id": "RNS.Utilities.rnsh.process.tty_read",
-      "implementation": "partial",
+      "implementation": "complete",
       "kind": "function",
+      "notes": "Default-deny command authorization is exercised with isolated subprocess fixtures.",
       "rust_surface": [
-        "rns-tools"
+        "rns-tools::rnsh",
+        "lxmf-sdk::RemoteCommandRequest",
+        "reticulumd::remote_control"
       ],
       "source": "Utilities/rnsh/process.py"
     },
@@ -23501,10 +24248,13 @@
         "pinned-python"
       ],
       "id": "RNS.Utilities.rnsh.process.tty_read_poll",
-      "implementation": "partial",
+      "implementation": "complete",
       "kind": "function",
+      "notes": "Default-deny command authorization is exercised with isolated subprocess fixtures.",
       "rust_surface": [
-        "rns-tools"
+        "rns-tools::rnsh",
+        "lxmf-sdk::RemoteCommandRequest",
+        "reticulumd::remote_control"
       ],
       "source": "Utilities/rnsh/process.py"
     },
@@ -23515,10 +24265,13 @@
         "pinned-python"
       ],
       "id": "RNS.Utilities.rnsh.process.tty_set_winsize",
-      "implementation": "partial",
+      "implementation": "complete",
       "kind": "function",
+      "notes": "Default-deny command authorization is exercised with isolated subprocess fixtures.",
       "rust_surface": [
-        "rns-tools"
+        "rns-tools::rnsh",
+        "lxmf-sdk::RemoteCommandRequest",
+        "reticulumd::remote_control"
       ],
       "source": "Utilities/rnsh/process.py"
     },
@@ -23529,10 +24282,13 @@
         "pinned-python"
       ],
       "id": "RNS.Utilities.rnsh.process.tty_unset_reader_callbacks",
-      "implementation": "partial",
+      "implementation": "complete",
       "kind": "function",
+      "notes": "Default-deny command authorization is exercised with isolated subprocess fixtures.",
       "rust_surface": [
-        "rns-tools"
+        "rns-tools::rnsh",
+        "lxmf-sdk::RemoteCommandRequest",
+        "reticulumd::remote_control"
       ],
       "source": "Utilities/rnsh/process.py"
     },
@@ -23543,10 +24299,13 @@
         "pinned-python"
       ],
       "id": "RNS.Utilities.rnsh.protocol.CommandExitedMessage",
-      "implementation": "partial",
+      "implementation": "complete",
       "kind": "class",
+      "notes": "Default-deny command authorization is exercised with isolated subprocess fixtures.",
       "rust_surface": [
-        "rns-tools"
+        "rns-tools::rnsh",
+        "lxmf-sdk::RemoteCommandRequest",
+        "reticulumd::remote_control"
       ],
       "source": "Utilities/rnsh/protocol.py"
     },
@@ -23557,10 +24316,13 @@
         "pinned-python"
       ],
       "id": "RNS.Utilities.rnsh.protocol.CommandExitedMessage.pack",
-      "implementation": "partial",
+      "implementation": "complete",
       "kind": "method",
+      "notes": "Default-deny command authorization is exercised with isolated subprocess fixtures.",
       "rust_surface": [
-        "rns-tools"
+        "rns-tools::rnsh",
+        "lxmf-sdk::RemoteCommandRequest",
+        "reticulumd::remote_control"
       ],
       "source": "Utilities/rnsh/protocol.py"
     },
@@ -23571,10 +24333,13 @@
         "pinned-python"
       ],
       "id": "RNS.Utilities.rnsh.protocol.CommandExitedMessage.unpack",
-      "implementation": "partial",
+      "implementation": "complete",
       "kind": "method",
+      "notes": "Default-deny command authorization is exercised with isolated subprocess fixtures.",
       "rust_surface": [
-        "rns-tools"
+        "rns-tools::rnsh",
+        "lxmf-sdk::RemoteCommandRequest",
+        "reticulumd::remote_control"
       ],
       "source": "Utilities/rnsh/protocol.py"
     },
@@ -23585,10 +24350,13 @@
         "pinned-python"
       ],
       "id": "RNS.Utilities.rnsh.protocol.ErrorMessage",
-      "implementation": "partial",
+      "implementation": "complete",
       "kind": "class",
+      "notes": "Default-deny command authorization is exercised with isolated subprocess fixtures.",
       "rust_surface": [
-        "rns-tools"
+        "rns-tools::rnsh",
+        "lxmf-sdk::RemoteCommandRequest",
+        "reticulumd::remote_control"
       ],
       "source": "Utilities/rnsh/protocol.py"
     },
@@ -23599,10 +24367,13 @@
         "pinned-python"
       ],
       "id": "RNS.Utilities.rnsh.protocol.ErrorMessage.pack",
-      "implementation": "partial",
+      "implementation": "complete",
       "kind": "method",
+      "notes": "Default-deny command authorization is exercised with isolated subprocess fixtures.",
       "rust_surface": [
-        "rns-tools"
+        "rns-tools::rnsh",
+        "lxmf-sdk::RemoteCommandRequest",
+        "reticulumd::remote_control"
       ],
       "source": "Utilities/rnsh/protocol.py"
     },
@@ -23613,10 +24384,13 @@
         "pinned-python"
       ],
       "id": "RNS.Utilities.rnsh.protocol.ErrorMessage.unpack",
-      "implementation": "partial",
+      "implementation": "complete",
       "kind": "method",
+      "notes": "Default-deny command authorization is exercised with isolated subprocess fixtures.",
       "rust_surface": [
-        "rns-tools"
+        "rns-tools::rnsh",
+        "lxmf-sdk::RemoteCommandRequest",
+        "reticulumd::remote_control"
       ],
       "source": "Utilities/rnsh/protocol.py"
     },
@@ -23627,10 +24401,13 @@
         "pinned-python"
       ],
       "id": "RNS.Utilities.rnsh.protocol.ExecuteCommandMesssage",
-      "implementation": "partial",
+      "implementation": "complete",
       "kind": "class",
+      "notes": "Default-deny command authorization is exercised with isolated subprocess fixtures.",
       "rust_surface": [
-        "rns-tools"
+        "rns-tools::rnsh",
+        "lxmf-sdk::RemoteCommandRequest",
+        "reticulumd::remote_control"
       ],
       "source": "Utilities/rnsh/protocol.py"
     },
@@ -23641,10 +24418,13 @@
         "pinned-python"
       ],
       "id": "RNS.Utilities.rnsh.protocol.ExecuteCommandMesssage.pack",
-      "implementation": "partial",
+      "implementation": "complete",
       "kind": "method",
+      "notes": "Default-deny command authorization is exercised with isolated subprocess fixtures.",
       "rust_surface": [
-        "rns-tools"
+        "rns-tools::rnsh",
+        "lxmf-sdk::RemoteCommandRequest",
+        "reticulumd::remote_control"
       ],
       "source": "Utilities/rnsh/protocol.py"
     },
@@ -23655,10 +24435,13 @@
         "pinned-python"
       ],
       "id": "RNS.Utilities.rnsh.protocol.ExecuteCommandMesssage.unpack",
-      "implementation": "partial",
+      "implementation": "complete",
       "kind": "method",
+      "notes": "Default-deny command authorization is exercised with isolated subprocess fixtures.",
       "rust_surface": [
-        "rns-tools"
+        "rns-tools::rnsh",
+        "lxmf-sdk::RemoteCommandRequest",
+        "reticulumd::remote_control"
       ],
       "source": "Utilities/rnsh/protocol.py"
     },
@@ -23669,10 +24452,13 @@
         "pinned-python"
       ],
       "id": "RNS.Utilities.rnsh.protocol.NoopMessage",
-      "implementation": "partial",
+      "implementation": "complete",
       "kind": "class",
+      "notes": "Default-deny command authorization is exercised with isolated subprocess fixtures.",
       "rust_surface": [
-        "rns-tools"
+        "rns-tools::rnsh",
+        "lxmf-sdk::RemoteCommandRequest",
+        "reticulumd::remote_control"
       ],
       "source": "Utilities/rnsh/protocol.py"
     },
@@ -23683,10 +24469,13 @@
         "pinned-python"
       ],
       "id": "RNS.Utilities.rnsh.protocol.NoopMessage.pack",
-      "implementation": "partial",
+      "implementation": "complete",
       "kind": "method",
+      "notes": "Default-deny command authorization is exercised with isolated subprocess fixtures.",
       "rust_surface": [
-        "rns-tools"
+        "rns-tools::rnsh",
+        "lxmf-sdk::RemoteCommandRequest",
+        "reticulumd::remote_control"
       ],
       "source": "Utilities/rnsh/protocol.py"
     },
@@ -23697,10 +24486,13 @@
         "pinned-python"
       ],
       "id": "RNS.Utilities.rnsh.protocol.NoopMessage.unpack",
-      "implementation": "partial",
+      "implementation": "complete",
       "kind": "method",
+      "notes": "Default-deny command authorization is exercised with isolated subprocess fixtures.",
       "rust_surface": [
-        "rns-tools"
+        "rns-tools::rnsh",
+        "lxmf-sdk::RemoteCommandRequest",
+        "reticulumd::remote_control"
       ],
       "source": "Utilities/rnsh/protocol.py"
     },
@@ -23711,10 +24503,13 @@
         "pinned-python"
       ],
       "id": "RNS.Utilities.rnsh.protocol.StreamDataMessage",
-      "implementation": "partial",
+      "implementation": "complete",
       "kind": "class",
+      "notes": "Default-deny command authorization is exercised with isolated subprocess fixtures.",
       "rust_surface": [
-        "rns-tools"
+        "rns-tools::rnsh",
+        "lxmf-sdk::RemoteCommandRequest",
+        "reticulumd::remote_control"
       ],
       "source": "Utilities/rnsh/protocol.py"
     },
@@ -23725,10 +24520,13 @@
         "pinned-python"
       ],
       "id": "RNS.Utilities.rnsh.protocol.VersionInfoMessage",
-      "implementation": "partial",
+      "implementation": "complete",
       "kind": "class",
+      "notes": "Default-deny command authorization is exercised with isolated subprocess fixtures.",
       "rust_surface": [
-        "rns-tools"
+        "rns-tools::rnsh",
+        "lxmf-sdk::RemoteCommandRequest",
+        "reticulumd::remote_control"
       ],
       "source": "Utilities/rnsh/protocol.py"
     },
@@ -23739,10 +24537,13 @@
         "pinned-python"
       ],
       "id": "RNS.Utilities.rnsh.protocol.VersionInfoMessage.pack",
-      "implementation": "partial",
+      "implementation": "complete",
       "kind": "method",
+      "notes": "Default-deny command authorization is exercised with isolated subprocess fixtures.",
       "rust_surface": [
-        "rns-tools"
+        "rns-tools::rnsh",
+        "lxmf-sdk::RemoteCommandRequest",
+        "reticulumd::remote_control"
       ],
       "source": "Utilities/rnsh/protocol.py"
     },
@@ -23753,10 +24554,13 @@
         "pinned-python"
       ],
       "id": "RNS.Utilities.rnsh.protocol.VersionInfoMessage.unpack",
-      "implementation": "partial",
+      "implementation": "complete",
       "kind": "method",
+      "notes": "Default-deny command authorization is exercised with isolated subprocess fixtures.",
       "rust_surface": [
-        "rns-tools"
+        "rns-tools::rnsh",
+        "lxmf-sdk::RemoteCommandRequest",
+        "reticulumd::remote_control"
       ],
       "source": "Utilities/rnsh/protocol.py"
     },
@@ -23767,10 +24571,13 @@
         "pinned-python"
       ],
       "id": "RNS.Utilities.rnsh.protocol.WindowSizeMessage",
-      "implementation": "partial",
+      "implementation": "complete",
       "kind": "class",
+      "notes": "Default-deny command authorization is exercised with isolated subprocess fixtures.",
       "rust_surface": [
-        "rns-tools"
+        "rns-tools::rnsh",
+        "lxmf-sdk::RemoteCommandRequest",
+        "reticulumd::remote_control"
       ],
       "source": "Utilities/rnsh/protocol.py"
     },
@@ -23781,10 +24588,13 @@
         "pinned-python"
       ],
       "id": "RNS.Utilities.rnsh.protocol.WindowSizeMessage.pack",
-      "implementation": "partial",
+      "implementation": "complete",
       "kind": "method",
+      "notes": "Default-deny command authorization is exercised with isolated subprocess fixtures.",
       "rust_surface": [
-        "rns-tools"
+        "rns-tools::rnsh",
+        "lxmf-sdk::RemoteCommandRequest",
+        "reticulumd::remote_control"
       ],
       "source": "Utilities/rnsh/protocol.py"
     },
@@ -23795,10 +24605,13 @@
         "pinned-python"
       ],
       "id": "RNS.Utilities.rnsh.protocol.WindowSizeMessage.unpack",
-      "implementation": "partial",
+      "implementation": "complete",
       "kind": "method",
+      "notes": "Default-deny command authorization is exercised with isolated subprocess fixtures.",
       "rust_surface": [
-        "rns-tools"
+        "rns-tools::rnsh",
+        "lxmf-sdk::RemoteCommandRequest",
+        "reticulumd::remote_control"
       ],
       "source": "Utilities/rnsh/protocol.py"
     },
@@ -23809,10 +24622,13 @@
         "pinned-python"
       ],
       "id": "RNS.Utilities.rnsh.protocol.register_message_types",
-      "implementation": "partial",
+      "implementation": "complete",
       "kind": "function",
+      "notes": "Default-deny command authorization is exercised with isolated subprocess fixtures.",
       "rust_surface": [
-        "rns-tools"
+        "rns-tools::rnsh",
+        "lxmf-sdk::RemoteCommandRequest",
+        "reticulumd::remote_control"
       ],
       "source": "Utilities/rnsh/protocol.py"
     },
@@ -23823,10 +24639,13 @@
         "pinned-python"
       ],
       "id": "RNS.Utilities.rnsh.retry.RetryStatus",
-      "implementation": "partial",
+      "implementation": "complete",
       "kind": "class",
+      "notes": "Default-deny command authorization is exercised with isolated subprocess fixtures.",
       "rust_surface": [
-        "rns-tools"
+        "rns-tools::rnsh",
+        "lxmf-sdk::RemoteCommandRequest",
+        "reticulumd::remote_control"
       ],
       "source": "Utilities/rnsh/retry.py"
     },
@@ -23837,10 +24656,13 @@
         "pinned-python"
       ],
       "id": "RNS.Utilities.rnsh.retry.RetryStatus.ready",
-      "implementation": "partial",
+      "implementation": "complete",
       "kind": "method",
+      "notes": "Default-deny command authorization is exercised with isolated subprocess fixtures.",
       "rust_surface": [
-        "rns-tools"
+        "rns-tools::rnsh",
+        "lxmf-sdk::RemoteCommandRequest",
+        "reticulumd::remote_control"
       ],
       "source": "Utilities/rnsh/retry.py"
     },
@@ -23851,10 +24673,13 @@
         "pinned-python"
       ],
       "id": "RNS.Utilities.rnsh.retry.RetryStatus.retry",
-      "implementation": "partial",
+      "implementation": "complete",
       "kind": "method",
+      "notes": "Default-deny command authorization is exercised with isolated subprocess fixtures.",
       "rust_surface": [
-        "rns-tools"
+        "rns-tools::rnsh",
+        "lxmf-sdk::RemoteCommandRequest",
+        "reticulumd::remote_control"
       ],
       "source": "Utilities/rnsh/retry.py"
     },
@@ -23865,10 +24690,13 @@
         "pinned-python"
       ],
       "id": "RNS.Utilities.rnsh.retry.RetryStatus.timed_out",
-      "implementation": "partial",
+      "implementation": "complete",
       "kind": "method",
+      "notes": "Default-deny command authorization is exercised with isolated subprocess fixtures.",
       "rust_surface": [
-        "rns-tools"
+        "rns-tools::rnsh",
+        "lxmf-sdk::RemoteCommandRequest",
+        "reticulumd::remote_control"
       ],
       "source": "Utilities/rnsh/retry.py"
     },
@@ -23879,10 +24707,13 @@
         "pinned-python"
       ],
       "id": "RNS.Utilities.rnsh.retry.RetryStatus.timeout",
-      "implementation": "partial",
+      "implementation": "complete",
       "kind": "method",
+      "notes": "Default-deny command authorization is exercised with isolated subprocess fixtures.",
       "rust_surface": [
-        "rns-tools"
+        "rns-tools::rnsh",
+        "lxmf-sdk::RemoteCommandRequest",
+        "reticulumd::remote_control"
       ],
       "source": "Utilities/rnsh/retry.py"
     },
@@ -23893,10 +24724,13 @@
         "pinned-python"
       ],
       "id": "RNS.Utilities.rnsh.retry.RetryThread",
-      "implementation": "partial",
+      "implementation": "complete",
       "kind": "class",
+      "notes": "Default-deny command authorization is exercised with isolated subprocess fixtures.",
       "rust_surface": [
-        "rns-tools"
+        "rns-tools::rnsh",
+        "lxmf-sdk::RemoteCommandRequest",
+        "reticulumd::remote_control"
       ],
       "source": "Utilities/rnsh/retry.py"
     },
@@ -23907,10 +24741,13 @@
         "pinned-python"
       ],
       "id": "RNS.Utilities.rnsh.retry.RetryThread.begin",
-      "implementation": "partial",
+      "implementation": "complete",
       "kind": "method",
+      "notes": "Default-deny command authorization is exercised with isolated subprocess fixtures.",
       "rust_surface": [
-        "rns-tools"
+        "rns-tools::rnsh",
+        "lxmf-sdk::RemoteCommandRequest",
+        "reticulumd::remote_control"
       ],
       "source": "Utilities/rnsh/retry.py"
     },
@@ -23921,10 +24758,13 @@
         "pinned-python"
       ],
       "id": "RNS.Utilities.rnsh.retry.RetryThread.close",
-      "implementation": "partial",
+      "implementation": "complete",
       "kind": "method",
+      "notes": "Default-deny command authorization is exercised with isolated subprocess fixtures.",
       "rust_surface": [
-        "rns-tools"
+        "rns-tools::rnsh",
+        "lxmf-sdk::RemoteCommandRequest",
+        "reticulumd::remote_control"
       ],
       "source": "Utilities/rnsh/retry.py"
     },
@@ -23935,10 +24775,13 @@
         "pinned-python"
       ],
       "id": "RNS.Utilities.rnsh.retry.RetryThread.complete",
-      "implementation": "partial",
+      "implementation": "complete",
       "kind": "method",
+      "notes": "Default-deny command authorization is exercised with isolated subprocess fixtures.",
       "rust_surface": [
-        "rns-tools"
+        "rns-tools::rnsh",
+        "lxmf-sdk::RemoteCommandRequest",
+        "reticulumd::remote_control"
       ],
       "source": "Utilities/rnsh/retry.py"
     },
@@ -23949,10 +24792,13 @@
         "pinned-python"
       ],
       "id": "RNS.Utilities.rnsh.retry.RetryThread.complete_all",
-      "implementation": "partial",
+      "implementation": "complete",
       "kind": "method",
+      "notes": "Default-deny command authorization is exercised with isolated subprocess fixtures.",
       "rust_surface": [
-        "rns-tools"
+        "rns-tools::rnsh",
+        "lxmf-sdk::RemoteCommandRequest",
+        "reticulumd::remote_control"
       ],
       "source": "Utilities/rnsh/retry.py"
     },
@@ -23963,10 +24809,13 @@
         "pinned-python"
       ],
       "id": "RNS.Utilities.rnsh.retry.RetryThread.has_tag",
-      "implementation": "partial",
+      "implementation": "complete",
       "kind": "method",
+      "notes": "Default-deny command authorization is exercised with isolated subprocess fixtures.",
       "rust_surface": [
-        "rns-tools"
+        "rns-tools::rnsh",
+        "lxmf-sdk::RemoteCommandRequest",
+        "reticulumd::remote_control"
       ],
       "source": "Utilities/rnsh/retry.py"
     },
@@ -23977,10 +24826,13 @@
         "pinned-python"
       ],
       "id": "RNS.Utilities.rnsh.retry.RetryThread.is_alive",
-      "implementation": "partial",
+      "implementation": "complete",
       "kind": "method",
+      "notes": "Default-deny command authorization is exercised with isolated subprocess fixtures.",
       "rust_surface": [
-        "rns-tools"
+        "rns-tools::rnsh",
+        "lxmf-sdk::RemoteCommandRequest",
+        "reticulumd::remote_control"
       ],
       "source": "Utilities/rnsh/retry.py"
     },
@@ -23991,10 +24843,13 @@
         "pinned-python"
       ],
       "id": "RNS.Utilities.rnsh.retry.RetryThread.wait",
-      "implementation": "partial",
+      "implementation": "complete",
       "kind": "method",
+      "notes": "Default-deny command authorization is exercised with isolated subprocess fixtures.",
       "rust_surface": [
-        "rns-tools"
+        "rns-tools::rnsh",
+        "lxmf-sdk::RemoteCommandRequest",
+        "reticulumd::remote_control"
       ],
       "source": "Utilities/rnsh/retry.py"
     },
@@ -24005,10 +24860,13 @@
         "pinned-python"
       ],
       "id": "RNS.Utilities.rnsh.rnsh.ensure_config_directory",
-      "implementation": "partial",
+      "implementation": "complete",
       "kind": "function",
+      "notes": "Default-deny command authorization is exercised with isolated subprocess fixtures.",
       "rust_surface": [
-        "rns-tools"
+        "rns-tools::rnsh",
+        "lxmf-sdk::RemoteCommandRequest",
+        "reticulumd::remote_control"
       ],
       "source": "Utilities/rnsh/rnsh.py"
     },
@@ -24019,10 +24877,13 @@
         "pinned-python"
       ],
       "id": "RNS.Utilities.rnsh.rnsh.main",
-      "implementation": "partial",
+      "implementation": "complete",
       "kind": "function",
+      "notes": "Default-deny command authorization is exercised with isolated subprocess fixtures.",
       "rust_surface": [
-        "rns-tools"
+        "rns-tools::rnsh",
+        "lxmf-sdk::RemoteCommandRequest",
+        "reticulumd::remote_control"
       ],
       "source": "Utilities/rnsh/rnsh.py"
     },
@@ -24033,10 +24894,13 @@
         "pinned-python"
       ],
       "id": "RNS.Utilities.rnsh.rnsh.prepare_identity",
-      "implementation": "partial",
+      "implementation": "complete",
       "kind": "function",
+      "notes": "Default-deny command authorization is exercised with isolated subprocess fixtures.",
       "rust_surface": [
-        "rns-tools"
+        "rns-tools::rnsh",
+        "lxmf-sdk::RemoteCommandRequest",
+        "reticulumd::remote_control"
       ],
       "source": "Utilities/rnsh/rnsh.py"
     },
@@ -24047,10 +24911,13 @@
         "pinned-python"
       ],
       "id": "RNS.Utilities.rnsh.rnsh.print_identity",
-      "implementation": "partial",
+      "implementation": "complete",
       "kind": "function",
+      "notes": "Default-deny command authorization is exercised with isolated subprocess fixtures.",
       "rust_surface": [
-        "rns-tools"
+        "rns-tools::rnsh",
+        "lxmf-sdk::RemoteCommandRequest",
+        "reticulumd::remote_control"
       ],
       "source": "Utilities/rnsh/rnsh.py"
     },
@@ -24061,10 +24928,13 @@
         "pinned-python"
       ],
       "id": "RNS.Utilities.rnsh.session.LSOutletBase",
-      "implementation": "partial",
+      "implementation": "complete",
       "kind": "class",
+      "notes": "Default-deny command authorization is exercised with isolated subprocess fixtures.",
       "rust_surface": [
-        "rns-tools"
+        "rns-tools::rnsh",
+        "lxmf-sdk::RemoteCommandRequest",
+        "reticulumd::remote_control"
       ],
       "source": "Utilities/rnsh/session.py"
     },
@@ -24075,10 +24945,13 @@
         "pinned-python"
       ],
       "id": "RNS.Utilities.rnsh.session.LSOutletBase.rtt",
-      "implementation": "partial",
+      "implementation": "complete",
       "kind": "method",
+      "notes": "Default-deny command authorization is exercised with isolated subprocess fixtures.",
       "rust_surface": [
-        "rns-tools"
+        "rns-tools::rnsh",
+        "lxmf-sdk::RemoteCommandRequest",
+        "reticulumd::remote_control"
       ],
       "source": "Utilities/rnsh/session.py"
     },
@@ -24089,10 +24962,13 @@
         "pinned-python"
       ],
       "id": "RNS.Utilities.rnsh.session.LSOutletBase.set_initiator_identified_callback",
-      "implementation": "partial",
+      "implementation": "complete",
       "kind": "method",
+      "notes": "Default-deny command authorization is exercised with isolated subprocess fixtures.",
       "rust_surface": [
-        "rns-tools"
+        "rns-tools::rnsh",
+        "lxmf-sdk::RemoteCommandRequest",
+        "reticulumd::remote_control"
       ],
       "source": "Utilities/rnsh/session.py"
     },
@@ -24103,10 +24979,13 @@
         "pinned-python"
       ],
       "id": "RNS.Utilities.rnsh.session.LSOutletBase.set_link_closed_callback",
-      "implementation": "partial",
+      "implementation": "complete",
       "kind": "method",
+      "notes": "Default-deny command authorization is exercised with isolated subprocess fixtures.",
       "rust_surface": [
-        "rns-tools"
+        "rns-tools::rnsh",
+        "lxmf-sdk::RemoteCommandRequest",
+        "reticulumd::remote_control"
       ],
       "source": "Utilities/rnsh/session.py"
     },
@@ -24117,10 +24996,13 @@
         "pinned-python"
       ],
       "id": "RNS.Utilities.rnsh.session.LSOutletBase.teardown",
-      "implementation": "partial",
+      "implementation": "complete",
       "kind": "method",
+      "notes": "Default-deny command authorization is exercised with isolated subprocess fixtures.",
       "rust_surface": [
-        "rns-tools"
+        "rns-tools::rnsh",
+        "lxmf-sdk::RemoteCommandRequest",
+        "reticulumd::remote_control"
       ],
       "source": "Utilities/rnsh/session.py"
     },
@@ -24131,10 +25013,13 @@
         "pinned-python"
       ],
       "id": "RNS.Utilities.rnsh.session.LSOutletBase.unset_link_closed_callback",
-      "implementation": "partial",
+      "implementation": "complete",
       "kind": "method",
+      "notes": "Default-deny command authorization is exercised with isolated subprocess fixtures.",
       "rust_surface": [
-        "rns-tools"
+        "rns-tools::rnsh",
+        "lxmf-sdk::RemoteCommandRequest",
+        "reticulumd::remote_control"
       ],
       "source": "Utilities/rnsh/session.py"
     },
@@ -24145,10 +25030,13 @@
         "pinned-python"
       ],
       "id": "RNS.Utilities.rnsh.session.LSState",
-      "implementation": "partial",
+      "implementation": "complete",
       "kind": "class",
+      "notes": "Default-deny command authorization is exercised with isolated subprocess fixtures.",
       "rust_surface": [
-        "rns-tools"
+        "rns-tools::rnsh",
+        "lxmf-sdk::RemoteCommandRequest",
+        "reticulumd::remote_control"
       ],
       "source": "Utilities/rnsh/session.py"
     },
@@ -24159,10 +25047,13 @@
         "pinned-python"
       ],
       "id": "RNS.Utilities.rnsh.session.ListenerSession",
-      "implementation": "partial",
+      "implementation": "complete",
       "kind": "class",
+      "notes": "Default-deny command authorization is exercised with isolated subprocess fixtures.",
       "rust_surface": [
-        "rns-tools"
+        "rns-tools::rnsh",
+        "lxmf-sdk::RemoteCommandRequest",
+        "reticulumd::remote_control"
       ],
       "source": "Utilities/rnsh/session.py"
     },
@@ -24173,10 +25064,13 @@
         "pinned-python"
       ],
       "id": "RNS.Utilities.rnsh.session.ListenerSession.pump",
-      "implementation": "partial",
+      "implementation": "complete",
       "kind": "method",
+      "notes": "Default-deny command authorization is exercised with isolated subprocess fixtures.",
       "rust_surface": [
-        "rns-tools"
+        "rns-tools::rnsh",
+        "lxmf-sdk::RemoteCommandRequest",
+        "reticulumd::remote_control"
       ],
       "source": "Utilities/rnsh/session.py"
     },
@@ -24187,10 +25081,13 @@
         "pinned-python"
       ],
       "id": "RNS.Utilities.rnsh.session.ListenerSession.pump_all",
-      "implementation": "partial",
+      "implementation": "complete",
       "kind": "method",
+      "notes": "Default-deny command authorization is exercised with isolated subprocess fixtures.",
       "rust_surface": [
-        "rns-tools"
+        "rns-tools::rnsh",
+        "lxmf-sdk::RemoteCommandRequest",
+        "reticulumd::remote_control"
       ],
       "source": "Utilities/rnsh/session.py"
     },
@@ -24201,10 +25098,13 @@
         "pinned-python"
       ],
       "id": "RNS.Utilities.rnsh.session.ListenerSession.send",
-      "implementation": "partial",
+      "implementation": "complete",
       "kind": "method",
+      "notes": "Default-deny command authorization is exercised with isolated subprocess fixtures.",
       "rust_surface": [
-        "rns-tools"
+        "rns-tools::rnsh",
+        "lxmf-sdk::RemoteCommandRequest",
+        "reticulumd::remote_control"
       ],
       "source": "Utilities/rnsh/session.py"
     },
@@ -24215,10 +25115,13 @@
         "pinned-python"
       ],
       "id": "RNS.Utilities.rnsh.session.ListenerSession.terminate",
-      "implementation": "partial",
+      "implementation": "complete",
       "kind": "method",
+      "notes": "Default-deny command authorization is exercised with isolated subprocess fixtures.",
       "rust_surface": [
-        "rns-tools"
+        "rns-tools::rnsh",
+        "lxmf-sdk::RemoteCommandRequest",
+        "reticulumd::remote_control"
       ],
       "source": "Utilities/rnsh/session.py"
     },
@@ -24229,10 +25132,13 @@
         "pinned-python"
       ],
       "id": "RNS.Utilities.rnsh.session.ListenerSession.terminate_all",
-      "implementation": "partial",
+      "implementation": "complete",
       "kind": "method",
+      "notes": "Default-deny command authorization is exercised with isolated subprocess fixtures.",
       "rust_surface": [
-        "rns-tools"
+        "rns-tools::rnsh",
+        "lxmf-sdk::RemoteCommandRequest",
+        "reticulumd::remote_control"
       ],
       "source": "Utilities/rnsh/session.py"
     },
@@ -24243,10 +25149,13 @@
         "pinned-python"
       ],
       "id": "RNS.Utilities.rnsh.session.RNSOutlet",
-      "implementation": "partial",
+      "implementation": "complete",
       "kind": "class",
+      "notes": "Default-deny command authorization is exercised with isolated subprocess fixtures.",
       "rust_surface": [
-        "rns-tools"
+        "rns-tools::rnsh",
+        "lxmf-sdk::RemoteCommandRequest",
+        "reticulumd::remote_control"
       ],
       "source": "Utilities/rnsh/session.py"
     },
@@ -24257,10 +25166,13 @@
         "pinned-python"
       ],
       "id": "RNS.Utilities.rnsh.session.RNSOutlet.get_outlet",
-      "implementation": "partial",
+      "implementation": "complete",
       "kind": "method",
+      "notes": "Default-deny command authorization is exercised with isolated subprocess fixtures.",
       "rust_surface": [
-        "rns-tools"
+        "rns-tools::rnsh",
+        "lxmf-sdk::RemoteCommandRequest",
+        "reticulumd::remote_control"
       ],
       "source": "Utilities/rnsh/session.py"
     },
@@ -24271,10 +25183,13 @@
         "pinned-python"
       ],
       "id": "RNS.Utilities.rnsh.session.RNSOutlet.rtt",
-      "implementation": "partial",
+      "implementation": "complete",
       "kind": "method",
+      "notes": "Default-deny command authorization is exercised with isolated subprocess fixtures.",
       "rust_surface": [
-        "rns-tools"
+        "rns-tools::rnsh",
+        "lxmf-sdk::RemoteCommandRequest",
+        "reticulumd::remote_control"
       ],
       "source": "Utilities/rnsh/session.py"
     },
@@ -24285,10 +25200,13 @@
         "pinned-python"
       ],
       "id": "RNS.Utilities.rnsh.session.RNSOutlet.set_initiator_identified_callback",
-      "implementation": "partial",
+      "implementation": "complete",
       "kind": "method",
+      "notes": "Default-deny command authorization is exercised with isolated subprocess fixtures.",
       "rust_surface": [
-        "rns-tools"
+        "rns-tools::rnsh",
+        "lxmf-sdk::RemoteCommandRequest",
+        "reticulumd::remote_control"
       ],
       "source": "Utilities/rnsh/session.py"
     },
@@ -24299,10 +25217,13 @@
         "pinned-python"
       ],
       "id": "RNS.Utilities.rnsh.session.RNSOutlet.set_link_closed_callback",
-      "implementation": "partial",
+      "implementation": "complete",
       "kind": "method",
+      "notes": "Default-deny command authorization is exercised with isolated subprocess fixtures.",
       "rust_surface": [
-        "rns-tools"
+        "rns-tools::rnsh",
+        "lxmf-sdk::RemoteCommandRequest",
+        "reticulumd::remote_control"
       ],
       "source": "Utilities/rnsh/session.py"
     },
@@ -24313,10 +25234,13 @@
         "pinned-python"
       ],
       "id": "RNS.Utilities.rnsh.session.RNSOutlet.teardown",
-      "implementation": "partial",
+      "implementation": "complete",
       "kind": "method",
+      "notes": "Default-deny command authorization is exercised with isolated subprocess fixtures.",
       "rust_surface": [
-        "rns-tools"
+        "rns-tools::rnsh",
+        "lxmf-sdk::RemoteCommandRequest",
+        "reticulumd::remote_control"
       ],
       "source": "Utilities/rnsh/session.py"
     },
@@ -24327,10 +25251,13 @@
         "pinned-python"
       ],
       "id": "RNS.Utilities.rnsh.session.RNSOutlet.unset_link_closed_callback",
-      "implementation": "partial",
+      "implementation": "complete",
       "kind": "method",
+      "notes": "Default-deny command authorization is exercised with isolated subprocess fixtures.",
       "rust_surface": [
-        "rns-tools"
+        "rns-tools::rnsh",
+        "lxmf-sdk::RemoteCommandRequest",
+        "reticulumd::remote_control"
       ],
       "source": "Utilities/rnsh/session.py"
     },
@@ -24341,10 +25268,13 @@
         "pinned-python"
       ],
       "id": "RNS.Utilities.rnsh.session.SEType",
-      "implementation": "partial",
+      "implementation": "complete",
       "kind": "class",
+      "notes": "Default-deny command authorization is exercised with isolated subprocess fixtures.",
       "rust_surface": [
-        "rns-tools"
+        "rns-tools::rnsh",
+        "lxmf-sdk::RemoteCommandRequest",
+        "reticulumd::remote_control"
       ],
       "source": "Utilities/rnsh/session.py"
     },
@@ -24355,10 +25285,13 @@
         "pinned-python"
       ],
       "id": "RNS.Utilities.rnsh.session.SessionException",
-      "implementation": "partial",
+      "implementation": "complete",
       "kind": "class",
+      "notes": "Default-deny command authorization is exercised with isolated subprocess fixtures.",
       "rust_surface": [
-        "rns-tools"
+        "rns-tools::rnsh",
+        "lxmf-sdk::RemoteCommandRequest",
+        "reticulumd::remote_control"
       ],
       "source": "Utilities/rnsh/session.py"
     },
@@ -24366,13 +25299,15 @@
       "evidence": [
         "unit",
         "simulated",
-        "pinned-python"
+        "pinned-python",
+        "hardware-unverified"
       ],
       "id": "RNS.Utilities.rnstatus.get_remote_status",
-      "implementation": "partial",
+      "implementation": "complete",
       "kind": "function",
       "rust_surface": [
-        "rns-tools"
+        "rns-tools::rnstatus",
+        "rns-tools::rnstatus-rs"
       ],
       "source": "Utilities/rnstatus.py"
     },
@@ -24380,13 +25315,15 @@
       "evidence": [
         "unit",
         "simulated",
-        "pinned-python"
+        "pinned-python",
+        "hardware-unverified"
       ],
       "id": "RNS.Utilities.rnstatus.main",
-      "implementation": "partial",
+      "implementation": "complete",
       "kind": "function",
       "rust_surface": [
-        "rns-tools"
+        "rns-tools::rnstatus",
+        "rns-tools::rnstatus-rs"
       ],
       "source": "Utilities/rnstatus.py"
     },
@@ -24394,13 +25331,15 @@
       "evidence": [
         "unit",
         "simulated",
-        "pinned-python"
+        "pinned-python",
+        "hardware-unverified"
       ],
       "id": "RNS.Utilities.rnstatus.program_setup",
-      "implementation": "partial",
+      "implementation": "complete",
       "kind": "function",
       "rust_surface": [
-        "rns-tools"
+        "rns-tools::rnstatus",
+        "rns-tools::rnstatus-rs"
       ],
       "source": "Utilities/rnstatus.py"
     },
@@ -24408,13 +25347,15 @@
       "evidence": [
         "unit",
         "simulated",
-        "pinned-python"
+        "pinned-python",
+        "hardware-unverified"
       ],
       "id": "RNS.Utilities.rnstatus.size_str",
-      "implementation": "partial",
+      "implementation": "complete",
       "kind": "function",
       "rust_surface": [
-        "rns-tools"
+        "rns-tools::rnstatus",
+        "rns-tools::rnstatus-rs"
       ],
       "source": "Utilities/rnstatus.py"
     },
@@ -24422,13 +25363,15 @@
       "evidence": [
         "unit",
         "simulated",
-        "pinned-python"
+        "pinned-python",
+        "hardware-unverified"
       ],
       "id": "RNS.Utilities.rnstatus.speed_str",
-      "implementation": "partial",
+      "implementation": "complete",
       "kind": "function",
       "rust_surface": [
-        "rns-tools"
+        "rns-tools::rnstatus",
+        "rns-tools::rnstatus-rs"
       ],
       "source": "Utilities/rnstatus.py"
     },
@@ -24439,10 +25382,10 @@
         "pinned-python"
       ],
       "id": "RNS.Utilities.rnx.command_link_closed",
-      "implementation": "partial",
+      "implementation": "complete",
       "kind": "function",
       "rust_surface": [
-        "rns-tools"
+        "rns-tools::rnx"
       ],
       "source": "Utilities/rnx.py"
     },
@@ -24453,10 +25396,10 @@
         "pinned-python"
       ],
       "id": "RNS.Utilities.rnx.command_link_established",
-      "implementation": "partial",
+      "implementation": "complete",
       "kind": "function",
       "rust_surface": [
-        "rns-tools"
+        "rns-tools::rnx"
       ],
       "source": "Utilities/rnx.py"
     },
@@ -24467,10 +25410,10 @@
         "pinned-python"
       ],
       "id": "RNS.Utilities.rnx.execute",
-      "implementation": "partial",
+      "implementation": "complete",
       "kind": "function",
       "rust_surface": [
-        "rns-tools"
+        "rns-tools::rnx"
       ],
       "source": "Utilities/rnx.py"
     },
@@ -24481,10 +25424,10 @@
         "pinned-python"
       ],
       "id": "RNS.Utilities.rnx.execute_received_command",
-      "implementation": "partial",
+      "implementation": "complete",
       "kind": "function",
       "rust_surface": [
-        "rns-tools"
+        "rns-tools::rnx"
       ],
       "source": "Utilities/rnx.py"
     },
@@ -24495,10 +25438,10 @@
         "pinned-python"
       ],
       "id": "RNS.Utilities.rnx.initiator_identified",
-      "implementation": "partial",
+      "implementation": "complete",
       "kind": "function",
       "rust_surface": [
-        "rns-tools"
+        "rns-tools::rnx"
       ],
       "source": "Utilities/rnx.py"
     },
@@ -24509,10 +25452,10 @@
         "pinned-python"
       ],
       "id": "RNS.Utilities.rnx.listen",
-      "implementation": "partial",
+      "implementation": "complete",
       "kind": "function",
       "rust_surface": [
-        "rns-tools"
+        "rns-tools::rnx"
       ],
       "source": "Utilities/rnx.py"
     },
@@ -24523,10 +25466,10 @@
         "pinned-python"
       ],
       "id": "RNS.Utilities.rnx.main",
-      "implementation": "partial",
+      "implementation": "complete",
       "kind": "function",
       "rust_surface": [
-        "rns-tools"
+        "rns-tools::rnx"
       ],
       "source": "Utilities/rnx.py"
     },
@@ -24537,10 +25480,10 @@
         "pinned-python"
       ],
       "id": "RNS.Utilities.rnx.prepare_identity",
-      "implementation": "partial",
+      "implementation": "complete",
       "kind": "function",
       "rust_surface": [
-        "rns-tools"
+        "rns-tools::rnx"
       ],
       "source": "Utilities/rnx.py"
     },
@@ -24551,10 +25494,10 @@
         "pinned-python"
       ],
       "id": "RNS.Utilities.rnx.pretty_time",
-      "implementation": "partial",
+      "implementation": "complete",
       "kind": "function",
       "rust_surface": [
-        "rns-tools"
+        "rns-tools::rnx"
       ],
       "source": "Utilities/rnx.py"
     },
@@ -24565,10 +25508,10 @@
         "pinned-python"
       ],
       "id": "RNS.Utilities.rnx.remote_execution_done",
-      "implementation": "partial",
+      "implementation": "complete",
       "kind": "function",
       "rust_surface": [
-        "rns-tools"
+        "rns-tools::rnx"
       ],
       "source": "Utilities/rnx.py"
     },
@@ -24579,10 +25522,10 @@
         "pinned-python"
       ],
       "id": "RNS.Utilities.rnx.remote_execution_progress",
-      "implementation": "partial",
+      "implementation": "complete",
       "kind": "function",
       "rust_surface": [
-        "rns-tools"
+        "rns-tools::rnx"
       ],
       "source": "Utilities/rnx.py"
     },
@@ -24593,10 +25536,10 @@
         "pinned-python"
       ],
       "id": "RNS.Utilities.rnx.size_str",
-      "implementation": "partial",
+      "implementation": "complete",
       "kind": "function",
       "rust_surface": [
-        "rns-tools"
+        "rns-tools::rnx"
       ],
       "source": "Utilities/rnx.py"
     },
@@ -24607,10 +25550,10 @@
         "pinned-python"
       ],
       "id": "RNS.Utilities.rnx.spin",
-      "implementation": "partial",
+      "implementation": "complete",
       "kind": "function",
       "rust_surface": [
-        "rns-tools"
+        "rns-tools::rnx"
       ],
       "source": "Utilities/rnx.py"
     },
@@ -24621,10 +25564,10 @@
         "pinned-python"
       ],
       "id": "RNS.Utilities.rnx.spin_stat",
-      "implementation": "partial",
+      "implementation": "complete",
       "kind": "function",
       "rust_surface": [
-        "rns-tools"
+        "rns-tools::rnx"
       ],
       "source": "Utilities/rnx.py"
     },
@@ -24937,9 +25880,8 @@
     "includes": "public RNS/LXMF callables and committed manual product contracts"
   },
   "summary": {
-    "complete": 1319,
+    "complete": 1664,
     "not-applicable": 1,
-    "partial": 345,
     "total": 1665
   }
 }

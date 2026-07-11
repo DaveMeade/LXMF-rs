@@ -655,6 +655,86 @@
       "evidence": ["unit", "simulated", "hardware-unverified"]
     },
     {
+      "pattern": "RNS.Utilities.rnx.*",
+      "implementation": "complete",
+      "rust_surface": ["rns-tools::rnx"],
+      "evidence": ["unit", "simulated", "pinned-python"]
+    },
+    {
+      "pattern": "RNS.Utilities.rnsd.*",
+      "implementation": "complete",
+      "rust_surface": ["rns-tools::rnsd", "reticulumd"],
+      "evidence": ["unit", "simulated", "pinned-python"]
+    },
+    {
+      "pattern": "RNS.Utilities.rnstatus.*",
+      "implementation": "complete",
+      "rust_surface": ["rns-tools::rnstatus", "rns-tools::rnstatus-rs"],
+      "evidence": ["unit", "simulated", "pinned-python", "hardware-unverified"]
+    },
+    {
+      "pattern": "RNS.Utilities.rnpath.*",
+      "implementation": "complete",
+      "rust_surface": ["rns-tools::rnpath", "rns-tools::rnpath-rs"],
+      "evidence": ["unit", "simulated", "pinned-python"]
+    },
+    {
+      "pattern": "RNS.Utilities.rnodeconf.*",
+      "implementation": "complete",
+      "rust_surface": ["rns-tools::rnodeconf", "rns-tools::rnodeconf-rs", "reticulumd::bridge_rnode_management"],
+      "evidence": ["unit", "simulated", "prepared-host", "pinned-python", "hardware-unverified"]
+    },
+    {
+      "pattern": "RNS.Utilities.rncp.*",
+      "implementation": "complete",
+      "rust_surface": ["rns-tools::rncp", "reticulum-rs-transport::resource"],
+      "evidence": ["unit", "simulated", "pinned-python"]
+    },
+    {
+      "pattern": "RNS.Utilities.rnid.*",
+      "implementation": "complete",
+      "rust_surface": ["rns-tools::rnid", "reticulum-rs-transport::identity"],
+      "evidence": ["unit", "pinned-python"]
+    },
+    {
+      "pattern": "RNS.Utilities.rnir.*",
+      "implementation": "complete",
+      "rust_surface": ["rns-tools::rnir", "reticulum-rs-rpc::identity"],
+      "evidence": ["unit", "simulated", "pinned-python"]
+    },
+    {
+      "pattern": "RNS.Utilities.rnpkg.*",
+      "implementation": "complete",
+      "rust_surface": ["rns-tools::rnpkg", "reticulum-rs-transport::resource"],
+      "evidence": ["unit", "simulated", "pinned-python"]
+    },
+    {
+      "pattern": "RNS.Utilities.rnprobe.*",
+      "implementation": "complete",
+      "rust_surface": ["rns-tools::rnprobe", "rns-tools::rnpath"],
+      "evidence": ["unit", "simulated", "pinned-python"]
+    },
+    {
+      "pattern": "RNS.Utilities.rnsh.*",
+      "implementation": "complete",
+      "rust_surface": ["rns-tools::rnsh", "lxmf-sdk::RemoteCommandRequest", "reticulumd::remote_control"],
+      "evidence": ["unit", "simulated", "pinned-python"],
+      "notes": "Default-deny command authorization is exercised with isolated subprocess fixtures."
+    },
+    {
+      "pattern": "RNS.Utilities.rngit.*",
+      "implementation": "complete",
+      "rust_surface": ["rns-tools::rngit", "rns-tools::rncp", "rns-tools::rnsh"],
+      "evidence": ["unit", "simulated", "pinned-python"],
+      "notes": "Local isolated repositories and Git bundles provide deterministic transport workflow evidence."
+    },
+    {
+      "pattern": "RNS.Utilities.cli-contracts",
+      "implementation": "complete",
+      "rust_surface": ["rns-tools"],
+      "evidence": ["unit", "simulated", "pinned-python"]
+    },
+    {
       "pattern": "RNS.Utilities.*",
       "implementation": "partial",
       "rust_surface": ["rns-tools"],
@@ -908,7 +988,7 @@
     },
     {
       "pattern": "LXMF.Utilities.*",
-      "implementation": "partial",
+      "implementation": "complete",
       "rust_surface": ["lxmf-cli::lxmd"],
       "evidence": ["unit", "simulated", "pinned-python"]
     },
