@@ -255,6 +255,219 @@
       "evidence": ["unit", "simulated", "pinned-python"]
     },
     {
+      "pattern": "RNS.Transport.Transport.*path*",
+      "implementation": "complete",
+      "rust_surface": ["reticulum-rs-transport::transport::PathTable", "reticulum-rs-transport::Transport", "reticulum-rs-rpc::path_status/request_path/drop_path"],
+      "evidence": ["unit", "simulated", "pinned-python"]
+    },
+    {
+      "pattern": "RNS.Transport.Transport.*hop*",
+      "implementation": "complete",
+      "rust_surface": ["reticulum-rs-transport::transport::NextHopMetrics", "reticulum-rs-rpc::path_status"],
+      "evidence": ["unit", "simulated", "pinned-python"]
+    },
+    {
+      "pattern": "RNS.Transport.Transport.*tunnel*",
+      "implementation": "complete",
+      "rust_surface": ["reticulum-rs-transport::transport::tunnels"],
+      "evidence": ["unit", "simulated", "pinned-python"]
+    },
+    {
+      "pattern": "RNS.Transport.Transport.*blackhole*",
+      "implementation": "complete",
+      "rust_surface": ["reticulum-rs-rpc::blackhole", "reticulum-rs-transport::discovery::lifecycle::BlackholeUpdateScheduler"],
+      "evidence": ["unit", "simulated", "pinned-python"]
+    },
+    {
+      "pattern": "RNS.Transport.Transport.*destination*",
+      "implementation": "complete",
+      "rust_surface": ["reticulum-rs-transport::Transport::add_destination/deregister_destination", "reticulum-rs-transport::transport::jobs"],
+      "evidence": ["unit", "simulated", "pinned-python"]
+    },
+    {
+      "pattern": "RNS.Transport.Transport.*link*",
+      "implementation": "complete",
+      "rust_surface": ["reticulum-rs-transport::destination::link", "reticulum-rs-transport::transport::LinkTable", "reticulum-rs-transport::transport::NextHopMetrics"],
+      "evidence": ["unit", "simulated", "pinned-python"]
+    },
+    {
+      "pattern": "RNS.Transport.Transport.*announce*",
+      "implementation": "complete",
+      "rust_surface": ["reticulum-rs-transport::Transport::recv_announces", "reticulum-rs-transport::transport::announce", "reticulum-rs-transport::InterfaceManager::drop_announce_queues"],
+      "evidence": ["unit", "simulated", "pinned-python"]
+    },
+    {
+      "pattern": "RNS.Transport.Transport.await_path",
+      "implementation": "complete",
+      "rust_surface": ["reticulum-rs-transport::Transport::await_path"],
+      "evidence": ["unit", "simulated", "pinned-python"]
+    },
+    {
+      "pattern": "RNS.Transport.Transport.add_packet_hash",
+      "implementation": "complete",
+      "rust_surface": ["reticulum-rs-transport::transport::PacketCache"],
+      "evidence": ["unit", "pinned-python"]
+    },
+    {
+      "pattern": "RNS.Transport.Transport.packet_filter",
+      "implementation": "complete",
+      "rust_surface": ["reticulum-rs-transport::transport::PacketCache", "reticulum-rs-transport::transport::handler"],
+      "evidence": ["unit", "simulated", "pinned-python"]
+    },
+    {
+      "pattern": "RNS.Transport.Transport.should_cache",
+      "implementation": "complete",
+      "rust_surface": ["reticulum-rs-transport::transport::reticulum_announce_cache"],
+      "evidence": ["unit", "pinned-python"],
+      "notes": "Pinned Python returns false for ordinary packet caching; Rust retains the forced announce-cache path."
+    },
+    {
+      "pattern": "RNS.Transport.Transport.timebase_from_random_blob*",
+      "implementation": "complete",
+      "rust_surface": ["reticulum-rs-transport::transport::path_table::random_blob_timebase"],
+      "evidence": ["unit", "pinned-python"]
+    },
+    {
+      "pattern": "RNS.Transport.Transport.find_interface_from_hash",
+      "implementation": "complete",
+      "rust_surface": ["reticulum-rs-transport::Transport::find_interface_from_hash"],
+      "evidence": ["unit", "pinned-python"]
+    },
+    {
+      "pattern": "RNS.Transport.Transport.detach_interfaces",
+      "implementation": "complete",
+      "rust_surface": ["reticulum-rs-transport::Transport::detach_interfaces"],
+      "evidence": ["unit", "simulated", "pinned-python"]
+    },
+    {
+      "pattern": "RNS.Transport.Transport.discover_interfaces",
+      "implementation": "complete",
+      "rust_surface": ["reticulum-rs-transport::discovery", "reticulumd::announce_worker"],
+      "evidence": ["unit", "simulated", "pinned-python"]
+    },
+    {
+      "pattern": "RNS.Transport.Transport.start",
+      "implementation": "complete",
+      "rust_surface": ["reticulum-rs-transport::Transport::new", "reticulumd::bootstrap"],
+      "evidence": ["unit", "simulated"]
+    },
+    {
+      "pattern": "RNS.Transport.Transport.job*",
+      "implementation": "complete",
+      "rust_surface": ["reticulum-rs-transport::transport::manage_transport"],
+      "evidence": ["unit", "simulated", "pinned-python"]
+    },
+    {
+      "pattern": "RNS.Transport.Transport.count_traffic_loop",
+      "implementation": "complete",
+      "rust_surface": ["reticulumd::runtime_status", "reticulum-rs-rpc::daemon_status_ex"],
+      "evidence": ["unit", "simulated"]
+    },
+    {
+      "pattern": "RNS.Transport.Transport.exit_handler",
+      "implementation": "complete",
+      "rust_surface": ["reticulumd::announce_persistence", "reticulumd::main"],
+      "evidence": ["unit", "simulated"]
+    },
+    {
+      "pattern": "RNS.Transport.Transport.inbound",
+      "implementation": "complete",
+      "rust_surface": ["reticulum-rs-transport::transport::manage_transport"],
+      "evidence": ["unit", "simulated", "pinned-python"]
+    },
+    {
+      "pattern": "RNS.Transport.Transport.outbound",
+      "implementation": "complete",
+      "rust_surface": ["reticulum-rs-transport::Transport::send_packet"],
+      "evidence": ["unit", "simulated", "pinned-python"]
+    },
+    {
+      "pattern": "RNS.Transport.Transport.transmit",
+      "implementation": "complete",
+      "rust_surface": ["reticulum-rs-transport::InterfaceManager::send"],
+      "evidence": ["unit", "simulated", "pinned-python"]
+    },
+    {
+      "pattern": "RNS.Transport.Transport.*local_client*",
+      "implementation": "complete",
+      "rust_surface": ["reticulum-rs-transport::iface::local", "reticulumd::bootstrap_interface_startup"],
+      "evidence": ["unit", "simulated", "pinned-python"]
+    },
+    {
+      "pattern": "RNS.Transport.Transport.interface_to_shared_instance",
+      "implementation": "complete",
+      "rust_surface": ["reticulum-rs-transport::iface::local", "reticulumd::bootstrap_interface_startup"],
+      "evidence": ["unit", "simulated", "pinned-python"]
+    },
+    {
+      "pattern": "RNS.Transport.Transport.shared_connection_*",
+      "implementation": "complete",
+      "rust_surface": ["reticulum-rs-transport::iface::local", "reticulum-rs-transport::iface::tcp_client"],
+      "evidence": ["unit", "simulated", "pinned-python"]
+    },
+    {
+      "pattern": "RNS.Transport.Transport.remote_*_handler",
+      "implementation": "complete",
+      "rust_surface": ["reticulum-rs-rpc::RpcDaemon", "reticulumd::bridge_remote_control"],
+      "evidence": ["unit", "simulated", "pinned-python"]
+    },
+    {
+      "pattern": "RNS.Transport.Transport.cache*",
+      "implementation": "complete",
+      "rust_surface": ["reticulum-rs-transport::ReticulumPacketDiskCache", "reticulum-rs-transport::Transport::cache_packet/get_cached_packet"],
+      "evidence": ["unit", "simulated", "pinned-python"],
+      "notes": "Uses Python's MessagePack [raw_packet, interface_reference] persisted shape."
+    },
+    {
+      "pattern": "RNS.Transport.Transport.get_cached_packet",
+      "implementation": "complete",
+      "rust_surface": ["reticulum-rs-transport::Transport::get_cached_packet"],
+      "evidence": ["unit", "pinned-python"]
+    },
+    {
+      "pattern": "RNS.Transport.Transport.clean_cache",
+      "implementation": "complete",
+      "rust_surface": ["reticulum-rs-transport::ReticulumPacketDiskCache::clean_announces"],
+      "evidence": ["unit", "simulated", "pinned-python"]
+    },
+    {
+      "pattern": "RNS.Transport.Transport.enable_discovery",
+      "implementation": "complete",
+      "rust_surface": ["reticulum-rs-transport::Transport::enable_discovery", "reticulumd::announce_worker"],
+      "evidence": ["unit", "simulated", "pinned-python"]
+    },
+    {
+      "pattern": "RNS.Transport.Transport.*network_identity",
+      "implementation": "complete",
+      "rust_surface": ["reticulum-rs-transport::Transport::set_network_identity/has_network_identity"],
+      "evidence": ["unit", "pinned-python"]
+    },
+    {
+      "pattern": "RNS.Transport.Transport.persist_data",
+      "implementation": "complete",
+      "rust_surface": ["reticulum-rs-transport::Transport::persist_data"],
+      "evidence": ["unit", "simulated", "pinned-python"]
+    },
+    {
+      "pattern": "RNS.Transport.Transport.save_packet_hashlist",
+      "implementation": "complete",
+      "rust_surface": ["reticulum-rs-transport::Transport::save_packet_hashlist"],
+      "evidence": ["unit", "pinned-python"],
+      "notes": "Persists the Python-compatible MessagePack list of full packet hashes."
+    },
+    {
+      "pattern": "RNS.Transport.Transport.prioritize_interfaces",
+      "implementation": "complete",
+      "rust_surface": ["reticulum-rs-transport::InterfaceManager::prioritize_interfaces"],
+      "evidence": ["unit", "pinned-python"]
+    },
+    {
+      "pattern": "RNS.Transport.Transport",
+      "implementation": "complete",
+      "rust_surface": ["reticulum-rs-transport::Transport", "reticulumd", "reticulum-rs-rpc::RpcDaemon"],
+      "evidence": ["unit", "simulated", "pinned-python"]
+    },
+    {
       "pattern": "RNS.Transport.*",
       "implementation": "partial",
       "rust_surface": ["reticulum-rs-transport::transport", "reticulumd"],

@@ -17719,11 +17719,12 @@
         "pinned-python"
       ],
       "id": "RNS.Transport.Transport",
-      "implementation": "partial",
+      "implementation": "complete",
       "kind": "class",
       "rust_surface": [
-        "reticulum-rs-transport::transport",
-        "reticulumd"
+        "reticulum-rs-transport::Transport",
+        "reticulumd",
+        "reticulum-rs-rpc::RpcDaemon"
       ],
       "source": "Transport.py"
     },
@@ -17734,26 +17735,25 @@
         "pinned-python"
       ],
       "id": "RNS.Transport.Transport.activate_link",
-      "implementation": "partial",
+      "implementation": "complete",
       "kind": "method",
       "rust_surface": [
-        "reticulum-rs-transport::transport",
-        "reticulumd"
+        "reticulum-rs-transport::destination::link",
+        "reticulum-rs-transport::transport::LinkTable",
+        "reticulum-rs-transport::transport::NextHopMetrics"
       ],
       "source": "Transport.py"
     },
     {
       "evidence": [
         "unit",
-        "simulated",
         "pinned-python"
       ],
       "id": "RNS.Transport.Transport.add_packet_hash",
-      "implementation": "partial",
+      "implementation": "complete",
       "kind": "method",
       "rust_surface": [
-        "reticulum-rs-transport::transport",
-        "reticulumd"
+        "reticulum-rs-transport::transport::PacketCache"
       ],
       "source": "Transport.py"
     },
@@ -17764,11 +17764,12 @@
         "pinned-python"
       ],
       "id": "RNS.Transport.Transport.announce_emitted",
-      "implementation": "partial",
+      "implementation": "complete",
       "kind": "method",
       "rust_surface": [
-        "reticulum-rs-transport::transport",
-        "reticulumd"
+        "reticulum-rs-transport::Transport::recv_announces",
+        "reticulum-rs-transport::transport::announce",
+        "reticulum-rs-transport::InterfaceManager::drop_announce_queues"
       ],
       "source": "Transport.py"
     },
@@ -17779,11 +17780,10 @@
         "pinned-python"
       ],
       "id": "RNS.Transport.Transport.await_path",
-      "implementation": "partial",
+      "implementation": "complete",
       "kind": "method",
       "rust_surface": [
-        "reticulum-rs-transport::transport",
-        "reticulumd"
+        "reticulum-rs-transport::Transport::await_path"
       ],
       "source": "Transport.py"
     },
@@ -17794,11 +17794,11 @@
         "pinned-python"
       ],
       "id": "RNS.Transport.Transport.blackhole_identity",
-      "implementation": "partial",
+      "implementation": "complete",
       "kind": "method",
       "rust_surface": [
-        "reticulum-rs-transport::transport",
-        "reticulumd"
+        "reticulum-rs-rpc::blackhole",
+        "reticulum-rs-transport::discovery::lifecycle::BlackholeUpdateScheduler"
       ],
       "source": "Transport.py"
     },
@@ -17809,11 +17809,11 @@
         "pinned-python"
       ],
       "id": "RNS.Transport.Transport.blackhole_list_handler",
-      "implementation": "partial",
+      "implementation": "complete",
       "kind": "method",
       "rust_surface": [
-        "reticulum-rs-transport::transport",
-        "reticulumd"
+        "reticulum-rs-rpc::blackhole",
+        "reticulum-rs-transport::discovery::lifecycle::BlackholeUpdateScheduler"
       ],
       "source": "Transport.py"
     },
@@ -17824,11 +17824,12 @@
         "pinned-python"
       ],
       "id": "RNS.Transport.Transport.cache",
-      "implementation": "partial",
+      "implementation": "complete",
       "kind": "method",
+      "notes": "Uses Python's MessagePack [raw_packet, interface_reference] persisted shape.",
       "rust_surface": [
-        "reticulum-rs-transport::transport",
-        "reticulumd"
+        "reticulum-rs-transport::ReticulumPacketDiskCache",
+        "reticulum-rs-transport::Transport::cache_packet/get_cached_packet"
       ],
       "source": "Transport.py"
     },
@@ -17839,11 +17840,12 @@
         "pinned-python"
       ],
       "id": "RNS.Transport.Transport.cache_request",
-      "implementation": "partial",
+      "implementation": "complete",
       "kind": "method",
+      "notes": "Uses Python's MessagePack [raw_packet, interface_reference] persisted shape.",
       "rust_surface": [
-        "reticulum-rs-transport::transport",
-        "reticulumd"
+        "reticulum-rs-transport::ReticulumPacketDiskCache",
+        "reticulum-rs-transport::Transport::cache_packet/get_cached_packet"
       ],
       "source": "Transport.py"
     },
@@ -17854,11 +17856,12 @@
         "pinned-python"
       ],
       "id": "RNS.Transport.Transport.cache_request_packet",
-      "implementation": "partial",
+      "implementation": "complete",
       "kind": "method",
+      "notes": "Uses Python's MessagePack [raw_packet, interface_reference] persisted shape.",
       "rust_surface": [
-        "reticulum-rs-transport::transport",
-        "reticulumd"
+        "reticulum-rs-transport::ReticulumPacketDiskCache",
+        "reticulum-rs-transport::Transport::cache_packet/get_cached_packet"
       ],
       "source": "Transport.py"
     },
@@ -17869,11 +17872,12 @@
         "pinned-python"
       ],
       "id": "RNS.Transport.Transport.clean_announce_cache",
-      "implementation": "partial",
+      "implementation": "complete",
       "kind": "method",
       "rust_surface": [
-        "reticulum-rs-transport::transport",
-        "reticulumd"
+        "reticulum-rs-transport::Transport::recv_announces",
+        "reticulum-rs-transport::transport::announce",
+        "reticulum-rs-transport::InterfaceManager::drop_announce_queues"
       ],
       "source": "Transport.py"
     },
@@ -17884,11 +17888,10 @@
         "pinned-python"
       ],
       "id": "RNS.Transport.Transport.clean_cache",
-      "implementation": "partial",
+      "implementation": "complete",
       "kind": "method",
       "rust_surface": [
-        "reticulum-rs-transport::transport",
-        "reticulumd"
+        "reticulum-rs-transport::ReticulumPacketDiskCache::clean_announces"
       ],
       "source": "Transport.py"
     },
@@ -17899,26 +17902,25 @@
         "pinned-python"
       ],
       "id": "RNS.Transport.Transport.clean_destinations_map",
-      "implementation": "partial",
+      "implementation": "complete",
       "kind": "method",
       "rust_surface": [
-        "reticulum-rs-transport::transport",
-        "reticulumd"
+        "reticulum-rs-transport::Transport::add_destination/deregister_destination",
+        "reticulum-rs-transport::transport::jobs"
       ],
       "source": "Transport.py"
     },
     {
       "evidence": [
         "unit",
-        "simulated",
-        "pinned-python"
+        "simulated"
       ],
       "id": "RNS.Transport.Transport.count_traffic_loop",
-      "implementation": "partial",
+      "implementation": "complete",
       "kind": "method",
       "rust_surface": [
-        "reticulum-rs-transport::transport",
-        "reticulumd"
+        "reticulumd::runtime_status",
+        "reticulum-rs-rpc::daemon_status_ex"
       ],
       "source": "Transport.py"
     },
@@ -17929,11 +17931,12 @@
         "pinned-python"
       ],
       "id": "RNS.Transport.Transport.deregister_announce_handler",
-      "implementation": "partial",
+      "implementation": "complete",
       "kind": "method",
       "rust_surface": [
-        "reticulum-rs-transport::transport",
-        "reticulumd"
+        "reticulum-rs-transport::Transport::recv_announces",
+        "reticulum-rs-transport::transport::announce",
+        "reticulum-rs-transport::InterfaceManager::drop_announce_queues"
       ],
       "source": "Transport.py"
     },
@@ -17944,11 +17947,11 @@
         "pinned-python"
       ],
       "id": "RNS.Transport.Transport.deregister_destination",
-      "implementation": "partial",
+      "implementation": "complete",
       "kind": "method",
       "rust_surface": [
-        "reticulum-rs-transport::transport",
-        "reticulumd"
+        "reticulum-rs-transport::Transport::add_destination/deregister_destination",
+        "reticulum-rs-transport::transport::jobs"
       ],
       "source": "Transport.py"
     },
@@ -17959,11 +17962,10 @@
         "pinned-python"
       ],
       "id": "RNS.Transport.Transport.detach_interfaces",
-      "implementation": "partial",
+      "implementation": "complete",
       "kind": "method",
       "rust_surface": [
-        "reticulum-rs-transport::transport",
-        "reticulumd"
+        "reticulum-rs-transport::Transport::detach_interfaces"
       ],
       "source": "Transport.py"
     },
@@ -17974,11 +17976,11 @@
         "pinned-python"
       ],
       "id": "RNS.Transport.Transport.discover_interfaces",
-      "implementation": "partial",
+      "implementation": "complete",
       "kind": "method",
       "rust_surface": [
-        "reticulum-rs-transport::transport",
-        "reticulumd"
+        "reticulum-rs-transport::discovery",
+        "reticulumd::announce_worker"
       ],
       "source": "Transport.py"
     },
@@ -17989,11 +17991,12 @@
         "pinned-python"
       ],
       "id": "RNS.Transport.Transport.drop_announce_queues",
-      "implementation": "partial",
+      "implementation": "complete",
       "kind": "method",
       "rust_surface": [
-        "reticulum-rs-transport::transport",
-        "reticulumd"
+        "reticulum-rs-transport::Transport::recv_announces",
+        "reticulum-rs-transport::transport::announce",
+        "reticulum-rs-transport::InterfaceManager::drop_announce_queues"
       ],
       "source": "Transport.py"
     },
@@ -18004,11 +18007,11 @@
         "pinned-python"
       ],
       "id": "RNS.Transport.Transport.enable_blackhole_updater",
-      "implementation": "partial",
+      "implementation": "complete",
       "kind": "method",
       "rust_surface": [
-        "reticulum-rs-transport::transport",
-        "reticulumd"
+        "reticulum-rs-rpc::blackhole",
+        "reticulum-rs-transport::discovery::lifecycle::BlackholeUpdateScheduler"
       ],
       "source": "Transport.py"
     },
@@ -18019,26 +18022,25 @@
         "pinned-python"
       ],
       "id": "RNS.Transport.Transport.enable_discovery",
-      "implementation": "partial",
+      "implementation": "complete",
       "kind": "method",
       "rust_surface": [
-        "reticulum-rs-transport::transport",
-        "reticulumd"
+        "reticulum-rs-transport::Transport::enable_discovery",
+        "reticulumd::announce_worker"
       ],
       "source": "Transport.py"
     },
     {
       "evidence": [
         "unit",
-        "simulated",
-        "pinned-python"
+        "simulated"
       ],
       "id": "RNS.Transport.Transport.exit_handler",
-      "implementation": "partial",
+      "implementation": "complete",
       "kind": "method",
       "rust_surface": [
-        "reticulum-rs-transport::transport",
-        "reticulumd"
+        "reticulumd::announce_persistence",
+        "reticulumd::main"
       ],
       "source": "Transport.py"
     },
@@ -18049,11 +18051,12 @@
         "pinned-python"
       ],
       "id": "RNS.Transport.Transport.expire_path",
-      "implementation": "partial",
+      "implementation": "complete",
       "kind": "method",
       "rust_surface": [
-        "reticulum-rs-transport::transport",
-        "reticulumd"
+        "reticulum-rs-transport::transport::PathTable",
+        "reticulum-rs-transport::Transport",
+        "reticulum-rs-rpc::path_status/request_path/drop_path"
       ],
       "source": "Transport.py"
     },
@@ -18064,26 +18067,25 @@
         "pinned-python"
       ],
       "id": "RNS.Transport.Transport.extra_link_proof_timeout",
-      "implementation": "partial",
+      "implementation": "complete",
       "kind": "method",
       "rust_surface": [
-        "reticulum-rs-transport::transport",
-        "reticulumd"
+        "reticulum-rs-transport::destination::link",
+        "reticulum-rs-transport::transport::LinkTable",
+        "reticulum-rs-transport::transport::NextHopMetrics"
       ],
       "source": "Transport.py"
     },
     {
       "evidence": [
         "unit",
-        "simulated",
         "pinned-python"
       ],
       "id": "RNS.Transport.Transport.find_interface_from_hash",
-      "implementation": "partial",
+      "implementation": "complete",
       "kind": "method",
       "rust_surface": [
-        "reticulum-rs-transport::transport",
-        "reticulumd"
+        "reticulum-rs-transport::Transport::find_interface_from_hash"
       ],
       "source": "Transport.py"
     },
@@ -18094,11 +18096,11 @@
         "pinned-python"
       ],
       "id": "RNS.Transport.Transport.first_hop_timeout",
-      "implementation": "partial",
+      "implementation": "complete",
       "kind": "method",
       "rust_surface": [
-        "reticulum-rs-transport::transport",
-        "reticulumd"
+        "reticulum-rs-transport::transport::NextHopMetrics",
+        "reticulum-rs-rpc::path_status"
       ],
       "source": "Transport.py"
     },
@@ -18109,26 +18111,24 @@
         "pinned-python"
       ],
       "id": "RNS.Transport.Transport.from_local_client",
-      "implementation": "partial",
+      "implementation": "complete",
       "kind": "method",
       "rust_surface": [
-        "reticulum-rs-transport::transport",
-        "reticulumd"
+        "reticulum-rs-transport::iface::local",
+        "reticulumd::bootstrap_interface_startup"
       ],
       "source": "Transport.py"
     },
     {
       "evidence": [
         "unit",
-        "simulated",
         "pinned-python"
       ],
       "id": "RNS.Transport.Transport.get_cached_packet",
-      "implementation": "partial",
+      "implementation": "complete",
       "kind": "method",
       "rust_surface": [
-        "reticulum-rs-transport::transport",
-        "reticulumd"
+        "reticulum-rs-transport::Transport::get_cached_packet"
       ],
       "source": "Transport.py"
     },
@@ -18139,26 +18139,23 @@
         "pinned-python"
       ],
       "id": "RNS.Transport.Transport.handle_tunnel",
-      "implementation": "partial",
+      "implementation": "complete",
       "kind": "method",
       "rust_surface": [
-        "reticulum-rs-transport::transport",
-        "reticulumd"
+        "reticulum-rs-transport::transport::tunnels"
       ],
       "source": "Transport.py"
     },
     {
       "evidence": [
         "unit",
-        "simulated",
         "pinned-python"
       ],
       "id": "RNS.Transport.Transport.has_network_identity",
-      "implementation": "partial",
+      "implementation": "complete",
       "kind": "method",
       "rust_surface": [
-        "reticulum-rs-transport::transport",
-        "reticulumd"
+        "reticulum-rs-transport::Transport::set_network_identity/has_network_identity"
       ],
       "source": "Transport.py"
     },
@@ -18169,11 +18166,12 @@
         "pinned-python"
       ],
       "id": "RNS.Transport.Transport.has_path",
-      "implementation": "partial",
+      "implementation": "complete",
       "kind": "method",
       "rust_surface": [
-        "reticulum-rs-transport::transport",
-        "reticulumd"
+        "reticulum-rs-transport::transport::PathTable",
+        "reticulum-rs-transport::Transport",
+        "reticulum-rs-rpc::path_status/request_path/drop_path"
       ],
       "source": "Transport.py"
     },
@@ -18184,11 +18182,11 @@
         "pinned-python"
       ],
       "id": "RNS.Transport.Transport.hops_to",
-      "implementation": "partial",
+      "implementation": "complete",
       "kind": "method",
       "rust_surface": [
-        "reticulum-rs-transport::transport",
-        "reticulumd"
+        "reticulum-rs-transport::transport::NextHopMetrics",
+        "reticulum-rs-rpc::path_status"
       ],
       "source": "Transport.py"
     },
@@ -18199,11 +18197,10 @@
         "pinned-python"
       ],
       "id": "RNS.Transport.Transport.inbound",
-      "implementation": "partial",
+      "implementation": "complete",
       "kind": "method",
       "rust_surface": [
-        "reticulum-rs-transport::transport",
-        "reticulumd"
+        "reticulum-rs-transport::transport::manage_transport"
       ],
       "source": "Transport.py"
     },
@@ -18214,11 +18211,11 @@
         "pinned-python"
       ],
       "id": "RNS.Transport.Transport.interface_to_shared_instance",
-      "implementation": "partial",
+      "implementation": "complete",
       "kind": "method",
       "rust_surface": [
-        "reticulum-rs-transport::transport",
-        "reticulumd"
+        "reticulum-rs-transport::iface::local",
+        "reticulumd::bootstrap_interface_startup"
       ],
       "source": "Transport.py"
     },
@@ -18229,11 +18226,11 @@
         "pinned-python"
       ],
       "id": "RNS.Transport.Transport.is_local_client_interface",
-      "implementation": "partial",
+      "implementation": "complete",
       "kind": "method",
       "rust_surface": [
-        "reticulum-rs-transport::transport",
-        "reticulumd"
+        "reticulum-rs-transport::iface::local",
+        "reticulumd::bootstrap_interface_startup"
       ],
       "source": "Transport.py"
     },
@@ -18244,11 +18241,10 @@
         "pinned-python"
       ],
       "id": "RNS.Transport.Transport.jobloop",
-      "implementation": "partial",
+      "implementation": "complete",
       "kind": "method",
       "rust_surface": [
-        "reticulum-rs-transport::transport",
-        "reticulumd"
+        "reticulum-rs-transport::transport::manage_transport"
       ],
       "source": "Transport.py"
     },
@@ -18259,11 +18255,10 @@
         "pinned-python"
       ],
       "id": "RNS.Transport.Transport.jobs",
-      "implementation": "partial",
+      "implementation": "complete",
       "kind": "method",
       "rust_surface": [
-        "reticulum-rs-transport::transport",
-        "reticulumd"
+        "reticulum-rs-transport::transport::manage_transport"
       ],
       "source": "Transport.py"
     },
@@ -18274,11 +18269,12 @@
         "pinned-python"
       ],
       "id": "RNS.Transport.Transport.mark_path_responsive",
-      "implementation": "partial",
+      "implementation": "complete",
       "kind": "method",
       "rust_surface": [
-        "reticulum-rs-transport::transport",
-        "reticulumd"
+        "reticulum-rs-transport::transport::PathTable",
+        "reticulum-rs-transport::Transport",
+        "reticulum-rs-rpc::path_status/request_path/drop_path"
       ],
       "source": "Transport.py"
     },
@@ -18289,11 +18285,12 @@
         "pinned-python"
       ],
       "id": "RNS.Transport.Transport.mark_path_unknown_state",
-      "implementation": "partial",
+      "implementation": "complete",
       "kind": "method",
       "rust_surface": [
-        "reticulum-rs-transport::transport",
-        "reticulumd"
+        "reticulum-rs-transport::transport::PathTable",
+        "reticulum-rs-transport::Transport",
+        "reticulum-rs-rpc::path_status/request_path/drop_path"
       ],
       "source": "Transport.py"
     },
@@ -18304,11 +18301,12 @@
         "pinned-python"
       ],
       "id": "RNS.Transport.Transport.mark_path_unresponsive",
-      "implementation": "partial",
+      "implementation": "complete",
       "kind": "method",
       "rust_surface": [
-        "reticulum-rs-transport::transport",
-        "reticulumd"
+        "reticulum-rs-transport::transport::PathTable",
+        "reticulum-rs-transport::Transport",
+        "reticulum-rs-rpc::path_status/request_path/drop_path"
       ],
       "source": "Transport.py"
     },
@@ -18319,11 +18317,11 @@
         "pinned-python"
       ],
       "id": "RNS.Transport.Transport.next_hop",
-      "implementation": "partial",
+      "implementation": "complete",
       "kind": "method",
       "rust_surface": [
-        "reticulum-rs-transport::transport",
-        "reticulumd"
+        "reticulum-rs-transport::transport::NextHopMetrics",
+        "reticulum-rs-rpc::path_status"
       ],
       "source": "Transport.py"
     },
@@ -18334,11 +18332,11 @@
         "pinned-python"
       ],
       "id": "RNS.Transport.Transport.next_hop_interface",
-      "implementation": "partial",
+      "implementation": "complete",
       "kind": "method",
       "rust_surface": [
-        "reticulum-rs-transport::transport",
-        "reticulumd"
+        "reticulum-rs-transport::transport::NextHopMetrics",
+        "reticulum-rs-rpc::path_status"
       ],
       "source": "Transport.py"
     },
@@ -18349,11 +18347,11 @@
         "pinned-python"
       ],
       "id": "RNS.Transport.Transport.next_hop_interface_bitrate",
-      "implementation": "partial",
+      "implementation": "complete",
       "kind": "method",
       "rust_surface": [
-        "reticulum-rs-transport::transport",
-        "reticulumd"
+        "reticulum-rs-transport::transport::NextHopMetrics",
+        "reticulum-rs-rpc::path_status"
       ],
       "source": "Transport.py"
     },
@@ -18364,11 +18362,11 @@
         "pinned-python"
       ],
       "id": "RNS.Transport.Transport.next_hop_interface_hw_mtu",
-      "implementation": "partial",
+      "implementation": "complete",
       "kind": "method",
       "rust_surface": [
-        "reticulum-rs-transport::transport",
-        "reticulumd"
+        "reticulum-rs-transport::transport::NextHopMetrics",
+        "reticulum-rs-rpc::path_status"
       ],
       "source": "Transport.py"
     },
@@ -18379,11 +18377,11 @@
         "pinned-python"
       ],
       "id": "RNS.Transport.Transport.next_hop_per_bit_latency",
-      "implementation": "partial",
+      "implementation": "complete",
       "kind": "method",
       "rust_surface": [
-        "reticulum-rs-transport::transport",
-        "reticulumd"
+        "reticulum-rs-transport::transport::NextHopMetrics",
+        "reticulum-rs-rpc::path_status"
       ],
       "source": "Transport.py"
     },
@@ -18394,11 +18392,11 @@
         "pinned-python"
       ],
       "id": "RNS.Transport.Transport.next_hop_per_byte_latency",
-      "implementation": "partial",
+      "implementation": "complete",
       "kind": "method",
       "rust_surface": [
-        "reticulum-rs-transport::transport",
-        "reticulumd"
+        "reticulum-rs-transport::transport::NextHopMetrics",
+        "reticulum-rs-rpc::path_status"
       ],
       "source": "Transport.py"
     },
@@ -18409,11 +18407,10 @@
         "pinned-python"
       ],
       "id": "RNS.Transport.Transport.outbound",
-      "implementation": "partial",
+      "implementation": "complete",
       "kind": "method",
       "rust_surface": [
-        "reticulum-rs-transport::transport",
-        "reticulumd"
+        "reticulum-rs-transport::Transport::send_packet"
       ],
       "source": "Transport.py"
     },
@@ -18424,11 +18421,11 @@
         "pinned-python"
       ],
       "id": "RNS.Transport.Transport.packet_filter",
-      "implementation": "partial",
+      "implementation": "complete",
       "kind": "method",
       "rust_surface": [
-        "reticulum-rs-transport::transport",
-        "reticulumd"
+        "reticulum-rs-transport::transport::PacketCache",
+        "reticulum-rs-transport::transport::handler"
       ],
       "source": "Transport.py"
     },
@@ -18439,11 +18436,12 @@
         "pinned-python"
       ],
       "id": "RNS.Transport.Transport.path_is_unresponsive",
-      "implementation": "partial",
+      "implementation": "complete",
       "kind": "method",
       "rust_surface": [
-        "reticulum-rs-transport::transport",
-        "reticulumd"
+        "reticulum-rs-transport::transport::PathTable",
+        "reticulum-rs-transport::Transport",
+        "reticulum-rs-rpc::path_status/request_path/drop_path"
       ],
       "source": "Transport.py"
     },
@@ -18454,11 +18452,12 @@
         "pinned-python"
       ],
       "id": "RNS.Transport.Transport.path_request",
-      "implementation": "partial",
+      "implementation": "complete",
       "kind": "method",
       "rust_surface": [
-        "reticulum-rs-transport::transport",
-        "reticulumd"
+        "reticulum-rs-transport::transport::PathTable",
+        "reticulum-rs-transport::Transport",
+        "reticulum-rs-rpc::path_status/request_path/drop_path"
       ],
       "source": "Transport.py"
     },
@@ -18469,11 +18468,12 @@
         "pinned-python"
       ],
       "id": "RNS.Transport.Transport.path_request_handler",
-      "implementation": "partial",
+      "implementation": "complete",
       "kind": "method",
       "rust_surface": [
-        "reticulum-rs-transport::transport",
-        "reticulumd"
+        "reticulum-rs-transport::transport::PathTable",
+        "reticulum-rs-transport::Transport",
+        "reticulum-rs-rpc::path_status/request_path/drop_path"
       ],
       "source": "Transport.py"
     },
@@ -18484,11 +18484,11 @@
         "pinned-python"
       ],
       "id": "RNS.Transport.Transport.persist_blackhole",
-      "implementation": "partial",
+      "implementation": "complete",
       "kind": "method",
       "rust_surface": [
-        "reticulum-rs-transport::transport",
-        "reticulumd"
+        "reticulum-rs-rpc::blackhole",
+        "reticulum-rs-transport::discovery::lifecycle::BlackholeUpdateScheduler"
       ],
       "source": "Transport.py"
     },
@@ -18499,26 +18499,23 @@
         "pinned-python"
       ],
       "id": "RNS.Transport.Transport.persist_data",
-      "implementation": "partial",
+      "implementation": "complete",
       "kind": "method",
       "rust_surface": [
-        "reticulum-rs-transport::transport",
-        "reticulumd"
+        "reticulum-rs-transport::Transport::persist_data"
       ],
       "source": "Transport.py"
     },
     {
       "evidence": [
         "unit",
-        "simulated",
         "pinned-python"
       ],
       "id": "RNS.Transport.Transport.prioritize_interfaces",
-      "implementation": "partial",
+      "implementation": "complete",
       "kind": "method",
       "rust_surface": [
-        "reticulum-rs-transport::transport",
-        "reticulumd"
+        "reticulum-rs-transport::InterfaceManager::prioritize_interfaces"
       ],
       "source": "Transport.py"
     },
@@ -18529,11 +18526,12 @@
         "pinned-python"
       ],
       "id": "RNS.Transport.Transport.register_announce_handler",
-      "implementation": "partial",
+      "implementation": "complete",
       "kind": "method",
       "rust_surface": [
-        "reticulum-rs-transport::transport",
-        "reticulumd"
+        "reticulum-rs-transport::Transport::recv_announces",
+        "reticulum-rs-transport::transport::announce",
+        "reticulum-rs-transport::InterfaceManager::drop_announce_queues"
       ],
       "source": "Transport.py"
     },
@@ -18544,11 +18542,11 @@
         "pinned-python"
       ],
       "id": "RNS.Transport.Transport.register_destination",
-      "implementation": "partial",
+      "implementation": "complete",
       "kind": "method",
       "rust_surface": [
-        "reticulum-rs-transport::transport",
-        "reticulumd"
+        "reticulum-rs-transport::Transport::add_destination/deregister_destination",
+        "reticulum-rs-transport::transport::jobs"
       ],
       "source": "Transport.py"
     },
@@ -18559,11 +18557,12 @@
         "pinned-python"
       ],
       "id": "RNS.Transport.Transport.register_link",
-      "implementation": "partial",
+      "implementation": "complete",
       "kind": "method",
       "rust_surface": [
-        "reticulum-rs-transport::transport",
-        "reticulumd"
+        "reticulum-rs-transport::destination::link",
+        "reticulum-rs-transport::transport::LinkTable",
+        "reticulum-rs-transport::transport::NextHopMetrics"
       ],
       "source": "Transport.py"
     },
@@ -18574,11 +18573,11 @@
         "pinned-python"
       ],
       "id": "RNS.Transport.Transport.reload_blackhole",
-      "implementation": "partial",
+      "implementation": "complete",
       "kind": "method",
       "rust_surface": [
-        "reticulum-rs-transport::transport",
-        "reticulumd"
+        "reticulum-rs-rpc::blackhole",
+        "reticulum-rs-transport::discovery::lifecycle::BlackholeUpdateScheduler"
       ],
       "source": "Transport.py"
     },
@@ -18589,11 +18588,11 @@
         "pinned-python"
       ],
       "id": "RNS.Transport.Transport.remote_path_handler",
-      "implementation": "partial",
+      "implementation": "complete",
       "kind": "method",
       "rust_surface": [
-        "reticulum-rs-transport::transport",
-        "reticulumd"
+        "reticulum-rs-rpc::RpcDaemon",
+        "reticulumd::bridge_remote_control"
       ],
       "source": "Transport.py"
     },
@@ -18604,11 +18603,11 @@
         "pinned-python"
       ],
       "id": "RNS.Transport.Transport.remote_status_handler",
-      "implementation": "partial",
+      "implementation": "complete",
       "kind": "method",
       "rust_surface": [
-        "reticulum-rs-transport::transport",
-        "reticulumd"
+        "reticulum-rs-rpc::RpcDaemon",
+        "reticulumd::bridge_remote_control"
       ],
       "source": "Transport.py"
     },
@@ -18619,11 +18618,11 @@
         "pinned-python"
       ],
       "id": "RNS.Transport.Transport.remove_blackholed_paths",
-      "implementation": "partial",
+      "implementation": "complete",
       "kind": "method",
       "rust_surface": [
-        "reticulum-rs-transport::transport",
-        "reticulumd"
+        "reticulum-rs-rpc::blackhole",
+        "reticulum-rs-transport::discovery::lifecycle::BlackholeUpdateScheduler"
       ],
       "source": "Transport.py"
     },
@@ -18634,26 +18633,26 @@
         "pinned-python"
       ],
       "id": "RNS.Transport.Transport.request_path",
-      "implementation": "partial",
+      "implementation": "complete",
       "kind": "method",
       "rust_surface": [
-        "reticulum-rs-transport::transport",
-        "reticulumd"
+        "reticulum-rs-transport::transport::PathTable",
+        "reticulum-rs-transport::Transport",
+        "reticulum-rs-rpc::path_status/request_path/drop_path"
       ],
       "source": "Transport.py"
     },
     {
       "evidence": [
         "unit",
-        "simulated",
         "pinned-python"
       ],
       "id": "RNS.Transport.Transport.save_packet_hashlist",
-      "implementation": "partial",
+      "implementation": "complete",
       "kind": "method",
+      "notes": "Persists the Python-compatible MessagePack list of full packet hashes.",
       "rust_surface": [
-        "reticulum-rs-transport::transport",
-        "reticulumd"
+        "reticulum-rs-transport::Transport::save_packet_hashlist"
       ],
       "source": "Transport.py"
     },
@@ -18664,11 +18663,12 @@
         "pinned-python"
       ],
       "id": "RNS.Transport.Transport.save_path_table",
-      "implementation": "partial",
+      "implementation": "complete",
       "kind": "method",
       "rust_surface": [
-        "reticulum-rs-transport::transport",
-        "reticulumd"
+        "reticulum-rs-transport::transport::PathTable",
+        "reticulum-rs-transport::Transport",
+        "reticulum-rs-rpc::path_status/request_path/drop_path"
       ],
       "source": "Transport.py"
     },
@@ -18679,26 +18679,23 @@
         "pinned-python"
       ],
       "id": "RNS.Transport.Transport.save_tunnel_table",
-      "implementation": "partial",
+      "implementation": "complete",
       "kind": "method",
       "rust_surface": [
-        "reticulum-rs-transport::transport",
-        "reticulumd"
+        "reticulum-rs-transport::transport::tunnels"
       ],
       "source": "Transport.py"
     },
     {
       "evidence": [
         "unit",
-        "simulated",
         "pinned-python"
       ],
       "id": "RNS.Transport.Transport.set_network_identity",
-      "implementation": "partial",
+      "implementation": "complete",
       "kind": "method",
       "rust_surface": [
-        "reticulum-rs-transport::transport",
-        "reticulumd"
+        "reticulum-rs-transport::Transport::set_network_identity/has_network_identity"
       ],
       "source": "Transport.py"
     },
@@ -18709,11 +18706,11 @@
         "pinned-python"
       ],
       "id": "RNS.Transport.Transport.shared_connection_disappeared",
-      "implementation": "partial",
+      "implementation": "complete",
       "kind": "method",
       "rust_surface": [
-        "reticulum-rs-transport::transport",
-        "reticulumd"
+        "reticulum-rs-transport::iface::local",
+        "reticulum-rs-transport::iface::tcp_client"
       ],
       "source": "Transport.py"
     },
@@ -18724,41 +18721,39 @@
         "pinned-python"
       ],
       "id": "RNS.Transport.Transport.shared_connection_reappeared",
-      "implementation": "partial",
+      "implementation": "complete",
       "kind": "method",
       "rust_surface": [
-        "reticulum-rs-transport::transport",
-        "reticulumd"
+        "reticulum-rs-transport::iface::local",
+        "reticulum-rs-transport::iface::tcp_client"
       ],
       "source": "Transport.py"
     },
     {
       "evidence": [
         "unit",
-        "simulated",
         "pinned-python"
       ],
       "id": "RNS.Transport.Transport.should_cache",
-      "implementation": "partial",
+      "implementation": "complete",
       "kind": "method",
+      "notes": "Pinned Python returns false for ordinary packet caching; Rust retains the forced announce-cache path.",
       "rust_surface": [
-        "reticulum-rs-transport::transport",
-        "reticulumd"
+        "reticulum-rs-transport::transport::reticulum_announce_cache"
       ],
       "source": "Transport.py"
     },
     {
       "evidence": [
         "unit",
-        "simulated",
-        "pinned-python"
+        "simulated"
       ],
       "id": "RNS.Transport.Transport.start",
-      "implementation": "partial",
+      "implementation": "complete",
       "kind": "method",
       "rust_surface": [
-        "reticulum-rs-transport::transport",
-        "reticulumd"
+        "reticulum-rs-transport::Transport::new",
+        "reticulumd::bootstrap"
       ],
       "source": "Transport.py"
     },
@@ -18769,41 +18764,36 @@
         "pinned-python"
       ],
       "id": "RNS.Transport.Transport.synthesize_tunnel",
-      "implementation": "partial",
+      "implementation": "complete",
       "kind": "method",
       "rust_surface": [
-        "reticulum-rs-transport::transport",
-        "reticulumd"
+        "reticulum-rs-transport::transport::tunnels"
       ],
       "source": "Transport.py"
     },
     {
       "evidence": [
         "unit",
-        "simulated",
         "pinned-python"
       ],
       "id": "RNS.Transport.Transport.timebase_from_random_blob",
-      "implementation": "partial",
+      "implementation": "complete",
       "kind": "method",
       "rust_surface": [
-        "reticulum-rs-transport::transport",
-        "reticulumd"
+        "reticulum-rs-transport::transport::path_table::random_blob_timebase"
       ],
       "source": "Transport.py"
     },
     {
       "evidence": [
         "unit",
-        "simulated",
         "pinned-python"
       ],
       "id": "RNS.Transport.Transport.timebase_from_random_blobs",
-      "implementation": "partial",
+      "implementation": "complete",
       "kind": "method",
       "rust_surface": [
-        "reticulum-rs-transport::transport",
-        "reticulumd"
+        "reticulum-rs-transport::transport::path_table::random_blob_timebase"
       ],
       "source": "Transport.py"
     },
@@ -18814,11 +18804,10 @@
         "pinned-python"
       ],
       "id": "RNS.Transport.Transport.transmit",
-      "implementation": "partial",
+      "implementation": "complete",
       "kind": "method",
       "rust_surface": [
-        "reticulum-rs-transport::transport",
-        "reticulumd"
+        "reticulum-rs-transport::InterfaceManager::send"
       ],
       "source": "Transport.py"
     },
@@ -18829,11 +18818,10 @@
         "pinned-python"
       ],
       "id": "RNS.Transport.Transport.tunnel_synthesize_handler",
-      "implementation": "partial",
+      "implementation": "complete",
       "kind": "method",
       "rust_surface": [
-        "reticulum-rs-transport::transport",
-        "reticulumd"
+        "reticulum-rs-transport::transport::tunnels"
       ],
       "source": "Transport.py"
     },
@@ -18844,11 +18832,11 @@
         "pinned-python"
       ],
       "id": "RNS.Transport.Transport.unblackhole_identity",
-      "implementation": "partial",
+      "implementation": "complete",
       "kind": "method",
       "rust_surface": [
-        "reticulum-rs-transport::transport",
-        "reticulumd"
+        "reticulum-rs-rpc::blackhole",
+        "reticulum-rs-transport::discovery::lifecycle::BlackholeUpdateScheduler"
       ],
       "source": "Transport.py"
     },
@@ -18859,11 +18847,10 @@
         "pinned-python"
       ],
       "id": "RNS.Transport.Transport.void_tunnel_interface",
-      "implementation": "partial",
+      "implementation": "complete",
       "kind": "method",
       "rust_surface": [
-        "reticulum-rs-transport::transport",
-        "reticulumd"
+        "reticulum-rs-transport::transport::tunnels"
       ],
       "source": "Transport.py"
     },
@@ -23838,9 +23825,9 @@
     "includes": "public RNS/LXMF callables and committed manual product contracts"
   },
   "summary": {
-    "complete": 622,
+    "complete": 699,
     "not-applicable": 1,
-    "partial": 1042,
+    "partial": 965,
     "total": 1665
   }
 }

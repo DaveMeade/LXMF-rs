@@ -62,13 +62,16 @@ mod announce_table;
 mod diag;
 mod link_table;
 mod packet_cache;
+mod packet_disk_cache;
 mod path_requests;
 mod path_table;
 mod reticulum_announce_cache;
 mod reticulum_path_store;
+mod runtime_management;
 mod tunnels;
 
 pub use announce_limits::AnnounceRateTableEntry;
+pub use packet_disk_cache::{CachedPacket, ReticulumPacketDiskCache};
 
 pub use reticulum_path_store::{
     RestoredReticulumPathIdentity, ReticulumPathTableRestoreReport,
@@ -223,6 +226,8 @@ pub(crate) struct TransportHandler {
 
     announce_limits: AnnounceLimits,
     packet_signal_cache: VecDeque<(Hash, PacketSignal)>,
+    network_identity: Option<PrivateIdentity>,
+    discovery_enabled: bool,
 
     out_links: HashMap<AddressHash, Arc<Mutex<Link>>>,
     in_links: HashMap<AddressHash, Arc<Mutex<Link>>>,
@@ -283,6 +288,32 @@ pub struct PacketSignal {
     pub rssi: Option<f64>,
     pub snr: Option<f64>,
     pub q: Option<f64>,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct NextHopMetrics {
+    pub interface: AddressHash,
+    pub bitrate: u64,
+    pub hardware_mtu: Option<usize>,
+    pub per_bit_latency: Option<f64>,
+}
+
+impl NextHopMetrics {
+    pub fn per_byte_latency(self) -> Option<f64> {
+        self.per_bit_latency.map(|latency| latency * 8.0)
+    }
+
+    pub fn first_hop_timeout(self, mtu: usize, default_timeout: Duration) -> Duration {
+        self.per_byte_latency()
+            .map(|latency| default_timeout + Duration::from_secs_f64(mtu as f64 * latency))
+            .unwrap_or(default_timeout)
+    }
+
+    pub fn extra_link_proof_timeout(self, mtu: usize) -> Duration {
+        self.per_byte_latency()
+            .map(|latency| Duration::from_secs_f64(mtu as f64 * latency))
+            .unwrap_or_default()
+    }
 }
 
 #[derive(Clone)]

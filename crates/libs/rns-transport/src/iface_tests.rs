@@ -554,6 +554,18 @@ mod tests {
         assert_eq!(mgr.drop_announce_queues(), 0);
     }
 
+    #[test]
+    fn prioritize_interfaces_orders_highest_bitrate_first() {
+        let mut manager = InterfaceManager::new(4);
+        let slow = manager.new_channel(1).address;
+        let fast = manager.new_channel(1).address;
+        assert!(manager.set_announce_pacing(slow, 1_000, 2));
+        assert!(manager.set_announce_pacing(fast, 10_000, 2));
+        manager.prioritize_interfaces();
+        assert_eq!(manager.ifaces[0].address, fast);
+        assert_eq!(manager.ifaces[1].address, slow);
+    }
+
     #[tokio::test]
     async fn recursive_path_request_waits_for_active_announce_cap_like_python() {
         let mut mgr = InterfaceManager::new(16);

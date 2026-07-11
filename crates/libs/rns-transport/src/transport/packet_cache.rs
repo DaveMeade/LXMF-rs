@@ -112,4 +112,8 @@ impl PacketCache {
         let track = self.map.get(&hash)?;
         Some((hash, track.destination, track.source_iface))
     }
+
+    pub fn hashes(&self) -> Vec<Hash> {
+        self.map.keys().copied().collect()
+    }
 }
