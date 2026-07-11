@@ -552,6 +552,103 @@
       "notes": "Daemon lifecycle uses an explicit deterministic loopback bearer; native device operation is not physically validated."
     },
     {
+      "pattern": "RNS.Interfaces.Interface.*",
+      "implementation": "complete",
+      "rust_surface": ["reticulum-rs-transport::iface::Interface", "reticulum-rs-transport::InterfaceManager"],
+      "evidence": ["unit", "simulated", "pinned-python"]
+    },
+    {
+      "pattern": "RNS.Interfaces.util.*",
+      "implementation": "complete",
+      "rust_surface": ["reticulum-rs-transport::iface::driver", "reticulum-rs-transport::iface::hdlc"],
+      "evidence": ["unit", "simulated", "pinned-python"]
+    },
+    {
+      "pattern": "RNS.Interfaces.TCPInterface.*",
+      "implementation": "complete",
+      "rust_surface": ["reticulum-rs-transport::iface::tcp_client", "reticulum-rs-transport::iface::tcp_server", "reticulumd::interfaces"],
+      "evidence": ["unit", "simulated", "pinned-python", "hardware-unverified"]
+    },
+    {
+      "pattern": "RNS.Interfaces.BackboneInterface.*",
+      "implementation": "complete",
+      "rust_surface": ["reticulum-rs-transport::iface::tcp_client", "reticulum-rs-transport::iface::tcp_server", "reticulum-rs-transport::iface::hdlc"],
+      "evidence": ["unit", "simulated", "pinned-python", "hardware-unverified"]
+    },
+    {
+      "pattern": "RNS.Interfaces.LocalInterface.*",
+      "implementation": "complete",
+      "rust_surface": ["reticulum-rs-transport::iface::local", "reticulumd::bootstrap_interface_startup"],
+      "evidence": ["unit", "simulated", "pinned-python"]
+    },
+    {
+      "pattern": "RNS.Interfaces.PipeInterface.*",
+      "implementation": "complete",
+      "rust_surface": ["reticulum-rs-transport::iface::pipe", "reticulumd::interface_hot_apply"],
+      "evidence": ["unit", "simulated", "pinned-python"]
+    },
+    {
+      "pattern": "RNS.Interfaces.UDPInterface.*",
+      "implementation": "complete",
+      "rust_surface": ["reticulum-rs-transport::iface::udp", "reticulumd::interface_hot_apply"],
+      "evidence": ["unit", "simulated", "pinned-python", "hardware-unverified"]
+    },
+    {
+      "pattern": "RNS.Interfaces.SerialInterface.*",
+      "implementation": "complete",
+      "rust_surface": ["reticulum-rs-transport::iface::serial", "reticulumd::bootstrap_interface_startup"],
+      "evidence": ["unit", "simulated", "pinned-python", "hardware-unverified"]
+    },
+    {
+      "pattern": "RNS.Interfaces.KISSInterface.*",
+      "implementation": "complete",
+      "rust_surface": ["reticulum-rs-transport::iface::kiss", "reticulum-rs-transport::kiss"],
+      "evidence": ["unit", "simulated", "pinned-python", "hardware-unverified"]
+    },
+    {
+      "pattern": "RNS.Interfaces.AX25KISSInterface.*",
+      "implementation": "complete",
+      "rust_surface": ["reticulum-rs-transport::iface::kiss", "reticulum-rs-transport::kiss::Ax25Kiss"],
+      "evidence": ["unit", "simulated", "pinned-python", "hardware-unverified"]
+    },
+    {
+      "pattern": "RNS.Interfaces.AutoInterface.*",
+      "implementation": "complete",
+      "rust_surface": ["reticulum-rs-transport::iface::auto", "reticulumd::interfaces::auto"],
+      "evidence": ["unit", "simulated", "prepared-host", "pinned-python", "hardware-unverified"]
+    },
+    {
+      "pattern": "RNS.Interfaces.I2PInterface.*",
+      "implementation": "complete",
+      "rust_surface": ["reticulum-rs-transport::iface::i2p", "reticulumd::bootstrap_interface_startup"],
+      "evidence": ["unit", "simulated", "prepared-host", "pinned-python", "hardware-unverified"],
+      "notes": "Fake-SAM and prepared-host evidence prove software lifecycle; public I2P operation is not claimed."
+    },
+    {
+      "pattern": "RNS.Interfaces.RNodeInterface.*",
+      "implementation": "complete",
+      "rust_surface": ["reticulum-rs-transport::iface::lora", "reticulum-rs-transport::iface::rnode_ble", "reticulumd::bridge_rnode_management"],
+      "evidence": ["unit", "simulated", "prepared-host", "pinned-python", "hardware-unverified"]
+    },
+    {
+      "pattern": "RNS.Interfaces.RNodeMultiInterface.*",
+      "implementation": "complete",
+      "rust_surface": ["reticulum-rs-transport::iface::rnode_multi", "reticulumd::bootstrap_interface_startup"],
+      "evidence": ["unit", "simulated", "prepared-host", "pinned-python", "hardware-unverified"]
+    },
+    {
+      "pattern": "RNS.Interfaces.WeaveInterface.*",
+      "implementation": "complete",
+      "rust_surface": ["reticulum-rs-transport::iface::weave", "reticulumd::bridge_weave_control"],
+      "evidence": ["unit", "simulated", "prepared-host", "pinned-python", "hardware-unverified"]
+    },
+    {
+      "pattern": "RNS.Interfaces.Android.*",
+      "implementation": "complete",
+      "rust_surface": ["reticulum-rs-transport::iface::rnode_ble", "reticulum-rs-transport::iface::rnode_spp", "reticulum-rs-transport::iface::vrn76_kiss_ble", "reticulumd::interfaces::ble"],
+      "evidence": ["unit", "simulated", "prepared-host", "pinned-python", "hardware-unverified"]
+    },
+    {
       "pattern": "RNS.Interfaces.*",
       "implementation": "partial",
       "rust_surface": ["reticulum-rs-transport::iface", "reticulumd::interfaces"],
