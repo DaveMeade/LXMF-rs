@@ -120,6 +120,12 @@ pub(super) async fn bootstrap(args: Args) -> BootstrapContext {
             None
         }
     });
+    let reticulum_runtime_policy = args
+        .config
+        .as_ref()
+        .and_then(|path| std::fs::read_to_string(path).ok())
+        .and_then(|input| ReticulumRuntimePolicy::from_toml(&input).ok())
+        .unwrap_or_default();
     let identity_hash = hex::encode(identity.address_hash().as_slice());
     let local_display_name = std::env::var("LXMF_DISPLAY_NAME")
         .ok()
@@ -292,17 +298,10 @@ pub(super) async fn bootstrap(args: Args) -> BootstrapContext {
     configure_startup_rpc_token_auth(&args, daemon.as_ref());
     enforce_rpc_bind_security(rpc_addr.as_ref(), rpc_tls.as_ref(), daemon.as_ref());
     if let Some(transport) = transport.as_ref() {
-        let discovery_sources = args
-            .config
-            .as_ref()
-            .and_then(|path| std::fs::read_to_string(path).ok())
-            .and_then(|input| ReticulumRuntimePolicy::from_toml(&input).ok())
-            .map(|policy| policy.interface_discovery_sources)
-            .unwrap_or_default();
         daemon.set_path_lookup_bridge(Arc::new(DaemonPathLookupBridge::with_discovery_store(
             transport.clone(),
             &reticulum_storage_path,
-            discovery_sources,
+            reticulum_runtime_policy.interface_discovery_sources.clone(),
         )));
         daemon.set_interface_mutation_bridge(Arc::new(
             InterfaceHotApplyBridge::spawn_with_transport_and_daemon(
@@ -479,7 +478,20 @@ pub(super) async fn bootstrap(args: Args) -> BootstrapContext {
             receipt_tx.clone(),
             outbound_resource_map,
         );
-        spawn_announce_worker(daemon.clone(), transport, peer_crypto, Some(reticulum_storage_path));
+        let discovery = reticulum_runtime_policy.discover_interfaces.then(|| {
+            crate::announce_worker::DiscoveryWorkerConfig {
+                storage_path: reticulum_storage_path.clone(),
+                allowed_network_ids: reticulum_runtime_policy.interface_discovery_sources.clone(),
+                required_value: reticulum_runtime_policy.required_discovery_value.unwrap_or(14),
+            }
+        });
+        spawn_announce_worker(
+            daemon.clone(),
+            transport,
+            peer_crypto,
+            Some(reticulum_storage_path),
+            discovery,
+        );
     }
 
     BootstrapContext { rpc_addr, rpc_unix, daemon, rpc_tls, path_table_persistence }

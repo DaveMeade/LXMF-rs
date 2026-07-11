@@ -5,6 +5,9 @@ use std::io;
 use std::net::IpAddr;
 use std::path::{Path, PathBuf};
 
+pub mod announce;
+pub mod lifecycle;
+
 pub const THRESHOLD_UNKNOWN_SECS: f64 = 24.0 * 60.0 * 60.0;
 pub const THRESHOLD_STALE_SECS: f64 = 3.0 * 24.0 * 60.0 * 60.0;
 pub const THRESHOLD_REMOVE_SECS: f64 = 7.0 * 24.0 * 60.0 * 60.0;
@@ -193,11 +196,19 @@ fn validate_record(info: &DiscoveredInterface) -> io::Result<()> {
     Ok(())
 }
 
-fn valid_endpoint(endpoint: &str) -> bool {
-    if endpoint.parse::<IpAddr>().is_ok() {
-        return true;
-    }
+pub fn is_ip_address(endpoint: &str) -> bool {
+    endpoint.parse::<IpAddr>().is_ok()
+}
+
+pub fn is_hostname(endpoint: &str) -> bool {
     let endpoint = endpoint.trim_end_matches('.');
+    if endpoint
+        .rsplit('.')
+        .next()
+        .is_some_and(|label| label.bytes().all(|byte| byte.is_ascii_digit()))
+    {
+        return false;
+    }
     !endpoint.is_empty()
         && endpoint.len() <= 253
         && endpoint.split('.').all(|label| {
@@ -207,6 +218,13 @@ fn valid_endpoint(endpoint: &str) -> bool {
                 && !label.ends_with('-')
                 && label.bytes().all(|byte| byte.is_ascii_alphanumeric() || byte == b'-')
         })
+}
+
+fn valid_endpoint(endpoint: &str) -> bool {
+    if is_ip_address(endpoint) {
+        return true;
+    }
+    is_hostname(endpoint)
 }
 
 fn read_record(path: &Path) -> io::Result<DiscoveredInterface> {

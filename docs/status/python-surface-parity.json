@@ -6444,9 +6444,11 @@
         "pinned-python"
       ],
       "id": "RNS.Discovery.BlackholeUpdater",
-      "implementation": "partial",
+      "implementation": "complete",
       "kind": "class",
+      "notes": "Lifecycle side effects are exposed as deterministic Rust plans applied by daemon/transport boundaries; physical carrier behavior is not claimed.",
       "rust_surface": [
+        "reticulum-rs-transport::discovery",
         "reticulum-rs-transport::iface::auto",
         "reticulumd"
       ],
@@ -6459,9 +6461,11 @@
         "pinned-python"
       ],
       "id": "RNS.Discovery.BlackholeUpdater.job",
-      "implementation": "partial",
+      "implementation": "complete",
       "kind": "method",
+      "notes": "Lifecycle side effects are exposed as deterministic Rust plans applied by daemon/transport boundaries; physical carrier behavior is not claimed.",
       "rust_surface": [
+        "reticulum-rs-transport::discovery",
         "reticulum-rs-transport::iface::auto",
         "reticulumd"
       ],
@@ -6470,30 +6474,26 @@
     {
       "evidence": [
         "unit",
-        "simulated",
         "pinned-python"
       ],
       "id": "RNS.Discovery.BlackholeUpdater.start",
-      "implementation": "partial",
+      "implementation": "complete",
       "kind": "method",
       "rust_surface": [
-        "reticulum-rs-transport::iface::auto",
-        "reticulumd"
+        "reticulum-rs-transport::discovery::lifecycle::BlackholeUpdateScheduler::start"
       ],
       "source": "Discovery.py"
     },
     {
       "evidence": [
         "unit",
-        "simulated",
         "pinned-python"
       ],
       "id": "RNS.Discovery.BlackholeUpdater.stop",
-      "implementation": "partial",
+      "implementation": "complete",
       "kind": "method",
       "rust_surface": [
-        "reticulum-rs-transport::iface::auto",
-        "reticulumd"
+        "reticulum-rs-transport::discovery::lifecycle::BlackholeUpdateScheduler::stop"
       ],
       "source": "Discovery.py"
     },
@@ -6504,9 +6504,11 @@
         "pinned-python"
       ],
       "id": "RNS.Discovery.BlackholeUpdater.update_link_established",
-      "implementation": "partial",
+      "implementation": "complete",
       "kind": "method",
+      "notes": "Lifecycle side effects are exposed as deterministic Rust plans applied by daemon/transport boundaries; physical carrier behavior is not claimed.",
       "rust_surface": [
+        "reticulum-rs-transport::discovery",
         "reticulum-rs-transport::iface::auto",
         "reticulumd"
       ],
@@ -6519,11 +6521,11 @@
         "pinned-python"
       ],
       "id": "RNS.Discovery.InterfaceAnnounceHandler",
-      "implementation": "partial",
+      "implementation": "complete",
       "kind": "class",
       "rust_surface": [
-        "reticulum-rs-transport::iface::auto",
-        "reticulumd"
+        "reticulum-rs-transport::discovery::announce::decode_announce",
+        "reticulumd::announce_worker"
       ],
       "source": "Discovery.py"
     },
@@ -6534,11 +6536,11 @@
         "pinned-python"
       ],
       "id": "RNS.Discovery.InterfaceAnnounceHandler.received_announce",
-      "implementation": "partial",
+      "implementation": "complete",
       "kind": "method",
       "rust_surface": [
-        "reticulum-rs-transport::iface::auto",
-        "reticulumd"
+        "reticulum-rs-transport::discovery::announce::decode_announce",
+        "reticulumd::announce_worker"
       ],
       "source": "Discovery.py"
     },
@@ -6549,11 +6551,12 @@
         "pinned-python"
       ],
       "id": "RNS.Discovery.InterfaceAnnouncer",
-      "implementation": "partial",
+      "implementation": "complete",
       "kind": "class",
+      "notes": "Includes Python-compatible sanitization, MessagePack fields, 20-round LXStamper workblock, proof-of-work validation, encrypted callback boundary, and most-overdue scheduling.",
       "rust_surface": [
-        "reticulum-rs-transport::iface::auto",
-        "reticulumd"
+        "reticulum-rs-transport::discovery::announce",
+        "reticulum-rs-transport::discovery::lifecycle::InterfaceAnnounceScheduler"
       ],
       "source": "Discovery.py"
     },
@@ -6564,11 +6567,12 @@
         "pinned-python"
       ],
       "id": "RNS.Discovery.InterfaceAnnouncer.get_interface_announce_data",
-      "implementation": "partial",
+      "implementation": "complete",
       "kind": "method",
+      "notes": "Includes Python-compatible sanitization, MessagePack fields, 20-round LXStamper workblock, proof-of-work validation, encrypted callback boundary, and most-overdue scheduling.",
       "rust_surface": [
-        "reticulum-rs-transport::iface::auto",
-        "reticulumd"
+        "reticulum-rs-transport::discovery::announce",
+        "reticulum-rs-transport::discovery::lifecycle::InterfaceAnnounceScheduler"
       ],
       "source": "Discovery.py"
     },
@@ -6579,11 +6583,12 @@
         "pinned-python"
       ],
       "id": "RNS.Discovery.InterfaceAnnouncer.job",
-      "implementation": "partial",
+      "implementation": "complete",
       "kind": "method",
+      "notes": "Includes Python-compatible sanitization, MessagePack fields, 20-round LXStamper workblock, proof-of-work validation, encrypted callback boundary, and most-overdue scheduling.",
       "rust_surface": [
-        "reticulum-rs-transport::iface::auto",
-        "reticulumd"
+        "reticulum-rs-transport::discovery::announce",
+        "reticulum-rs-transport::discovery::lifecycle::InterfaceAnnounceScheduler"
       ],
       "source": "Discovery.py"
     },
@@ -6594,11 +6599,12 @@
         "pinned-python"
       ],
       "id": "RNS.Discovery.InterfaceAnnouncer.sanitize",
-      "implementation": "partial",
+      "implementation": "complete",
       "kind": "method",
+      "notes": "Includes Python-compatible sanitization, MessagePack fields, 20-round LXStamper workblock, proof-of-work validation, encrypted callback boundary, and most-overdue scheduling.",
       "rust_surface": [
-        "reticulum-rs-transport::iface::auto",
-        "reticulumd"
+        "reticulum-rs-transport::discovery::announce",
+        "reticulum-rs-transport::discovery::lifecycle::InterfaceAnnounceScheduler"
       ],
       "source": "Discovery.py"
     },
@@ -6609,11 +6615,12 @@
         "pinned-python"
       ],
       "id": "RNS.Discovery.InterfaceAnnouncer.start",
-      "implementation": "partial",
+      "implementation": "complete",
       "kind": "method",
+      "notes": "Includes Python-compatible sanitization, MessagePack fields, 20-round LXStamper workblock, proof-of-work validation, encrypted callback boundary, and most-overdue scheduling.",
       "rust_surface": [
-        "reticulum-rs-transport::iface::auto",
-        "reticulumd"
+        "reticulum-rs-transport::discovery::announce",
+        "reticulum-rs-transport::discovery::lifecycle::InterfaceAnnounceScheduler"
       ],
       "source": "Discovery.py"
     },
@@ -6624,11 +6631,12 @@
         "pinned-python"
       ],
       "id": "RNS.Discovery.InterfaceAnnouncer.stop",
-      "implementation": "partial",
+      "implementation": "complete",
       "kind": "method",
+      "notes": "Includes Python-compatible sanitization, MessagePack fields, 20-round LXStamper workblock, proof-of-work validation, encrypted callback boundary, and most-overdue scheduling.",
       "rust_surface": [
-        "reticulum-rs-transport::iface::auto",
-        "reticulumd"
+        "reticulum-rs-transport::discovery::announce",
+        "reticulum-rs-transport::discovery::lifecycle::InterfaceAnnounceScheduler"
       ],
       "source": "Discovery.py"
     },
@@ -6639,9 +6647,11 @@
         "pinned-python"
       ],
       "id": "RNS.Discovery.InterfaceDiscovery",
-      "implementation": "partial",
+      "implementation": "complete",
       "kind": "class",
+      "notes": "Lifecycle side effects are exposed as deterministic Rust plans applied by daemon/transport boundaries; physical carrier behavior is not claimed.",
       "rust_surface": [
+        "reticulum-rs-transport::discovery",
         "reticulum-rs-transport::iface::auto",
         "reticulumd"
       ],
@@ -6654,9 +6664,11 @@
         "pinned-python"
       ],
       "id": "RNS.Discovery.InterfaceDiscovery.autoconnect",
-      "implementation": "partial",
+      "implementation": "complete",
       "kind": "method",
+      "notes": "Lifecycle side effects are exposed as deterministic Rust plans applied by daemon/transport boundaries; physical carrier behavior is not claimed.",
       "rust_surface": [
+        "reticulum-rs-transport::discovery",
         "reticulum-rs-transport::iface::auto",
         "reticulumd"
       ],
@@ -6665,30 +6677,26 @@
     {
       "evidence": [
         "unit",
-        "simulated",
         "pinned-python"
       ],
       "id": "RNS.Discovery.InterfaceDiscovery.autoconnect_count",
-      "implementation": "partial",
+      "implementation": "complete",
       "kind": "method",
       "rust_surface": [
-        "reticulum-rs-transport::iface::auto",
-        "reticulumd"
+        "reticulum-rs-transport::discovery::lifecycle"
       ],
       "source": "Discovery.py"
     },
     {
       "evidence": [
         "unit",
-        "simulated",
         "pinned-python"
       ],
       "id": "RNS.Discovery.InterfaceDiscovery.bootstrap_interface_count",
-      "implementation": "partial",
+      "implementation": "complete",
       "kind": "method",
       "rust_surface": [
-        "reticulum-rs-transport::iface::auto",
-        "reticulumd"
+        "reticulum-rs-transport::discovery::lifecycle"
       ],
       "source": "Discovery.py"
     },
@@ -6699,9 +6707,11 @@
         "pinned-python"
       ],
       "id": "RNS.Discovery.InterfaceDiscovery.connect_discovered",
-      "implementation": "partial",
+      "implementation": "complete",
       "kind": "method",
+      "notes": "Lifecycle side effects are exposed as deterministic Rust plans applied by daemon/transport boundaries; physical carrier behavior is not claimed.",
       "rust_surface": [
+        "reticulum-rs-transport::discovery",
         "reticulum-rs-transport::iface::auto",
         "reticulumd"
       ],
@@ -6710,15 +6720,13 @@
     {
       "evidence": [
         "unit",
-        "simulated",
         "pinned-python"
       ],
       "id": "RNS.Discovery.InterfaceDiscovery.endpoint_hash",
-      "implementation": "partial",
+      "implementation": "complete",
       "kind": "method",
       "rust_surface": [
-        "reticulum-rs-transport::iface::auto",
-        "reticulumd"
+        "reticulum-rs-transport::discovery::lifecycle::endpoint_hash"
       ],
       "source": "Discovery.py"
     },
@@ -6729,26 +6737,24 @@
         "pinned-python"
       ],
       "id": "RNS.Discovery.InterfaceDiscovery.interface_discovered",
-      "implementation": "partial",
+      "implementation": "complete",
       "kind": "method",
       "rust_surface": [
-        "reticulum-rs-transport::iface::auto",
-        "reticulumd"
+        "reticulum-rs-transport::discovery::InterfaceDiscoveryStore::observe",
+        "reticulumd::announce_worker"
       ],
       "source": "Discovery.py"
     },
     {
       "evidence": [
         "unit",
-        "simulated",
         "pinned-python"
       ],
       "id": "RNS.Discovery.InterfaceDiscovery.interface_exists",
-      "implementation": "partial",
+      "implementation": "complete",
       "kind": "method",
       "rust_surface": [
-        "reticulum-rs-transport::iface::auto",
-        "reticulumd"
+        "reticulum-rs-transport::discovery::lifecycle::interface_exists"
       ],
       "source": "Discovery.py"
     },
@@ -6759,11 +6765,11 @@
         "pinned-python"
       ],
       "id": "RNS.Discovery.InterfaceDiscovery.list_discovered_interfaces",
-      "implementation": "partial",
+      "implementation": "complete",
       "kind": "method",
       "rust_surface": [
-        "reticulum-rs-transport::iface::auto",
-        "reticulumd"
+        "reticulum-rs-transport::discovery::InterfaceDiscoveryStore::list",
+        "reticulum-rs-rpc::discovered_interfaces"
       ],
       "source": "Discovery.py"
     },
@@ -6774,9 +6780,11 @@
         "pinned-python"
       ],
       "id": "RNS.Discovery.InterfaceDiscovery.monitor_interface",
-      "implementation": "partial",
+      "implementation": "complete",
       "kind": "method",
+      "notes": "Lifecycle side effects are exposed as deterministic Rust plans applied by daemon/transport boundaries; physical carrier behavior is not claimed.",
       "rust_surface": [
+        "reticulum-rs-transport::discovery",
         "reticulum-rs-transport::iface::auto",
         "reticulumd"
       ],
@@ -6789,9 +6797,11 @@
         "pinned-python"
       ],
       "id": "RNS.Discovery.InterfaceDiscovery.teardown_interface",
-      "implementation": "partial",
+      "implementation": "complete",
       "kind": "method",
+      "notes": "Lifecycle side effects are exposed as deterministic Rust plans applied by daemon/transport boundaries; physical carrier behavior is not claimed.",
       "rust_surface": [
+        "reticulum-rs-transport::discovery",
         "reticulum-rs-transport::iface::auto",
         "reticulumd"
       ],
@@ -6800,30 +6810,26 @@
     {
       "evidence": [
         "unit",
-        "simulated",
         "pinned-python"
       ],
       "id": "RNS.Discovery.is_hostname",
-      "implementation": "partial",
+      "implementation": "complete",
       "kind": "function",
       "rust_surface": [
-        "reticulum-rs-transport::iface::auto",
-        "reticulumd"
+        "reticulum-rs-transport::discovery::is_ip_address/is_hostname"
       ],
       "source": "Discovery.py"
     },
     {
       "evidence": [
         "unit",
-        "simulated",
         "pinned-python"
       ],
       "id": "RNS.Discovery.is_ip_address",
-      "implementation": "partial",
+      "implementation": "complete",
       "kind": "function",
       "rust_surface": [
-        "reticulum-rs-transport::iface::auto",
-        "reticulumd"
+        "reticulum-rs-transport::discovery::is_ip_address/is_hostname"
       ],
       "source": "Discovery.py"
     },
@@ -23832,9 +23838,9 @@
     "includes": "public RNS/LXMF callables and committed manual product contracts"
   },
   "summary": {
-    "complete": 596,
+    "complete": 622,
     "not-applicable": 1,
-    "partial": 1068,
+    "partial": 1042,
     "total": 1665
   }
 }

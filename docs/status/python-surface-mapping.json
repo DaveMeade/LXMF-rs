@@ -261,10 +261,72 @@
       "evidence": ["unit", "simulated", "pinned-python"]
     },
     {
-      "pattern": "RNS.Discovery.*",
-      "implementation": "partial",
-      "rust_surface": ["reticulum-rs-transport::iface::auto", "reticulumd"],
+      "pattern": "RNS.Discovery.InterfaceAnnouncer*",
+      "implementation": "complete",
+      "rust_surface": ["reticulum-rs-transport::discovery::announce", "reticulum-rs-transport::discovery::lifecycle::InterfaceAnnounceScheduler"],
+      "evidence": ["unit", "simulated", "pinned-python"],
+      "notes": "Includes Python-compatible sanitization, MessagePack fields, 20-round LXStamper workblock, proof-of-work validation, encrypted callback boundary, and most-overdue scheduling."
+    },
+    {
+      "pattern": "RNS.Discovery.InterfaceAnnounceHandler*",
+      "implementation": "complete",
+      "rust_surface": ["reticulum-rs-transport::discovery::announce::decode_announce", "reticulumd::announce_worker"],
       "evidence": ["unit", "simulated", "pinned-python"]
+    },
+    {
+      "pattern": "RNS.Discovery.InterfaceDiscovery.list_discovered_interfaces",
+      "implementation": "complete",
+      "rust_surface": ["reticulum-rs-transport::discovery::InterfaceDiscoveryStore::list", "reticulum-rs-rpc::discovered_interfaces"],
+      "evidence": ["unit", "simulated", "pinned-python"]
+    },
+    {
+      "pattern": "RNS.Discovery.InterfaceDiscovery.interface_discovered",
+      "implementation": "complete",
+      "rust_surface": ["reticulum-rs-transport::discovery::InterfaceDiscoveryStore::observe", "reticulumd::announce_worker"],
+      "evidence": ["unit", "simulated", "pinned-python"]
+    },
+    {
+      "pattern": "RNS.Discovery.InterfaceDiscovery.endpoint_hash",
+      "implementation": "complete",
+      "rust_surface": ["reticulum-rs-transport::discovery::lifecycle::endpoint_hash"],
+      "evidence": ["unit", "pinned-python"]
+    },
+    {
+      "pattern": "RNS.Discovery.InterfaceDiscovery.interface_exists",
+      "implementation": "complete",
+      "rust_surface": ["reticulum-rs-transport::discovery::lifecycle::interface_exists"],
+      "evidence": ["unit", "pinned-python"]
+    },
+    {
+      "pattern": "RNS.Discovery.InterfaceDiscovery.*_count",
+      "implementation": "complete",
+      "rust_surface": ["reticulum-rs-transport::discovery::lifecycle"],
+      "evidence": ["unit", "pinned-python"]
+    },
+    {
+      "pattern": "RNS.Discovery.BlackholeUpdater.start",
+      "implementation": "complete",
+      "rust_surface": ["reticulum-rs-transport::discovery::lifecycle::BlackholeUpdateScheduler::start"],
+      "evidence": ["unit", "pinned-python"]
+    },
+    {
+      "pattern": "RNS.Discovery.BlackholeUpdater.stop",
+      "implementation": "complete",
+      "rust_surface": ["reticulum-rs-transport::discovery::lifecycle::BlackholeUpdateScheduler::stop"],
+      "evidence": ["unit", "pinned-python"]
+    },
+    {
+      "pattern": "RNS.Discovery.is_*",
+      "implementation": "complete",
+      "rust_surface": ["reticulum-rs-transport::discovery::is_ip_address/is_hostname"],
+      "evidence": ["unit", "pinned-python"]
+    },
+    {
+      "pattern": "RNS.Discovery.*",
+      "implementation": "complete",
+      "rust_surface": ["reticulum-rs-transport::discovery", "reticulum-rs-transport::iface::auto", "reticulumd"],
+      "evidence": ["unit", "simulated", "pinned-python"],
+      "notes": "Lifecycle side effects are exposed as deterministic Rust plans applied by daemon/transport boundaries; physical carrier behavior is not claimed."
     },
     {
       "pattern": "RNS.Interfaces.Meshtastic.*",
