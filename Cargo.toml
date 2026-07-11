@@ -86,6 +86,7 @@ allowed_app_edges = [
   "rns-tools->rns-embedded-core",
   "rns-tools->rns-embedded-runtime",
   "rns-tools->reticulum-rs-rpc",
+  "rns-tools->reticulum-rs-transport",
 ]
 
 [workspace.dependencies]
