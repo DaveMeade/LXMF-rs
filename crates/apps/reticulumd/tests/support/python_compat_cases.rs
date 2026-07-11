@@ -332,6 +332,10 @@ pub(crate) fn assert_smoke_rpc_call_retries_transient_connection_refusals() {
         smoke.contains("ConnectionRefusedError"),
         "smoke rpc_call should retry connection refusals while Rust RPC starts accepting"
     );
+    assert!(
+        smoke.contains("\"path_status\"") && smoke.contains("'\"known\": *true'"),
+        "delivery announce readiness should use learned transport paths without treating delivery destinations as propagation peers"
+    );
 }
 
 fn assert_case_present(case_id: &str) {

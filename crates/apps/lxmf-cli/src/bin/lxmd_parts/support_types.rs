@@ -148,7 +148,7 @@ fn main() -> ExitCode {
 
     cmd.arg("--rpc").arg(&effective.rpc);
     if let Some(config_dir) = effective.config_dir.as_ref() {
-        cmd.arg("--rpc-unix").arg(config_dir.join("lxmf-rpc.sock"));
+        cmd.arg("--rpc-unix").arg(lxmd_rpc_unix_path(config_dir));
     }
     if let Some(rnsconfig) = effective.rnsconfig.as_ref() {
         cmd.arg("--config").arg(rnsconfig);
@@ -333,6 +333,22 @@ fn reticulumd_binary_name() -> &'static str {
     {
         "reticulumd"
     }
+}
+
+fn lxmd_rpc_unix_path(config_dir: &Path) -> PathBuf {
+    const SAFE_UNIX_SOCKET_PATH_BYTES: usize = 100;
+
+    let configured = config_dir.join("lxmf-rpc.sock");
+    if configured.as_os_str().as_encoded_bytes().len() <= SAFE_UNIX_SOCKET_PATH_BYTES {
+        return configured;
+    }
+
+    #[cfg(unix)]
+    let fallback_dir = Path::new("/tmp");
+    #[cfg(not(unix))]
+    let fallback_dir = env::temp_dir();
+
+    fallback_dir.join(format!("lxmf-rpc-{}.sock", std::process::id()))
 }
 
 fn read_identity_private_key_hex(path: Option<&Path>) -> Result<Option<String>, String> {

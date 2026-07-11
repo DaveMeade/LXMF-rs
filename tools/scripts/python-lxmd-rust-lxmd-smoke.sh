@@ -490,6 +490,13 @@ wait_for_rust_peer() {
     if rpc_call "${RUST_RPC_ADDR}" "list_peers" "null" | grep -Eq "\"peer\": *\"${peer_hash}\""; then
       return 0
     fi
+    # Delivery announces are routing evidence, not propagation peers. Keep the
+    # propagation-directory check above, but also accept a learned transport
+    # path for delivery and link endpoints.
+    if rpc_call "${RUST_RPC_ADDR}" "path_status" "{\"destination\":\"${peer_hash}\"}" \
+      | grep -Eq '"known": *true'; then
+      return 0
+    fi
     sleep 1
   done
   return 1
@@ -2903,7 +2910,10 @@ PY
       echo "Rust daemon recorded resource failure despite Python stored-message evidence" >&2
       exit 1
     fi
-    assert_contains "${RUST_LXMD_LOG}" "resource_hash=|sending: link resource|sent: link resource" "Rust resource transfer trace"
+    assert_contains \
+      "${RUST_EVIDENCE_DIR}/${RUST_MESSAGE_ID}/message_delivery_trace.json" \
+      '"status": *"(sending|sent): link resource"' \
+      "Rust resource transfer trace"
   elif [[ "${COMPAT_CASE}" == "propagated_rust_to_python" ]]; then
     if ! wait_rust_trace_status "${RUST_MESSAGE_ID}" "sent: propagated resource" "${TIMEOUT_SECS}"; then
       echo "Rust daemon did not record sent: propagated resource for propagated transfer" >&2
