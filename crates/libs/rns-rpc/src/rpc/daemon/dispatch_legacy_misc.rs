@@ -1,5 +1,4 @@
 use super::*;
-
 impl RpcDaemon {
     pub(super) fn handle_rpc_legacy_misc(
         &self,
@@ -90,7 +89,6 @@ impl RpcDaemon {
                     .map_err(|err| std::io::Error::new(std::io::ErrorKind::InvalidInput, err))?;
                 let destination = normalize_destination_hash_param(&parsed.destination)?;
                 let stamp_cost = self.outbound_stamp_cost_for(destination.as_str())?;
-
                 Ok(RpcResponse {
                     id: request.id,
                     result: Some(json!({
@@ -122,7 +120,6 @@ impl RpcDaemon {
                         error: None,
                     });
                 };
-
                 Ok(RpcResponse {
                     id: request.id,
                     result: Some(json!({
@@ -215,6 +212,9 @@ impl RpcDaemon {
             | "get_packet_rssi"
             | "get_packet_snr"
             | "get_packet_q" => self.handle_rpc_legacy_runtime_management(request),
+            "router_stats" | "router_storage_policy_get" | "router_storage_policy_set" => {
+                self.handle_rpc_legacy_router_management(request)
+            }
             "request_path" => {
                 let params = request.params.ok_or_else(|| {
                     std::io::Error::new(std::io::ErrorKind::InvalidInput, "missing params")

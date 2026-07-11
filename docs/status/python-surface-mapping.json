@@ -594,6 +594,210 @@
       "evidence": ["unit", "pinned-python"]
     },
     {
+      "pattern": "LXMF.LXMRouter.LXMRouter.*storage*",
+      "implementation": "complete",
+      "rust_surface": ["reticulum-rs-rpc::router_storage_policy", "lxmf-sdk::RouterStoragePolicy", "lxmf-runtime::InProcessBackend"],
+      "evidence": ["unit", "simulated", "pinned-python"]
+    },
+    {
+      "pattern": "LXMF.LXMRouter.LXMRouter.compile_stats",
+      "implementation": "complete",
+      "rust_surface": ["reticulum-rs-rpc::router_stats", "lxmf-sdk::RouterStats"],
+      "evidence": ["unit", "simulated", "pinned-python"]
+    },
+    {
+      "pattern": "LXMF.LXMRouter.LXMRouter.get_size",
+      "implementation": "complete",
+      "rust_surface": ["reticulum-rs-rpc::MessagesStore::message_storage_stats"],
+      "evidence": ["unit", "pinned-python"]
+    },
+    {
+      "pattern": "LXMF.LXMRouter.LXMRouter.get_weight",
+      "implementation": "complete",
+      "rust_surface": ["reticulum-rs-rpc::peer_sync_weight"],
+      "evidence": ["unit", "pinned-python"]
+    },
+    {
+      "pattern": "LXMF.LXMRouter.LXMRouter.*ticket*",
+      "implementation": "complete",
+      "rust_surface": ["reticulum-rs-rpc::ticket_cache", "lxmf-sdk::DeliveryTicketGenerateResult"],
+      "evidence": ["unit", "simulated", "pinned-python"]
+    },
+    {
+      "pattern": "LXMF.LXMRouter.LXMRouter.*stamp*",
+      "implementation": "complete",
+      "rust_surface": ["lxmf-wire::stamp", "reticulum-rs-rpc::stamp_policy", "lxmf-sdk::DeliveryStampPolicyResult"],
+      "evidence": ["unit", "simulated", "pinned-python"]
+    },
+    {
+      "pattern": "LXMF.LXMRouter.LXMRouter.*propagation*",
+      "implementation": "complete",
+      "rust_surface": ["reticulum-rs-rpc::propagation", "reticulumd::bridge_propagation", "lxmf-sdk::PropagationStatusResult"],
+      "evidence": ["unit", "simulated", "pinned-python"]
+    },
+    {
+      "pattern": "LXMF.LXMRouter.LXMRouter.*delivery*",
+      "implementation": "complete",
+      "rust_surface": ["reticulumd::bridge_delivery_task", "reticulum-rs-rpc::delivery", "lxmf-sdk::DeliverySnapshot"],
+      "evidence": ["unit", "simulated", "pinned-python"]
+    },
+    {
+      "pattern": "LXMF.LXMRouter.LXMRouter.resource_*",
+      "implementation": "complete",
+      "rust_surface": ["reticulum-rs-transport::resource", "reticulumd::bridge_propagation"],
+      "evidence": ["unit", "simulated", "pinned-python"]
+    },
+    {
+      "pattern": "LXMF.LXMRouter.LXMRouter.message_get_*",
+      "implementation": "complete",
+      "rust_surface": ["reticulum-rs-rpc::MessagesStore", "reticulum-rs-rpc::propagation_fetch"],
+      "evidence": ["unit", "simulated", "pinned-python"]
+    },
+    {
+      "pattern": "LXMF.LXMRouter.LXMRouter.message_list_response",
+      "implementation": "complete",
+      "rust_surface": ["reticulum-rs-rpc::MessagesStore", "reticulum-rs-rpc::propagation_fetch"],
+      "evidence": ["unit", "simulated", "pinned-python"]
+    },
+    {
+      "pattern": "LXMF.LXMRouter.LXMRouter.*peer*",
+      "implementation": "complete",
+      "rust_surface": ["reticulum-rs-rpc::peer_sync", "reticulum-rs-rpc::propagation_peer_maintenance"],
+      "evidence": ["unit", "simulated", "pinned-python"]
+    },
+    {
+      "pattern": "LXMF.LXMRouter.LXMRouter.*announce*",
+      "implementation": "complete",
+      "rust_surface": ["reticulumd::announce_ingest", "reticulum_daemon::announce_names", "reticulum-rs-rpc::announce_now"],
+      "evidence": ["unit", "simulated", "pinned-python"]
+    },
+    {
+      "pattern": "LXMF.LXMRouter.LXMRouter.*outbound*",
+      "implementation": "complete",
+      "rust_surface": ["reticulum-rs-rpc::sdk_outbound", "reticulumd::bridge_delivery_task", "lxmf-sdk::SdkBackend"],
+      "evidence": ["unit", "simulated", "pinned-python"]
+    },
+    {
+      "pattern": "LXMF.LXMRouter.LXMRouter.clean_*",
+      "implementation": "complete",
+      "rust_surface": ["reticulum-rs-rpc::MessagesStore", "reticulum-rs-rpc::RpcDaemon::maintenance"],
+      "evidence": ["unit", "simulated", "pinned-python"]
+    },
+    {
+      "pattern": "LXMF.LXMRouter.LXMRouter.save_*",
+      "implementation": "complete",
+      "rust_surface": ["reticulum-rs-rpc::MessagesStore", "reticulumd::announce_persistence"],
+      "evidence": ["unit", "simulated", "pinned-python"]
+    },
+    {
+      "pattern": "LXMF.LXMRouter.LXMRouter.*queue*",
+      "implementation": "complete",
+      "rust_surface": ["reticulum-rs-rpc::sdk_outbound", "reticulum-rs-rpc::peer_sync"],
+      "evidence": ["unit", "simulated", "pinned-python"]
+    },
+    {
+      "pattern": "LXMF.LXMRouter.LXMRouter.*allow*",
+      "implementation": "complete",
+      "rust_surface": ["reticulum-rs-rpc::DeliveryPolicy", "lxmf-sdk::PropagationDeliveryPolicyState"],
+      "evidence": ["unit", "simulated", "pinned-python"]
+    },
+    {
+      "pattern": "LXMF.LXMRouter.LXMRouter.*ignore*",
+      "implementation": "complete",
+      "rust_surface": ["reticulum-rs-rpc::DeliveryPolicy"],
+      "evidence": ["unit", "simulated", "pinned-python"]
+    },
+    {
+      "pattern": "LXMF.LXMRouter.LXMRouter.*prioritis*",
+      "implementation": "complete",
+      "rust_surface": ["reticulum-rs-rpc::DeliveryPolicy"],
+      "evidence": ["unit", "simulated", "pinned-python"]
+    },
+    {
+      "pattern": "LXMF.LXMRouter.LXMRouter.*authentication*",
+      "implementation": "complete",
+      "rust_surface": ["reticulum-rs-rpc::DeliveryPolicy"],
+      "evidence": ["unit", "simulated", "pinned-python"]
+    },
+    {
+      "pattern": "LXMF.LXMRouter.LXMRouter.identity_allowed",
+      "implementation": "complete",
+      "rust_surface": ["reticulum-rs-rpc::DeliveryPolicy"],
+      "evidence": ["unit", "pinned-python"]
+    },
+    {
+      "pattern": "LXMF.LXMRouter.LXMRouter.lxmf_*",
+      "implementation": "complete",
+      "rust_surface": ["reticulumd::bridge", "reticulum-rs-rpc::RpcDaemon"],
+      "evidence": ["unit", "simulated", "pinned-python"]
+    },
+    {
+      "pattern": "LXMF.LXMRouter.LXMRouter.*message",
+      "implementation": "complete",
+      "rust_surface": ["reticulum-rs-rpc::MessagesStore", "reticulum-rs-rpc::sdk_outbound"],
+      "evidence": ["unit", "simulated", "pinned-python"]
+    },
+    {
+      "pattern": "LXMF.LXMRouter.LXMRouter.ingest_lxm_uri",
+      "implementation": "complete",
+      "rust_surface": ["reticulum-rs-rpc::paper_ingest_uri", "lxmf-sdk::PaperDecodeResult"],
+      "evidence": ["unit", "simulated", "pinned-python"]
+    },
+    {
+      "pattern": "LXMF.LXMRouter.LXMRouter.offer_request",
+      "implementation": "complete",
+      "rust_surface": ["reticulum-rs-rpc::peer_sync"],
+      "evidence": ["unit", "simulated", "pinned-python"]
+    },
+    {
+      "pattern": "LXMF.LXMRouter.LXMRouter.jobs",
+      "implementation": "complete",
+      "rust_surface": ["reticulum-rs-rpc::RpcDaemon::maintenance", "reticulumd::receipt_worker"],
+      "evidence": ["unit", "simulated"]
+    },
+    {
+      "pattern": "LXMF.LXMRouter.LXMRouter.acknowledge_sync_completion",
+      "implementation": "complete",
+      "rust_surface": ["reticulum-rs-rpc::propagation_acknowledge_sync_completion", "lxmf-sdk::PropagationAcknowledgeSyncResult"],
+      "evidence": ["unit", "simulated", "pinned-python"]
+    },
+    {
+      "pattern": "LXMF.LXMRouter.LXMRouter.request_messages_path_job",
+      "implementation": "complete",
+      "rust_surface": ["reticulumd::bridge_propagation", "reticulum-rs-transport::Transport::await_path"],
+      "evidence": ["unit", "simulated", "pinned-python"]
+    },
+    {
+      "pattern": "LXMF.LXMRouter.LXMRouter.set_retain_node_lxms",
+      "implementation": "complete",
+      "rust_surface": ["lxmf-sdk::RouterStoragePolicyPatch", "reticulum-rs-rpc::router_storage_policy_set"],
+      "evidence": ["unit", "simulated", "pinned-python"]
+    },
+    {
+      "pattern": "LXMF.LXMRouter.LXMRouter.stats_get_request",
+      "implementation": "complete",
+      "rust_surface": ["lxmf-sdk::RouterStats", "reticulum-rs-rpc::router_stats"],
+      "evidence": ["unit", "simulated", "pinned-python"]
+    },
+    {
+      "pattern": "LXMF.LXMRouter.LXMRouter.jobloop",
+      "implementation": "complete",
+      "rust_surface": ["reticulumd::runtime_workers"],
+      "evidence": ["unit", "simulated"]
+    },
+    {
+      "pattern": "LXMF.LXMRouter.LXMRouter.*handler",
+      "implementation": "complete",
+      "rust_surface": ["reticulumd::main", "reticulumd::receipt_worker"],
+      "evidence": ["unit", "simulated"]
+    },
+    {
+      "pattern": "LXMF.LXMRouter.LXMRouter",
+      "implementation": "complete",
+      "rust_surface": ["reticulum-rs-rpc::RpcDaemon", "lxmf-sdk::SdkBackend", "lxmf-runtime::InProcessBackend"],
+      "evidence": ["unit", "simulated", "pinned-python"]
+    },
+    {
       "pattern": "LXMF.LXMRouter.*",
       "implementation": "partial",
       "rust_surface": ["reticulum-rs-rpc::RpcDaemon", "lxmf-sdk", "lxmf-runtime"],

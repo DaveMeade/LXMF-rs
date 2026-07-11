@@ -339,6 +339,8 @@ impl RpcDaemon {
             stamp_policy: Mutex::new(StampPolicy::default()),
             ticket_cache: Mutex::new(HashMap::new()),
             ticket_last_deliveries: Mutex::new(HashMap::new()),
+            router_information_storage_limit_bytes: Mutex::new(None),
+            router_retain_node_lxms: Mutex::new(false),
             delivery_traces,
             daemon_status_snapshot: std::sync::RwLock::new(DaemonStatusSnapshot::default()),
             delivery_status_lock,

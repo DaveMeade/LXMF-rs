@@ -3,8 +3,8 @@ use std::time::Duration;
 
 use lxmf_core::{MessageMethod, TransportMethod};
 use lxmf_sdk::{
-    Client, DeliveryState, LxmfSdk, MessageId, SdkBackend, SdkConfig, SendRequest, Severity,
-    StartRequest,
+    Client, DeliveryState, LxmfSdk, MessageId, RouterStoragePolicyPatch, SdkBackend, SdkConfig,
+    SendRequest, Severity, StartRequest,
 };
 use rand_core::OsRng;
 use rns_transport::destination::{DestinationName, SingleInputDestination};
@@ -186,4 +186,35 @@ async fn sdk_client_starts_with_in_process_backend_capability_contract() {
         .effective_capabilities
         .iter()
         .any(|capability| capability == "sdk.capability.idempotency_ttl"));
+}
+
+#[tokio::test]
+async fn in_process_backend_implements_typed_router_management_contract() {
+    let identity = rns_transport::identity::PrivateIdentity::new_from_rand(OsRng);
+    let transport = std::sync::Arc::new(Transport::new(TransportConfig::new(
+        "router-management-test",
+        &identity,
+        true,
+    )));
+    let source =
+        SingleInputDestination::new(identity.clone(), DestinationName::new("lxmf", "delivery"))
+            .desc
+            .address_hash;
+    let backend = InProcessBackend::new(InProcessBackendConfig::new(
+        "router-management-test",
+        tokio::runtime::Handle::current(),
+        transport,
+        identity,
+        source,
+    ));
+    let policy = backend
+        .set_router_storage_policy(RouterStoragePolicyPatch {
+            message_limit_bytes: Some(2_000_000),
+            information_limit_bytes: Some(500_000),
+            retain_node_lxms: Some(true),
+        })
+        .expect("set router policy");
+    assert_eq!(policy.message_limit_bytes, Some(2_000_000));
+    assert!(policy.retain_node_lxms);
+    assert_eq!(backend.router_stats().expect("stats").storage_policy, policy);
 }

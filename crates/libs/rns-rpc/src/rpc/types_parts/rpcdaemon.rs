@@ -54,6 +54,8 @@ pub struct RpcDaemon {
     stamp_policy: Mutex<StampPolicy>,
     ticket_cache: Mutex<HashMap<String, TicketRecord>>,
     ticket_last_deliveries: Mutex<HashMap<String, i64>>,
+    router_information_storage_limit_bytes: Mutex<Option<u64>>,
+    router_retain_node_lxms: Mutex<bool>,
     delivery_traces: Arc<Mutex<HashMap<String, Vec<DeliveryTraceEntry>>>>,
     daemon_status_snapshot: std::sync::RwLock<DaemonStatusSnapshot>,
     delivery_status_lock: Arc<Mutex<()>>,

@@ -17,10 +17,11 @@ use crate::domain::{
     MarkerListRequest, MarkerListResult, MarkerRecord, MarkerUpdatePositionRequest,
     PaperDecodeResult, PaperMessageEnvelope, PresenceListRequest, PresenceListResult,
     RemoteCommandRequest, RemoteCommandResponse, RemoteCommandSession,
-    RemoteCommandSessionListRequest, RemoteCommandSessionListResult, TelemetryPoint,
-    TelemetryQuery, TopicCreateRequest, TopicId, TopicListRequest, TopicListResult,
-    TopicPublishRequest, TopicRecord, TopicSubscriptionRequest, VoiceSessionId,
-    VoiceSessionOpenRequest, VoiceSessionState, VoiceSessionUpdateRequest,
+    RemoteCommandSessionListRequest, RemoteCommandSessionListResult, RouterStats,
+    RouterStoragePolicy, RouterStoragePolicyPatch, TelemetryPoint, TelemetryQuery,
+    TopicCreateRequest, TopicId, TopicListRequest, TopicListResult, TopicPublishRequest,
+    TopicRecord, TopicSubscriptionRequest, VoiceSessionId, VoiceSessionOpenRequest,
+    VoiceSessionState, VoiceSessionUpdateRequest,
 };
 use crate::error::{code, ErrorCategory, SdkError};
 use crate::event::{EventBatch, EventCursor, SdkEvent, Severity};
@@ -164,6 +165,27 @@ impl SdkBackend for RpcBackendClient {
 
     fn shutdown(&self, mode: ShutdownMode) -> Result<Ack, SdkError> {
         self.shutdown_impl(mode)
+    }
+
+    fn router_stats(&self) -> Result<RouterStats, SdkError> {
+        let result = self.call_rpc("router_stats", Some(serde_json::json!({})))?;
+        Self::decode_value(result, "router stats")
+    }
+
+    fn router_storage_policy(&self) -> Result<RouterStoragePolicy, SdkError> {
+        let result = self.call_rpc("router_storage_policy_get", Some(serde_json::json!({})))?;
+        Self::decode_value(result, "router storage policy")
+    }
+
+    fn set_router_storage_policy(
+        &self,
+        patch: RouterStoragePolicyPatch,
+    ) -> Result<RouterStoragePolicy, SdkError> {
+        let params = serde_json::to_value(patch).map_err(|error| {
+            SdkError::new(code::INTERNAL, ErrorCategory::Internal, error.to_string())
+        })?;
+        let result = self.call_rpc("router_storage_policy_set", Some(params))?;
+        Self::decode_value(result, "router storage policy")
     }
 
     fn topic_create(&self, req: TopicCreateRequest) -> Result<TopicRecord, SdkError> {

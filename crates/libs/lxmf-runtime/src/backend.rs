@@ -2,8 +2,9 @@ use std::sync::{Arc, Mutex};
 
 use lxmf_sdk::{
     Ack, CancelResult, ConfigPatch, DeliverySnapshot, DeliveryState, EventBatch, EventCursor,
-    MessageId, NegotiationRequest, NegotiationResponse, RuntimeSnapshot, SdkBackend, SdkError,
-    SendRequest, Severity, ShutdownMode,
+    MessageId, NegotiationRequest, NegotiationResponse, RouterStats, RouterStoragePolicy,
+    RouterStoragePolicyPatch, RuntimeSnapshot, SdkBackend, SdkError, SendRequest, Severity,
+    ShutdownMode,
 };
 use rns_transport::hash::AddressHash;
 use serde_json::{json, Value as JsonValue};
@@ -20,13 +21,19 @@ pub struct InProcessBackend {
     config: Arc<InProcessBackendConfig>,
     state: Arc<Mutex<BackendState>>,
     propagation_relay: Arc<Mutex<Option<AddressHash>>>,
+    router_storage_policy: Arc<Mutex<RouterStoragePolicy>>,
 }
 
 impl InProcessBackend {
     pub fn new(config: InProcessBackendConfig) -> Self {
         let state = BackendState::new(config.runtime_id.clone(), config.limits);
         let propagation_relay = Arc::new(Mutex::new(config.propagation_relay));
-        Self { config: Arc::new(config), state: Arc::new(Mutex::new(state)), propagation_relay }
+        Self {
+            config: Arc::new(config),
+            state: Arc::new(Mutex::new(state)),
+            propagation_relay,
+            router_storage_policy: Arc::new(Mutex::new(RouterStoragePolicy::default())),
+        }
     }
 
     pub fn send_report(
@@ -174,6 +181,47 @@ impl SdkBackend for InProcessBackend {
 
     fn shutdown(&self, _mode: ShutdownMode) -> Result<Ack, SdkError> {
         make_ack(None)
+    }
+
+    fn router_stats(&self) -> Result<RouterStats, SdkError> {
+        let (messages, outbound_inflight) = self
+            .state
+            .lock()
+            .map_err(|_| internal_error("in-process backend state poisoned"))?
+            .router_counts();
+        let storage_policy = self
+            .router_storage_policy
+            .lock()
+            .map_err(|_| internal_error("in-process router policy state poisoned"))?
+            .clone();
+        Ok(RouterStats { messages, outbound_inflight, storage_policy, ..Default::default() })
+    }
+
+    fn router_storage_policy(&self) -> Result<RouterStoragePolicy, SdkError> {
+        self.router_storage_policy
+            .lock()
+            .map_err(|_| internal_error("in-process router policy state poisoned"))
+            .map(|policy| policy.clone())
+    }
+
+    fn set_router_storage_policy(
+        &self,
+        patch: RouterStoragePolicyPatch,
+    ) -> Result<RouterStoragePolicy, SdkError> {
+        let mut policy = self
+            .router_storage_policy
+            .lock()
+            .map_err(|_| internal_error("in-process router policy state poisoned"))?;
+        if let Some(limit) = patch.message_limit_bytes {
+            policy.message_limit_bytes = Some(limit);
+        }
+        if let Some(limit) = patch.information_limit_bytes {
+            policy.information_limit_bytes = Some(limit);
+        }
+        if let Some(retain) = patch.retain_node_lxms {
+            policy.retain_node_lxms = retain;
+        }
+        Ok(policy.clone())
     }
 }
 

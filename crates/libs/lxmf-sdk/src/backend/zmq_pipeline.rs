@@ -48,6 +48,8 @@ mod parsing;
 mod peer;
 #[path = "zmq_pipeline/propagation.rs"]
 mod propagation;
+#[path = "zmq_pipeline/router.rs"]
+mod router;
 #[path = "zmq_pipeline/send.rs"]
 mod send;
 #[path = "zmq_pipeline/ticket.rs"]
@@ -210,18 +212,15 @@ impl SdkBackend for ZmqPipelineBackendClient {
             python_reference: Self::parse_parity_reference(&result)?,
         })
     }
-
     fn send(&self, req: SendRequest) -> Result<MessageId, SdkError> {
         let value =
             self.call_rpc("sdk_send_v2", Some(send::send_params(req, self.next_message_id())))?;
         Ok(MessageId(Self::parse_required_string(&value, "message_id")?))
     }
-
     fn cancel(&self, id: MessageId) -> Result<CancelResult, SdkError> {
         let result = self.call_rpc("sdk_cancel_message_v2", Some(json!({ "message_id": id.0 })))?;
         Self::parse_cancel_result(Self::parse_required_string(&result, "result")?.as_str())
     }
-
     fn status(&self, id: MessageId) -> Result<Option<DeliverySnapshot>, SdkError> {
         let result = self.call_rpc("sdk_status_v2", Some(json!({ "message_id": id.0 })))?;
         let Some(record) = result.get("message") else {
@@ -254,7 +253,6 @@ impl SdkBackend for ZmqPipelineBackendClient {
             reason_code: Self::parse_optional_string(record, "reason_code")?,
         }))
     }
-
     fn configure(&self, expected_revision: u64, patch: ConfigPatch) -> Result<Ack, SdkError> {
         let result = self.call_rpc(
             "sdk_configure_v2",
@@ -265,7 +263,6 @@ impl SdkBackend for ZmqPipelineBackendClient {
             revision: result.get("revision").and_then(JsonValue::as_u64),
         })
     }
-
     fn poll_events(&self, cursor: Option<EventCursor>, max: usize) -> Result<EventBatch, SdkError> {
         let result = self.call_rpc(
             "sdk_poll_events_v2",
@@ -336,19 +333,16 @@ impl SdkBackend for ZmqPipelineBackendClient {
             extensions: BTreeMap::new(),
         })
     }
-
     fn identity_announce_now(&self) -> Result<Ack, SdkError> {
         let result = self.call_rpc("sdk_identity_announce_now_v2", Some(json!({})))?;
         Ok(Self::parse_ack(&result))
     }
-
     fn identity_announce(
         &self,
         req: IdentityAnnounceRequest,
     ) -> Result<IdentityAnnounceResult, SdkError> {
         ZmqPipelineBackendClient::identity_announce(self, req)
     }
-
     fn identity_presence_list(
         &self,
         req: PresenceListRequest,
@@ -455,9 +449,23 @@ impl SdkBackend for ZmqPipelineBackendClient {
     fn snapshot(&self) -> Result<RuntimeSnapshot, SdkError> {
         ZmqPipelineBackendClient::snapshot(self)
     }
-
     fn shutdown(&self, mode: ShutdownMode) -> Result<Ack, SdkError> {
         ZmqPipelineBackendClient::shutdown(self, mode)
+    }
+
+    fn router_stats(&self) -> Result<crate::RouterStats, SdkError> {
+        self.router_stats_impl()
+    }
+
+    fn router_storage_policy(&self) -> Result<crate::RouterStoragePolicy, SdkError> {
+        self.router_storage_policy_impl()
+    }
+
+    fn set_router_storage_policy(
+        &self,
+        patch: crate::RouterStoragePolicyPatch,
+    ) -> Result<crate::RouterStoragePolicy, SdkError> {
+        self.set_router_storage_policy_impl(patch)
     }
 }
 

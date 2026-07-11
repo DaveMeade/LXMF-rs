@@ -11,10 +11,11 @@ use crate::domain::{
     MarkerListResult, MarkerRecord, MarkerUpdatePositionRequest, PaperDecodeResult,
     PaperMessageEnvelope, PeerConnectionRequest, PeerConnectionResult, PresenceListRequest,
     PresenceListResult, RemoteCommandRequest, RemoteCommandResponse, RemoteCommandSession,
-    RemoteCommandSessionListRequest, RemoteCommandSessionListResult, TelemetryPoint,
-    TelemetryQuery, TopicCreateRequest, TopicId, TopicListRequest, TopicListResult,
-    TopicPublishRequest, TopicRecord, TopicSubscriptionRequest, VoiceSessionId,
-    VoiceSessionOpenRequest, VoiceSessionState, VoiceSessionUpdateRequest,
+    RemoteCommandSessionListRequest, RemoteCommandSessionListResult, RouterStats,
+    RouterStoragePolicy, RouterStoragePolicyPatch, TelemetryPoint, TelemetryQuery,
+    TopicCreateRequest, TopicId, TopicListRequest, TopicListResult, TopicPublishRequest,
+    TopicRecord, TopicSubscriptionRequest, VoiceSessionId, VoiceSessionOpenRequest,
+    VoiceSessionState, VoiceSessionUpdateRequest,
 };
 use crate::error::{code, ErrorCategory, SdkError};
 use crate::event::{EventBatch, EventCursor};
@@ -117,6 +118,21 @@ pub trait SdkBackend: Send + Sync {
     fn snapshot(&self) -> Result<RuntimeSnapshot, SdkError>;
 
     fn shutdown(&self, mode: ShutdownMode) -> Result<Ack, SdkError>;
+
+    fn router_stats(&self) -> Result<RouterStats, SdkError> {
+        Err(SdkError::capability_disabled("sdk.capability.router_management"))
+    }
+
+    fn router_storage_policy(&self) -> Result<RouterStoragePolicy, SdkError> {
+        Err(SdkError::capability_disabled("sdk.capability.router_management"))
+    }
+
+    fn set_router_storage_policy(
+        &self,
+        _patch: RouterStoragePolicyPatch,
+    ) -> Result<RouterStoragePolicy, SdkError> {
+        Err(SdkError::capability_disabled("sdk.capability.router_management"))
+    }
 
     fn tick(&self, _budget: TickBudget) -> Result<TickResult, SdkError> {
         Err(SdkError::new(

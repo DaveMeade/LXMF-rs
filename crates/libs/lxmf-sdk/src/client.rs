@@ -64,6 +64,28 @@ impl<B: SdkBackend> Client<B> {
         }
     }
 
+    pub fn router_stats(&self) -> Result<crate::RouterStats, SdkError> {
+        self.backend.router_stats()
+    }
+
+    pub fn router_storage_policy(&self) -> Result<crate::RouterStoragePolicy, SdkError> {
+        self.backend.router_storage_policy()
+    }
+
+    pub fn set_router_storage_policy(
+        &self,
+        patch: crate::RouterStoragePolicyPatch,
+    ) -> Result<crate::RouterStoragePolicy, SdkError> {
+        if patch.is_empty() {
+            return Err(SdkError::new(
+                code::VALIDATION_INVALID_ARGUMENT,
+                ErrorCategory::Validation,
+                "router storage policy patch must contain at least one field",
+            ));
+        }
+        self.backend.set_router_storage_policy(patch)
+    }
+
     pub fn backend(&self) -> &B {
         &self.backend
     }

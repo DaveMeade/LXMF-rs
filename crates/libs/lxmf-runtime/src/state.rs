@@ -37,6 +37,10 @@ impl BackendState {
         &self.runtime_id
     }
 
+    pub(crate) fn router_counts(&self) -> (u64, u64) {
+        (self.deliveries.len() as u64, self.send_reports.len() as u64)
+    }
+
     pub(crate) fn advance_config_revision(&mut self) -> u64 {
         self.config_revision = self.config_revision.saturating_add(1);
         self.config_revision
