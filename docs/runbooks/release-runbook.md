@@ -38,8 +38,10 @@
 
 ## crates.io Automation
 
-Publishing a GitHub Release now triggers `.github/workflows/crates-io-publish.yml`.
-The workflow publishes the public library crates listed in
+Publishing a final GitHub Release triggers `.github/workflows/crates-io-publish.yml`.
+Prereleases are intentionally skipped so RC tags can publish simulation and
+bundle evidence without publishing crates. For a final release, the workflow
+publishes the public library crates listed in
 `docs/runbooks/crates-io-publish-plan.md` in dependency order.
 The workflow rejects the release if any public crate version differs from the
 GitHub release tag after removing the leading `v`.
