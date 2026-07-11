@@ -50,23 +50,33 @@ Inbound routing now resolves full-wire packets and resources received over an
 outbound LXMF delivery link back to the local delivery destination, which keeps
 direct backchannel reuse bidirectional in two-node and multi-hop mesh runs.
 
-## v0.7.0 SDK-First Release Focus
+## v0.9.0 Full Software-Parity Release Focus
 
-The v0.7.0 release thread is SDK-first: REM/RCH-facing delivery, discovery,
-identity, saved-peer, paper, history, conversation, cancellation, and
-propagation workflows should keep moving onto the existing `lxmf-sdk` surface.
-Daemon consumers use `ZmqPipelineBackendClient`; embedded host applications can
-use `lxmf-runtime::InProcessBackend` over their existing Reticulum transport.
-Both implement the same `SdkBackend` contract. This is not a compatibility
-layer, shim, or parallel SDK surface.
+The v0.9.0 release criterion is zero partial or unmapped entries in the
+generated pinned-Python surface manifest. The scope is the full public
+Reticulum and LXMF software surface, official utilities, and idiomatic Rust
+equivalents. `docs/status/python-surface-parity.json` is generated from the
+pinned references and `docs/status/python-surface-mapping.json`; CI rejects
+stale or unmapped entries.
+
+Current generated inventory: **1,664 implementation-complete, 0 partial, and
+1 provenance-backed not-applicable entry across 1,665 entries**. Release and
+documentation CI invoke the inventory with `--require-complete`.
+
+Implementation and evidence are independent. Hardware-capable interfaces may
+reach `implementation=complete` with deterministic simulation while retaining
+`evidence=hardware-unverified`. The release does not claim physical-device,
+public-network, or third-party-client validation. Daemon consumers continue to
+use `ZmqPipelineBackendClient`; embedded hosts use
+`lxmf-runtime::InProcessBackend`, both through the same `SdkBackend` contract.
 
 Scoped release evidence is split as follows:
 
 | Evidence slice | Release use | Acceptance boundary |
 | --- | --- | --- |
-| LXMF send/receive | Proves typed SDK delivery, receipt/status, history, inbound event, paper, and propagation-control behavior exercised through `ZmqPipelineBackendClient`. | Software and pinned Python-reference evidence can support the v0.7.0 SDK-first claim when the scenario is named. |
+| LXMF send/receive | Proves typed SDK delivery, receipt/status, history, inbound event, paper, and propagation-control behavior exercised through `ZmqPipelineBackendClient`. | Software and pinned Python-reference evidence support only the named scenario and mapped manifest entries. |
 | Carrier attach/announce software | Proves daemon/runtime interface attach, local shared-instance attach, AutoInterface carrier lifecycle, I2P fake-SAM or real-SAM attach, and announce/path fanout where the carrier is software-controlled. | Supports interface readiness for the implemented software carriers only; it does not claim broad physical-network parity. |
-| Optional HIL | Adds confidence for RNode, RNodeMulti, Weave, VR-N76, BLE, and prepared-host carrier/device combinations. | Useful release evidence, but optional for the SDK-first software release and not required to promote software ledger rows. |
+| Optional HIL | Adds confidence for RNode, RNodeMulti, Weave, VR-N76, BLE, and prepared-host carrier/device combinations. | Useful release evidence, but optional for the v0.9.0 software-parity release and tracked independently from implementation status. |
 
 ## Strong Areas
 
@@ -249,13 +259,13 @@ Scoped release evidence is split as follows:
   outbound I2P SAM peer baseline. Enabled unknown interface kinds remain
   parseable for operator visibility but are covered as explicit failed startup
   records with `unsupported interface kind` runtime metadata.
-- Meshtastic tunnel support now exists at the transport boundary with the
-  reference `RETICULUM_TUNNEL_APP` chunk metadata, modem-preset pacing,
-  missing-chunk request frames, node/destination route learning, and an
-  injectable bearer handle for serial/TCP/BLE adapters. Configuration and
-  library integration guidance lives in `docs/interfaces/meshtastic.md`.
-  Daemon config startup and live Meshtastic hardware evidence remain future
-  parity work.
+- Meshtastic tunnel support includes the reference `RETICULUM_TUNNEL_APP`
+  chunk metadata, modem-preset pacing, missing-chunk requests,
+  node/destination route learning, an injectable bearer handle, daemon TOML
+  startup, runtime status refresh, and deterministic loopback lifecycle
+  simulation. Native device evidence remains explicitly hardware-unverified.
+  Configuration and integration guidance lives in
+  `docs/interfaces/meshtastic.md`.
 - RNodeMultiInterface has a transport-side vport slice: a single serial or TCP
   RNode endpoint can host nested subinterfaces, select virtual ports with KISS
   `CMD_SEL_INT`, route direct sends to the matching virtual child, and fan out
@@ -1389,57 +1399,21 @@ Scoped release evidence is split as follows:
 
 ## Remaining Release Blockers
 
-These are blockers to a broad "Python replacement" claim, not blockers to using
-the implemented subset. For the v0.7.0 SDK-first release, the gating evidence
-is the scoped LXMF send/receive and carrier attach/announce software evidence
-listed above; optional HIL remains confidence-building evidence, not a release
-gate for the SDK-first software slice.
-
-1. **Interop breadth**
-   - Propagation router lifecycle now has dispatchable Python-reference cases
-     for remote status, Rust-to-Python fetch/download/sync, Python-origin
-     `/get` haves acknowledgement, and Python-origin `/offer` side effects.
-   - Columba release evidence is captured with
-     `tools/scripts/external-client-interop-gate.sh columba /home/pgiuseppe/Documents/columba`
-     against clean Columba `3738bd7834128023db491cca0876585b799de942`
-     (`v2.0.9-beta`), proving bidirectional direct LXMF delivery through the
-     current Python `event_bridge.py` backend adapter.
-   - Capture release evidence for Sideband and MeshChatX before making those
-     client-specific compatibility claims.
-2. **Reticulum behavioral breadth**
-   - Finish bootstrap/discovery, announce/path edge behavior, and broader runtime
-     mutation parity for startup-only interface families beyond the hot-applied
-     TCP client/server, UDP listener/peer/multicast, and Pipe surfaces.
-3. **Operational breadth**
-   - Add broader prepared-host hardware evidence across serial/TCP/BLE RNode
-     device, firmware, management, and radio combinations; ordinary
-     serial/TCP/BLE RNode now has an opt-in prepared-host smoke gate with
-     bearer-scoped lifecycle plus safe-management dispatch reports and a
-     software-only BLE fallback/management smoke report. LocalInterface #384
-     and RNode BLE #385 now have an executable audit at
-     `target/reticulum-interface-parity-audit/report.json`; strict
-     `--require-full` mode remains incomplete until serial, TCP/Wi-Fi, and BLE
-     prepared-host RNode hardware reports are present. The
-     `reticulum-interface-hil-matrix.sh` runner is the collection path for that
-     hardware matrix, and its artifact manifest can be passed back through
-     `RNODE_HIL_ARTIFACT_MANIFEST` for strict SHA-256 verification.
-   - Capture broader RNodeMulti prepared-host hardware validation/evidence
-     across device, firmware, and radio combinations before treating that
-     family as production-complete.
-   - Capture broader public I2P peer-set and long-running prepared-host
-     evidence, and implement utility commands where product demand justifies
-     them.
-   - Capture broader prepared-host Weave hardware evidence before treating that
-     family as production-complete.
+There are no remaining software-manifest blockers. Promotion is now gated by
+the reproducible build, package, API, security, simulator, pinned-Python, and
+release checks. Physical radio/BLE/serial devices, public I2P, public networks,
+and Sideband/MeshChatX/Columba claims remain separate optional evidence tracks
+and do not block v0.9.0.
 
 ## Active Execution Order
 
-1. Finish the v0.7.0 SDK-first evidence slice on the existing
-   `lxmf-sdk`/`ZmqPipelineBackendClient` path.
-2. Expand pinned Rust/Python interoperability gates with each completed row.
-3. Close RNS discovery and transport-policy gaps.
-4. Collect hardware, soak, and external-client release evidence.
-5. Expand interface and utility breadth after protocol behavior stabilizes.
+1. Run formatting, all-feature Clippy, workspace tests, boundaries,
+   architecture, module-size, security, API, interop, and reproducible-build
+   gates.
+2. Align every public crate and binary to `0.9.0` and prepare release notes.
+3. Publish `v0.9.0-rc.1` from the exact passing SHA with simulation artifacts.
+4. Promote that exact SHA to `v0.9.0`, publish packages and platform bundles,
+   and verify remote tags, registries, checksums, and support wording.
 
 ## Verification Baseline
 
@@ -1452,7 +1426,10 @@ gate for the SDK-first software slice.
 
 ## Status Rules
 
-- `done` requires active implementation plus active automated evidence.
+- `implementation=complete` requires active implementation; evidence is
+  recorded independently and must name the validation level actually run.
+- `hardware-unverified` must never be described as physical or production
+  validation.
 - A local model, RPC projection, or SDK state machine alone does not establish
   Python protocol/runtime parity.
 - A passing interop workflow does not promote unrelated matrix rows.

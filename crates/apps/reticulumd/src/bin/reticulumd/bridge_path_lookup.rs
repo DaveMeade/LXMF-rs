@@ -1,17 +1,33 @@
 use rns_rpc::PathLookupBridge;
 use rns_transport::destination_hash::parse_destination_hash_required;
-use rns_transport::hash::AddressHash;
+use rns_transport::discovery::{DiscoveryListFilter, InterfaceDiscoveryStore};
+use rns_transport::hash::{AddressHash, Hash, HASH_SIZE};
 use rns_transport::transport::Transport;
 use serde_json::{json, Value as JsonValue};
 use std::sync::Arc;
 
 pub(crate) struct DaemonPathLookupBridge {
     transport: Arc<Transport>,
+    discovery_store: Option<InterfaceDiscoveryStore>,
+    discovery_sources: Vec<String>,
 }
 
 impl DaemonPathLookupBridge {
+    #[cfg(test)]
     pub(crate) fn new(transport: Arc<Transport>) -> Self {
-        Self { transport }
+        Self { transport, discovery_store: None, discovery_sources: Vec::new() }
+    }
+
+    pub(crate) fn with_discovery_store(
+        transport: Arc<Transport>,
+        storage_path: impl AsRef<std::path::Path>,
+        discovery_sources: Vec<String>,
+    ) -> Self {
+        Self {
+            transport,
+            discovery_store: Some(InterfaceDiscoveryStore::new(storage_path)),
+            discovery_sources,
+        }
     }
 
     fn destination_hash(destination: &str) -> Result<AddressHash, std::io::Error> {
@@ -32,6 +48,22 @@ impl DaemonPathLookupBridge {
 
     fn hash_hex(value: AddressHash) -> String {
         value.to_hex_string()
+    }
+
+    fn packet_hash(value: &str) -> Result<Hash, std::io::Error> {
+        let bytes = hex::decode(value).map_err(|err| {
+            std::io::Error::new(
+                std::io::ErrorKind::InvalidInput,
+                format!("packet_hash must be hexadecimal: {err}"),
+            )
+        })?;
+        let bytes: [u8; HASH_SIZE] = bytes.try_into().map_err(|bytes: Vec<u8>| {
+            std::io::Error::new(
+                std::io::ErrorKind::InvalidInput,
+                format!("packet_hash must be {HASH_SIZE} bytes, got {}", bytes.len()),
+            )
+        })?;
+        Ok(Hash::new(bytes))
     }
 
     fn run_transport<F, T>(&self, f: F) -> Result<T, std::io::Error>
@@ -142,6 +174,99 @@ impl PathLookupBridge for DaemonPathLookupBridge {
             Ok(runtime
                 .block_on(async move { transport.expire_paths_for_identity(&identity).await }))
         })
+    }
+
+    fn drop_path(&self, destination: &str) -> Result<bool, std::io::Error> {
+        let destination = Self::destination_hash(destination)?;
+        self.run_transport(move |transport| {
+            let runtime = tokio::runtime::Builder::new_current_thread()
+                .enable_all()
+                .build()
+                .map_err(|err| {
+                    std::io::Error::other(format!("failed to build path mutation runtime: {err}"))
+                })?;
+            Ok(runtime.block_on(async move { transport.expire_path(&destination).await }))
+        })
+    }
+
+    fn drop_all_via(&self, transport_hash: &str) -> Result<usize, std::io::Error> {
+        let transport_hash = Self::destination_hash(transport_hash)?;
+        self.run_transport(move |transport| {
+            let runtime = tokio::runtime::Builder::new_current_thread()
+                .enable_all()
+                .build()
+                .map_err(|err| {
+                    std::io::Error::other(format!("failed to build path mutation runtime: {err}"))
+                })?;
+            Ok(runtime.block_on(async move { transport.expire_paths_via(&transport_hash).await }))
+        })
+    }
+
+    fn drop_announce_queues(&self) -> Result<usize, std::io::Error> {
+        self.run_transport(move |transport| {
+            let runtime = tokio::runtime::Builder::new_current_thread()
+                .enable_all()
+                .build()
+                .map_err(|err| {
+                    std::io::Error::other(format!("failed to build announce queue runtime: {err}"))
+                })?;
+            Ok(runtime.block_on(async move { transport.drop_announce_queues().await }))
+        })
+    }
+
+    fn rate_table(&self) -> Result<JsonValue, std::io::Error> {
+        self.run_transport(move |transport| {
+            let runtime = tokio::runtime::Builder::new_current_thread()
+                .enable_all()
+                .build()
+                .map_err(|err| {
+                    std::io::Error::other(format!("failed to build rate table runtime: {err}"))
+                })?;
+            let rows = runtime.block_on(async move { transport.announce_rate_table().await });
+            Ok(JsonValue::Array(
+                rows.into_iter()
+                    .map(|row| {
+                        json!({
+                            "hash": row.destination.to_hex_string(),
+                            "last": row.last,
+                            "rate_violations": row.rate_violations,
+                            "blocked_until": row.blocked_until,
+                            "timestamps": row.timestamps,
+                        })
+                    })
+                    .collect(),
+            ))
+        })
+    }
+
+    fn packet_signal(&self, packet_hash: &str) -> Result<JsonValue, std::io::Error> {
+        let packet_hash = Self::packet_hash(packet_hash)?;
+        self.run_transport(move |transport| {
+            let runtime = tokio::runtime::Builder::new_current_thread()
+                .enable_all()
+                .build()
+                .map_err(|err| {
+                    std::io::Error::other(format!("failed to build packet signal runtime: {err}"))
+                })?;
+            let signal =
+                runtime.block_on(async move { transport.packet_signal(&packet_hash).await });
+            Ok(match signal {
+                Some(signal) => json!({ "rssi": signal.rssi, "snr": signal.snr, "q": signal.q }),
+                None => JsonValue::Null,
+            })
+        })
+    }
+
+    fn discovered_interfaces(&self) -> Result<JsonValue, std::io::Error> {
+        let Some(store) = &self.discovery_store else {
+            return Ok(JsonValue::Array(Vec::new()));
+        };
+        let rows = store.list(
+            rns_transport::time::now_epoch_secs_u64() as f64,
+            &self.discovery_sources,
+            DiscoveryListFilter::default(),
+        )?;
+        serde_json::to_value(rows).map_err(std::io::Error::other)
     }
 
     fn link_count(&self) -> Result<usize, std::io::Error> {

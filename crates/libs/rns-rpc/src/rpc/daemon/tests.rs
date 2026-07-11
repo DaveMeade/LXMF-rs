@@ -17,6 +17,7 @@ mod tests {
     include!("tests/interface_mutation_policy_reload.rs");
     include!("tests/path_rpc.rs");
     include!("tests/blackhole_rpc.rs");
+    include!("tests/router_management.rs");
     include!("tests/rnode_management.rs");
     include!("tests/weave_display_control.rs");
     include!("tests/status_snapshot.rs");

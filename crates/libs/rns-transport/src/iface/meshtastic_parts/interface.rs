@@ -60,6 +60,11 @@ impl MeshtasticInterface {
             .to_json()
     }
 
+    #[must_use]
+    pub fn runtime_status_handle(&self) -> MeshtasticRuntimeStatusHandle {
+        MeshtasticRuntimeStatusHandle { inner: self.runtime_status.clone() }
+    }
+
     pub async fn spawn(context: InterfaceContext<Self>) {
         let iface_stop = context.channel.stop.clone();
         let iface_address = context.channel.address;

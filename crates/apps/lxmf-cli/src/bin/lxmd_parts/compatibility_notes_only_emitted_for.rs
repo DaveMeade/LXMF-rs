@@ -320,4 +320,18 @@ on_inbound = rm
         assert!(paths.messages_dir.exists());
         assert_eq!(paths.identity_file, config_dir.join("identity"));
     }
+
+    #[test]
+    #[cfg(unix)]
+    fn rpc_unix_path_falls_back_when_config_path_exceeds_socket_limit() {
+        let long_component = "x".repeat(120);
+        let config_dir = std::path::Path::new("/tmp").join(long_component);
+        let socket = super::lxmd_rpc_unix_path(&config_dir);
+
+        assert!(socket.as_os_str().as_encoded_bytes().len() <= 100);
+        assert_ne!(socket, config_dir.join("lxmf-rpc.sock"));
+        assert!(socket.file_name().and_then(|name| name.to_str()).is_some_and(|name| {
+            name.starts_with("lxmf-rpc-") && name.ends_with(".sock")
+        }));
+    }
 }

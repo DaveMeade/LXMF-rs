@@ -1322,6 +1322,27 @@ pub lxmf_sdk::domain::RemoteCommandSessionListRequest::limit: core::option::Opti
 pub struct lxmf_sdk::domain::RemoteCommandSessionListResult
 pub lxmf_sdk::domain::RemoteCommandSessionListResult::next_cursor: core::option::Option<alloc::string::String>
 pub lxmf_sdk::domain::RemoteCommandSessionListResult::sessions: alloc::vec::Vec<lxmf_sdk::domain::RemoteCommandSession>
+pub struct lxmf_sdk::domain::RouterStats
+pub lxmf_sdk::domain::RouterStats::interfaces: u64
+pub lxmf_sdk::domain::RouterStats::message_bytes: u64
+pub lxmf_sdk::domain::RouterStats::messages: u64
+pub lxmf_sdk::domain::RouterStats::outbound_inflight: u64
+pub lxmf_sdk::domain::RouterStats::peers: u64
+pub lxmf_sdk::domain::RouterStats::propagation_enabled: bool
+pub lxmf_sdk::domain::RouterStats::propagation_node_enabled: bool
+pub lxmf_sdk::domain::RouterStats::propagation_payloads: u64
+pub lxmf_sdk::domain::RouterStats::storage_policy: lxmf_sdk::domain::RouterStoragePolicy
+pub lxmf_sdk::domain::RouterStats::tickets: u64
+pub struct lxmf_sdk::domain::RouterStoragePolicy
+pub lxmf_sdk::domain::RouterStoragePolicy::information_limit_bytes: core::option::Option<u64>
+pub lxmf_sdk::domain::RouterStoragePolicy::message_limit_bytes: core::option::Option<u64>
+pub lxmf_sdk::domain::RouterStoragePolicy::retain_node_lxms: bool
+pub struct lxmf_sdk::domain::RouterStoragePolicyPatch
+pub lxmf_sdk::domain::RouterStoragePolicyPatch::information_limit_bytes: core::option::Option<u64>
+pub lxmf_sdk::domain::RouterStoragePolicyPatch::message_limit_bytes: core::option::Option<u64>
+pub lxmf_sdk::domain::RouterStoragePolicyPatch::retain_node_lxms: core::option::Option<bool>
+impl lxmf_sdk::domain::RouterStoragePolicyPatch
+pub fn lxmf_sdk::domain::RouterStoragePolicyPatch::is_empty(&self) -> bool
 pub struct lxmf_sdk::domain::TelemetryPoint
 pub lxmf_sdk::domain::TelemetryPoint::extensions: alloc::collections::btree::map::BTreeMap<alloc::string::String, serde_json::value::Value>
 pub lxmf_sdk::domain::TelemetryPoint::key: alloc::string::String
@@ -2294,6 +2315,9 @@ pub struct lxmf_sdk::Client<B: lxmf_sdk::SdkBackend>
 impl<B: lxmf_sdk::SdkBackend> lxmf_sdk::Client<B>
 pub fn lxmf_sdk::Client<B>::backend(&self) -> &B
 pub fn lxmf_sdk::Client<B>::new(backend: B) -> Self
+pub fn lxmf_sdk::Client<B>::router_stats(&self) -> core::result::Result<lxmf_sdk::domain::RouterStats, lxmf_sdk::SdkError>
+pub fn lxmf_sdk::Client<B>::router_storage_policy(&self) -> core::result::Result<lxmf_sdk::domain::RouterStoragePolicy, lxmf_sdk::SdkError>
+pub fn lxmf_sdk::Client<B>::set_router_storage_policy(&self, patch: lxmf_sdk::domain::RouterStoragePolicyPatch) -> core::result::Result<lxmf_sdk::domain::RouterStoragePolicy, lxmf_sdk::SdkError>
 impl<B: lxmf_sdk::SdkBackendAsyncOps> lxmf_sdk::Client<B>
 pub async fn lxmf_sdk::Client<B>::send_async(&self, req: lxmf_sdk::SendRequest) -> core::result::Result<lxmf_sdk::MessageId, lxmf_sdk::SdkError>
 pub async fn lxmf_sdk::Client<B>::shutdown_async(&self, mode: lxmf_sdk::ShutdownMode) -> core::result::Result<lxmf_sdk::Ack, lxmf_sdk::SdkError>
@@ -3166,6 +3190,27 @@ pub lxmf_sdk::RemoteCommandSessionListRequest::limit: core::option::Option<usize
 pub struct lxmf_sdk::RemoteCommandSessionListResult
 pub lxmf_sdk::RemoteCommandSessionListResult::next_cursor: core::option::Option<alloc::string::String>
 pub lxmf_sdk::RemoteCommandSessionListResult::sessions: alloc::vec::Vec<lxmf_sdk::domain::RemoteCommandSession>
+pub struct lxmf_sdk::RouterStats
+pub lxmf_sdk::RouterStats::interfaces: u64
+pub lxmf_sdk::RouterStats::message_bytes: u64
+pub lxmf_sdk::RouterStats::messages: u64
+pub lxmf_sdk::RouterStats::outbound_inflight: u64
+pub lxmf_sdk::RouterStats::peers: u64
+pub lxmf_sdk::RouterStats::propagation_enabled: bool
+pub lxmf_sdk::RouterStats::propagation_node_enabled: bool
+pub lxmf_sdk::RouterStats::propagation_payloads: u64
+pub lxmf_sdk::RouterStats::storage_policy: lxmf_sdk::domain::RouterStoragePolicy
+pub lxmf_sdk::RouterStats::tickets: u64
+pub struct lxmf_sdk::RouterStoragePolicy
+pub lxmf_sdk::RouterStoragePolicy::information_limit_bytes: core::option::Option<u64>
+pub lxmf_sdk::RouterStoragePolicy::message_limit_bytes: core::option::Option<u64>
+pub lxmf_sdk::RouterStoragePolicy::retain_node_lxms: bool
+pub struct lxmf_sdk::RouterStoragePolicyPatch
+pub lxmf_sdk::RouterStoragePolicyPatch::information_limit_bytes: core::option::Option<u64>
+pub lxmf_sdk::RouterStoragePolicyPatch::message_limit_bytes: core::option::Option<u64>
+pub lxmf_sdk::RouterStoragePolicyPatch::retain_node_lxms: core::option::Option<bool>
+impl lxmf_sdk::domain::RouterStoragePolicyPatch
+pub fn lxmf_sdk::domain::RouterStoragePolicyPatch::is_empty(&self) -> bool
 pub struct lxmf_sdk::RpcBackendClient
 impl lxmf_sdk::RpcBackendClient
 pub fn lxmf_sdk::RpcBackendClient::new(endpoint: impl core::convert::Into<alloc::string::String>) -> Self
@@ -3207,7 +3252,10 @@ pub fn lxmf_sdk::RpcBackendClient::paper_decode(&self, envelope: lxmf_sdk::domai
 pub fn lxmf_sdk::RpcBackendClient::paper_decode_with_metadata(&self, envelope: lxmf_sdk::domain::PaperMessageEnvelope) -> core::result::Result<lxmf_sdk::domain::PaperDecodeResult, lxmf_sdk::SdkError>
 pub fn lxmf_sdk::RpcBackendClient::paper_encode(&self, message_id: lxmf_sdk::MessageId) -> core::result::Result<lxmf_sdk::domain::PaperMessageEnvelope, lxmf_sdk::SdkError>
 pub fn lxmf_sdk::RpcBackendClient::poll_events(&self, cursor: core::option::Option<lxmf_sdk::event::EventCursor>, max: usize) -> core::result::Result<lxmf_sdk::event::EventBatch, lxmf_sdk::SdkError>
+pub fn lxmf_sdk::RpcBackendClient::router_stats(&self) -> core::result::Result<lxmf_sdk::domain::RouterStats, lxmf_sdk::SdkError>
+pub fn lxmf_sdk::RpcBackendClient::router_storage_policy(&self) -> core::result::Result<lxmf_sdk::domain::RouterStoragePolicy, lxmf_sdk::SdkError>
 pub fn lxmf_sdk::RpcBackendClient::send(&self, req: lxmf_sdk::SendRequest) -> core::result::Result<lxmf_sdk::MessageId, lxmf_sdk::SdkError>
+pub fn lxmf_sdk::RpcBackendClient::set_router_storage_policy(&self, patch: lxmf_sdk::domain::RouterStoragePolicyPatch) -> core::result::Result<lxmf_sdk::domain::RouterStoragePolicy, lxmf_sdk::SdkError>
 pub fn lxmf_sdk::RpcBackendClient::shutdown(&self, mode: lxmf_sdk::ShutdownMode) -> core::result::Result<lxmf_sdk::Ack, lxmf_sdk::SdkError>
 pub fn lxmf_sdk::RpcBackendClient::snapshot(&self) -> core::result::Result<lxmf_sdk::RuntimeSnapshot, lxmf_sdk::SdkError>
 pub fn lxmf_sdk::RpcBackendClient::status(&self, id: lxmf_sdk::MessageId) -> core::result::Result<core::option::Option<lxmf_sdk::DeliverySnapshot>, lxmf_sdk::SdkError>
@@ -3650,7 +3698,10 @@ pub fn lxmf_sdk::SdkBackend::peer_connect(&self, _req: lxmf_sdk::domain::PeerCon
 pub fn lxmf_sdk::SdkBackend::peer_disconnect(&self, _req: lxmf_sdk::domain::PeerConnectionRequest) -> core::result::Result<lxmf_sdk::domain::PeerConnectionResult, lxmf_sdk::SdkError>
 pub fn lxmf_sdk::SdkBackend::peer_reconnect(&self, _req: lxmf_sdk::domain::PeerConnectionRequest) -> core::result::Result<lxmf_sdk::domain::PeerConnectionResult, lxmf_sdk::SdkError>
 pub fn lxmf_sdk::SdkBackend::poll_events(&self, cursor: core::option::Option<lxmf_sdk::event::EventCursor>, max: usize) -> core::result::Result<lxmf_sdk::event::EventBatch, lxmf_sdk::SdkError>
+pub fn lxmf_sdk::SdkBackend::router_stats(&self) -> core::result::Result<lxmf_sdk::domain::RouterStats, lxmf_sdk::SdkError>
+pub fn lxmf_sdk::SdkBackend::router_storage_policy(&self) -> core::result::Result<lxmf_sdk::domain::RouterStoragePolicy, lxmf_sdk::SdkError>
 pub fn lxmf_sdk::SdkBackend::send(&self, req: lxmf_sdk::SendRequest) -> core::result::Result<lxmf_sdk::MessageId, lxmf_sdk::SdkError>
+pub fn lxmf_sdk::SdkBackend::set_router_storage_policy(&self, _patch: lxmf_sdk::domain::RouterStoragePolicyPatch) -> core::result::Result<lxmf_sdk::domain::RouterStoragePolicy, lxmf_sdk::SdkError>
 pub fn lxmf_sdk::SdkBackend::shutdown(&self, mode: lxmf_sdk::ShutdownMode) -> core::result::Result<lxmf_sdk::Ack, lxmf_sdk::SdkError>
 pub fn lxmf_sdk::SdkBackend::snapshot(&self) -> core::result::Result<lxmf_sdk::RuntimeSnapshot, lxmf_sdk::SdkError>
 pub fn lxmf_sdk::SdkBackend::status(&self, id: lxmf_sdk::MessageId) -> core::result::Result<core::option::Option<lxmf_sdk::DeliverySnapshot>, lxmf_sdk::SdkError>
@@ -3704,7 +3755,10 @@ pub fn lxmf_sdk::RpcBackendClient::paper_decode(&self, envelope: lxmf_sdk::domai
 pub fn lxmf_sdk::RpcBackendClient::paper_decode_with_metadata(&self, envelope: lxmf_sdk::domain::PaperMessageEnvelope) -> core::result::Result<lxmf_sdk::domain::PaperDecodeResult, lxmf_sdk::SdkError>
 pub fn lxmf_sdk::RpcBackendClient::paper_encode(&self, message_id: lxmf_sdk::MessageId) -> core::result::Result<lxmf_sdk::domain::PaperMessageEnvelope, lxmf_sdk::SdkError>
 pub fn lxmf_sdk::RpcBackendClient::poll_events(&self, cursor: core::option::Option<lxmf_sdk::event::EventCursor>, max: usize) -> core::result::Result<lxmf_sdk::event::EventBatch, lxmf_sdk::SdkError>
+pub fn lxmf_sdk::RpcBackendClient::router_stats(&self) -> core::result::Result<lxmf_sdk::domain::RouterStats, lxmf_sdk::SdkError>
+pub fn lxmf_sdk::RpcBackendClient::router_storage_policy(&self) -> core::result::Result<lxmf_sdk::domain::RouterStoragePolicy, lxmf_sdk::SdkError>
 pub fn lxmf_sdk::RpcBackendClient::send(&self, req: lxmf_sdk::SendRequest) -> core::result::Result<lxmf_sdk::MessageId, lxmf_sdk::SdkError>
+pub fn lxmf_sdk::RpcBackendClient::set_router_storage_policy(&self, patch: lxmf_sdk::domain::RouterStoragePolicyPatch) -> core::result::Result<lxmf_sdk::domain::RouterStoragePolicy, lxmf_sdk::SdkError>
 pub fn lxmf_sdk::RpcBackendClient::shutdown(&self, mode: lxmf_sdk::ShutdownMode) -> core::result::Result<lxmf_sdk::Ack, lxmf_sdk::SdkError>
 pub fn lxmf_sdk::RpcBackendClient::snapshot(&self) -> core::result::Result<lxmf_sdk::RuntimeSnapshot, lxmf_sdk::SdkError>
 pub fn lxmf_sdk::RpcBackendClient::status(&self, id: lxmf_sdk::MessageId) -> core::result::Result<core::option::Option<lxmf_sdk::DeliverySnapshot>, lxmf_sdk::SdkError>

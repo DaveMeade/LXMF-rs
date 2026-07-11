@@ -36,6 +36,7 @@ pub struct PathTable {
 #[derive(Debug, Copy, Clone, PartialEq, Eq)]
 enum PathState {
     Unknown,
+    Responsive,
     Unresponsive,
 }
 
@@ -73,6 +74,12 @@ impl PathTable {
         self.map.remove(destination).is_some()
     }
 
+    pub fn expire_paths_via(&mut self, transport: &AddressHash) -> usize {
+        let before = self.map.len();
+        self.map.retain(|_, entry| entry.received_from != *transport);
+        before.saturating_sub(self.map.len())
+    }
+
     pub fn mark_path_unresponsive(&mut self, destination: &AddressHash) -> bool {
         let Some(entry) = self.map.get_mut(destination) else {
             return false;
@@ -81,9 +88,28 @@ impl PathTable {
         true
     }
 
-    #[cfg(test)]
+    pub fn mark_path_responsive(&mut self, destination: &AddressHash) -> bool {
+        self.set_path_state(destination, PathState::Responsive)
+    }
+
+    pub fn mark_path_unknown(&mut self, destination: &AddressHash) -> bool {
+        self.set_path_state(destination, PathState::Unknown)
+    }
+
+    fn set_path_state(&mut self, destination: &AddressHash, state: PathState) -> bool {
+        let Some(entry) = self.map.get_mut(destination) else {
+            return false;
+        };
+        entry.state = state;
+        true
+    }
+
     pub fn path_is_unresponsive(&self, destination: &AddressHash) -> bool {
         self.map.get(destination).is_some_and(|entry| entry.state == PathState::Unresponsive)
+    }
+
+    pub fn hops_to(&self, destination: &AddressHash) -> u8 {
+        self.map.get(destination).map_or(super::PATHFINDER_M as u8, |entry| entry.hops)
     }
 
     pub fn handle_announce(

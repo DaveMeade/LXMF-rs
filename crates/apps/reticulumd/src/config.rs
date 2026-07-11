@@ -1,5 +1,9 @@
 include!("config_parts/module_prelude.rs");
 
+include!("config_parts/reticulum_runtime_policy.rs");
+
+include!("config_parts/daemonconfig_impl.rs");
+
 include!("config_parts/interfaceconfig.rs");
 
 include!("config_parts/non_empty_string.rs");

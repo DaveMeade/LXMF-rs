@@ -76,6 +76,26 @@ fn remove_stale_and_expire_path_match_expected_lifetimes() {
 }
 
 #[test]
+fn expire_paths_via_removes_only_matching_next_hop() {
+    let now = test_now();
+    let via = addr(b"shared-next-hop");
+    let retained_via = addr(b"other-next-hop");
+    let first = addr(b"first-destination");
+    let second = addr(b"second-destination");
+    let retained = addr(b"retained-destination");
+    let mut table = PathTable::new();
+    for (destination, received_from) in [(first, via), (second, via), (retained, retained_via)] {
+        add_path(&mut table, destination, now);
+        table.map.get_mut(&destination).expect("inserted path").received_from = received_from;
+    }
+
+    assert_eq!(table.expire_paths_via(&via), 2);
+    assert!(table.get(&first).is_none());
+    assert!(table.get(&second).is_none());
+    assert!(table.get(&retained).is_some());
+}
+
+#[test]
 fn handle_announce_replacement_matches_python_freshness_rules() {
     let destination = addr(b"destination");
     let first_iface = addr(b"first-iface");

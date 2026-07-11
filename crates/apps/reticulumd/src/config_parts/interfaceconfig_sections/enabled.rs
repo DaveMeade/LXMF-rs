@@ -164,6 +164,29 @@ impl InterfaceConfig {
                 insert_opt_u64(&mut settings, "reconnect_backoff_ms", self.reconnect_backoff_ms);
                 insert_opt_string(&mut settings, "state_path", self.state_path.as_ref());
             }
+            "meshtastic" => {
+                insert_opt_u64(&mut settings, "hop_limit", self.hop_limit.map(u64::from));
+                insert_opt_u64(&mut settings, "bitrate", self.bitrate);
+                insert_opt_u64(
+                    &mut settings,
+                    "max_payload_bytes",
+                    self.max_payload_bytes.map(u64::from),
+                );
+                insert_opt_u64(&mut settings, "modem_preset", self.modem_preset.map(u64::from));
+                insert_opt_u64(&mut settings, "send_delay_ms", self.send_delay_ms);
+                insert_opt_u64(
+                    &mut settings,
+                    "destination_cache_size",
+                    self.destination_cache_size.map(|value| value as u64),
+                );
+                insert_opt_bool(&mut settings, "simulation_loopback", self.simulation_loopback);
+                insert_opt_u64(
+                    &mut settings,
+                    "simulation_node_id",
+                    self.simulation_node_id.map(u64::from),
+                );
+                settings.insert("hardware_unverified".to_string(), serde_json::Value::Bool(true));
+            }
             "udp" => {
                 insert_opt_string(&mut settings, "host", self.host.as_ref());
                 insert_opt_u64(&mut settings, "port", self.port.map(u64::from));
@@ -463,6 +486,7 @@ impl InterfaceConfig {
             "local" | "local_client" => self.validate_local(index),
             "pipe" => self.validate_pipe(index),
             "i2p" => self.validate_i2p(index),
+            "meshtastic" => self.validate_meshtastic(index),
             "ble_gatt" => self.validate_ble(index),
             "reticulum_ble" => self.validate_reticulum_ble(index),
             "vrn76_kiss_ble" => self.validate_vrn76_kiss_ble(index),
@@ -1151,6 +1175,35 @@ impl InterfaceConfig {
                     "interfaces[{index}].mtu must be between 256 and 262144 for i2p"
                 ));
             }
+        }
+        Ok(())
+    }
+
+    fn validate_meshtastic(&self, index: usize) -> Result<(), String> {
+        self.reject_unknown_new_kind_keys(index, "meshtastic")?;
+        if !self.enabled() {
+            return Ok(());
+        }
+        if self.hop_limit == Some(0) {
+            return Err(format!("interfaces[{index}].hop_limit must be greater than zero"));
+        }
+        if self.max_payload_bytes == Some(0) {
+            return Err(format!(
+                "interfaces[{index}].max_payload_bytes must be greater than zero"
+            ));
+        }
+        if self.send_delay_ms == Some(0) {
+            return Err(format!("interfaces[{index}].send_delay_ms must be greater than zero"));
+        }
+        if self.destination_cache_size == Some(0) {
+            return Err(format!(
+                "interfaces[{index}].destination_cache_size must be greater than zero"
+            ));
+        }
+        if self.simulation_loopback != Some(true) {
+            return Err(format!(
+                "interfaces[{index}].simulation_loopback must be true until a native Meshtastic bearer is configured"
+            ));
         }
         Ok(())
     }

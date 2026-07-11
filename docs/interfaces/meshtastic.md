@@ -14,12 +14,14 @@ bearer app payload reads -> Meshtastic tunnel reassembly -> Reticulum packet byt
 
 Use this interface when an application already has a Meshtastic bearer and
 wants Reticulum packet routing, chunking, retransmit requests, and destination
-route learning in `reticulum-rs-transport`.
+route learning in `reticulum-rs-transport`. `reticulumd` also provides a
+deterministic loopback bearer for software-only lifecycle and fault testing.
 
 ## Current Support Boundary
 
-This is a transport-library interface, not a daemon-configured hardware
-adapter yet.
+The tunnel and daemon lifecycle are implementation-complete for deterministic
+simulation. Native Meshtastic device I/O remains hardware-unverified and is not
+claimed as physically validated.
 
 Implemented:
 
@@ -34,20 +36,32 @@ Implemented:
 - An injectable `MeshtasticInterfaceHandle` for serial, TCP, BLE, or native
   Meshtastic API adapters.
 - Runtime counters through `MeshtasticTunnelStatus`.
+- `reticulumd` TOML startup, status refresh, shutdown, and deterministic
+  loopback simulation.
 
 Not implemented yet:
 
-- `reticulumd` TOML startup for `MeshtasticInterface`.
 - Native serial, TCP, BLE, or protobuf Meshtastic device discovery.
 - Prepared-host Meshtastic hardware smoke evidence.
 - Channel selection beyond the current outbound `channel_index = 0` default.
 - Rich Meshtastic device or radio management.
 
-Do not add a `MeshtasticInterface` entry to `reticulumd` config yet; enabled
-unknown interface kinds are reported as unsupported startup records by the
-daemon.
+Until a native bearer is configured, enabled daemon entries must explicitly set
+`simulation_loopback = true`. This prevents a simulated interface from being
+mistaken for a physical radio.
 
 ## Configuration
+
+Daemon example:
+
+```toml
+interfaces = [
+  { type = "MeshtasticInterface", enabled = true, name = "mesh-sim", simulation_loopback = true, simulation_node_id = 42, modem_preset = 8, hop_limit = 3, max_payload_bytes = 180, send_delay_ms = 25, destination_cache_size = 32 }
+]
+```
+
+The daemon reports `evidence = "simulated"` and
+`hardware_unverified = true` in interface runtime metadata.
 
 Use `MeshtasticInterfaceConfig` when constructing either a standalone
 `MeshtasticTunnel` or a spawned `MeshtasticInterface`.
@@ -231,6 +245,7 @@ Focused coverage lives in:
 
 ```powershell
 cargo test -p reticulum-rs-transport --test meshtastic_interface
+cargo test -p reticulumd --test config meshtastic
 ```
 
 That test target covers reference metadata splitting/reassembly,

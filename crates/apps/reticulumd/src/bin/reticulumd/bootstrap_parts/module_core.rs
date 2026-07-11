@@ -4,7 +4,7 @@ use reticulum_daemon::announce_names::{
     normalize_capabilities, normalize_display_name, PropagationNodeAnnounceConfig,
 };
 
-use reticulum_daemon::config::{DaemonConfig, InterfaceConfig};
+use reticulum_daemon::config::{DaemonConfig, InterfaceConfig, ReticulumRuntimePolicy};
 
 use reticulum_daemon::identity_store::load_or_create_identity;
 
@@ -120,6 +120,12 @@ pub(super) async fn bootstrap(args: Args) -> BootstrapContext {
             None
         }
     });
+    let reticulum_runtime_policy = args
+        .config
+        .as_ref()
+        .and_then(|path| std::fs::read_to_string(path).ok())
+        .and_then(|input| ReticulumRuntimePolicy::from_toml(&input).ok())
+        .unwrap_or_default();
     let identity_hash = hex::encode(identity.address_hash().as_slice());
     let local_display_name = std::env::var("LXMF_DISPLAY_NAME")
         .ok()
@@ -198,6 +204,7 @@ pub(super) async fn bootstrap(args: Args) -> BootstrapContext {
     let weave_runtime_refreshes = startup.weave_runtime_refreshes;
     let rnode_multi_runtime_refreshes = startup.rnode_multi_runtime_refreshes;
     let lora_runtime_refreshes = startup.lora_runtime_refreshes;
+    let meshtastic_runtime_refreshes = startup.meshtastic_runtime_refreshes;
     #[cfg(feature = "vrn76-kiss-ble")]
     let vrn76_runtime_refreshes = startup.vrn76_runtime_refreshes;
     let rnode_management_bindings = startup.rnode_management_bindings;
@@ -291,7 +298,11 @@ pub(super) async fn bootstrap(args: Args) -> BootstrapContext {
     configure_startup_rpc_token_auth(&args, daemon.as_ref());
     enforce_rpc_bind_security(rpc_addr.as_ref(), rpc_tls.as_ref(), daemon.as_ref());
     if let Some(transport) = transport.as_ref() {
-        daemon.set_path_lookup_bridge(Arc::new(DaemonPathLookupBridge::new(transport.clone())));
+        daemon.set_path_lookup_bridge(Arc::new(DaemonPathLookupBridge::with_discovery_store(
+            transport.clone(),
+            &reticulum_storage_path,
+            reticulum_runtime_policy.interface_discovery_sources.clone(),
+        )));
         daemon.set_interface_mutation_bridge(Arc::new(
             InterfaceHotApplyBridge::spawn_with_transport_and_daemon(
                 transport.clone(),
@@ -343,6 +354,7 @@ pub(super) async fn bootstrap(args: Args) -> BootstrapContext {
     spawn_weave_runtime_status_refresher(daemon.clone(), weave_runtime_refreshes);
     spawn_rnode_multi_runtime_status_refresher(daemon.clone(), rnode_multi_runtime_refreshes);
     spawn_lora_runtime_status_refresher(daemon.clone(), lora_runtime_refreshes);
+    spawn_meshtastic_runtime_status_refresher(daemon.clone(), meshtastic_runtime_refreshes);
     #[cfg(feature = "vrn76-kiss-ble")]
     spawn_vrn76_runtime_status_refresher(daemon.clone(), vrn76_runtime_refreshes);
     daemon.set_propagation_state(transport.is_some(), None, 0);
@@ -466,7 +478,20 @@ pub(super) async fn bootstrap(args: Args) -> BootstrapContext {
             receipt_tx.clone(),
             outbound_resource_map,
         );
-        spawn_announce_worker(daemon.clone(), transport, peer_crypto, Some(reticulum_storage_path));
+        let discovery = reticulum_runtime_policy.discover_interfaces.then(|| {
+            crate::announce_worker::DiscoveryWorkerConfig {
+                storage_path: reticulum_storage_path.clone(),
+                allowed_network_ids: reticulum_runtime_policy.interface_discovery_sources.clone(),
+                required_value: reticulum_runtime_policy.required_discovery_value.unwrap_or(14),
+            }
+        });
+        spawn_announce_worker(
+            daemon.clone(),
+            transport,
+            peer_crypto,
+            Some(reticulum_storage_path),
+            discovery,
+        );
     }
 
     BootstrapContext { rpc_addr, rpc_unix, daemon, rpc_tls, path_table_persistence }
@@ -789,6 +814,40 @@ fn spawn_tcp_runtime_status_refresher(
             refresh_tcp_runtime_status_once(&daemon, &refreshes);
         }
     });
+}
+
+fn spawn_meshtastic_runtime_status_refresher(
+    daemon: Arc<RpcDaemon>,
+    refreshes: Vec<transport_startup::MeshtasticRuntimeRefresh>,
+) {
+    if refreshes.is_empty() {
+        return;
+    }
+    tokio::spawn(async move {
+        let mut interval = tokio::time::interval(INTERFACE_RUNTIME_STATUS_REFRESH_INTERVAL);
+        interval.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Delay);
+        loop {
+            interval.tick().await;
+            refresh_meshtastic_runtime_status_once(&daemon, &refreshes);
+        }
+    });
+}
+
+fn refresh_meshtastic_runtime_status_once(
+    daemon: &RpcDaemon,
+    refreshes: &[transport_startup::MeshtasticRuntimeRefresh],
+) -> usize {
+    refreshes
+        .iter()
+        .filter(|refresh| {
+            daemon.update_interface_runtime_metadata_by_iface(
+                refresh.runtime_iface.to_string().as_str(),
+                "meshtastic",
+                "status",
+                refresh.status.to_json(),
+            )
+        })
+        .count()
 }
 
 fn refresh_tcp_runtime_status_once(

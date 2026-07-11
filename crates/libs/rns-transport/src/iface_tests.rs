@@ -527,6 +527,45 @@ mod tests {
         assert!(target_rx.try_recv().is_err());
     }
 
+    #[test]
+    fn drop_announce_queues_clears_every_interface_and_reports_count() {
+        let mut mgr = InterfaceManager::new(16);
+        mgr.new_channel(16);
+        mgr.new_channel(16);
+        for (index, iface) in mgr.ifaces.iter_mut().enumerate() {
+            for emitted in 0..=index {
+                iface.announce_queue.push_back(QueuedAnnounce {
+                    message: TxMessage {
+                        tx_type: TxMessageType::Broadcast(None),
+                        packet: announce_packet_with(
+                            1,
+                            format!("drop-{index}-{emitted}").as_bytes(),
+                            emitted as u64,
+                        ),
+                    },
+                    queued_at: Instant::now(),
+                    emitted: emitted as u64,
+                });
+            }
+        }
+
+        assert_eq!(mgr.drop_announce_queues(), 3);
+        assert!(mgr.ifaces.iter().all(|iface| iface.announce_queue.is_empty()));
+        assert_eq!(mgr.drop_announce_queues(), 0);
+    }
+
+    #[test]
+    fn prioritize_interfaces_orders_highest_bitrate_first() {
+        let mut manager = InterfaceManager::new(4);
+        let slow = manager.new_channel(1).address;
+        let fast = manager.new_channel(1).address;
+        assert!(manager.set_announce_pacing(slow, 1_000, 2));
+        assert!(manager.set_announce_pacing(fast, 10_000, 2));
+        manager.prioritize_interfaces();
+        assert_eq!(manager.ifaces[0].address, fast);
+        assert_eq!(manager.ifaces[1].address, slow);
+    }
+
     #[tokio::test]
     async fn recursive_path_request_waits_for_active_announce_cap_like_python() {
         let mut mgr = InterfaceManager::new(16);

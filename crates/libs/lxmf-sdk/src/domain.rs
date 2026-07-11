@@ -27,3 +27,5 @@ include!("domain_parts/propagationmaintenance.rs");
 include!("domain_parts/propagationremoteunpeer.rs");
 
 include!("domain_parts/workflowpeerreadyrequest.rs");
+
+include!("domain_parts/routermanagement.rs");

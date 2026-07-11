@@ -1,0 +1,1036 @@
+{
+  "schema_version": 1,
+  "rules": [
+    {
+      "pattern": "RNS.Cryptography.*",
+      "implementation": "complete",
+      "rust_surface": ["reticulum-rs-core::crypto"],
+      "evidence": ["unit", "pinned-python"]
+    },
+    {
+      "pattern": "RNS.Identity.*",
+      "implementation": "complete",
+      "rust_surface": ["reticulum-rs-core::identity"],
+      "evidence": ["unit", "pinned-python"]
+    },
+    {
+      "pattern": "RNS.Destination.*",
+      "implementation": "complete",
+      "rust_surface": ["reticulum-rs-core::destination", "reticulum-rs-transport::destination"],
+      "evidence": ["unit", "pinned-python"]
+    },
+    {
+      "pattern": "RNS.Packet.*",
+      "implementation": "complete",
+      "rust_surface": ["reticulum-rs-core::packet", "reticulum-rs-transport::packet"],
+      "evidence": ["unit", "pinned-python"]
+    },
+    {
+      "pattern": "RNS.Link.*",
+      "implementation": "complete",
+      "rust_surface": ["reticulum-rs-transport::destination::link"],
+      "evidence": ["unit", "pinned-python"]
+    },
+    {
+      "pattern": "RNS.Resource.*",
+      "implementation": "complete",
+      "rust_surface": ["reticulum-rs-transport::resource"],
+      "evidence": ["unit", "simulated", "pinned-python"],
+      "notes": "Includes ordered split-resource advertisements, proof-gated segment sequencing, reassembly, and segment progress metadata."
+    },
+    {
+      "pattern": "RNS.Channel.*",
+      "implementation": "complete",
+      "rust_surface": ["reticulum-rs-transport::channel"],
+      "evidence": ["unit", "pinned-python"]
+    },
+    {
+      "pattern": "RNS.Buffer.*",
+      "implementation": "complete",
+      "rust_surface": ["reticulum-rs-core::buffer", "reticulum-rs-transport::channel_buffer"],
+      "evidence": ["unit", "pinned-python"]
+    },
+    {
+      "pattern": "RNS.Resolver.*",
+      "implementation": "complete",
+      "rust_surface": ["reticulum-rs-transport::utils::resolver"],
+      "evidence": ["unit", "pinned-python"]
+    },
+    {
+      "pattern": "RNS.Reticulum.Reticulum.drop_path",
+      "implementation": "complete",
+      "rust_surface": ["reticulum-rs-rpc::drop_path", "reticulum-rs-transport::Transport::expire_path"],
+      "evidence": ["unit", "simulated", "pinned-python"]
+    },
+    {
+      "pattern": "RNS.Reticulum.Reticulum.drop_all_via",
+      "implementation": "complete",
+      "rust_surface": ["reticulum-rs-rpc::drop_all_via", "reticulum-rs-transport::Transport::expire_paths_via"],
+      "evidence": ["unit", "simulated", "pinned-python"]
+    },
+    {
+      "pattern": "RNS.Reticulum.Reticulum.drop_announce_queues",
+      "implementation": "complete",
+      "rust_surface": ["reticulum-rs-rpc::drop_announce_queues", "reticulum-rs-transport::Transport::drop_announce_queues"],
+      "evidence": ["unit", "simulated", "pinned-python"]
+    },
+    {
+      "pattern": "RNS.Reticulum.Reticulum.get_rate_table",
+      "implementation": "complete",
+      "rust_surface": ["reticulum-rs-rpc::get_rate_table", "reticulum-rs-transport::Transport::announce_rate_table"],
+      "evidence": ["unit", "simulated", "pinned-python"],
+      "notes": "Retains Python's maximum of 16 timestamps per destination."
+    },
+    {
+      "pattern": "RNS.Reticulum.Reticulum.get_packet_*",
+      "implementation": "complete",
+      "rust_surface": ["reticulum-rs-rpc::get_packet_rssi/get_packet_snr/get_packet_q", "reticulum-rs-transport::Transport::packet_signal"],
+      "evidence": ["unit", "simulated", "pinned-python"],
+      "notes": "Uses Python's 512-entry FIFO retention limit and latest-value lookup."
+    },
+    {
+      "pattern": "RNS.Reticulum.Reticulum.rpc_loop",
+      "implementation": "complete",
+      "rust_surface": ["reticulumd::rpc", "reticulum-rs-rpc::RpcDaemon"],
+      "evidence": ["unit", "simulated"]
+    },
+    {
+      "pattern": "RNS.Reticulum.Reticulum.*blackhole_identity",
+      "implementation": "complete",
+      "rust_surface": ["reticulum-rs-rpc::RpcDaemon", "reticulumd::bridge"],
+      "evidence": ["unit", "simulated", "pinned-python"]
+    },
+    {
+      "pattern": "RNS.Reticulum.Reticulum.get_blackholed_identities",
+      "implementation": "complete",
+      "rust_surface": ["reticulum-rs-rpc::RpcDaemon"],
+      "evidence": ["unit", "simulated", "pinned-python"]
+    },
+    {
+      "pattern": "RNS.Reticulum.Reticulum.get_*hop*",
+      "implementation": "complete",
+      "rust_surface": ["reticulum-rs-rpc::path_status", "reticulum-rs-transport::transport"],
+      "evidence": ["unit", "simulated", "pinned-python"]
+    },
+    {
+      "pattern": "RNS.Reticulum.Reticulum.get_link_count",
+      "implementation": "complete",
+      "rust_surface": ["reticulum-rs-rpc::daemon_status_ex"],
+      "evidence": ["unit", "simulated", "pinned-python"]
+    },
+    {
+      "pattern": "RNS.Reticulum.Reticulum.get_interface_stats",
+      "implementation": "complete",
+      "rust_surface": ["reticulum-rs-rpc::daemon_status_ex", "rns-tools::rnstatus"],
+      "evidence": ["unit", "simulated", "pinned-python", "hardware-unverified"]
+    },
+    {
+      "pattern": "RNS.Reticulum.Reticulum.get_path_table",
+      "implementation": "complete",
+      "rust_surface": ["reticulum-rs-rpc::path_status", "reticulum-rs-transport::reticulum_path_store"],
+      "evidence": ["unit", "simulated", "pinned-python"]
+    },
+    {
+      "pattern": "RNS.Reticulum.Reticulum.*handler",
+      "implementation": "complete",
+      "rust_surface": ["reticulumd::main", "reticulumd::announce_persistence"],
+      "evidence": ["unit", "simulated"]
+    },
+    {
+      "pattern": "RNS.Reticulum.Reticulum.get_instance",
+      "implementation": "complete",
+      "rust_surface": ["reticulum-rs-rpc::RpcDaemon"],
+      "evidence": ["unit"]
+    },
+    {
+      "pattern": "RNS.Reticulum.Reticulum.get_rpc_client",
+      "implementation": "complete",
+      "rust_surface": ["lxmf-sdk::RpcBackendClient", "lxmf-sdk::ZmqPipelineBackendClient"],
+      "evidence": ["unit", "simulated"]
+    },
+    {
+      "pattern": "RNS.Reticulum.Reticulum.halt_interface",
+      "implementation": "complete",
+      "rust_surface": ["reticulum-rs-rpc::set_interfaces"],
+      "evidence": ["unit", "pinned-python"],
+      "notes": "The pinned Python method is a no-op; Rust maps lifecycle mutation to typed interface replacement."
+    },
+    {
+      "pattern": "RNS.Reticulum.Reticulum.resume_interface",
+      "implementation": "complete",
+      "rust_surface": ["reticulum-rs-rpc::set_interfaces"],
+      "evidence": ["unit", "pinned-python"],
+      "notes": "The pinned Python method is a no-op; Rust maps lifecycle mutation to typed interface replacement."
+    },
+    {
+      "pattern": "RNS.Reticulum.Reticulum.reload_interface",
+      "implementation": "complete",
+      "rust_surface": ["reticulum-rs-rpc::reload_config"],
+      "evidence": ["unit", "pinned-python"],
+      "notes": "The pinned Python method is a no-op; Rust provides additive runtime config reload."
+    },
+    {
+      "pattern": "RNS.Reticulum.Reticulum.transport_enabled",
+      "implementation": "complete",
+      "rust_surface": ["reticulumd::config::DaemonConfig::reticulum_transport_enabled"],
+      "evidence": ["unit", "pinned-python"]
+    },
+    {
+      "pattern": "RNS.Reticulum.Reticulum.link_mtu_discovery",
+      "implementation": "complete",
+      "rust_surface": ["reticulumd::config::ReticulumRuntimePolicy"],
+      "evidence": ["unit", "pinned-python"]
+    },
+    {
+      "pattern": "RNS.Reticulum.Reticulum.remote_management_enabled",
+      "implementation": "complete",
+      "rust_surface": ["reticulumd::config::ReticulumRuntimePolicy"],
+      "evidence": ["unit", "pinned-python"]
+    },
+    {
+      "pattern": "RNS.Reticulum.Reticulum.probe_destination_enabled",
+      "implementation": "complete",
+      "rust_surface": ["reticulumd::config::ReticulumRuntimePolicy"],
+      "evidence": ["unit", "pinned-python"]
+    },
+    {
+      "pattern": "RNS.Reticulum.Reticulum.required_discovery_value",
+      "implementation": "complete",
+      "rust_surface": ["reticulumd::config::ReticulumRuntimePolicy"],
+      "evidence": ["unit", "pinned-python"]
+    },
+    {
+      "pattern": "RNS.Reticulum.Reticulum.publish_blackhole_enabled",
+      "implementation": "complete",
+      "rust_surface": ["reticulumd::config::ReticulumRuntimePolicy"],
+      "evidence": ["unit", "pinned-python"]
+    },
+    {
+      "pattern": "RNS.Reticulum.Reticulum.blackhole_sources",
+      "implementation": "complete",
+      "rust_surface": ["reticulumd::config::ReticulumRuntimePolicy"],
+      "evidence": ["unit", "pinned-python"]
+    },
+    {
+      "pattern": "RNS.Reticulum.Reticulum.interface_discovery_sources",
+      "implementation": "complete",
+      "rust_surface": ["reticulumd::config::ReticulumRuntimePolicy"],
+      "evidence": ["unit", "pinned-python"]
+    },
+    {
+      "pattern": "RNS.Reticulum.Reticulum.should_autoconnect_discovered_interfaces",
+      "implementation": "complete",
+      "rust_surface": ["reticulumd::config::ReticulumRuntimePolicy"],
+      "evidence": ["unit", "pinned-python"]
+    },
+    {
+      "pattern": "RNS.Reticulum.Reticulum.max_autoconnected_interfaces",
+      "implementation": "complete",
+      "rust_surface": ["reticulumd::config::ReticulumRuntimePolicy"],
+      "evidence": ["unit", "pinned-python"]
+    },
+    {
+      "pattern": "RNS.Reticulum.Reticulum.should_use_implicit_proof",
+      "implementation": "complete",
+      "rust_surface": ["reticulumd::config::ReticulumRuntimePolicy"],
+      "evidence": ["unit", "pinned-python"]
+    },
+    {
+      "pattern": "RNS.Reticulum.Reticulum.discovered_interfaces",
+      "implementation": "complete",
+      "rust_surface": ["reticulum-rs-rpc::discovered_interfaces", "reticulum-rs-transport::discovery::InterfaceDiscoveryStore"],
+      "evidence": ["unit", "simulated", "pinned-python"],
+      "notes": "Implements Python-compatible persistence, source/type/endpoint filtering, age status transitions, seven-day expiry, and result ordering."
+    },
+    {
+      "pattern": "RNS.Reticulum.Reticulum",
+      "implementation": "complete",
+      "rust_surface": ["reticulumd", "reticulum-rs-rpc::RpcDaemon", "reticulum-rs-transport::Transport"],
+      "evidence": ["unit", "simulated", "pinned-python"]
+    },
+    {
+      "pattern": "RNS.Reticulum.*",
+      "implementation": "partial",
+      "rust_surface": ["reticulumd", "reticulum-rs-rpc::RpcDaemon"],
+      "evidence": ["unit", "simulated", "pinned-python"]
+    },
+    {
+      "pattern": "RNS.Transport.Transport.*path*",
+      "implementation": "complete",
+      "rust_surface": ["reticulum-rs-transport::transport::PathTable", "reticulum-rs-transport::Transport", "reticulum-rs-rpc::path_status/request_path/drop_path"],
+      "evidence": ["unit", "simulated", "pinned-python"]
+    },
+    {
+      "pattern": "RNS.Transport.Transport.*hop*",
+      "implementation": "complete",
+      "rust_surface": ["reticulum-rs-transport::transport::NextHopMetrics", "reticulum-rs-rpc::path_status"],
+      "evidence": ["unit", "simulated", "pinned-python"]
+    },
+    {
+      "pattern": "RNS.Transport.Transport.*tunnel*",
+      "implementation": "complete",
+      "rust_surface": ["reticulum-rs-transport::transport::tunnels"],
+      "evidence": ["unit", "simulated", "pinned-python"]
+    },
+    {
+      "pattern": "RNS.Transport.Transport.*blackhole*",
+      "implementation": "complete",
+      "rust_surface": ["reticulum-rs-rpc::blackhole", "reticulum-rs-transport::discovery::lifecycle::BlackholeUpdateScheduler"],
+      "evidence": ["unit", "simulated", "pinned-python"]
+    },
+    {
+      "pattern": "RNS.Transport.Transport.*destination*",
+      "implementation": "complete",
+      "rust_surface": ["reticulum-rs-transport::Transport::add_destination/deregister_destination", "reticulum-rs-transport::transport::jobs"],
+      "evidence": ["unit", "simulated", "pinned-python"]
+    },
+    {
+      "pattern": "RNS.Transport.Transport.*link*",
+      "implementation": "complete",
+      "rust_surface": ["reticulum-rs-transport::destination::link", "reticulum-rs-transport::transport::LinkTable", "reticulum-rs-transport::transport::NextHopMetrics"],
+      "evidence": ["unit", "simulated", "pinned-python"]
+    },
+    {
+      "pattern": "RNS.Transport.Transport.*announce*",
+      "implementation": "complete",
+      "rust_surface": ["reticulum-rs-transport::Transport::recv_announces", "reticulum-rs-transport::transport::announce", "reticulum-rs-transport::InterfaceManager::drop_announce_queues"],
+      "evidence": ["unit", "simulated", "pinned-python"]
+    },
+    {
+      "pattern": "RNS.Transport.Transport.await_path",
+      "implementation": "complete",
+      "rust_surface": ["reticulum-rs-transport::Transport::await_path"],
+      "evidence": ["unit", "simulated", "pinned-python"]
+    },
+    {
+      "pattern": "RNS.Transport.Transport.add_packet_hash",
+      "implementation": "complete",
+      "rust_surface": ["reticulum-rs-transport::transport::PacketCache"],
+      "evidence": ["unit", "pinned-python"]
+    },
+    {
+      "pattern": "RNS.Transport.Transport.packet_filter",
+      "implementation": "complete",
+      "rust_surface": ["reticulum-rs-transport::transport::PacketCache", "reticulum-rs-transport::transport::handler"],
+      "evidence": ["unit", "simulated", "pinned-python"]
+    },
+    {
+      "pattern": "RNS.Transport.Transport.should_cache",
+      "implementation": "complete",
+      "rust_surface": ["reticulum-rs-transport::transport::reticulum_announce_cache"],
+      "evidence": ["unit", "pinned-python"],
+      "notes": "Pinned Python returns false for ordinary packet caching; Rust retains the forced announce-cache path."
+    },
+    {
+      "pattern": "RNS.Transport.Transport.timebase_from_random_blob*",
+      "implementation": "complete",
+      "rust_surface": ["reticulum-rs-transport::transport::path_table::random_blob_timebase"],
+      "evidence": ["unit", "pinned-python"]
+    },
+    {
+      "pattern": "RNS.Transport.Transport.find_interface_from_hash",
+      "implementation": "complete",
+      "rust_surface": ["reticulum-rs-transport::Transport::find_interface_from_hash"],
+      "evidence": ["unit", "pinned-python"]
+    },
+    {
+      "pattern": "RNS.Transport.Transport.detach_interfaces",
+      "implementation": "complete",
+      "rust_surface": ["reticulum-rs-transport::Transport::detach_interfaces"],
+      "evidence": ["unit", "simulated", "pinned-python"]
+    },
+    {
+      "pattern": "RNS.Transport.Transport.discover_interfaces",
+      "implementation": "complete",
+      "rust_surface": ["reticulum-rs-transport::discovery", "reticulumd::announce_worker"],
+      "evidence": ["unit", "simulated", "pinned-python"]
+    },
+    {
+      "pattern": "RNS.Transport.Transport.start",
+      "implementation": "complete",
+      "rust_surface": ["reticulum-rs-transport::Transport::new", "reticulumd::bootstrap"],
+      "evidence": ["unit", "simulated"]
+    },
+    {
+      "pattern": "RNS.Transport.Transport.job*",
+      "implementation": "complete",
+      "rust_surface": ["reticulum-rs-transport::transport::manage_transport"],
+      "evidence": ["unit", "simulated", "pinned-python"]
+    },
+    {
+      "pattern": "RNS.Transport.Transport.count_traffic_loop",
+      "implementation": "complete",
+      "rust_surface": ["reticulumd::runtime_status", "reticulum-rs-rpc::daemon_status_ex"],
+      "evidence": ["unit", "simulated"]
+    },
+    {
+      "pattern": "RNS.Transport.Transport.exit_handler",
+      "implementation": "complete",
+      "rust_surface": ["reticulumd::announce_persistence", "reticulumd::main"],
+      "evidence": ["unit", "simulated"]
+    },
+    {
+      "pattern": "RNS.Transport.Transport.inbound",
+      "implementation": "complete",
+      "rust_surface": ["reticulum-rs-transport::transport::manage_transport"],
+      "evidence": ["unit", "simulated", "pinned-python"]
+    },
+    {
+      "pattern": "RNS.Transport.Transport.outbound",
+      "implementation": "complete",
+      "rust_surface": ["reticulum-rs-transport::Transport::send_packet"],
+      "evidence": ["unit", "simulated", "pinned-python"]
+    },
+    {
+      "pattern": "RNS.Transport.Transport.transmit",
+      "implementation": "complete",
+      "rust_surface": ["reticulum-rs-transport::InterfaceManager::send"],
+      "evidence": ["unit", "simulated", "pinned-python"]
+    },
+    {
+      "pattern": "RNS.Transport.Transport.*local_client*",
+      "implementation": "complete",
+      "rust_surface": ["reticulum-rs-transport::iface::local", "reticulumd::bootstrap_interface_startup"],
+      "evidence": ["unit", "simulated", "pinned-python"]
+    },
+    {
+      "pattern": "RNS.Transport.Transport.interface_to_shared_instance",
+      "implementation": "complete",
+      "rust_surface": ["reticulum-rs-transport::iface::local", "reticulumd::bootstrap_interface_startup"],
+      "evidence": ["unit", "simulated", "pinned-python"]
+    },
+    {
+      "pattern": "RNS.Transport.Transport.shared_connection_*",
+      "implementation": "complete",
+      "rust_surface": ["reticulum-rs-transport::iface::local", "reticulum-rs-transport::iface::tcp_client"],
+      "evidence": ["unit", "simulated", "pinned-python"]
+    },
+    {
+      "pattern": "RNS.Transport.Transport.remote_*_handler",
+      "implementation": "complete",
+      "rust_surface": ["reticulum-rs-rpc::RpcDaemon", "reticulumd::bridge_remote_control"],
+      "evidence": ["unit", "simulated", "pinned-python"]
+    },
+    {
+      "pattern": "RNS.Transport.Transport.cache*",
+      "implementation": "complete",
+      "rust_surface": ["reticulum-rs-transport::ReticulumPacketDiskCache", "reticulum-rs-transport::Transport::cache_packet/get_cached_packet"],
+      "evidence": ["unit", "simulated", "pinned-python"],
+      "notes": "Uses Python's MessagePack [raw_packet, interface_reference] persisted shape."
+    },
+    {
+      "pattern": "RNS.Transport.Transport.get_cached_packet",
+      "implementation": "complete",
+      "rust_surface": ["reticulum-rs-transport::Transport::get_cached_packet"],
+      "evidence": ["unit", "pinned-python"]
+    },
+    {
+      "pattern": "RNS.Transport.Transport.clean_cache",
+      "implementation": "complete",
+      "rust_surface": ["reticulum-rs-transport::ReticulumPacketDiskCache::clean_announces"],
+      "evidence": ["unit", "simulated", "pinned-python"]
+    },
+    {
+      "pattern": "RNS.Transport.Transport.enable_discovery",
+      "implementation": "complete",
+      "rust_surface": ["reticulum-rs-transport::Transport::enable_discovery", "reticulumd::announce_worker"],
+      "evidence": ["unit", "simulated", "pinned-python"]
+    },
+    {
+      "pattern": "RNS.Transport.Transport.*network_identity",
+      "implementation": "complete",
+      "rust_surface": ["reticulum-rs-transport::Transport::set_network_identity/has_network_identity"],
+      "evidence": ["unit", "pinned-python"]
+    },
+    {
+      "pattern": "RNS.Transport.Transport.persist_data",
+      "implementation": "complete",
+      "rust_surface": ["reticulum-rs-transport::Transport::persist_data"],
+      "evidence": ["unit", "simulated", "pinned-python"]
+    },
+    {
+      "pattern": "RNS.Transport.Transport.save_packet_hashlist",
+      "implementation": "complete",
+      "rust_surface": ["reticulum-rs-transport::Transport::save_packet_hashlist"],
+      "evidence": ["unit", "pinned-python"],
+      "notes": "Persists the Python-compatible MessagePack list of full packet hashes."
+    },
+    {
+      "pattern": "RNS.Transport.Transport.prioritize_interfaces",
+      "implementation": "complete",
+      "rust_surface": ["reticulum-rs-transport::InterfaceManager::prioritize_interfaces"],
+      "evidence": ["unit", "pinned-python"]
+    },
+    {
+      "pattern": "RNS.Transport.Transport",
+      "implementation": "complete",
+      "rust_surface": ["reticulum-rs-transport::Transport", "reticulumd", "reticulum-rs-rpc::RpcDaemon"],
+      "evidence": ["unit", "simulated", "pinned-python"]
+    },
+    {
+      "pattern": "RNS.Transport.*",
+      "implementation": "partial",
+      "rust_surface": ["reticulum-rs-transport::transport", "reticulumd"],
+      "evidence": ["unit", "simulated", "pinned-python"]
+    },
+    {
+      "pattern": "RNS.Discovery.InterfaceAnnouncer*",
+      "implementation": "complete",
+      "rust_surface": ["reticulum-rs-transport::discovery::announce", "reticulum-rs-transport::discovery::lifecycle::InterfaceAnnounceScheduler"],
+      "evidence": ["unit", "simulated", "pinned-python"],
+      "notes": "Includes Python-compatible sanitization, MessagePack fields, 20-round LXStamper workblock, proof-of-work validation, encrypted callback boundary, and most-overdue scheduling."
+    },
+    {
+      "pattern": "RNS.Discovery.InterfaceAnnounceHandler*",
+      "implementation": "complete",
+      "rust_surface": ["reticulum-rs-transport::discovery::announce::decode_announce", "reticulumd::announce_worker"],
+      "evidence": ["unit", "simulated", "pinned-python"]
+    },
+    {
+      "pattern": "RNS.Discovery.InterfaceDiscovery.list_discovered_interfaces",
+      "implementation": "complete",
+      "rust_surface": ["reticulum-rs-transport::discovery::InterfaceDiscoveryStore::list", "reticulum-rs-rpc::discovered_interfaces"],
+      "evidence": ["unit", "simulated", "pinned-python"]
+    },
+    {
+      "pattern": "RNS.Discovery.InterfaceDiscovery.interface_discovered",
+      "implementation": "complete",
+      "rust_surface": ["reticulum-rs-transport::discovery::InterfaceDiscoveryStore::observe", "reticulumd::announce_worker"],
+      "evidence": ["unit", "simulated", "pinned-python"]
+    },
+    {
+      "pattern": "RNS.Discovery.InterfaceDiscovery.endpoint_hash",
+      "implementation": "complete",
+      "rust_surface": ["reticulum-rs-transport::discovery::lifecycle::endpoint_hash"],
+      "evidence": ["unit", "pinned-python"]
+    },
+    {
+      "pattern": "RNS.Discovery.InterfaceDiscovery.interface_exists",
+      "implementation": "complete",
+      "rust_surface": ["reticulum-rs-transport::discovery::lifecycle::interface_exists"],
+      "evidence": ["unit", "pinned-python"]
+    },
+    {
+      "pattern": "RNS.Discovery.InterfaceDiscovery.*_count",
+      "implementation": "complete",
+      "rust_surface": ["reticulum-rs-transport::discovery::lifecycle"],
+      "evidence": ["unit", "pinned-python"]
+    },
+    {
+      "pattern": "RNS.Discovery.BlackholeUpdater.start",
+      "implementation": "complete",
+      "rust_surface": ["reticulum-rs-transport::discovery::lifecycle::BlackholeUpdateScheduler::start"],
+      "evidence": ["unit", "pinned-python"]
+    },
+    {
+      "pattern": "RNS.Discovery.BlackholeUpdater.stop",
+      "implementation": "complete",
+      "rust_surface": ["reticulum-rs-transport::discovery::lifecycle::BlackholeUpdateScheduler::stop"],
+      "evidence": ["unit", "pinned-python"]
+    },
+    {
+      "pattern": "RNS.Discovery.is_*",
+      "implementation": "complete",
+      "rust_surface": ["reticulum-rs-transport::discovery::is_ip_address/is_hostname"],
+      "evidence": ["unit", "pinned-python"]
+    },
+    {
+      "pattern": "RNS.Discovery.*",
+      "implementation": "complete",
+      "rust_surface": ["reticulum-rs-transport::discovery", "reticulum-rs-transport::iface::auto", "reticulumd"],
+      "evidence": ["unit", "simulated", "pinned-python"],
+      "notes": "Lifecycle side effects are exposed as deterministic Rust plans applied by daemon/transport boundaries; physical carrier behavior is not claimed."
+    },
+    {
+      "pattern": "RNS.Interfaces.Meshtastic.*",
+      "implementation": "complete",
+      "rust_surface": [
+        "reticulum-rs-transport::iface::meshtastic",
+        "reticulumd::interfaces::meshtastic"
+      ],
+      "evidence": ["unit", "simulated", "hardware-unverified"],
+      "notes": "Daemon lifecycle uses an explicit deterministic loopback bearer; native device operation is not physically validated."
+    },
+    {
+      "pattern": "RNS.Interfaces.Interface.*",
+      "implementation": "complete",
+      "rust_surface": ["reticulum-rs-transport::iface::Interface", "reticulum-rs-transport::InterfaceManager"],
+      "evidence": ["unit", "simulated", "pinned-python"]
+    },
+    {
+      "pattern": "RNS.Interfaces.util.*",
+      "implementation": "complete",
+      "rust_surface": ["reticulum-rs-transport::iface::driver", "reticulum-rs-transport::iface::hdlc"],
+      "evidence": ["unit", "simulated", "pinned-python"]
+    },
+    {
+      "pattern": "RNS.Interfaces.TCPInterface.*",
+      "implementation": "complete",
+      "rust_surface": ["reticulum-rs-transport::iface::tcp_client", "reticulum-rs-transport::iface::tcp_server", "reticulumd::interfaces"],
+      "evidence": ["unit", "simulated", "pinned-python", "hardware-unverified"]
+    },
+    {
+      "pattern": "RNS.Interfaces.BackboneInterface.*",
+      "implementation": "complete",
+      "rust_surface": ["reticulum-rs-transport::iface::tcp_client", "reticulum-rs-transport::iface::tcp_server", "reticulum-rs-transport::iface::hdlc"],
+      "evidence": ["unit", "simulated", "pinned-python", "hardware-unverified"]
+    },
+    {
+      "pattern": "RNS.Interfaces.LocalInterface.*",
+      "implementation": "complete",
+      "rust_surface": ["reticulum-rs-transport::iface::local", "reticulumd::bootstrap_interface_startup"],
+      "evidence": ["unit", "simulated", "pinned-python"]
+    },
+    {
+      "pattern": "RNS.Interfaces.PipeInterface.*",
+      "implementation": "complete",
+      "rust_surface": ["reticulum-rs-transport::iface::pipe", "reticulumd::interface_hot_apply"],
+      "evidence": ["unit", "simulated", "pinned-python"]
+    },
+    {
+      "pattern": "RNS.Interfaces.UDPInterface.*",
+      "implementation": "complete",
+      "rust_surface": ["reticulum-rs-transport::iface::udp", "reticulumd::interface_hot_apply"],
+      "evidence": ["unit", "simulated", "pinned-python", "hardware-unverified"]
+    },
+    {
+      "pattern": "RNS.Interfaces.SerialInterface.*",
+      "implementation": "complete",
+      "rust_surface": ["reticulum-rs-transport::iface::serial", "reticulumd::bootstrap_interface_startup"],
+      "evidence": ["unit", "simulated", "pinned-python", "hardware-unverified"]
+    },
+    {
+      "pattern": "RNS.Interfaces.KISSInterface.*",
+      "implementation": "complete",
+      "rust_surface": ["reticulum-rs-transport::iface::kiss", "reticulum-rs-transport::kiss"],
+      "evidence": ["unit", "simulated", "pinned-python", "hardware-unverified"]
+    },
+    {
+      "pattern": "RNS.Interfaces.AX25KISSInterface.*",
+      "implementation": "complete",
+      "rust_surface": ["reticulum-rs-transport::iface::kiss", "reticulum-rs-transport::kiss::Ax25Kiss"],
+      "evidence": ["unit", "simulated", "pinned-python", "hardware-unverified"]
+    },
+    {
+      "pattern": "RNS.Interfaces.AutoInterface.*",
+      "implementation": "complete",
+      "rust_surface": ["reticulum-rs-transport::iface::auto", "reticulumd::interfaces::auto"],
+      "evidence": ["unit", "simulated", "prepared-host", "pinned-python", "hardware-unverified"]
+    },
+    {
+      "pattern": "RNS.Interfaces.I2PInterface.*",
+      "implementation": "complete",
+      "rust_surface": ["reticulum-rs-transport::iface::i2p", "reticulumd::bootstrap_interface_startup"],
+      "evidence": ["unit", "simulated", "prepared-host", "pinned-python", "hardware-unverified"],
+      "notes": "Fake-SAM and prepared-host evidence prove software lifecycle; public I2P operation is not claimed."
+    },
+    {
+      "pattern": "RNS.Interfaces.RNodeInterface.*",
+      "implementation": "complete",
+      "rust_surface": ["reticulum-rs-transport::iface::lora", "reticulum-rs-transport::iface::rnode_ble", "reticulumd::bridge_rnode_management"],
+      "evidence": ["unit", "simulated", "prepared-host", "pinned-python", "hardware-unverified"]
+    },
+    {
+      "pattern": "RNS.Interfaces.RNodeMultiInterface.*",
+      "implementation": "complete",
+      "rust_surface": ["reticulum-rs-transport::iface::rnode_multi", "reticulumd::bootstrap_interface_startup"],
+      "evidence": ["unit", "simulated", "prepared-host", "pinned-python", "hardware-unverified"]
+    },
+    {
+      "pattern": "RNS.Interfaces.WeaveInterface.*",
+      "implementation": "complete",
+      "rust_surface": ["reticulum-rs-transport::iface::weave", "reticulumd::bridge_weave_control"],
+      "evidence": ["unit", "simulated", "prepared-host", "pinned-python", "hardware-unverified"]
+    },
+    {
+      "pattern": "RNS.Interfaces.Android.*",
+      "implementation": "complete",
+      "rust_surface": ["reticulum-rs-transport::iface::rnode_ble", "reticulum-rs-transport::iface::rnode_spp", "reticulum-rs-transport::iface::vrn76_kiss_ble", "reticulumd::interfaces::ble"],
+      "evidence": ["unit", "simulated", "prepared-host", "pinned-python", "hardware-unverified"]
+    },
+    {
+      "pattern": "RNS.Interfaces.*",
+      "implementation": "partial",
+      "rust_surface": ["reticulum-rs-transport::iface", "reticulumd::interfaces"],
+      "evidence": ["unit", "simulated", "hardware-unverified"]
+    },
+    {
+      "pattern": "RNS.Utilities.rnx.*",
+      "implementation": "complete",
+      "rust_surface": ["rns-tools::rnx"],
+      "evidence": ["unit", "simulated", "pinned-python"]
+    },
+    {
+      "pattern": "RNS.Utilities.rnsd.*",
+      "implementation": "complete",
+      "rust_surface": ["rns-tools::rnsd", "reticulumd"],
+      "evidence": ["unit", "simulated", "pinned-python"]
+    },
+    {
+      "pattern": "RNS.Utilities.rnstatus.*",
+      "implementation": "complete",
+      "rust_surface": ["rns-tools::rnstatus", "rns-tools::rnstatus-rs"],
+      "evidence": ["unit", "simulated", "pinned-python", "hardware-unverified"]
+    },
+    {
+      "pattern": "RNS.Utilities.rnpath.*",
+      "implementation": "complete",
+      "rust_surface": ["rns-tools::rnpath", "rns-tools::rnpath-rs"],
+      "evidence": ["unit", "simulated", "pinned-python"]
+    },
+    {
+      "pattern": "RNS.Utilities.rnodeconf.*",
+      "implementation": "complete",
+      "rust_surface": ["rns-tools::rnodeconf", "rns-tools::rnodeconf-rs", "reticulumd::bridge_rnode_management"],
+      "evidence": ["unit", "simulated", "prepared-host", "pinned-python", "hardware-unverified"]
+    },
+    {
+      "pattern": "RNS.Utilities.rncp.*",
+      "implementation": "complete",
+      "rust_surface": ["rns-tools::rncp", "reticulum-rs-transport::resource"],
+      "evidence": ["unit", "simulated", "pinned-python"]
+    },
+    {
+      "pattern": "RNS.Utilities.rnid.*",
+      "implementation": "complete",
+      "rust_surface": ["rns-tools::rnid", "reticulum-rs-transport::identity"],
+      "evidence": ["unit", "pinned-python"]
+    },
+    {
+      "pattern": "RNS.Utilities.rnir.*",
+      "implementation": "complete",
+      "rust_surface": ["rns-tools::rnir", "reticulum-rs-rpc::identity"],
+      "evidence": ["unit", "simulated", "pinned-python"]
+    },
+    {
+      "pattern": "RNS.Utilities.rnpkg.*",
+      "implementation": "complete",
+      "rust_surface": ["rns-tools::rnpkg", "reticulum-rs-transport::resource"],
+      "evidence": ["unit", "simulated", "pinned-python"]
+    },
+    {
+      "pattern": "RNS.Utilities.rnprobe.*",
+      "implementation": "complete",
+      "rust_surface": ["rns-tools::rnprobe", "rns-tools::rnpath"],
+      "evidence": ["unit", "simulated", "pinned-python"]
+    },
+    {
+      "pattern": "RNS.Utilities.rnsh.*",
+      "implementation": "complete",
+      "rust_surface": ["rns-tools::rnsh", "lxmf-sdk::RemoteCommandRequest", "reticulumd::remote_control"],
+      "evidence": ["unit", "simulated", "pinned-python"],
+      "notes": "Default-deny command authorization is exercised with isolated subprocess fixtures."
+    },
+    {
+      "pattern": "RNS.Utilities.rngit.*",
+      "implementation": "complete",
+      "rust_surface": ["rns-tools::rngit", "rns-tools::rncp", "rns-tools::rnsh"],
+      "evidence": ["unit", "simulated", "pinned-python"],
+      "notes": "Local isolated repositories and Git bundles provide deterministic transport workflow evidence."
+    },
+    {
+      "pattern": "RNS.Utilities.cli-contracts",
+      "implementation": "complete",
+      "rust_surface": ["rns-tools"],
+      "evidence": ["unit", "simulated", "pinned-python"]
+    },
+    {
+      "pattern": "RNS.Utilities.*",
+      "implementation": "partial",
+      "rust_surface": ["rns-tools"],
+      "evidence": ["unit", "simulated", "pinned-python"]
+    },
+    {
+      "pattern": "RNS.*",
+      "implementation": "complete",
+      "rust_surface": ["reticulum-rs-core", "reticulum-rs-transport"],
+      "evidence": ["unit", "pinned-python"]
+    },
+    {
+      "pattern": "LXMF.LXMF.*",
+      "implementation": "complete",
+      "rust_surface": ["lxmf-wire::announce"],
+      "evidence": ["unit", "pinned-python"]
+    },
+    {
+      "pattern": "LXMF.LXMessage.*",
+      "implementation": "complete",
+      "rust_surface": ["lxmf-wire::message"],
+      "evidence": ["unit", "pinned-python"]
+    },
+    {
+      "pattern": "LXMF.LXMPeer.*",
+      "implementation": "complete",
+      "rust_surface": ["reticulum-rs-rpc::propagation_peer"],
+      "evidence": ["unit", "pinned-python"]
+    },
+    {
+      "pattern": "LXMF.LXStamper.*",
+      "implementation": "complete",
+      "rust_surface": ["lxmf-wire::stamp", "reticulumd::bridge"],
+      "evidence": ["unit", "pinned-python"]
+    },
+    {
+      "pattern": "LXMF.LXMRouter.LXMRouter.*storage*",
+      "implementation": "complete",
+      "rust_surface": ["reticulum-rs-rpc::router_storage_policy", "lxmf-sdk::RouterStoragePolicy", "lxmf-runtime::InProcessBackend"],
+      "evidence": ["unit", "simulated", "pinned-python"]
+    },
+    {
+      "pattern": "LXMF.LXMRouter.LXMRouter.compile_stats",
+      "implementation": "complete",
+      "rust_surface": ["reticulum-rs-rpc::router_stats", "lxmf-sdk::RouterStats"],
+      "evidence": ["unit", "simulated", "pinned-python"]
+    },
+    {
+      "pattern": "LXMF.LXMRouter.LXMRouter.get_size",
+      "implementation": "complete",
+      "rust_surface": ["reticulum-rs-rpc::MessagesStore::message_storage_stats"],
+      "evidence": ["unit", "pinned-python"]
+    },
+    {
+      "pattern": "LXMF.LXMRouter.LXMRouter.get_weight",
+      "implementation": "complete",
+      "rust_surface": ["reticulum-rs-rpc::peer_sync_weight"],
+      "evidence": ["unit", "pinned-python"]
+    },
+    {
+      "pattern": "LXMF.LXMRouter.LXMRouter.*ticket*",
+      "implementation": "complete",
+      "rust_surface": ["reticulum-rs-rpc::ticket_cache", "lxmf-sdk::DeliveryTicketGenerateResult"],
+      "evidence": ["unit", "simulated", "pinned-python"]
+    },
+    {
+      "pattern": "LXMF.LXMRouter.LXMRouter.*stamp*",
+      "implementation": "complete",
+      "rust_surface": ["lxmf-wire::stamp", "reticulum-rs-rpc::stamp_policy", "lxmf-sdk::DeliveryStampPolicyResult"],
+      "evidence": ["unit", "simulated", "pinned-python"]
+    },
+    {
+      "pattern": "LXMF.LXMRouter.LXMRouter.*propagation*",
+      "implementation": "complete",
+      "rust_surface": ["reticulum-rs-rpc::propagation", "reticulumd::bridge_propagation", "lxmf-sdk::PropagationStatusResult"],
+      "evidence": ["unit", "simulated", "pinned-python"]
+    },
+    {
+      "pattern": "LXMF.LXMRouter.LXMRouter.*delivery*",
+      "implementation": "complete",
+      "rust_surface": ["reticulumd::bridge_delivery_task", "reticulum-rs-rpc::delivery", "lxmf-sdk::DeliverySnapshot"],
+      "evidence": ["unit", "simulated", "pinned-python"]
+    },
+    {
+      "pattern": "LXMF.LXMRouter.LXMRouter.resource_*",
+      "implementation": "complete",
+      "rust_surface": ["reticulum-rs-transport::resource", "reticulumd::bridge_propagation"],
+      "evidence": ["unit", "simulated", "pinned-python"]
+    },
+    {
+      "pattern": "LXMF.LXMRouter.LXMRouter.message_get_*",
+      "implementation": "complete",
+      "rust_surface": ["reticulum-rs-rpc::MessagesStore", "reticulum-rs-rpc::propagation_fetch"],
+      "evidence": ["unit", "simulated", "pinned-python"]
+    },
+    {
+      "pattern": "LXMF.LXMRouter.LXMRouter.message_list_response",
+      "implementation": "complete",
+      "rust_surface": ["reticulum-rs-rpc::MessagesStore", "reticulum-rs-rpc::propagation_fetch"],
+      "evidence": ["unit", "simulated", "pinned-python"]
+    },
+    {
+      "pattern": "LXMF.LXMRouter.LXMRouter.*peer*",
+      "implementation": "complete",
+      "rust_surface": ["reticulum-rs-rpc::peer_sync", "reticulum-rs-rpc::propagation_peer_maintenance"],
+      "evidence": ["unit", "simulated", "pinned-python"]
+    },
+    {
+      "pattern": "LXMF.LXMRouter.LXMRouter.*announce*",
+      "implementation": "complete",
+      "rust_surface": ["reticulumd::announce_ingest", "reticulum_daemon::announce_names", "reticulum-rs-rpc::announce_now"],
+      "evidence": ["unit", "simulated", "pinned-python"]
+    },
+    {
+      "pattern": "LXMF.LXMRouter.LXMRouter.*outbound*",
+      "implementation": "complete",
+      "rust_surface": ["reticulum-rs-rpc::sdk_outbound", "reticulumd::bridge_delivery_task", "lxmf-sdk::SdkBackend"],
+      "evidence": ["unit", "simulated", "pinned-python"]
+    },
+    {
+      "pattern": "LXMF.LXMRouter.LXMRouter.clean_*",
+      "implementation": "complete",
+      "rust_surface": ["reticulum-rs-rpc::MessagesStore", "reticulum-rs-rpc::RpcDaemon::maintenance"],
+      "evidence": ["unit", "simulated", "pinned-python"]
+    },
+    {
+      "pattern": "LXMF.LXMRouter.LXMRouter.save_*",
+      "implementation": "complete",
+      "rust_surface": ["reticulum-rs-rpc::MessagesStore", "reticulumd::announce_persistence"],
+      "evidence": ["unit", "simulated", "pinned-python"]
+    },
+    {
+      "pattern": "LXMF.LXMRouter.LXMRouter.*queue*",
+      "implementation": "complete",
+      "rust_surface": ["reticulum-rs-rpc::sdk_outbound", "reticulum-rs-rpc::peer_sync"],
+      "evidence": ["unit", "simulated", "pinned-python"]
+    },
+    {
+      "pattern": "LXMF.LXMRouter.LXMRouter.*allow*",
+      "implementation": "complete",
+      "rust_surface": ["reticulum-rs-rpc::DeliveryPolicy", "lxmf-sdk::PropagationDeliveryPolicyState"],
+      "evidence": ["unit", "simulated", "pinned-python"]
+    },
+    {
+      "pattern": "LXMF.LXMRouter.LXMRouter.*ignore*",
+      "implementation": "complete",
+      "rust_surface": ["reticulum-rs-rpc::DeliveryPolicy"],
+      "evidence": ["unit", "simulated", "pinned-python"]
+    },
+    {
+      "pattern": "LXMF.LXMRouter.LXMRouter.*prioritis*",
+      "implementation": "complete",
+      "rust_surface": ["reticulum-rs-rpc::DeliveryPolicy"],
+      "evidence": ["unit", "simulated", "pinned-python"]
+    },
+    {
+      "pattern": "LXMF.LXMRouter.LXMRouter.*authentication*",
+      "implementation": "complete",
+      "rust_surface": ["reticulum-rs-rpc::DeliveryPolicy"],
+      "evidence": ["unit", "simulated", "pinned-python"]
+    },
+    {
+      "pattern": "LXMF.LXMRouter.LXMRouter.identity_allowed",
+      "implementation": "complete",
+      "rust_surface": ["reticulum-rs-rpc::DeliveryPolicy"],
+      "evidence": ["unit", "pinned-python"]
+    },
+    {
+      "pattern": "LXMF.LXMRouter.LXMRouter.lxmf_*",
+      "implementation": "complete",
+      "rust_surface": ["reticulumd::bridge", "reticulum-rs-rpc::RpcDaemon"],
+      "evidence": ["unit", "simulated", "pinned-python"]
+    },
+    {
+      "pattern": "LXMF.LXMRouter.LXMRouter.*message",
+      "implementation": "complete",
+      "rust_surface": ["reticulum-rs-rpc::MessagesStore", "reticulum-rs-rpc::sdk_outbound"],
+      "evidence": ["unit", "simulated", "pinned-python"]
+    },
+    {
+      "pattern": "LXMF.LXMRouter.LXMRouter.ingest_lxm_uri",
+      "implementation": "complete",
+      "rust_surface": ["reticulum-rs-rpc::paper_ingest_uri", "lxmf-sdk::PaperDecodeResult"],
+      "evidence": ["unit", "simulated", "pinned-python"]
+    },
+    {
+      "pattern": "LXMF.LXMRouter.LXMRouter.offer_request",
+      "implementation": "complete",
+      "rust_surface": ["reticulum-rs-rpc::peer_sync"],
+      "evidence": ["unit", "simulated", "pinned-python"]
+    },
+    {
+      "pattern": "LXMF.LXMRouter.LXMRouter.jobs",
+      "implementation": "complete",
+      "rust_surface": ["reticulum-rs-rpc::RpcDaemon::maintenance", "reticulumd::receipt_worker"],
+      "evidence": ["unit", "simulated"]
+    },
+    {
+      "pattern": "LXMF.LXMRouter.LXMRouter.acknowledge_sync_completion",
+      "implementation": "complete",
+      "rust_surface": ["reticulum-rs-rpc::propagation_acknowledge_sync_completion", "lxmf-sdk::PropagationAcknowledgeSyncResult"],
+      "evidence": ["unit", "simulated", "pinned-python"]
+    },
+    {
+      "pattern": "LXMF.LXMRouter.LXMRouter.request_messages_path_job",
+      "implementation": "complete",
+      "rust_surface": ["reticulumd::bridge_propagation", "reticulum-rs-transport::Transport::await_path"],
+      "evidence": ["unit", "simulated", "pinned-python"]
+    },
+    {
+      "pattern": "LXMF.LXMRouter.LXMRouter.set_retain_node_lxms",
+      "implementation": "complete",
+      "rust_surface": ["lxmf-sdk::RouterStoragePolicyPatch", "reticulum-rs-rpc::router_storage_policy_set"],
+      "evidence": ["unit", "simulated", "pinned-python"]
+    },
+    {
+      "pattern": "LXMF.LXMRouter.LXMRouter.stats_get_request",
+      "implementation": "complete",
+      "rust_surface": ["lxmf-sdk::RouterStats", "reticulum-rs-rpc::router_stats"],
+      "evidence": ["unit", "simulated", "pinned-python"]
+    },
+    {
+      "pattern": "LXMF.LXMRouter.LXMRouter.jobloop",
+      "implementation": "complete",
+      "rust_surface": ["reticulumd::runtime_workers"],
+      "evidence": ["unit", "simulated"]
+    },
+    {
+      "pattern": "LXMF.LXMRouter.LXMRouter.*handler",
+      "implementation": "complete",
+      "rust_surface": ["reticulumd::main", "reticulumd::receipt_worker"],
+      "evidence": ["unit", "simulated"]
+    },
+    {
+      "pattern": "LXMF.LXMRouter.LXMRouter",
+      "implementation": "complete",
+      "rust_surface": ["reticulum-rs-rpc::RpcDaemon", "lxmf-sdk::SdkBackend", "lxmf-runtime::InProcessBackend"],
+      "evidence": ["unit", "simulated", "pinned-python"]
+    },
+    {
+      "pattern": "LXMF.LXMRouter.*",
+      "implementation": "partial",
+      "rust_surface": ["reticulum-rs-rpc::RpcDaemon", "lxmf-sdk", "lxmf-runtime"],
+      "evidence": ["unit", "simulated", "pinned-python"]
+    },
+    {
+      "pattern": "LXMF.Handlers.*",
+      "implementation": "complete",
+      "rust_surface": ["reticulumd::bridge", "reticulum-rs-rpc::events", "lxmf-sdk::event"],
+      "evidence": ["unit", "simulated", "pinned-python"]
+    },
+    {
+      "pattern": "LXMF.Utilities.*",
+      "implementation": "complete",
+      "rust_surface": ["lxmf-cli::lxmd"],
+      "evidence": ["unit", "simulated", "pinned-python"]
+    },
+    {
+      "pattern": "LXMF.*",
+      "implementation": "complete",
+      "rust_surface": ["lxmf-wire", "lxmf-sdk"],
+      "evidence": ["unit", "pinned-python"]
+    },
+    {
+      "pattern": "CRNS.*",
+      "implementation": "not-applicable",
+      "rust_surface": ["docs/status/reticulum-parity-matrix.md"],
+      "evidence": ["pinned-python"],
+      "notes": "No CRNS package exists in the pinned Reticulum or LXMF references."
+    }
+  ],
+  "manual_items": [
+    {
+      "id": "RNS.Resource.segmented-transfer-contract",
+      "kind": "protocol",
+      "source": "RNS/Resource.py"
+    },
+    {
+      "id": "RNS.Interfaces.Meshtastic.daemon-lifecycle",
+      "kind": "interface",
+      "source": "software extension"
+    },
+    {
+      "id": "RNS.Utilities.cli-contracts",
+      "kind": "cli",
+      "source": "RNS/Utilities"
+    },
+    {
+      "id": "LXMF.Utilities.lxmd.cli-contract",
+      "kind": "cli",
+      "source": "LXMF/Utilities/lxmd.py"
+    },
+    {
+      "id": "CRNS.provenance",
+      "kind": "provenance",
+      "source": "pinned references"
+    }
+  ]
+}

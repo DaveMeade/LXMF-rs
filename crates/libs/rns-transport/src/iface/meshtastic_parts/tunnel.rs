@@ -63,12 +63,22 @@ impl MeshtasticTunnel {
     ) -> Result<Option<Vec<u8>>, String> {
         self.status.chunks_rx = self.status.chunks_rx.saturating_add(1);
         if frame.payload.starts_with(REQUEST_PREFIX) {
-            self.queue_retransmit_request(&frame.payload[REQUEST_PREFIX.len()..])?;
+            if let Err(error) = self.queue_retransmit_request(&frame.payload[REQUEST_PREFIX.len()..])
+            {
+                self.record_decode_error(&error);
+                return Err(error);
+            }
             self.refresh_status();
             return Ok(None);
         }
 
-        let (new_index, position) = MeshtasticPacketHandler::metadata(&frame.payload)?;
+        let (new_index, position) = match MeshtasticPacketHandler::metadata(&frame.payload) {
+            Ok(metadata) => metadata,
+            Err(error) => {
+                self.record_decode_error(&error);
+                return Err(error);
+            }
+        };
         let abs_position = position.unsigned_abs();
         let expected_key = (new_index, abs_position);
         let mut missing_request = None;
@@ -95,7 +105,13 @@ impl MeshtasticTunnel {
             let by_index = self.assembly.entry(frame.from).or_default();
             let handler =
                 by_index.entry(new_index).or_insert_with(MeshtasticPacketHandler::new_inbound);
-            let complete = handler.process_payload(&frame.payload)?;
+            let complete = match handler.process_payload(&frame.payload) {
+                Ok(complete) => complete,
+                Err(error) => {
+                    self.record_decode_error(&error);
+                    return Err(error);
+                }
+            };
             let first_missing_position = handler.first_missing_position();
             (complete, first_missing_position)
         };
@@ -248,6 +264,12 @@ impl MeshtasticTunnel {
     fn refresh_status(&mut self) {
         self.status.queued_transmissions = self.packet_queue.len();
         self.status.destination_routes = self.dest_to_node.len();
+    }
+
+    fn record_decode_error(&mut self, error: &str) {
+        self.status.decode_errors = self.status.decode_errors.saturating_add(1);
+        self.status.last_error = Some(error.to_string());
+        self.refresh_status();
     }
 }
 

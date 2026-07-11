@@ -1,67 +1,67 @@
 # LXMF Parity Matrix
 
-Last reassessed: 2026-07-06
+Last reassessed: 2026-07-10
 
 This is the maintained row-level status for Python LXMF compatibility.
 Repository-level posture and execution order live in
 `docs/status/current-roadmap.md`.
 
-Status legend:
+Parity is recorded on two independent axes:
 
-- `done`: implemented in the active workspace and backed by active tests.
-- `partial`: useful behavior exists, but identified Python behavior or evidence
-  remains missing.
-- `not-started`: no meaningful active implementation.
+- implementation: `complete`, `partial`, or `not-applicable`;
+- evidence: one or more of `unit`, `simulated`, `pinned-python`,
+  `prepared-host`, or `hardware-unverified`.
 
 Workspace paths are used for navigation. `crates/libs/lxmf-core` publishes as
 `lxmf-wire`; `crates/libs/rns-rpc` publishes as `reticulum-rs-rpc`.
 
 ## Module Matrix
 
-| Python module | Rust surface | Status | Implemented baseline | Residual gap |
-| --- | --- | --- | --- | --- |
-| `LXMF/LXMF.py` | `crates/libs/lxmf-core` | done | Pinned module constants, payload fields, message identity, inbound decoding, wire helpers, delivery app-data helpers, compression support detection, and propagation-node announce helper validation. | No confirmed `LXMF.py` blocker in the pinned Python reference. |
-| `LXMF/LXMessage.py` | `crates/libs/lxmf-core` | done | Wire, storage, propagation, paper, signatures, message IDs, binary fidelity, and timestamp precision metadata. | No confirmed base-message blocker. |
-| `LXMF/LXMPeer.py` | `crates/libs/rns-rpc`, `crates/apps/reticulumd` | done | Persistent peers, queue marks, offer selection, policy gates, peering keys, throttling, maintenance, source accounting, cumulative acceptance, serialized restored queue snapshots, boolean/list/numeric offer responses, transfer/retry/restart recovery, and unpeer cleanup. | No confirmed `LXMPeer.py` blocker in the pinned Python-only coverage. |
-| `LXMF/LXMRouter.py` | `crates/libs/rns-rpc`, `crates/apps/reticulumd`, `crates/apps/lxmf-cli` | partial | Outbound modes, selected propagation nodes, direct/propagated resources, cancellation, fetch/download/sync RPCs, receipts, persistence, propagation-node side effects, retry/failure handling, Python-style delivery-policy convenience mutators, delivery-announce wakeup for stored pending direct/opportunistic outbound work including reticulumd identity/path miss deferral, CLI paper encode/decode access to the SDK paper surface, and Python live remote lifecycle coverage. | No confirmed propagation-router lifecycle blocker remains; broader non-propagation router convenience surface remains narrower than Python. |
-| `LXMF/Handlers.py` | `crates/apps/reticulumd`, `crates/libs/rns-rpc` | partial | Delivery, announce, propagation app-data, receipt, inbound bridge handling, transport-origin delivery receipts publishing the same pollable SDK `receipt` event payload fields as RPC-origin receipts, successful direct packet/resource deliveries publishing SDK-pollable raw inbound events with LXMF bytes plus direct transport and signature metadata, direct and propagated local-delivery signature metadata including unknown-source, verified, and invalid-signature states, local propagated-delivery processed-transient markers for later duplicate ingest accounting, structured raw event-stream signals for direct packet/resource delivery drops, propagated local delivery-policy drops, RPC-layer ignored-destination propagation rejects including Python-served alias ingest, decryptable remote fetched/downloaded propagated local-delivery decode/stamp/policy drops, remote fetch/download/sync duplicate-import drop events, and propagated local-delivery pre-decode drops for local-addressed short/undecryptable envelopes plus strict remote fetch/download local-import rejects. | Some router-coupled side effects and broader propagated/drop observability remain narrower. |
-| `LXMF/LXStamper.py` | `crates/libs/lxmf-core`, `crates/libs/rns-rpc`, `crates/apps/reticulumd` | done | Validation, generation, ticket-derived stamps, cancellation-aware task work, background deferred worker queue ownership, retry state, cancellation, propagation-stamp pre-handoff preparation, and progress metadata. | No confirmed deferred-stamp lifecycle blocker. |
+| Python module | Rust surface | Implementation | Evidence | Implemented baseline | Residual gap |
+| --- | --- | --- | --- | --- | --- |
+| `LXMF/LXMF.py` | `crates/libs/lxmf-core` | complete | unit, pinned-python | Pinned module constants, payload fields, message identity, inbound decoding, wire helpers, delivery app-data helpers, compression support detection, and propagation-node announce helper validation. | No confirmed `LXMF.py` blocker in the pinned Python reference. |
+| `LXMF/LXMessage.py` | `crates/libs/lxmf-core` | complete | unit, pinned-python | Wire, storage, propagation, paper, signatures, message IDs, binary fidelity, and timestamp precision metadata. | No confirmed base-message blocker. |
+| `LXMF/LXMPeer.py` | `crates/libs/rns-rpc`, `crates/apps/reticulumd` | complete | unit, pinned-python | Persistent peers, queue marks, offer selection, policy gates, peering keys, throttling, maintenance, source accounting, cumulative acceptance, serialized restored queue snapshots, boolean/list/numeric offer responses, transfer/retry/restart recovery, and unpeer cleanup. | No confirmed `LXMPeer.py` blocker in the pinned Python-only coverage. |
+| `LXMF/LXMRouter.py` | `crates/libs/rns-rpc`, `crates/apps/reticulumd`, `crates/apps/lxmf-cli`, `crates/libs/lxmf-sdk`, `crates/libs/lxmf-runtime` | complete | unit, simulated, pinned-python | Outbound modes and progress/cancellation, selected propagation nodes, direct/propagated resources, fetch/download/sync RPCs, receipts, persistence and maintenance, propagation-node side effects, retry/failure handling, delivery policy, ticket and stamp lifecycle, peer distribution, announce metadata, delivery-link/resource callbacks, transient caches, typed router statistics, and typed message/information storage policy. `SdkBackend`, RPC, ZeroMQ, and in-process backends share the additive router-management contract. | No generated public-callable software gap remains in `LXMRouter.py`; physical/public-network and third-party-client evidence remain separate. |
+| `LXMF/Handlers.py` | `crates/apps/reticulumd`, `crates/libs/rns-rpc` | complete | unit, simulated, pinned-python | Delivery and propagation announce handlers implement stamp-cost updates, pending direct/opportunistic wakeup, path-response handling, static-peer refresh, autopeer depth policy, peer removal, malformed announce visibility, and the router-coupled delivery/receipt/drop side effects exposed through daemon events and the typed SDK. | No confirmed software blocker in the pinned four-item public handler surface. |
+| `LXMF/LXStamper.py` | `crates/libs/lxmf-core`, `crates/libs/rns-rpc`, `crates/apps/reticulumd` | complete | unit, pinned-python | Validation, generation, ticket-derived stamps, cancellation-aware task work, background deferred worker queue ownership, retry state, cancellation, propagation-stamp pre-handoff preparation, and progress metadata. | No confirmed deferred-stamp lifecycle blocker. |
+| `LXMF/Utilities/lxmd.py` | `crates/apps/lxmf-cli`, `crates/apps/reticulumd` | complete | unit, simulated, pinned-python | Canonical `lxmd` workflows, configuration, announce cadence, propagation controls, status, and daemon lifecycle map to the shared Rust daemon and CLI surfaces. | No generated public utility callable is unmapped. |
 
 ## Method Checklist
 
-- PARITY_ITEM id=message.pack_wire status=done
-- PARITY_ITEM id=message.unpack_wire status=done
-- PARITY_ITEM id=message.storage_roundtrip status=done
-- PARITY_ITEM id=message.propagation_pack_unpack status=done
-- PARITY_ITEM id=message.paper_pack status=done
-- PARITY_ITEM id=message.paper_uri_helpers status=done
-- PARITY_ITEM id=message.file_unpack_helpers status=done
-- PARITY_ITEM id=message.signature_verify status=done
-- PARITY_ITEM id=message.object_accessors status=done
-- PARITY_ITEM id=module.app_data_helpers status=done
-- PARITY_ITEM id=stamper.validate_pn_stamp status=done
-- PARITY_ITEM id=stamper.generate_stamp status=done
-- PARITY_ITEM id=stamper.cancel_work status=done
-- PARITY_ITEM id=stamper.outbound_progress_queries status=done
-- PARITY_ITEM id=ticket.validity_with_grace status=done
-- PARITY_ITEM id=ticket.renewal_window status=done
-- PARITY_ITEM id=ticket.derived_stamp status=done
-- PARITY_ITEM id=peer.serialize_roundtrip status=done
-- PARITY_ITEM id=peer.queue_accounting status=done
-- PARITY_ITEM id=peer.acceptance_rate status=done
-- PARITY_ITEM id=peer.peering_key status=done
-- PARITY_ITEM id=router.outbound_queue status=done
-- PARITY_ITEM id=router.handle_outbound_policy status=done
-- PARITY_ITEM id=router.adapter_transport status=done
-- PARITY_ITEM id=router.paper_uri_ingest status=done
-- PARITY_ITEM id=router.cancel_outbound status=done
-- PARITY_ITEM id=router.propagation_ingest_fetch status=done
-- PARITY_ITEM id=router.transfer_state_lifecycle status=done
-- PARITY_ITEM id=router.node_app_data status=done
-- PARITY_ITEM id=handlers.delivery_callback status=done
-- PARITY_ITEM id=handlers.propagation_app_data status=done
-- PARITY_ITEM id=handlers.router_side_effects status=done
-- PARITY_ITEM id=interop.python_live_gate status=done
+- PARITY_ITEM id=message.pack_wire implementation=complete evidence=unit,pinned-python
+- PARITY_ITEM id=message.unpack_wire implementation=complete evidence=unit,pinned-python
+- PARITY_ITEM id=message.storage_roundtrip implementation=complete evidence=unit,pinned-python
+- PARITY_ITEM id=message.propagation_pack_unpack implementation=complete evidence=unit,pinned-python
+- PARITY_ITEM id=message.paper_pack implementation=complete evidence=unit,pinned-python
+- PARITY_ITEM id=message.paper_uri_helpers implementation=complete evidence=unit,pinned-python
+- PARITY_ITEM id=message.file_unpack_helpers implementation=complete evidence=unit,pinned-python
+- PARITY_ITEM id=message.signature_verify implementation=complete evidence=unit,pinned-python
+- PARITY_ITEM id=message.object_accessors implementation=complete evidence=unit,pinned-python
+- PARITY_ITEM id=module.app_data_helpers implementation=complete evidence=unit,pinned-python
+- PARITY_ITEM id=stamper.validate_pn_stamp implementation=complete evidence=unit,pinned-python
+- PARITY_ITEM id=stamper.generate_stamp implementation=complete evidence=unit,pinned-python
+- PARITY_ITEM id=stamper.cancel_work implementation=complete evidence=unit,pinned-python
+- PARITY_ITEM id=stamper.outbound_progress_queries implementation=complete evidence=unit,pinned-python
+- PARITY_ITEM id=ticket.validity_with_grace implementation=complete evidence=unit,pinned-python
+- PARITY_ITEM id=ticket.renewal_window implementation=complete evidence=unit,pinned-python
+- PARITY_ITEM id=ticket.derived_stamp implementation=complete evidence=unit,pinned-python
+- PARITY_ITEM id=peer.serialize_roundtrip implementation=complete evidence=unit,pinned-python
+- PARITY_ITEM id=peer.queue_accounting implementation=complete evidence=unit,pinned-python
+- PARITY_ITEM id=peer.acceptance_rate implementation=complete evidence=unit,pinned-python
+- PARITY_ITEM id=peer.peering_key implementation=complete evidence=unit,pinned-python
+- PARITY_ITEM id=router.outbound_queue implementation=complete evidence=unit,pinned-python
+- PARITY_ITEM id=router.handle_outbound_policy implementation=complete evidence=unit,pinned-python
+- PARITY_ITEM id=router.adapter_transport implementation=complete evidence=unit,pinned-python
+- PARITY_ITEM id=router.paper_uri_ingest implementation=complete evidence=unit,pinned-python
+- PARITY_ITEM id=router.cancel_outbound implementation=complete evidence=unit,pinned-python
+- PARITY_ITEM id=router.propagation_ingest_fetch implementation=complete evidence=unit,pinned-python
+- PARITY_ITEM id=router.transfer_state_lifecycle implementation=complete evidence=unit,pinned-python
+- PARITY_ITEM id=router.node_app_data implementation=complete evidence=unit,pinned-python
+- PARITY_ITEM id=handlers.delivery_callback implementation=complete evidence=unit,pinned-python
+- PARITY_ITEM id=handlers.propagation_app_data implementation=complete evidence=unit,pinned-python
+- PARITY_ITEM id=handlers.router_side_effects implementation=complete evidence=unit,pinned-python
+- PARITY_ITEM id=interop.python_live_gate implementation=complete evidence=unit,pinned-python
 
 ## Capability Detail
 
@@ -79,9 +79,9 @@ Workspace paths are used for navigation. `crates/libs/lxmf-core` publishes as
   names fall back to durable delivery announce history without turning delivery
   announces into propagation peers.
 
-### v0.7.0 SDK-first boundary
+### v0.9.0 software-parity boundary
 
-- v0.7.0 improves the existing `lxmf-sdk` and
+- v0.9.0 extends the existing `lxmf-sdk` and
   `ZmqPipelineBackendClient` in place for REM/RCH-facing workflows. It does
   not add a compatibility layer, adapter, shim, or new parallel SDK surface.
 - LXMF send evidence for this release is scoped to typed SDK send/batch-send,
@@ -94,7 +94,7 @@ Workspace paths are used for navigation. `crates/libs/lxmf-core` publishes as
 - Carrier attach/announce evidence remains a Reticulum/interface concern:
   LXMF rows can cite it only when a named send/receive scenario crosses that
   software carrier, and optional HIL remains release confidence rather than a
-  prerequisite for SDK-first LXMF rows.
+  prerequisite for software-complete LXMF rows.
 
 ### Messages and interchange
 

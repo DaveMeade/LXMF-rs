@@ -10,8 +10,8 @@ use crate::bridge_rnode_management::DaemonRNodeManagementHandle;
 use crate::interface_hot_apply::hot_apply_interface_seed_key;
 
 use crate::interfaces::{
-    auto, ble, common::interface_label, i2p, kiss, lora, pipe, reticulum_ble, rnode_multi, serial, udp,
-    vrn76_kiss_ble, weave,
+    auto, ble, common::interface_label, i2p, kiss, lora, meshtastic, pipe, reticulum_ble,
+    rnode_multi, serial, udp, vrn76_kiss_ble, weave,
 };
 
 use crate::Args;
@@ -49,6 +49,7 @@ pub(super) struct InterfaceStartupBatch {
     pub(super) ble_gatt_runtime_refreshes: Vec<BleGattRuntimeRefresh>,
     pub(super) reticulum_ble_runtime_refreshes: Vec<ReticulumBleRuntimeRefresh>,
     pub(super) i2p_runtime_refreshes: Vec<I2pRuntimeRefresh>,
+    pub(super) meshtastic_runtime_refreshes: Vec<MeshtasticRuntimeRefresh>,
     pub(super) tcp_runtime_refreshes: Vec<TcpRuntimeRefresh>,
     pub(super) weave_runtime_refreshes: Vec<WeaveRuntimeRefresh>,
     pub(super) rnode_multi_runtime_refreshes: Vec<RNodeMultiRuntimeRefresh>,
@@ -112,6 +113,12 @@ struct UdpStartupSinks<'a> {
 pub(crate) struct I2pRuntimeRefresh {
     pub(crate) runtime_iface: AddressHash,
     pub(crate) status: rns_transport::iface::i2p::I2pRuntimeStatusHandle,
+}
+
+#[derive(Clone)]
+pub(crate) struct MeshtasticRuntimeRefresh {
+    pub(crate) runtime_iface: AddressHash,
+    pub(crate) status: rns_transport::iface::meshtastic::MeshtasticRuntimeStatusHandle,
 }
 
 #[derive(Clone)]
@@ -228,6 +235,7 @@ pub(super) async fn startup_configured_interfaces(
     let mut ble_gatt_runtime_refreshes = Vec::new();
     let mut reticulum_ble_runtime_refreshes = Vec::new();
     let mut i2p_runtime_refreshes = Vec::new();
+    let mut meshtastic_runtime_refreshes = Vec::new();
     let mut tcp_runtime_refreshes = Vec::new();
     let mut weave_runtime_refreshes = Vec::new();
     let mut rnode_multi_runtime_refreshes = Vec::new();
@@ -530,6 +538,20 @@ pub(super) async fn startup_configured_interfaces(
                     i2p_runtime_refreshes.push(refresh);
                 }
             }
+            "meshtastic" => {
+                if let Some(refresh) = startup_meshtastic(
+                    iface,
+                    &label,
+                    iface_manager,
+                    &mut configured_interfaces[index],
+                    &mut startup_failures,
+                )
+                .await
+                {
+                    startup_successes += 1;
+                    meshtastic_runtime_refreshes.push(refresh);
+                }
+            }
             "ble_gatt" => {
                 if startup_ble(
                     iface,
@@ -636,6 +658,7 @@ pub(super) async fn startup_configured_interfaces(
         ble_gatt_runtime_refreshes,
         reticulum_ble_runtime_refreshes,
         i2p_runtime_refreshes,
+        meshtastic_runtime_refreshes,
         tcp_runtime_refreshes,
         weave_runtime_refreshes,
         rnode_multi_runtime_refreshes,
@@ -645,6 +668,64 @@ pub(super) async fn startup_configured_interfaces(
         rnode_management_bindings,
         weave_control_bindings,
     }
+}
+
+async fn startup_meshtastic(
+    iface: &InterfaceConfig,
+    label: &str,
+    iface_manager: &Arc<tokio::sync::Mutex<rns_transport::iface::InterfaceManager>>,
+    record: &mut InterfaceRecord,
+    startup_failures: &mut Vec<InterfaceStartupFailure>,
+) -> Option<MeshtasticRuntimeRefresh> {
+    let config = meshtastic::build_config(iface);
+    if !config.simulation_loopback {
+        record_startup_failure(
+            record,
+            startup_failures,
+            label.to_string(),
+            iface.kind.clone(),
+            "Meshtastic daemon startup currently requires simulation_loopback = true".to_string(),
+        );
+        return None;
+    }
+    let adapter = rns_transport::iface::meshtastic::MeshtasticInterface::new(
+        label.to_string(),
+        config.transport,
+    );
+    let runtime_status = adapter.runtime_status_handle();
+    let simulation_handle = adapter.handle();
+    let mode = iface.interface_mode().unwrap_or(InterfaceMode::Full);
+    let runtime_iface = iface_manager.lock().await.spawn_as_with_mode(
+        adapter,
+        rns_transport::iface::meshtastic::MeshtasticInterface::spawn,
+        IfaceRole::Unicast,
+        mode,
+    );
+    {
+        let mut manager = iface_manager.lock().await;
+        apply_interface_runtime_config(&mut manager, runtime_iface, iface);
+    }
+    meshtastic::spawn_simulation_loopback(simulation_handle, config.simulation_node_id);
+    let runtime_iface_string = runtime_iface.to_string();
+    mark_interface_startup_status(record, "spawned", None, Some(runtime_iface_string.as_str()));
+    with_interface_runtime_metadata(record, |runtime| {
+        runtime.insert(
+            "meshtastic".to_string(),
+            serde_json::json!({
+                "status": runtime_status.to_json(),
+                "evidence": "simulated",
+                "hardware_unverified": true,
+                "simulation_node_id": config.simulation_node_id,
+            }),
+        );
+    });
+    log::info!(
+        "[daemon] meshtastic simulation enabled iface={} name={} node_id={}",
+        runtime_iface,
+        label,
+        config.simulation_node_id
+    );
+    Some(MeshtasticRuntimeRefresh { runtime_iface, status: runtime_status })
 }
 
 fn startup_tcp_server_record(

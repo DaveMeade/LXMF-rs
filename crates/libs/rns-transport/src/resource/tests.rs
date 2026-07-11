@@ -124,7 +124,7 @@ mod tests {
     }
 
     #[test]
-    fn resource_manager_rejects_split_flag() {
+    fn resource_manager_rejects_inconsistent_split_metadata() {
         let signer = PrivateIdentity::new_from_rand(OsRng);
         let identity = *signer.as_identity();
         let destination = DestinationDesc {
@@ -158,6 +158,126 @@ mod tests {
 
         assert!(responses.is_empty());
         assert!(manager.incoming.is_empty());
+    }
+
+    #[test]
+    fn resource_sender_sequences_split_advertisements_after_proofs() {
+        let signer = PrivateIdentity::new_from_rand(OsRng);
+        let identity = *signer.as_identity();
+        let destination = DestinationDesc {
+            identity,
+            address_hash: identity.address_hash,
+            name: DestinationName::new("lxmf", "resource"),
+        };
+        let (tx, _) = tokio::sync::broadcast::channel(1);
+        let mut link = Link::new(destination, tx);
+        let mut manager = ResourceManager::new_with_config(Duration::from_secs(1), 2);
+        let data = vec![0x5a; MAX_EFFICIENT_SIZE + 257];
+
+        let (original_hash, first_packet) =
+            manager.start_send(&link, data, None).expect("start split resource");
+        let first = decrypt_advertisement(&link, &first_packet);
+        assert_eq!(first.hash, original_hash);
+        assert_eq!(first.original_hash, original_hash);
+        assert_eq!(first.segment_index, 1);
+        assert_eq!(first.total_segments, 2);
+        assert_eq!(first.flags & FLAG_SPLIT, FLAG_SPLIT);
+        manager.confirm_outbound_dispatch(original_hash, true);
+
+        let first_proof = manager.outgoing.get(&first.hash).expect("first sender").expected_proof;
+        let proof = ResourceProof { resource_hash: first.hash, proof: first_proof };
+        let next_packets = manager.handle_packet(
+            &resource_packet(PacketContext::ResourceProof, &proof.encode(), *link.id()),
+            &mut link,
+        );
+        assert_eq!(next_packets.len(), 1);
+        let second = decrypt_advertisement(&link, &next_packets[0]);
+        assert_eq!(second.original_hash, original_hash);
+        assert_eq!(second.segment_index, 2);
+        assert_eq!(second.total_segments, 2);
+
+        let second_proof = manager
+            .outgoing
+            .get(&second.hash)
+            .expect("second sender")
+            .expected_proof;
+        let proof = ResourceProof { resource_hash: second.hash, proof: second_proof };
+        assert!(manager
+            .handle_packet(
+                &resource_packet(PacketContext::ResourceProof, &proof.encode(), *link.id()),
+                &mut link,
+            )
+            .is_empty());
+        let events = manager.drain_events();
+        assert!(events.iter().any(|event| {
+            event.hash == original_hash && matches!(event.kind, ResourceEventKind::OutboundComplete)
+        }));
+    }
+
+    #[test]
+    fn resource_receiver_assembles_ordered_split_segments() {
+        let signer = PrivateIdentity::new_from_rand(OsRng);
+        let identity = *signer.as_identity();
+        let destination = DestinationDesc {
+            identity,
+            address_hash: identity.address_hash,
+            name: DestinationName::new("lxmf", "resource"),
+        };
+        let (tx, _) = tokio::sync::broadcast::channel(1);
+        let mut link = Link::new(destination, tx);
+        link.request();
+        let mut manager = ResourceManager::new_with_config(Duration::from_secs(1), 2);
+        let first_data = b"first-segment";
+        let second_data = b"second-segment";
+
+        let total_data_size = (first_data.len() + second_data.len()) as u64;
+        let (first_adv, first_part) =
+            split_test_segment(first_data, None, 1, 2, total_data_size);
+        let original_hash = first_adv.hash;
+        let first_packet = resource_packet(
+            PacketContext::ResourceAdvrtisement,
+            &first_adv.pack().expect("first advertisement"),
+            *link.id(),
+        );
+        assert_eq!(manager.handle_packet(&first_packet, &mut link).len(), 1);
+        assert_eq!(
+            manager
+                .handle_packet(
+                    &resource_packet(PacketContext::Resource, &first_part, *link.id()),
+                    &mut link,
+                )
+                .len(),
+            1
+        );
+        assert!(manager
+            .drain_events()
+            .iter()
+            .all(|event| !matches!(event.kind, ResourceEventKind::Complete(_))));
+
+        let (second_adv, second_part) =
+            split_test_segment(second_data, Some(original_hash), 2, 2, total_data_size);
+        let second_packet = resource_packet(
+            PacketContext::ResourceAdvrtisement,
+            &second_adv.pack().expect("second advertisement"),
+            *link.id(),
+        );
+        assert_eq!(manager.handle_packet(&second_packet, &mut link).len(), 1);
+        let responses = manager.handle_packet(
+            &resource_packet(PacketContext::Resource, &second_part, *link.id()),
+            &mut link,
+        );
+        let events = manager.drain_events();
+        assert_eq!(responses.len(), 1, "events={events:?}");
+
+        let complete = events
+            .into_iter()
+            .find_map(|event| match event.kind {
+                ResourceEventKind::Complete(complete) => Some((event.hash, complete)),
+                _ => None,
+            })
+            .expect("assembled split resource");
+        assert_eq!(complete.0, original_hash);
+        assert_eq!(complete.1.data, [first_data.as_slice(), second_data.as_slice()].concat());
     }
 
     #[test]
@@ -237,7 +357,7 @@ mod tests {
             random_hash,
             original_hash: Hash::new_from_slice(&[9u8; 32]),
             segment_index: 1,
-            total_segments: 2,
+            total_segments: 1,
             request_id: None,
             flags: 0,
             hashmap: first_segment,
@@ -522,6 +642,38 @@ mod tests {
             data: PacketDataBuffer::new_from_slice(payload),
             ..Default::default()
         }
+    }
+
+    fn split_test_segment(
+        data: &[u8],
+        original_hash: Option<Hash>,
+        segment_index: u32,
+        total_segments: u32,
+        total_data_size: u64,
+    ) -> (ResourceAdvertisement, Vec<u8>) {
+        let random_hash = segment_index.to_be_bytes();
+        let mut part = Vec::with_capacity(RANDOM_HASH_SIZE + data.len());
+        part.extend_from_slice(&random_hash);
+        part.extend_from_slice(data);
+        let resource_hash = Hash::new_from_slice(&[data, random_hash.as_slice()].concat());
+        let mut hashmap = Vec::with_capacity(MAPHASH_LEN);
+        hashmap.extend_from_slice(&map_hash(&part, &random_hash));
+        (
+            ResourceAdvertisement {
+                transfer_size: part.len() as u64,
+                data_size: total_data_size,
+                parts: 1,
+                hash: resource_hash,
+                random_hash,
+                original_hash: original_hash.unwrap_or(resource_hash),
+                segment_index,
+                total_segments,
+                request_id: None,
+                flags: FLAG_SPLIT,
+                hashmap,
+            },
+            part,
+        )
     }
 
     fn decrypt_advertisement(link: &Link, packet: &Packet) -> ResourceAdvertisement {

@@ -12,6 +12,7 @@ pub mod crypt;
 pub mod delivery;
 pub mod destination;
 pub mod destination_hash;
+pub mod discovery;
 pub mod embedded_link;
 pub mod error;
 pub mod hash;

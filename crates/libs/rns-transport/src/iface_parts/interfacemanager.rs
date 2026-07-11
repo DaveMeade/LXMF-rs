@@ -337,6 +337,22 @@ impl InterfaceManager {
         stopped
     }
 
+    /// Drops every pending announce and returns the number removed.
+    ///
+    /// This mirrors Python Reticulum's `Transport.drop_announce_queues()`
+    /// management operation while keeping queue ownership inside the
+    /// interface manager.
+    pub fn drop_announce_queues(&mut self) -> usize {
+        self.ifaces
+            .iter_mut()
+            .map(|iface| {
+                let dropped = iface.announce_queue.len();
+                iface.announce_queue.clear();
+                dropped
+            })
+            .sum()
+    }
+
     /// Test-only: returns the number of tracked ifaces (live or stopped).
     #[cfg(test)]
     pub fn iface_count(&self) -> usize {

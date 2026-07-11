@@ -263,6 +263,7 @@ pub(super) async fn wait_for_link_request_response_with_terminal_policy(
                                 }
                             }
                             rns_transport::resource::ResourceEventKind::OutboundComplete
+                            | rns_transport::resource::ResourceEventKind::SegmentComplete(_)
                             | rns_transport::resource::ResourceEventKind::Progress(_) => {}
                         }
                     }

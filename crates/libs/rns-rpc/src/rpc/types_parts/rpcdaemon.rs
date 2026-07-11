@@ -54,6 +54,8 @@ pub struct RpcDaemon {
     stamp_policy: Mutex<StampPolicy>,
     ticket_cache: Mutex<HashMap<String, TicketRecord>>,
     ticket_last_deliveries: Mutex<HashMap<String, i64>>,
+    router_information_storage_limit_bytes: Mutex<Option<u64>>,
+    router_retain_node_lxms: Mutex<bool>,
     delivery_traces: Arc<Mutex<HashMap<String, Vec<DeliveryTraceEntry>>>>,
     daemon_status_snapshot: std::sync::RwLock<DaemonStatusSnapshot>,
     delivery_status_lock: Arc<Mutex<()>>,
@@ -141,6 +143,30 @@ pub trait PathLookupBridge: Send + Sync {
 
     fn link_count(&self) -> Result<usize, std::io::Error> {
         Err(std::io::Error::other("link count bridge is not configured"))
+    }
+
+    fn drop_path(&self, _destination: &str) -> Result<bool, std::io::Error> {
+        Err(std::io::Error::other("path mutation bridge is not configured"))
+    }
+
+    fn drop_all_via(&self, _transport: &str) -> Result<usize, std::io::Error> {
+        Err(std::io::Error::other("path mutation bridge is not configured"))
+    }
+
+    fn drop_announce_queues(&self) -> Result<usize, std::io::Error> {
+        Err(std::io::Error::other("announce queue bridge is not configured"))
+    }
+
+    fn rate_table(&self) -> Result<JsonValue, std::io::Error> {
+        Err(std::io::Error::other("rate table bridge is not configured"))
+    }
+
+    fn packet_signal(&self, _packet_hash: &str) -> Result<JsonValue, std::io::Error> {
+        Err(std::io::Error::other("packet signal bridge is not configured"))
+    }
+
+    fn discovered_interfaces(&self) -> Result<JsonValue, std::io::Error> {
+        Err(std::io::Error::other("interface discovery bridge is not configured"))
     }
 
     fn remove_paths_for_identity(&self, _identity: &str) -> Result<usize, std::io::Error> {

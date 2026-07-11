@@ -186,6 +186,22 @@ impl Transport {
         destination
     }
 
+    pub async fn deregister_destination(&self, address: &AddressHash) -> bool {
+        let mut handler = self.handler.lock().await;
+        let removed_input = handler.single_in_destinations.remove(address).is_some();
+        handler.single_in_destination_app_data.remove(address);
+        let removed_output = handler.single_out_destinations.remove(address).is_some();
+        removed_input || removed_output
+    }
+
+    pub async fn find_interface_from_hash(&self, full_hash: &Hash) -> Option<AddressHash> {
+        self.iface_manager.lock().await.address_for_full_hash(full_hash)
+    }
+
+    pub async fn detach_interfaces(&self) -> usize {
+        self.iface_manager.lock().await.detach_interfaces()
+    }
+
     pub async fn has_destination(&self, address: &AddressHash) -> bool {
         self.handler.lock().await.has_destination(address)
     }
@@ -196,6 +212,58 @@ impl Transport {
 
     pub async fn has_path(&self, address: &AddressHash) -> bool {
         self.handler.lock().await.path_table.get(address).is_some()
+    }
+
+    pub async fn await_path(
+        &self,
+        destination: &AddressHash,
+        timeout: Duration,
+        on_iface: Option<AddressHash>,
+    ) -> bool {
+        if self.has_path(destination).await {
+            return true;
+        }
+        self.request_path(destination, on_iface, None).await;
+        let deadline = tokio::time::Instant::now() + timeout;
+        while tokio::time::Instant::now() < deadline {
+            tokio::time::sleep(Duration::from_millis(50)).await;
+            if self.has_path(destination).await {
+                return true;
+            }
+        }
+        self.has_path(destination).await
+    }
+
+    pub async fn hops_to(&self, destination: &AddressHash) -> u8 {
+        self.handler.lock().await.path_table.hops_to(destination)
+    }
+
+    pub async fn path_is_unresponsive(&self, destination: &AddressHash) -> bool {
+        self.handler.lock().await.path_table.path_is_unresponsive(destination)
+    }
+
+    pub async fn mark_path_responsive(&self, destination: &AddressHash) -> bool {
+        self.handler.lock().await.path_table.mark_path_responsive(destination)
+    }
+
+    pub async fn mark_path_unknown(&self, destination: &AddressHash) -> bool {
+        self.handler.lock().await.path_table.mark_path_unknown(destination)
+    }
+
+    pub async fn next_hop_metrics(
+        &self,
+        destination: &AddressHash,
+    ) -> Option<NextHopMetrics> {
+        let interface = self.handler.lock().await.path_table.next_hop_iface(destination)?;
+        let manager = self.iface_manager.lock().await;
+        let bitrate = manager.announce_pacing(&interface)?.0;
+        let hardware_mtu = manager.mtu(&interface);
+        Some(NextHopMetrics {
+            interface,
+            bitrate,
+            hardware_mtu,
+            per_bit_latency: (bitrate > 0).then(|| 1.0 / bitrate as f64),
+        })
     }
 
     pub async fn link_count(&self) -> usize {
@@ -221,6 +289,43 @@ impl Transport {
                 hops: None,
             }
         }
+    }
+
+    pub async fn expire_path(&self, destination: &AddressHash) -> bool {
+        self.handler.lock().await.path_table.expire_path(destination)
+    }
+
+    pub async fn expire_paths_via(&self, transport: &AddressHash) -> usize {
+        self.handler.lock().await.path_table.expire_paths_via(transport)
+    }
+
+    pub async fn drop_announce_queues(&self) -> usize {
+        self.iface_manager.lock().await.drop_announce_queues()
+    }
+
+    pub async fn announce_rate_table(&self) -> Vec<crate::transport::AnnounceRateTableEntry> {
+        self.handler.lock().await.announce_limits.rate_table()
+    }
+
+    /// Records per-packet radio metadata for local-client management queries.
+    /// Entries use Python Reticulum's 512-item FIFO retention limit.
+    pub async fn record_packet_signal(&self, packet_hash: Hash, signal: PacketSignal) {
+        let mut handler = self.handler.lock().await;
+        handler.packet_signal_cache.push_back((packet_hash, signal));
+        while handler.packet_signal_cache.len() > 512 {
+            handler.packet_signal_cache.pop_front();
+        }
+    }
+
+    pub async fn packet_signal(&self, packet_hash: &Hash) -> Option<PacketSignal> {
+        self.handler
+            .lock()
+            .await
+            .packet_signal_cache
+            .iter()
+            .rev()
+            .find(|(hash, _)| hash == packet_hash)
+            .map(|(_, signal)| *signal)
     }
 
     pub async fn expire_paths_for_identity(&self, identity: &AddressHash) -> usize {

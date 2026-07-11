@@ -21,6 +21,21 @@ struct RecordReceiptParams {
 }
 
 #[derive(Debug, Deserialize)]
+struct PacketHashParams {
+    packet_hash: String,
+}
+
+#[derive(Debug, Deserialize)]
+struct RouterStoragePolicyParams {
+    #[serde(default)]
+    message_limit_bytes: Option<u64>,
+    #[serde(default)]
+    information_limit_bytes: Option<u64>,
+    #[serde(default)]
+    retain_node_lxms: Option<bool>,
+}
+
+#[derive(Debug, Deserialize)]
 struct ReceiveMessageParams {
     id: String,
     source: String,

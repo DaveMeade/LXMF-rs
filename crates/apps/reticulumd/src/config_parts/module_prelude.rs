@@ -6,10 +6,6 @@ use serde_json::{Map as JsonMap, Value as JsonValue};
 
 use std::collections::BTreeMap;
 
-use std::fs;
-
-use std::path::Path;
-
 #[derive(Debug)]
 pub struct DaemonConfig {
     pub display_name: Option<String>,
@@ -52,6 +48,12 @@ impl<'de> Deserialize<'de> for DaemonConfig {
             iface.normalize_aliases(index, original_kind.as_str()).map_err(D::Error::custom)?;
             iface.validate(index, original_kind.as_str()).map_err(D::Error::custom)?;
         }
+        raw
+            .reticulum
+            .as_ref()
+            .map(ReticulumConfigRaw::runtime_policy)
+            .transpose()
+            .map_err(D::Error::custom)?;
         Ok(Self {
             display_name: raw.display_name,
             announce_capabilities: raw.announce_capabilities,
@@ -92,6 +94,26 @@ struct ReticulumConfigRaw {
     rpc_key: Option<String>,
     #[serde(default)]
     panic_on_interface_error: Option<bool>,
+    #[serde(default)]
+    link_mtu_discovery: Option<bool>,
+    #[serde(default)]
+    enable_remote_management: Option<bool>,
+    #[serde(default)]
+    respond_to_probes: Option<bool>,
+    #[serde(default)]
+    use_implicit_proof: Option<bool>,
+    #[serde(default)]
+    discover_interfaces: Option<bool>,
+    #[serde(default)]
+    required_discovery_value: Option<i64>,
+    #[serde(default)]
+    publish_blackhole: Option<bool>,
+    #[serde(default)]
+    blackhole_sources: Vec<String>,
+    #[serde(default)]
+    interface_discovery_sources: Vec<String>,
+    #[serde(default)]
+    autoconnect_discovered_interfaces: Option<i64>,
 }
 
 impl ReticulumConfigRaw {
@@ -437,64 +459,19 @@ pub struct InterfaceConfig {
     #[serde(default)]
     pub max_payload_bytes: Option<u16>,
     #[serde(default)]
+    pub hop_limit: Option<u8>,
+    #[serde(default)]
+    pub modem_preset: Option<u8>,
+    #[serde(default)]
+    pub send_delay_ms: Option<u64>,
+    #[serde(default)]
+    pub destination_cache_size: Option<usize>,
+    #[serde(default)]
+    pub simulation_loopback: Option<bool>,
+    #[serde(default)]
+    pub simulation_node_id: Option<u32>,
+    #[serde(default)]
     pub state_path: Option<String>,
     #[serde(flatten)]
     pub extra: BTreeMap<String, toml::Value>,
-}
-
-impl DaemonConfig {
-    pub fn from_toml(input: &str) -> Result<Self, toml::de::Error> {
-        toml::from_str(input)
-    }
-
-    pub fn from_path<P: AsRef<Path>>(path: P) -> Result<Self, std::io::Error> {
-        let contents = fs::read_to_string(path)?;
-        Self::from_toml(&contents)
-            .map_err(|err| std::io::Error::new(std::io::ErrorKind::InvalidData, err))
-    }
-
-    pub fn reticulum_transport_enabled(&self) -> bool {
-        self.reticulum_enable_transport
-    }
-    pub fn enabled_tcp_clients(&self) -> Vec<&InterfaceConfig> {
-        self.interfaces
-            .iter()
-            .filter(|iface| iface.enabled() && iface.kind == "tcp_client")
-            .collect()
-    }
-
-    pub fn tcp_client_endpoints(&self) -> Vec<(String, u16)> {
-        self.enabled_tcp_clients()
-            .iter()
-            .filter_map(|iface| {
-                let host = iface.host.as_ref()?;
-                let port = iface.port?;
-                Some((host.clone(), port))
-            })
-            .collect()
-    }
-
-    pub fn enabled_tcp_servers(&self) -> Vec<&InterfaceConfig> {
-        self.interfaces
-            .iter()
-            .filter(|iface| iface.enabled() && iface.kind == "tcp_server")
-            .collect()
-    }
-
-    pub fn tcp_server_endpoints(&self) -> Vec<(String, u16)> {
-        self.enabled_tcp_servers()
-            .iter()
-            .filter_map(|iface| {
-                let port = iface.port?;
-                let host = iface
-                    .host
-                    .as_deref()
-                    .map(str::trim)
-                    .filter(|value| !value.is_empty())
-                    .unwrap_or("0.0.0.0")
-                    .to_string();
-                Some((host, port))
-            })
-            .collect()
-    }
 }

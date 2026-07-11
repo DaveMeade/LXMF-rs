@@ -72,6 +72,7 @@ fn normalize_interface_kind(value: &str) -> String {
         "RNodeMultiInterface" => "rnode_multi".to_string(),
         "WeaveInterface" => "weave".to_string(),
         "I2PInterface" => "i2p".to_string(),
+        "MeshtasticInterface" => "meshtastic".to_string(),
         "Vrn76KissBluetoothInterface" | "Vrn76KissBleInterface" => "vrn76_kiss_ble".to_string(),
         "AndroidBLE" | "AndroidBLEInterface" | "BLEInterface" => "reticulum_ble".to_string(),
         value => value.to_string(),
