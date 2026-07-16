@@ -20,7 +20,7 @@
         assert!(response.error.is_none());
         let result = response.result.expect("result");
         assert_eq!(result["active_contract_version"], json!(2));
-        assert_eq!(result["contract_release"], json!("v2.5"));
+        assert_eq!(result["contract_release"], json!("v2.6"));
         assert_eq!(result["sdk_version"].as_str(), Some(expected_lxmf_sdk_version().as_str()));
         assert_eq!(
             result["python_reference"],

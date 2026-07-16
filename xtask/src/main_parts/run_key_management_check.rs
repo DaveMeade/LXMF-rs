@@ -252,8 +252,15 @@ struct BenchStats {
 
 #[derive(Debug, Deserialize)]
 struct PythonImplBenchConfig {
+    references: PythonImplReferences,
     profiles: PythonImplBenchProfiles,
     comparisons: Vec<PythonImplComparison>,
+}
+
+#[derive(Debug, Deserialize)]
+struct PythonImplReferences {
+    reticulum: String,
+    lxmf: String,
 }
 
 #[derive(Debug, Deserialize)]
@@ -338,7 +345,11 @@ struct PythonImplEnvironment {
     python_version: String,
     python_rns_module: String,
     python_lxmf_module: String,
+    python_rns_revision: String,
+    python_lxmf_revision: String,
     uname: String,
+    cpu: String,
+    timestamp_utc: String,
     git_commit: String,
     benchmark_config_path: String,
 }
@@ -444,5 +455,5 @@ fn run_python_impl_bench_compare(profile: PythonImplBenchProfile) -> Result<()> 
     let config = load_python_impl_bench_config()?;
     let profile_config = config.profiles.get(profile);
     let paths = default_python_impl_output_paths();
-    run_python_impl_bench_compare_with_paths(&config, profile_config, &paths)
+    run_python_impl_bench_compare_with_paths(&config, profile_config, &paths, true)
 }

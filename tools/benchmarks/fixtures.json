@@ -1,0 +1,24 @@
+{
+  "schema": "lxmf-rs-benchmark-fixtures-v1",
+  "identities": {
+    "source_private_key_hex": "01010101010101010101010101010101010101010101010101010101010101011111111111111111111111111111111111111111111111111111111111111111",
+    "destination_private_key_hex": "02020202020202020202020202020202020202020202020202020202020202022222222222222222222222222222222222222222222222222222222222222222"
+  },
+  "payloads": {
+    "crypto_byte_hex": "78",
+    "packet_payload_hex": "62656e63682d7061636b65742d7061796c6f6164",
+    "message_content": "bench-content-payload",
+    "message_title": "bench-title",
+    "large_content_length": 2048,
+    "resource_content_length": 16384,
+    "resource_pattern_hex": "73",
+    "announce_app_data": "rust-announce-app-data"
+  },
+  "topology": {
+    "transport": "tcp",
+    "host": "127.0.0.1",
+    "rust_port": 37726,
+    "python_port": 37727,
+    "route_warmup_excluded": true
+  }
+}

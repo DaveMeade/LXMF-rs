@@ -1,3 +1,7 @@
+[references]
+reticulum = "15320e4d2cfabb143c1db20ca887e275fd521585"
+lxmf = "727830cefda83d9c6e3982b48675425f3f988f9c"
+
 [profiles.fast.criterion]
 sample_size = 10
 warm_up_time_seconds = 0.1
@@ -57,6 +61,54 @@ python_benchmark = "python_lxmf/large_message_to_wire"
 workload_class = "protocol_core"
 payload_size_bytes = 2048
 batch_size = 1
+
+[[comparisons]]
+label = "LXMF resource-sized message decode"
+rust_benchmark = "lxmf_core_resource_message_from_wire"
+python_benchmark = "python_lxmf/resource_message_from_wire"
+workload_class = "protocol_core"
+payload_size_bytes = 16384
+batch_size = 1
+
+[[comparisons]]
+label = "LXMF resource-sized message encode"
+rust_benchmark = "lxmf_core_resource_message_to_wire"
+python_benchmark = "python_lxmf/resource_message_to_wire"
+workload_class = "protocol_core"
+payload_size_bytes = 16384
+batch_size = 1
+
+[[comparisons]]
+label = "Reticulum packet pack"
+rust_benchmark = "rns_core_packet_pack"
+python_benchmark = "python_rns/packet_pack"
+workload_class = "protocol_core"
+payload_size_bytes = 128
+batch_size = 1
+
+[[comparisons]]
+label = "Reticulum packet unpack"
+rust_benchmark = "rns_core_packet_unpack"
+python_benchmark = "python_rns/packet_unpack"
+workload_class = "protocol_core"
+payload_size_bytes = 128
+batch_size = 1
+
+[[comparisons]]
+label = "Reticulum resource segmentation 16 KiB"
+rust_benchmark = "rns_transport_resource_segment_16k"
+python_benchmark = "python_rns/resource_segment_16k"
+workload_class = "transport_hotpath"
+payload_size_bytes = 16384
+batch_size = 43
+
+[[comparisons]]
+label = "Reticulum resource reassembly 16 KiB"
+rust_benchmark = "rns_transport_resource_reassemble_16k"
+python_benchmark = "python_rns/resource_reassemble_16k"
+workload_class = "transport_hotpath"
+payload_size_bytes = 16384
+batch_size = 43
 
 [[comparisons]]
 label = "Reticulum announce create"

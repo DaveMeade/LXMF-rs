@@ -199,6 +199,9 @@ pub fn lxmf_sdk::app::CapabilitySummary::from(handle: &lxmf_sdk::ClientHandle) -
 pub struct lxmf_sdk::app::Client<B: lxmf_sdk::SdkBackend>
 impl lxmf_sdk::app::Client<lxmf_sdk::RpcBackendClient>
 pub fn lxmf_sdk::app::Client<lxmf_sdk::RpcBackendClient>::rpc(endpoint: impl core::convert::Into<alloc::string::String>) -> Self
+impl lxmf_sdk::app::Client<lxmf_sdk::ZmqPipelineBackendClient>
+pub fn lxmf_sdk::app::Client<lxmf_sdk::ZmqPipelineBackendClient>::zmq(config: lxmf_sdk::ZmqPipelineBackendConfig) -> core::result::Result<Self, lxmf_sdk::SdkError>
+pub fn lxmf_sdk::app::Client<lxmf_sdk::ZmqPipelineBackendClient>::zmq_local(endpoint: impl core::convert::Into<alloc::string::String>) -> core::result::Result<Self, lxmf_sdk::SdkError>
 impl<B: lxmf_sdk::SdkBackend> lxmf_sdk::app::Client<B>
 pub fn lxmf_sdk::app::Client<B>::announce_now(&self) -> core::result::Result<(), lxmf_sdk::app::Error>
 pub fn lxmf_sdk::app::Client<B>::bootstrap_identity(&self, request: lxmf_sdk::app::BootstrapRequest) -> core::result::Result<lxmf_sdk::app::Contact, lxmf_sdk::app::Error>
@@ -2059,6 +2062,29 @@ pub lxmf_sdk::KeyProviderClass::File
 pub lxmf_sdk::KeyProviderClass::Hsm
 pub lxmf_sdk::KeyProviderClass::InMemory
 pub lxmf_sdk::KeyProviderClass::OsKeystore
+#[non_exhaustive] pub enum lxmf_sdk::LxmfPropagationOperation
+pub lxmf_sdk::LxmfPropagationOperation::ControlAllow
+pub lxmf_sdk::LxmfPropagationOperation::ControlDisallow
+pub lxmf_sdk::LxmfPropagationOperation::DeliveryPolicyGet
+pub lxmf_sdk::LxmfPropagationOperation::DeliveryPolicySet
+pub lxmf_sdk::LxmfPropagationOperation::Enable
+pub lxmf_sdk::LxmfPropagationOperation::Fetch
+pub lxmf_sdk::LxmfPropagationOperation::Ingest
+pub lxmf_sdk::LxmfPropagationOperation::NodeGet
+pub lxmf_sdk::LxmfPropagationOperation::NodeList
+pub lxmf_sdk::LxmfPropagationOperation::NodeSet
+pub lxmf_sdk::LxmfPropagationOperation::PeerMaintenance
+pub lxmf_sdk::LxmfPropagationOperation::PeerSync
+pub lxmf_sdk::LxmfPropagationOperation::RemoteDownload
+pub lxmf_sdk::LxmfPropagationOperation::RemoteFetch
+pub lxmf_sdk::LxmfPropagationOperation::RemoteStatus
+pub lxmf_sdk::LxmfPropagationOperation::RemoteSync
+pub lxmf_sdk::LxmfPropagationOperation::RemoteUnpeer
+pub lxmf_sdk::LxmfPropagationOperation::Status
+#[non_exhaustive] pub enum lxmf_sdk::LxmfRouterOperation
+pub lxmf_sdk::LxmfRouterOperation::Stats
+pub lxmf_sdk::LxmfRouterOperation::StoragePolicyGet
+pub lxmf_sdk::LxmfRouterOperation::StoragePolicySet
 pub enum lxmf_sdk::MessageDirection
 pub lxmf_sdk::MessageDirection::Inbound
 pub lxmf_sdk::MessageDirection::Outbound
@@ -2112,6 +2138,36 @@ pub lxmf_sdk::Profile::EmbeddedAlloc
 pub lxmf_sdk::RedactionTransform::Hash
 pub lxmf_sdk::RedactionTransform::Redact
 pub lxmf_sdk::RedactionTransform::Truncate
+#[non_exhaustive] pub enum lxmf_sdk::RnsDataPlaneOperation
+pub lxmf_sdk::RnsDataPlaneOperation::AnnounceDelivery
+pub lxmf_sdk::RnsDataPlaneOperation::AnnounceNow
+pub lxmf_sdk::RnsDataPlaneOperation::AnnounceReceived
+pub lxmf_sdk::RnsDataPlaneOperation::LinkCount
+pub lxmf_sdk::RnsDataPlaneOperation::PacketQuality
+pub lxmf_sdk::RnsDataPlaneOperation::PacketRssi
+pub lxmf_sdk::RnsDataPlaneOperation::PacketSnr
+#[non_exhaustive] pub enum lxmf_sdk::RnsInterfacesOperation
+pub lxmf_sdk::RnsInterfacesOperation::Discovered
+pub lxmf_sdk::RnsInterfacesOperation::Set
+#[non_exhaustive] pub enum lxmf_sdk::RnsRuntimeOperation
+pub lxmf_sdk::RnsRuntimeOperation::ClearAll
+pub lxmf_sdk::RnsRuntimeOperation::ClearMessages
+pub lxmf_sdk::RnsRuntimeOperation::ClearPeers
+pub lxmf_sdk::RnsRuntimeOperation::ClearResources
+pub lxmf_sdk::RnsRuntimeOperation::Status
+#[non_exhaustive] pub enum lxmf_sdk::RnsTransportOperation
+pub lxmf_sdk::RnsTransportOperation::BlackholeAdd
+pub lxmf_sdk::RnsTransportOperation::BlackholeRemove
+pub lxmf_sdk::RnsTransportOperation::BlackholesList
+pub lxmf_sdk::RnsTransportOperation::DropAllVia
+pub lxmf_sdk::RnsTransportOperation::DropAnnounceQueues
+pub lxmf_sdk::RnsTransportOperation::DropPath
+pub lxmf_sdk::RnsTransportOperation::FirstHopTimeout
+pub lxmf_sdk::RnsTransportOperation::NextHop
+pub lxmf_sdk::RnsTransportOperation::NextHopInterface
+pub lxmf_sdk::RnsTransportOperation::PathStatus
+pub lxmf_sdk::RnsTransportOperation::RateTable
+pub lxmf_sdk::RnsTransportOperation::RequestPath
 #[non_exhaustive] pub enum lxmf_sdk::RuntimeState
 pub lxmf_sdk::RuntimeState::Draining
 pub lxmf_sdk::RuntimeState::Failed
@@ -2185,6 +2241,9 @@ pub lxmf_sdk::VoiceSessionState::Holding
 pub lxmf_sdk::VoiceSessionState::New
 pub lxmf_sdk::VoiceSessionState::Ringing
 pub lxmf_sdk::VoiceSessionState::Unknown
+pub enum lxmf_sdk::ZmqEndpointRole
+pub lxmf_sdk::ZmqEndpointRole::Bind
+pub lxmf_sdk::ZmqEndpointRole::Connect
 #[non_exhaustive] pub struct lxmf_sdk::Ack
 pub lxmf_sdk::Ack::accepted: bool
 pub lxmf_sdk::Ack::revision: core::option::Option<u64>
@@ -2319,6 +2378,9 @@ pub fn lxmf_sdk::Client<B>::router_stats(&self) -> core::result::Result<lxmf_sdk
 pub fn lxmf_sdk::Client<B>::router_storage_policy(&self) -> core::result::Result<lxmf_sdk::domain::RouterStoragePolicy, lxmf_sdk::SdkError>
 pub fn lxmf_sdk::Client<B>::set_router_storage_policy(&self, patch: lxmf_sdk::domain::RouterStoragePolicyPatch) -> core::result::Result<lxmf_sdk::domain::RouterStoragePolicy, lxmf_sdk::SdkError>
 impl<B: lxmf_sdk::SdkBackendAsyncOps> lxmf_sdk::Client<B>
+pub async fn lxmf_sdk::Client<B>::cancel_async(&self, id: lxmf_sdk::MessageId) -> core::result::Result<lxmf_sdk::CancelResult, lxmf_sdk::SdkError>
+pub async fn lxmf_sdk::Client<B>::configure_async(&self, expected_revision: u64, patch: lxmf_sdk::ConfigPatch) -> core::result::Result<lxmf_sdk::Ack, lxmf_sdk::SdkError>
+pub async fn lxmf_sdk::Client<B>::poll_events_async(&self, cursor: core::option::Option<lxmf_sdk::event::EventCursor>, max: usize) -> core::result::Result<lxmf_sdk::event::EventBatch, lxmf_sdk::SdkError>
 pub async fn lxmf_sdk::Client<B>::send_async(&self, req: lxmf_sdk::SendRequest) -> core::result::Result<lxmf_sdk::MessageId, lxmf_sdk::SdkError>
 pub async fn lxmf_sdk::Client<B>::shutdown_async(&self, mode: lxmf_sdk::ShutdownMode) -> core::result::Result<lxmf_sdk::Ack, lxmf_sdk::SdkError>
 pub async fn lxmf_sdk::Client<B>::snapshot_async(&self) -> core::result::Result<lxmf_sdk::RuntimeSnapshot, lxmf_sdk::SdkError>
@@ -2376,11 +2438,15 @@ impl<B: lxmf_sdk::SdkBackend> lxmf_sdk::LxmfSdkPeerLifecycle for lxmf_sdk::Clien
 pub fn lxmf_sdk::Client<B>::peer_connect(&self, req: lxmf_sdk::domain::PeerConnectionRequest) -> core::result::Result<lxmf_sdk::domain::PeerConnectionResult, lxmf_sdk::SdkError>
 pub fn lxmf_sdk::Client<B>::peer_disconnect(&self, req: lxmf_sdk::domain::PeerConnectionRequest) -> core::result::Result<lxmf_sdk::domain::PeerConnectionResult, lxmf_sdk::SdkError>
 pub fn lxmf_sdk::Client<B>::peer_reconnect(&self, req: lxmf_sdk::domain::PeerConnectionRequest) -> core::result::Result<lxmf_sdk::domain::PeerConnectionResult, lxmf_sdk::SdkError>
+impl<B: lxmf_sdk::SdkBackend> lxmf_sdk::LxmfSdkPropagation for lxmf_sdk::Client<B>
+pub fn lxmf_sdk::Client<B>::lxmf_propagation(&self, request: lxmf_sdk::SdkControlRequest<lxmf_sdk::LxmfPropagationOperation>) -> core::result::Result<lxmf_sdk::SdkControlResult, lxmf_sdk::SdkError>
 impl<B: lxmf_sdk::SdkBackend> lxmf_sdk::LxmfSdkRemoteCommands for lxmf_sdk::Client<B>
 pub fn lxmf_sdk::Client<B>::command_invoke(&self, req: lxmf_sdk::domain::RemoteCommandRequest) -> core::result::Result<lxmf_sdk::domain::RemoteCommandResponse, lxmf_sdk::SdkError>
 pub fn lxmf_sdk::Client<B>::command_reply(&self, correlation_id: alloc::string::String, reply: lxmf_sdk::domain::RemoteCommandResponse) -> core::result::Result<lxmf_sdk::Ack, lxmf_sdk::SdkError>
 pub fn lxmf_sdk::Client<B>::command_session_get(&self, correlation_id: alloc::string::String) -> core::result::Result<core::option::Option<lxmf_sdk::domain::RemoteCommandSession>, lxmf_sdk::SdkError>
 pub fn lxmf_sdk::Client<B>::command_session_list(&self, req: lxmf_sdk::domain::RemoteCommandSessionListRequest) -> core::result::Result<lxmf_sdk::domain::RemoteCommandSessionListResult, lxmf_sdk::SdkError>
+impl<B: lxmf_sdk::SdkBackend> lxmf_sdk::LxmfSdkRouter for lxmf_sdk::Client<B>
+pub fn lxmf_sdk::Client<B>::lxmf_router(&self, request: lxmf_sdk::SdkControlRequest<lxmf_sdk::LxmfRouterOperation>) -> core::result::Result<lxmf_sdk::SdkControlResult, lxmf_sdk::SdkError>
 impl<B: lxmf_sdk::SdkBackend> lxmf_sdk::LxmfSdkTelemetry for lxmf_sdk::Client<B>
 pub fn lxmf_sdk::Client<B>::telemetry_query(&self, query: lxmf_sdk::domain::TelemetryQuery) -> core::result::Result<alloc::vec::Vec<lxmf_sdk::domain::TelemetryPoint>, lxmf_sdk::SdkError>
 pub fn lxmf_sdk::Client<B>::telemetry_subscribe(&self, query: lxmf_sdk::domain::TelemetryQuery) -> core::result::Result<lxmf_sdk::Ack, lxmf_sdk::SdkError>
@@ -2395,6 +2461,14 @@ impl<B: lxmf_sdk::SdkBackend> lxmf_sdk::LxmfSdkVoiceSignaling for lxmf_sdk::Clie
 pub fn lxmf_sdk::Client<B>::voice_session_close(&self, session_id: lxmf_sdk::domain::VoiceSessionId) -> core::result::Result<lxmf_sdk::Ack, lxmf_sdk::SdkError>
 pub fn lxmf_sdk::Client<B>::voice_session_open(&self, req: lxmf_sdk::domain::VoiceSessionOpenRequest) -> core::result::Result<lxmf_sdk::domain::VoiceSessionId, lxmf_sdk::SdkError>
 pub fn lxmf_sdk::Client<B>::voice_session_update(&self, req: lxmf_sdk::domain::VoiceSessionUpdateRequest) -> core::result::Result<lxmf_sdk::domain::VoiceSessionState, lxmf_sdk::SdkError>
+impl<B: lxmf_sdk::SdkBackend> lxmf_sdk::RnsSdkDataPlane for lxmf_sdk::Client<B>
+pub fn lxmf_sdk::Client<B>::rns_data_plane(&self, request: lxmf_sdk::SdkControlRequest<lxmf_sdk::RnsDataPlaneOperation>) -> core::result::Result<lxmf_sdk::SdkControlResult, lxmf_sdk::SdkError>
+impl<B: lxmf_sdk::SdkBackend> lxmf_sdk::RnsSdkInterfaces for lxmf_sdk::Client<B>
+pub fn lxmf_sdk::Client<B>::rns_interfaces(&self, request: lxmf_sdk::SdkControlRequest<lxmf_sdk::RnsInterfacesOperation>) -> core::result::Result<lxmf_sdk::SdkControlResult, lxmf_sdk::SdkError>
+impl<B: lxmf_sdk::SdkBackend> lxmf_sdk::RnsSdkRuntime for lxmf_sdk::Client<B>
+pub fn lxmf_sdk::Client<B>::rns_runtime(&self, request: lxmf_sdk::SdkControlRequest<lxmf_sdk::RnsRuntimeOperation>) -> core::result::Result<lxmf_sdk::SdkControlResult, lxmf_sdk::SdkError>
+impl<B: lxmf_sdk::SdkBackend> lxmf_sdk::RnsSdkTransport for lxmf_sdk::Client<B>
+pub fn lxmf_sdk::Client<B>::rns_transport(&self, request: lxmf_sdk::SdkControlRequest<lxmf_sdk::RnsTransportOperation>) -> core::result::Result<lxmf_sdk::SdkControlResult, lxmf_sdk::SdkError>
 impl<B: lxmf_sdk::SdkBackendAsyncEvents> lxmf_sdk::LxmfSdkAsync for lxmf_sdk::Client<B>
 pub fn lxmf_sdk::Client<B>::open_event_stream(&self, subscription: &lxmf_sdk::event::EventSubscription) -> core::result::Result<core::option::Option<lxmf_sdk::SdkEventStream>, lxmf_sdk::SdkError>
 pub fn lxmf_sdk::Client<B>::subscribe_events(&self, start: lxmf_sdk::event::SubscriptionStart) -> core::result::Result<lxmf_sdk::event::EventSubscription, lxmf_sdk::SdkError>
@@ -3321,6 +3395,15 @@ pub fn lxmf_sdk::SdkConfig::with_rpc_listen_addr(self, listen_addr: impl core::c
 pub fn lxmf_sdk::SdkConfig::with_store_forward_limits(self, max_messages: usize, max_message_age_ms: u64) -> Self
 pub fn lxmf_sdk::SdkConfig::with_store_forward_policy(self, capacity_policy: lxmf_sdk::StoreForwardCapacityPolicy, eviction_priority: lxmf_sdk::StoreForwardEvictionPriority) -> Self
 pub fn lxmf_sdk::SdkConfig::with_token_auth(self, issuer: impl core::convert::Into<alloc::string::String>, audience: impl core::convert::Into<alloc::string::String>, shared_secret: impl core::convert::Into<alloc::string::String>) -> Self
+pub struct lxmf_sdk::SdkControlRequest<O>
+pub lxmf_sdk::SdkControlRequest::operation: O
+pub lxmf_sdk::SdkControlRequest::params: serde_json::value::Value
+impl<O> lxmf_sdk::SdkControlRequest<O>
+pub fn lxmf_sdk::SdkControlRequest<O>::new(operation: O, params: serde_json::value::Value) -> Self
+pub struct lxmf_sdk::SdkControlResult
+pub lxmf_sdk::SdkControlResult::accepted: bool
+pub lxmf_sdk::SdkControlResult::operation_id: alloc::string::String
+pub lxmf_sdk::SdkControlResult::value: serde_json::value::Value
 #[non_exhaustive] pub struct lxmf_sdk::SdkError
 pub lxmf_sdk::SdkError::category: lxmf_sdk::ErrorCategory
 pub lxmf_sdk::SdkError::cause_code: core::option::Option<alloc::string::String>
@@ -3497,6 +3580,161 @@ pub lxmf_sdk::WorkflowPeerReadyResult::announced: bool
 pub lxmf_sdk::WorkflowPeerReadyResult::contact: lxmf_sdk::domain::ContactRecord
 pub lxmf_sdk::WorkflowPeerReadyResult::identity: lxmf_sdk::domain::IdentityRef
 pub lxmf_sdk::WorkflowPeerReadyResult::was_created: bool
+pub struct lxmf_sdk::ZmqPipelineBackendClient
+impl lxmf_sdk::ZmqPipelineBackendClient
+pub fn lxmf_sdk::ZmqPipelineBackendClient::delivery_stamp_policy_get(&self) -> core::result::Result<lxmf_sdk::domain::DeliveryStampPolicyResult, lxmf_sdk::SdkError>
+pub fn lxmf_sdk::ZmqPipelineBackendClient::delivery_stamp_policy_set(&self, req: lxmf_sdk::domain::DeliveryStampPolicyRequest) -> core::result::Result<lxmf_sdk::domain::DeliveryStampPolicyResult, lxmf_sdk::SdkError>
+pub fn lxmf_sdk::ZmqPipelineBackendClient::propagation_acknowledge_sync_completion(&self, req: lxmf_sdk::domain::PropagationAcknowledgeSyncRequest) -> core::result::Result<lxmf_sdk::domain::PropagationAcknowledgeSyncResult, lxmf_sdk::SdkError>
+pub fn lxmf_sdk::ZmqPipelineBackendClient::propagation_delivery_policy_allow(&self, destination: impl core::convert::Into<alloc::string::String>) -> core::result::Result<lxmf_sdk::domain::PropagationDeliveryPolicyResult, lxmf_sdk::SdkError>
+pub fn lxmf_sdk::ZmqPipelineBackendClient::propagation_delivery_policy_allow_destination(&self, req: lxmf_sdk::domain::PropagationDeliveryPolicyEntryRequest) -> core::result::Result<lxmf_sdk::domain::PropagationDeliveryPolicyResult, lxmf_sdk::SdkError>
+pub fn lxmf_sdk::ZmqPipelineBackendClient::propagation_delivery_policy_disallow(&self, destination: &str) -> core::result::Result<lxmf_sdk::domain::PropagationDeliveryPolicyResult, lxmf_sdk::SdkError>
+pub fn lxmf_sdk::ZmqPipelineBackendClient::propagation_delivery_policy_disallow_destination(&self, req: lxmf_sdk::domain::PropagationDeliveryPolicyEntryRequest) -> core::result::Result<lxmf_sdk::domain::PropagationDeliveryPolicyResult, lxmf_sdk::SdkError>
+pub fn lxmf_sdk::ZmqPipelineBackendClient::propagation_delivery_policy_get(&self) -> core::result::Result<lxmf_sdk::domain::PropagationDeliveryPolicyResult, lxmf_sdk::SdkError>
+pub fn lxmf_sdk::ZmqPipelineBackendClient::propagation_delivery_policy_ignore(&self, destination: impl core::convert::Into<alloc::string::String>) -> core::result::Result<lxmf_sdk::domain::PropagationDeliveryPolicyResult, lxmf_sdk::SdkError>
+pub fn lxmf_sdk::ZmqPipelineBackendClient::propagation_delivery_policy_prioritise(&self, destination: impl core::convert::Into<alloc::string::String>) -> core::result::Result<lxmf_sdk::domain::PropagationDeliveryPolicyResult, lxmf_sdk::SdkError>
+pub fn lxmf_sdk::ZmqPipelineBackendClient::propagation_delivery_policy_prioritise_destination(&self, req: lxmf_sdk::domain::PropagationDeliveryPolicyEntryRequest) -> core::result::Result<lxmf_sdk::domain::PropagationDeliveryPolicyResult, lxmf_sdk::SdkError>
+pub fn lxmf_sdk::ZmqPipelineBackendClient::propagation_delivery_policy_set(&self, req: lxmf_sdk::domain::PropagationDeliveryPolicyRequest) -> core::result::Result<lxmf_sdk::domain::PropagationDeliveryPolicyResult, lxmf_sdk::SdkError>
+pub fn lxmf_sdk::ZmqPipelineBackendClient::propagation_delivery_policy_unignore(&self, destination: &str) -> core::result::Result<lxmf_sdk::domain::PropagationDeliveryPolicyResult, lxmf_sdk::SdkError>
+pub fn lxmf_sdk::ZmqPipelineBackendClient::propagation_delivery_policy_unprioritise(&self, destination: &str) -> core::result::Result<lxmf_sdk::domain::PropagationDeliveryPolicyResult, lxmf_sdk::SdkError>
+pub fn lxmf_sdk::ZmqPipelineBackendClient::propagation_enable(&self, req: lxmf_sdk::domain::PropagationEnableRequest) -> core::result::Result<lxmf_sdk::domain::PropagationStatusResult, lxmf_sdk::SdkError>
+pub fn lxmf_sdk::ZmqPipelineBackendClient::propagation_fetch(&self, req: lxmf_sdk::domain::PropagationFetchRequest) -> core::result::Result<lxmf_sdk::domain::PropagationFetchResult, lxmf_sdk::SdkError>
+pub fn lxmf_sdk::ZmqPipelineBackendClient::propagation_ingest(&self, req: lxmf_sdk::domain::PropagationIngestRequest) -> core::result::Result<lxmf_sdk::domain::PropagationIngestResult, lxmf_sdk::SdkError>
+pub fn lxmf_sdk::ZmqPipelineBackendClient::propagation_node_get(&self) -> core::result::Result<lxmf_sdk::domain::PropagationNodeSelectionResult, lxmf_sdk::SdkError>
+pub fn lxmf_sdk::ZmqPipelineBackendClient::propagation_node_list(&self) -> core::result::Result<lxmf_sdk::domain::PropagationNodeListResult, lxmf_sdk::SdkError>
+pub fn lxmf_sdk::ZmqPipelineBackendClient::propagation_node_set(&self, req: lxmf_sdk::domain::PropagationNodeSetRequest) -> core::result::Result<lxmf_sdk::domain::PropagationNodeSelectionResult, lxmf_sdk::SdkError>
+pub fn lxmf_sdk::ZmqPipelineBackendClient::propagation_peer_maintenance(&self) -> core::result::Result<lxmf_sdk::domain::PropagationPeerMaintenanceResult, lxmf_sdk::SdkError>
+pub fn lxmf_sdk::ZmqPipelineBackendClient::propagation_peer_sync(&self, req: lxmf_sdk::domain::PropagationPeerSyncRequest) -> core::result::Result<lxmf_sdk::domain::PropagationPeerSyncResult, lxmf_sdk::SdkError>
+pub fn lxmf_sdk::ZmqPipelineBackendClient::propagation_recovery_state(&self) -> core::result::Result<lxmf_sdk::domain::PropagationRecoveryStateResult, lxmf_sdk::SdkError>
+pub fn lxmf_sdk::ZmqPipelineBackendClient::propagation_remote_download(&self, req: lxmf_sdk::domain::PropagationRemoteRequest) -> core::result::Result<lxmf_sdk::domain::PropagationRemoteTransferResult, lxmf_sdk::SdkError>
+pub fn lxmf_sdk::ZmqPipelineBackendClient::propagation_remote_fetch(&self, req: lxmf_sdk::domain::PropagationRemoteRequest) -> core::result::Result<lxmf_sdk::domain::PropagationRemoteTransferResult, lxmf_sdk::SdkError>
+pub fn lxmf_sdk::ZmqPipelineBackendClient::propagation_remote_status(&self, req: lxmf_sdk::domain::PropagationRemoteRequest) -> core::result::Result<lxmf_sdk::domain::PropagationRemoteStatusResult, lxmf_sdk::SdkError>
+pub fn lxmf_sdk::ZmqPipelineBackendClient::propagation_remote_sync(&self, req: lxmf_sdk::domain::PropagationRemotePeerRequest) -> core::result::Result<lxmf_sdk::domain::PropagationRemoteSyncResult, lxmf_sdk::SdkError>
+pub fn lxmf_sdk::ZmqPipelineBackendClient::propagation_remote_unpeer(&self, req: lxmf_sdk::domain::PropagationRemotePeerRequest) -> core::result::Result<lxmf_sdk::domain::PropagationRemoteUnpeerResult, lxmf_sdk::SdkError>
+pub fn lxmf_sdk::ZmqPipelineBackendClient::propagation_status(&self) -> core::result::Result<lxmf_sdk::domain::PropagationStatusResult, lxmf_sdk::SdkError>
+impl lxmf_sdk::ZmqPipelineBackendClient
+pub fn lxmf_sdk::ZmqPipelineBackendClient::delivery_ticket_generate(&self, req: lxmf_sdk::domain::DeliveryTicketGenerateRequest) -> core::result::Result<lxmf_sdk::domain::DeliveryTicketGenerateResult, lxmf_sdk::SdkError>
+impl lxmf_sdk::ZmqPipelineBackendClient
+pub fn lxmf_sdk::ZmqPipelineBackendClient::envelope_execute(&self, envelope: lxmf_sdk::app::Envelope) -> core::result::Result<lxmf_sdk::app::EnvelopeResponse, lxmf_sdk::SdkError>
+pub fn lxmf_sdk::ZmqPipelineBackendClient::operation_registry(&self) -> core::result::Result<lxmf_sdk::app::OperationRegistry, lxmf_sdk::SdkError>
+pub fn lxmf_sdk::ZmqPipelineBackendClient::paper_decode(&self, envelope: lxmf_sdk::domain::PaperMessageEnvelope) -> core::result::Result<lxmf_sdk::Ack, lxmf_sdk::SdkError>
+pub fn lxmf_sdk::ZmqPipelineBackendClient::paper_decode_with_metadata(&self, envelope: lxmf_sdk::domain::PaperMessageEnvelope) -> core::result::Result<lxmf_sdk::domain::PaperDecodeResult, lxmf_sdk::SdkError>
+pub fn lxmf_sdk::ZmqPipelineBackendClient::paper_encode(&self, message_id: lxmf_sdk::MessageId) -> core::result::Result<lxmf_sdk::domain::PaperMessageEnvelope, lxmf_sdk::SdkError>
+pub fn lxmf_sdk::ZmqPipelineBackendClient::shutdown(&self, mode: lxmf_sdk::ShutdownMode) -> core::result::Result<lxmf_sdk::Ack, lxmf_sdk::SdkError>
+pub fn lxmf_sdk::ZmqPipelineBackendClient::snapshot(&self) -> core::result::Result<lxmf_sdk::RuntimeSnapshot, lxmf_sdk::SdkError>
+impl lxmf_sdk::ZmqPipelineBackendClient
+pub fn lxmf_sdk::ZmqPipelineBackendClient::identity_announce(&self, req: lxmf_sdk::domain::IdentityAnnounceRequest) -> core::result::Result<lxmf_sdk::domain::IdentityAnnounceResult, lxmf_sdk::SdkError>
+impl lxmf_sdk::ZmqPipelineBackendClient
+pub fn lxmf_sdk::ZmqPipelineBackendClient::list_conversations(&self, req: lxmf_sdk::ConversationListRequest) -> core::result::Result<lxmf_sdk::ConversationListPage, lxmf_sdk::SdkError>
+pub fn lxmf_sdk::ZmqPipelineBackendClient::list_message_history(&self, req: lxmf_sdk::messaging::MessageHistoryListRequest) -> core::result::Result<lxmf_sdk::messaging::MessageHistoryPage, lxmf_sdk::SdkError>
+impl lxmf_sdk::ZmqPipelineBackendClient
+pub fn lxmf_sdk::ZmqPipelineBackendClient::local_delivery_destination_hash(&self) -> core::result::Result<alloc::string::String, lxmf_sdk::SdkError>
+impl lxmf_sdk::ZmqPipelineBackendClient
+pub fn lxmf_sdk::ZmqPipelineBackendClient::new(config: lxmf_sdk::ZmqPipelineBackendConfig) -> core::result::Result<Self, lxmf_sdk::SdkError>
+pub fn lxmf_sdk::ZmqPipelineBackendClient::session_id(&self) -> &str
+impl lxmf_sdk::ZmqPipelineBackendClient
+pub fn lxmf_sdk::ZmqPipelineBackendClient::peer_connect(&self, req: lxmf_sdk::domain::PeerConnectionRequest) -> core::result::Result<lxmf_sdk::domain::PeerConnectionResult, lxmf_sdk::SdkError>
+pub fn lxmf_sdk::ZmqPipelineBackendClient::peer_disconnect(&self, req: lxmf_sdk::domain::PeerConnectionRequest) -> core::result::Result<lxmf_sdk::domain::PeerConnectionResult, lxmf_sdk::SdkError>
+pub fn lxmf_sdk::ZmqPipelineBackendClient::peer_reconnect(&self, req: lxmf_sdk::domain::PeerConnectionRequest) -> core::result::Result<lxmf_sdk::domain::PeerConnectionResult, lxmf_sdk::SdkError>
+impl lxmf_sdk::ZmqPipelineBackendClient
+pub fn lxmf_sdk::ZmqPipelineBackendClient::peer_directory(&self, limit: core::option::Option<usize>) -> core::result::Result<alloc::vec::Vec<lxmf_sdk::app::PeerDirectoryEntry>, lxmf_sdk::SdkError>
+pub fn lxmf_sdk::ZmqPipelineBackendClient::peer_directory_since(&self, limit: core::option::Option<usize>, min_last_seen_ts_ms: core::option::Option<i64>) -> core::result::Result<alloc::vec::Vec<lxmf_sdk::app::PeerDirectoryEntry>, lxmf_sdk::SdkError>
+impl lxmf_sdk::ZmqPipelineBackendClient
+pub fn lxmf_sdk::ZmqPipelineBackendClient::send_batch(&self, req: lxmf_sdk::BatchSendRequest) -> core::result::Result<lxmf_sdk::BatchSendResult, lxmf_sdk::SdkError>
+impl lxmf_sdk::ZmqPipelineBackendClient
+pub fn lxmf_sdk::ZmqPipelineBackendClient::workflow_peer_ready(&self, req: lxmf_sdk::domain::WorkflowPeerReadyRequest) -> core::result::Result<lxmf_sdk::domain::WorkflowPeerReadyResult, lxmf_sdk::SdkError>
+impl core::ops::drop::Drop for lxmf_sdk::ZmqPipelineBackendClient
+pub fn lxmf_sdk::ZmqPipelineBackendClient::drop(&mut self)
+impl lxmf_sdk::SdkBackend for lxmf_sdk::ZmqPipelineBackendClient
+pub fn lxmf_sdk::ZmqPipelineBackendClient::attachment_associate_topic(&self, attachment_id: lxmf_sdk::domain::AttachmentId, topic_id: lxmf_sdk::domain::TopicId) -> core::result::Result<lxmf_sdk::Ack, lxmf_sdk::SdkError>
+pub fn lxmf_sdk::ZmqPipelineBackendClient::attachment_delete(&self, attachment_id: lxmf_sdk::domain::AttachmentId) -> core::result::Result<lxmf_sdk::Ack, lxmf_sdk::SdkError>
+pub fn lxmf_sdk::ZmqPipelineBackendClient::attachment_download(&self, attachment_id: lxmf_sdk::domain::AttachmentId) -> core::result::Result<lxmf_sdk::Ack, lxmf_sdk::SdkError>
+pub fn lxmf_sdk::ZmqPipelineBackendClient::attachment_download_chunk(&self, req: lxmf_sdk::domain::AttachmentDownloadChunkRequest) -> core::result::Result<lxmf_sdk::domain::AttachmentDownloadChunk, lxmf_sdk::SdkError>
+pub fn lxmf_sdk::ZmqPipelineBackendClient::attachment_get(&self, attachment_id: lxmf_sdk::domain::AttachmentId) -> core::result::Result<core::option::Option<lxmf_sdk::domain::AttachmentMeta>, lxmf_sdk::SdkError>
+pub fn lxmf_sdk::ZmqPipelineBackendClient::attachment_list(&self, req: lxmf_sdk::domain::AttachmentListRequest) -> core::result::Result<lxmf_sdk::domain::AttachmentListResult, lxmf_sdk::SdkError>
+pub fn lxmf_sdk::ZmqPipelineBackendClient::attachment_store(&self, req: lxmf_sdk::domain::AttachmentStoreRequest) -> core::result::Result<lxmf_sdk::domain::AttachmentMeta, lxmf_sdk::SdkError>
+pub fn lxmf_sdk::ZmqPipelineBackendClient::attachment_upload_chunk(&self, req: lxmf_sdk::domain::AttachmentUploadChunkRequest) -> core::result::Result<lxmf_sdk::domain::AttachmentUploadChunkAck, lxmf_sdk::SdkError>
+pub fn lxmf_sdk::ZmqPipelineBackendClient::attachment_upload_commit(&self, req: lxmf_sdk::domain::AttachmentUploadCommitRequest) -> core::result::Result<lxmf_sdk::domain::AttachmentMeta, lxmf_sdk::SdkError>
+pub fn lxmf_sdk::ZmqPipelineBackendClient::attachment_upload_start(&self, req: lxmf_sdk::domain::AttachmentUploadStartRequest) -> core::result::Result<lxmf_sdk::domain::AttachmentUploadSession, lxmf_sdk::SdkError>
+pub fn lxmf_sdk::ZmqPipelineBackendClient::cancel(&self, id: lxmf_sdk::MessageId) -> core::result::Result<lxmf_sdk::CancelResult, lxmf_sdk::SdkError>
+pub fn lxmf_sdk::ZmqPipelineBackendClient::command_invoke(&self, req: lxmf_sdk::domain::RemoteCommandRequest) -> core::result::Result<lxmf_sdk::domain::RemoteCommandResponse, lxmf_sdk::SdkError>
+pub fn lxmf_sdk::ZmqPipelineBackendClient::command_reply(&self, correlation_id: alloc::string::String, reply: lxmf_sdk::domain::RemoteCommandResponse) -> core::result::Result<lxmf_sdk::Ack, lxmf_sdk::SdkError>
+pub fn lxmf_sdk::ZmqPipelineBackendClient::command_session_get(&self, correlation_id: alloc::string::String) -> core::result::Result<core::option::Option<lxmf_sdk::domain::RemoteCommandSession>, lxmf_sdk::SdkError>
+pub fn lxmf_sdk::ZmqPipelineBackendClient::command_session_list(&self, req: lxmf_sdk::domain::RemoteCommandSessionListRequest) -> core::result::Result<lxmf_sdk::domain::RemoteCommandSessionListResult, lxmf_sdk::SdkError>
+pub fn lxmf_sdk::ZmqPipelineBackendClient::configure(&self, expected_revision: u64, patch: lxmf_sdk::ConfigPatch) -> core::result::Result<lxmf_sdk::Ack, lxmf_sdk::SdkError>
+pub fn lxmf_sdk::ZmqPipelineBackendClient::envelope_execute(&self, envelope: lxmf_sdk::app::Envelope) -> core::result::Result<lxmf_sdk::app::EnvelopeResponse, lxmf_sdk::SdkError>
+pub fn lxmf_sdk::ZmqPipelineBackendClient::identity_activate(&self, identity: lxmf_sdk::domain::IdentityRef) -> core::result::Result<lxmf_sdk::Ack, lxmf_sdk::SdkError>
+pub fn lxmf_sdk::ZmqPipelineBackendClient::identity_announce(&self, req: lxmf_sdk::domain::IdentityAnnounceRequest) -> core::result::Result<lxmf_sdk::domain::IdentityAnnounceResult, lxmf_sdk::SdkError>
+pub fn lxmf_sdk::ZmqPipelineBackendClient::identity_announce_now(&self) -> core::result::Result<lxmf_sdk::Ack, lxmf_sdk::SdkError>
+pub fn lxmf_sdk::ZmqPipelineBackendClient::identity_bootstrap(&self, req: lxmf_sdk::domain::IdentityBootstrapRequest) -> core::result::Result<lxmf_sdk::domain::ContactRecord, lxmf_sdk::SdkError>
+pub fn lxmf_sdk::ZmqPipelineBackendClient::identity_contact_list(&self, req: lxmf_sdk::domain::ContactListRequest) -> core::result::Result<lxmf_sdk::domain::ContactListResult, lxmf_sdk::SdkError>
+pub fn lxmf_sdk::ZmqPipelineBackendClient::identity_contact_update(&self, req: lxmf_sdk::domain::ContactUpdateRequest) -> core::result::Result<lxmf_sdk::domain::ContactRecord, lxmf_sdk::SdkError>
+pub fn lxmf_sdk::ZmqPipelineBackendClient::identity_export(&self, identity: lxmf_sdk::domain::IdentityRef) -> core::result::Result<lxmf_sdk::domain::IdentityImportRequest, lxmf_sdk::SdkError>
+pub fn lxmf_sdk::ZmqPipelineBackendClient::identity_import(&self, req: lxmf_sdk::domain::IdentityImportRequest) -> core::result::Result<lxmf_sdk::domain::IdentityBundle, lxmf_sdk::SdkError>
+pub fn lxmf_sdk::ZmqPipelineBackendClient::identity_list(&self) -> core::result::Result<alloc::vec::Vec<lxmf_sdk::domain::IdentityBundle>, lxmf_sdk::SdkError>
+pub fn lxmf_sdk::ZmqPipelineBackendClient::identity_presence_list(&self, req: lxmf_sdk::domain::PresenceListRequest) -> core::result::Result<lxmf_sdk::domain::PresenceListResult, lxmf_sdk::SdkError>
+pub fn lxmf_sdk::ZmqPipelineBackendClient::identity_resolve(&self, req: lxmf_sdk::domain::IdentityResolveRequest) -> core::result::Result<core::option::Option<lxmf_sdk::domain::IdentityRef>, lxmf_sdk::SdkError>
+pub fn lxmf_sdk::ZmqPipelineBackendClient::marker_create(&self, req: lxmf_sdk::domain::MarkerCreateRequest) -> core::result::Result<lxmf_sdk::domain::MarkerRecord, lxmf_sdk::SdkError>
+pub fn lxmf_sdk::ZmqPipelineBackendClient::marker_delete(&self, req: lxmf_sdk::domain::MarkerDeleteRequest) -> core::result::Result<lxmf_sdk::Ack, lxmf_sdk::SdkError>
+pub fn lxmf_sdk::ZmqPipelineBackendClient::marker_list(&self, req: lxmf_sdk::domain::MarkerListRequest) -> core::result::Result<lxmf_sdk::domain::MarkerListResult, lxmf_sdk::SdkError>
+pub fn lxmf_sdk::ZmqPipelineBackendClient::marker_update_position(&self, req: lxmf_sdk::domain::MarkerUpdatePositionRequest) -> core::result::Result<lxmf_sdk::domain::MarkerRecord, lxmf_sdk::SdkError>
+pub fn lxmf_sdk::ZmqPipelineBackendClient::negotiate(&self, req: lxmf_sdk::capability::NegotiationRequest) -> core::result::Result<lxmf_sdk::capability::NegotiationResponse, lxmf_sdk::SdkError>
+pub fn lxmf_sdk::ZmqPipelineBackendClient::operation_registry(&self) -> core::result::Result<lxmf_sdk::app::OperationRegistry, lxmf_sdk::SdkError>
+pub fn lxmf_sdk::ZmqPipelineBackendClient::paper_decode(&self, envelope: lxmf_sdk::domain::PaperMessageEnvelope) -> core::result::Result<lxmf_sdk::Ack, lxmf_sdk::SdkError>
+pub fn lxmf_sdk::ZmqPipelineBackendClient::paper_decode_with_metadata(&self, envelope: lxmf_sdk::domain::PaperMessageEnvelope) -> core::result::Result<lxmf_sdk::domain::PaperDecodeResult, lxmf_sdk::SdkError>
+pub fn lxmf_sdk::ZmqPipelineBackendClient::paper_encode(&self, message_id: lxmf_sdk::MessageId) -> core::result::Result<lxmf_sdk::domain::PaperMessageEnvelope, lxmf_sdk::SdkError>
+pub fn lxmf_sdk::ZmqPipelineBackendClient::peer_connect(&self, req: lxmf_sdk::domain::PeerConnectionRequest) -> core::result::Result<lxmf_sdk::domain::PeerConnectionResult, lxmf_sdk::SdkError>
+pub fn lxmf_sdk::ZmqPipelineBackendClient::peer_disconnect(&self, req: lxmf_sdk::domain::PeerConnectionRequest) -> core::result::Result<lxmf_sdk::domain::PeerConnectionResult, lxmf_sdk::SdkError>
+pub fn lxmf_sdk::ZmqPipelineBackendClient::peer_reconnect(&self, req: lxmf_sdk::domain::PeerConnectionRequest) -> core::result::Result<lxmf_sdk::domain::PeerConnectionResult, lxmf_sdk::SdkError>
+pub fn lxmf_sdk::ZmqPipelineBackendClient::poll_events(&self, cursor: core::option::Option<lxmf_sdk::event::EventCursor>, max: usize) -> core::result::Result<lxmf_sdk::event::EventBatch, lxmf_sdk::SdkError>
+pub fn lxmf_sdk::ZmqPipelineBackendClient::router_stats(&self) -> core::result::Result<lxmf_sdk::domain::RouterStats, lxmf_sdk::SdkError>
+pub fn lxmf_sdk::ZmqPipelineBackendClient::router_storage_policy(&self) -> core::result::Result<lxmf_sdk::domain::RouterStoragePolicy, lxmf_sdk::SdkError>
+pub fn lxmf_sdk::ZmqPipelineBackendClient::send(&self, req: lxmf_sdk::SendRequest) -> core::result::Result<lxmf_sdk::MessageId, lxmf_sdk::SdkError>
+pub fn lxmf_sdk::ZmqPipelineBackendClient::set_router_storage_policy(&self, patch: lxmf_sdk::domain::RouterStoragePolicyPatch) -> core::result::Result<lxmf_sdk::domain::RouterStoragePolicy, lxmf_sdk::SdkError>
+pub fn lxmf_sdk::ZmqPipelineBackendClient::shutdown(&self, mode: lxmf_sdk::ShutdownMode) -> core::result::Result<lxmf_sdk::Ack, lxmf_sdk::SdkError>
+pub fn lxmf_sdk::ZmqPipelineBackendClient::snapshot(&self) -> core::result::Result<lxmf_sdk::RuntimeSnapshot, lxmf_sdk::SdkError>
+pub fn lxmf_sdk::ZmqPipelineBackendClient::status(&self, id: lxmf_sdk::MessageId) -> core::result::Result<core::option::Option<lxmf_sdk::DeliverySnapshot>, lxmf_sdk::SdkError>
+pub fn lxmf_sdk::ZmqPipelineBackendClient::telemetry_query(&self, query: lxmf_sdk::domain::TelemetryQuery) -> core::result::Result<alloc::vec::Vec<lxmf_sdk::domain::TelemetryPoint>, lxmf_sdk::SdkError>
+pub fn lxmf_sdk::ZmqPipelineBackendClient::telemetry_subscribe(&self, query: lxmf_sdk::domain::TelemetryQuery) -> core::result::Result<lxmf_sdk::Ack, lxmf_sdk::SdkError>
+pub fn lxmf_sdk::ZmqPipelineBackendClient::tick(&self, budget: lxmf_sdk::TickBudget) -> core::result::Result<lxmf_sdk::TickResult, lxmf_sdk::SdkError>
+pub fn lxmf_sdk::ZmqPipelineBackendClient::topic_create(&self, req: lxmf_sdk::domain::TopicCreateRequest) -> core::result::Result<lxmf_sdk::domain::TopicRecord, lxmf_sdk::SdkError>
+pub fn lxmf_sdk::ZmqPipelineBackendClient::topic_get(&self, topic_id: lxmf_sdk::domain::TopicId) -> core::result::Result<core::option::Option<lxmf_sdk::domain::TopicRecord>, lxmf_sdk::SdkError>
+pub fn lxmf_sdk::ZmqPipelineBackendClient::topic_list(&self, req: lxmf_sdk::domain::TopicListRequest) -> core::result::Result<lxmf_sdk::domain::TopicListResult, lxmf_sdk::SdkError>
+pub fn lxmf_sdk::ZmqPipelineBackendClient::topic_publish(&self, req: lxmf_sdk::domain::TopicPublishRequest) -> core::result::Result<lxmf_sdk::Ack, lxmf_sdk::SdkError>
+pub fn lxmf_sdk::ZmqPipelineBackendClient::topic_subscribe(&self, req: lxmf_sdk::domain::TopicSubscriptionRequest) -> core::result::Result<lxmf_sdk::Ack, lxmf_sdk::SdkError>
+pub fn lxmf_sdk::ZmqPipelineBackendClient::topic_unsubscribe(&self, topic_id: lxmf_sdk::domain::TopicId) -> core::result::Result<lxmf_sdk::Ack, lxmf_sdk::SdkError>
+pub fn lxmf_sdk::ZmqPipelineBackendClient::voice_session_close(&self, session_id: lxmf_sdk::domain::VoiceSessionId) -> core::result::Result<lxmf_sdk::Ack, lxmf_sdk::SdkError>
+pub fn lxmf_sdk::ZmqPipelineBackendClient::voice_session_open(&self, req: lxmf_sdk::domain::VoiceSessionOpenRequest) -> core::result::Result<lxmf_sdk::domain::VoiceSessionId, lxmf_sdk::SdkError>
+pub fn lxmf_sdk::ZmqPipelineBackendClient::voice_session_update(&self, req: lxmf_sdk::domain::VoiceSessionUpdateRequest) -> core::result::Result<lxmf_sdk::domain::VoiceSessionState, lxmf_sdk::SdkError>
+impl lxmf_sdk::SdkBackendAsyncEvents for lxmf_sdk::ZmqPipelineBackendClient
+pub fn lxmf_sdk::ZmqPipelineBackendClient::open_event_stream(&self, subscription: &lxmf_sdk::event::EventSubscription) -> core::result::Result<core::option::Option<lxmf_sdk::SdkEventStream>, lxmf_sdk::SdkError>
+pub fn lxmf_sdk::ZmqPipelineBackendClient::subscribe_events(&self, start: lxmf_sdk::event::SubscriptionStart) -> core::result::Result<lxmf_sdk::event::EventSubscription, lxmf_sdk::SdkError>
+impl lxmf_sdk::SdkBackendAsyncOps for lxmf_sdk::ZmqPipelineBackendClient
+pub fn lxmf_sdk::ZmqPipelineBackendClient::cancel_async(&self, id: lxmf_sdk::MessageId) -> lxmf_sdk::SdkBoxFuture<'_, lxmf_sdk::CancelResult>
+pub fn lxmf_sdk::ZmqPipelineBackendClient::configure_async(&self, expected_revision: u64, patch: lxmf_sdk::ConfigPatch) -> lxmf_sdk::SdkBoxFuture<'_, lxmf_sdk::Ack>
+pub fn lxmf_sdk::ZmqPipelineBackendClient::negotiate_async(&self, req: lxmf_sdk::capability::NegotiationRequest) -> lxmf_sdk::SdkBoxFuture<'_, lxmf_sdk::capability::NegotiationResponse>
+pub fn lxmf_sdk::ZmqPipelineBackendClient::poll_events_async(&self, cursor: core::option::Option<lxmf_sdk::event::EventCursor>, max: usize) -> lxmf_sdk::SdkBoxFuture<'_, lxmf_sdk::event::EventBatch>
+pub fn lxmf_sdk::ZmqPipelineBackendClient::send_async(&self, req: lxmf_sdk::SendRequest) -> lxmf_sdk::SdkBoxFuture<'_, lxmf_sdk::MessageId>
+pub fn lxmf_sdk::ZmqPipelineBackendClient::shutdown_async(&self, mode: lxmf_sdk::ShutdownMode) -> lxmf_sdk::SdkBoxFuture<'_, lxmf_sdk::Ack>
+pub fn lxmf_sdk::ZmqPipelineBackendClient::snapshot_async(&self) -> lxmf_sdk::SdkBoxFuture<'_, lxmf_sdk::RuntimeSnapshot>
+pub fn lxmf_sdk::ZmqPipelineBackendClient::status_async(&self, id: lxmf_sdk::MessageId) -> lxmf_sdk::SdkBoxFuture<'_, core::option::Option<lxmf_sdk::DeliverySnapshot>>
+pub struct lxmf_sdk::ZmqPipelineBackendConfig
+pub lxmf_sdk::ZmqPipelineBackendConfig::command_endpoint: alloc::string::String
+pub lxmf_sdk::ZmqPipelineBackendConfig::command_role: lxmf_sdk::ZmqEndpointRole
+pub lxmf_sdk::ZmqPipelineBackendConfig::max_envelope_bytes: usize
+pub lxmf_sdk::ZmqPipelineBackendConfig::request_timeout: core::time::Duration
+pub lxmf_sdk::ZmqPipelineBackendConfig::response_endpoint: alloc::string::String
+pub lxmf_sdk::ZmqPipelineBackendConfig::response_role: lxmf_sdk::ZmqEndpointRole
+pub lxmf_sdk::ZmqPipelineBackendConfig::token_auth: core::option::Option<lxmf_sdk::ZmqPipelineTokenAuth>
+impl lxmf_sdk::ZmqPipelineBackendConfig
+pub fn lxmf_sdk::ZmqPipelineBackendConfig::local(endpoint: impl core::convert::Into<alloc::string::String>) -> Self
+pub fn lxmf_sdk::ZmqPipelineBackendConfig::local_tcp(command_endpoint: impl core::convert::Into<alloc::string::String>, response_endpoint: impl core::convert::Into<alloc::string::String>) -> Self
+pub fn lxmf_sdk::ZmqPipelineBackendConfig::remote(endpoint: impl core::convert::Into<alloc::string::String>, token_auth: lxmf_sdk::ZmqPipelineTokenAuth) -> Self
+pub fn lxmf_sdk::ZmqPipelineBackendConfig::validate(&self) -> core::result::Result<(), lxmf_sdk::SdkError>
+pub struct lxmf_sdk::ZmqPipelineTokenAuth
+pub lxmf_sdk::ZmqPipelineTokenAuth::audience: alloc::string::String
+pub lxmf_sdk::ZmqPipelineTokenAuth::issuer: alloc::string::String
+pub lxmf_sdk::ZmqPipelineTokenAuth::shared_secret: alloc::string::String
+pub lxmf_sdk::ZmqPipelineTokenAuth::ttl_secs: u64
 pub const lxmf_sdk::CONTRACT_RELEASE: &str
 pub const lxmf_sdk::SCHEMA_NAMESPACE: &str
 pub const lxmf_sdk::SDK_VERSION: &str
@@ -3610,6 +3848,10 @@ impl<B: lxmf_sdk::SdkBackend> lxmf_sdk::LxmfSdkPeerLifecycle for lxmf_sdk::Clien
 pub fn lxmf_sdk::Client<B>::peer_connect(&self, req: lxmf_sdk::domain::PeerConnectionRequest) -> core::result::Result<lxmf_sdk::domain::PeerConnectionResult, lxmf_sdk::SdkError>
 pub fn lxmf_sdk::Client<B>::peer_disconnect(&self, req: lxmf_sdk::domain::PeerConnectionRequest) -> core::result::Result<lxmf_sdk::domain::PeerConnectionResult, lxmf_sdk::SdkError>
 pub fn lxmf_sdk::Client<B>::peer_reconnect(&self, req: lxmf_sdk::domain::PeerConnectionRequest) -> core::result::Result<lxmf_sdk::domain::PeerConnectionResult, lxmf_sdk::SdkError>
+pub trait lxmf_sdk::LxmfSdkPropagation
+pub fn lxmf_sdk::LxmfSdkPropagation::lxmf_propagation(&self, request: lxmf_sdk::SdkControlRequest<lxmf_sdk::LxmfPropagationOperation>) -> core::result::Result<lxmf_sdk::SdkControlResult, lxmf_sdk::SdkError>
+impl<B: lxmf_sdk::SdkBackend> lxmf_sdk::LxmfSdkPropagation for lxmf_sdk::Client<B>
+pub fn lxmf_sdk::Client<B>::lxmf_propagation(&self, request: lxmf_sdk::SdkControlRequest<lxmf_sdk::LxmfPropagationOperation>) -> core::result::Result<lxmf_sdk::SdkControlResult, lxmf_sdk::SdkError>
 pub trait lxmf_sdk::LxmfSdkRemoteCommands
 pub fn lxmf_sdk::LxmfSdkRemoteCommands::command_invoke(&self, _req: lxmf_sdk::domain::RemoteCommandRequest) -> core::result::Result<lxmf_sdk::domain::RemoteCommandResponse, lxmf_sdk::SdkError>
 pub fn lxmf_sdk::LxmfSdkRemoteCommands::command_reply(&self, _correlation_id: alloc::string::String, _reply: lxmf_sdk::domain::RemoteCommandResponse) -> core::result::Result<lxmf_sdk::Ack, lxmf_sdk::SdkError>
@@ -3620,6 +3862,10 @@ pub fn lxmf_sdk::Client<B>::command_invoke(&self, req: lxmf_sdk::domain::RemoteC
 pub fn lxmf_sdk::Client<B>::command_reply(&self, correlation_id: alloc::string::String, reply: lxmf_sdk::domain::RemoteCommandResponse) -> core::result::Result<lxmf_sdk::Ack, lxmf_sdk::SdkError>
 pub fn lxmf_sdk::Client<B>::command_session_get(&self, correlation_id: alloc::string::String) -> core::result::Result<core::option::Option<lxmf_sdk::domain::RemoteCommandSession>, lxmf_sdk::SdkError>
 pub fn lxmf_sdk::Client<B>::command_session_list(&self, req: lxmf_sdk::domain::RemoteCommandSessionListRequest) -> core::result::Result<lxmf_sdk::domain::RemoteCommandSessionListResult, lxmf_sdk::SdkError>
+pub trait lxmf_sdk::LxmfSdkRouter
+pub fn lxmf_sdk::LxmfSdkRouter::lxmf_router(&self, request: lxmf_sdk::SdkControlRequest<lxmf_sdk::LxmfRouterOperation>) -> core::result::Result<lxmf_sdk::SdkControlResult, lxmf_sdk::SdkError>
+impl<B: lxmf_sdk::SdkBackend> lxmf_sdk::LxmfSdkRouter for lxmf_sdk::Client<B>
+pub fn lxmf_sdk::Client<B>::lxmf_router(&self, request: lxmf_sdk::SdkControlRequest<lxmf_sdk::LxmfRouterOperation>) -> core::result::Result<lxmf_sdk::SdkControlResult, lxmf_sdk::SdkError>
 pub trait lxmf_sdk::LxmfSdkTelemetry
 pub fn lxmf_sdk::LxmfSdkTelemetry::telemetry_query(&self, _query: lxmf_sdk::domain::TelemetryQuery) -> core::result::Result<alloc::vec::Vec<lxmf_sdk::domain::TelemetryPoint>, lxmf_sdk::SdkError>
 pub fn lxmf_sdk::LxmfSdkTelemetry::telemetry_subscribe(&self, _query: lxmf_sdk::domain::TelemetryQuery) -> core::result::Result<lxmf_sdk::Ack, lxmf_sdk::SdkError>
@@ -3656,6 +3902,22 @@ pub fn lxmf_sdk::MobileBleHostAdapter::disconnect(&self, session_id: &str) -> co
 pub fn lxmf_sdk::MobileBleHostAdapter::poll_event(&self, timeout_ms: u64) -> core::result::Result<core::option::Option<lxmf_sdk::MobileBleEvent>, lxmf_sdk::SdkError>
 pub fn lxmf_sdk::MobileBleHostAdapter::read(&self, req: lxmf_sdk::MobileBleReadRequest) -> core::result::Result<lxmf_sdk::MobileBleReadResult, lxmf_sdk::SdkError>
 pub fn lxmf_sdk::MobileBleHostAdapter::write(&self, req: lxmf_sdk::MobileBleWriteRequest) -> core::result::Result<lxmf_sdk::MobileBleWriteAck, lxmf_sdk::SdkError>
+pub trait lxmf_sdk::RnsSdkDataPlane
+pub fn lxmf_sdk::RnsSdkDataPlane::rns_data_plane(&self, request: lxmf_sdk::SdkControlRequest<lxmf_sdk::RnsDataPlaneOperation>) -> core::result::Result<lxmf_sdk::SdkControlResult, lxmf_sdk::SdkError>
+impl<B: lxmf_sdk::SdkBackend> lxmf_sdk::RnsSdkDataPlane for lxmf_sdk::Client<B>
+pub fn lxmf_sdk::Client<B>::rns_data_plane(&self, request: lxmf_sdk::SdkControlRequest<lxmf_sdk::RnsDataPlaneOperation>) -> core::result::Result<lxmf_sdk::SdkControlResult, lxmf_sdk::SdkError>
+pub trait lxmf_sdk::RnsSdkInterfaces
+pub fn lxmf_sdk::RnsSdkInterfaces::rns_interfaces(&self, request: lxmf_sdk::SdkControlRequest<lxmf_sdk::RnsInterfacesOperation>) -> core::result::Result<lxmf_sdk::SdkControlResult, lxmf_sdk::SdkError>
+impl<B: lxmf_sdk::SdkBackend> lxmf_sdk::RnsSdkInterfaces for lxmf_sdk::Client<B>
+pub fn lxmf_sdk::Client<B>::rns_interfaces(&self, request: lxmf_sdk::SdkControlRequest<lxmf_sdk::RnsInterfacesOperation>) -> core::result::Result<lxmf_sdk::SdkControlResult, lxmf_sdk::SdkError>
+pub trait lxmf_sdk::RnsSdkRuntime
+pub fn lxmf_sdk::RnsSdkRuntime::rns_runtime(&self, request: lxmf_sdk::SdkControlRequest<lxmf_sdk::RnsRuntimeOperation>) -> core::result::Result<lxmf_sdk::SdkControlResult, lxmf_sdk::SdkError>
+impl<B: lxmf_sdk::SdkBackend> lxmf_sdk::RnsSdkRuntime for lxmf_sdk::Client<B>
+pub fn lxmf_sdk::Client<B>::rns_runtime(&self, request: lxmf_sdk::SdkControlRequest<lxmf_sdk::RnsRuntimeOperation>) -> core::result::Result<lxmf_sdk::SdkControlResult, lxmf_sdk::SdkError>
+pub trait lxmf_sdk::RnsSdkTransport
+pub fn lxmf_sdk::RnsSdkTransport::rns_transport(&self, request: lxmf_sdk::SdkControlRequest<lxmf_sdk::RnsTransportOperation>) -> core::result::Result<lxmf_sdk::SdkControlResult, lxmf_sdk::SdkError>
+impl<B: lxmf_sdk::SdkBackend> lxmf_sdk::RnsSdkTransport for lxmf_sdk::Client<B>
+pub fn lxmf_sdk::Client<B>::rns_transport(&self, request: lxmf_sdk::SdkControlRequest<lxmf_sdk::RnsTransportOperation>) -> core::result::Result<lxmf_sdk::SdkControlResult, lxmf_sdk::SdkError>
 pub trait lxmf_sdk::SdkBackend: core::marker::Send + core::marker::Sync
 pub fn lxmf_sdk::SdkBackend::attachment_associate_topic(&self, _attachment_id: lxmf_sdk::domain::AttachmentId, _topic_id: lxmf_sdk::domain::TopicId) -> core::result::Result<lxmf_sdk::Ack, lxmf_sdk::SdkError>
 pub fn lxmf_sdk::SdkBackend::attachment_delete(&self, _attachment_id: lxmf_sdk::domain::AttachmentId) -> core::result::Result<lxmf_sdk::Ack, lxmf_sdk::SdkError>
@@ -3774,14 +4036,81 @@ pub fn lxmf_sdk::RpcBackendClient::topic_unsubscribe(&self, topic_id: lxmf_sdk::
 pub fn lxmf_sdk::RpcBackendClient::voice_session_close(&self, session_id: lxmf_sdk::domain::VoiceSessionId) -> core::result::Result<lxmf_sdk::Ack, lxmf_sdk::SdkError>
 pub fn lxmf_sdk::RpcBackendClient::voice_session_open(&self, req: lxmf_sdk::domain::VoiceSessionOpenRequest) -> core::result::Result<lxmf_sdk::domain::VoiceSessionId, lxmf_sdk::SdkError>
 pub fn lxmf_sdk::RpcBackendClient::voice_session_update(&self, req: lxmf_sdk::domain::VoiceSessionUpdateRequest) -> core::result::Result<lxmf_sdk::domain::VoiceSessionState, lxmf_sdk::SdkError>
+impl lxmf_sdk::SdkBackend for lxmf_sdk::ZmqPipelineBackendClient
+pub fn lxmf_sdk::ZmqPipelineBackendClient::attachment_associate_topic(&self, attachment_id: lxmf_sdk::domain::AttachmentId, topic_id: lxmf_sdk::domain::TopicId) -> core::result::Result<lxmf_sdk::Ack, lxmf_sdk::SdkError>
+pub fn lxmf_sdk::ZmqPipelineBackendClient::attachment_delete(&self, attachment_id: lxmf_sdk::domain::AttachmentId) -> core::result::Result<lxmf_sdk::Ack, lxmf_sdk::SdkError>
+pub fn lxmf_sdk::ZmqPipelineBackendClient::attachment_download(&self, attachment_id: lxmf_sdk::domain::AttachmentId) -> core::result::Result<lxmf_sdk::Ack, lxmf_sdk::SdkError>
+pub fn lxmf_sdk::ZmqPipelineBackendClient::attachment_download_chunk(&self, req: lxmf_sdk::domain::AttachmentDownloadChunkRequest) -> core::result::Result<lxmf_sdk::domain::AttachmentDownloadChunk, lxmf_sdk::SdkError>
+pub fn lxmf_sdk::ZmqPipelineBackendClient::attachment_get(&self, attachment_id: lxmf_sdk::domain::AttachmentId) -> core::result::Result<core::option::Option<lxmf_sdk::domain::AttachmentMeta>, lxmf_sdk::SdkError>
+pub fn lxmf_sdk::ZmqPipelineBackendClient::attachment_list(&self, req: lxmf_sdk::domain::AttachmentListRequest) -> core::result::Result<lxmf_sdk::domain::AttachmentListResult, lxmf_sdk::SdkError>
+pub fn lxmf_sdk::ZmqPipelineBackendClient::attachment_store(&self, req: lxmf_sdk::domain::AttachmentStoreRequest) -> core::result::Result<lxmf_sdk::domain::AttachmentMeta, lxmf_sdk::SdkError>
+pub fn lxmf_sdk::ZmqPipelineBackendClient::attachment_upload_chunk(&self, req: lxmf_sdk::domain::AttachmentUploadChunkRequest) -> core::result::Result<lxmf_sdk::domain::AttachmentUploadChunkAck, lxmf_sdk::SdkError>
+pub fn lxmf_sdk::ZmqPipelineBackendClient::attachment_upload_commit(&self, req: lxmf_sdk::domain::AttachmentUploadCommitRequest) -> core::result::Result<lxmf_sdk::domain::AttachmentMeta, lxmf_sdk::SdkError>
+pub fn lxmf_sdk::ZmqPipelineBackendClient::attachment_upload_start(&self, req: lxmf_sdk::domain::AttachmentUploadStartRequest) -> core::result::Result<lxmf_sdk::domain::AttachmentUploadSession, lxmf_sdk::SdkError>
+pub fn lxmf_sdk::ZmqPipelineBackendClient::cancel(&self, id: lxmf_sdk::MessageId) -> core::result::Result<lxmf_sdk::CancelResult, lxmf_sdk::SdkError>
+pub fn lxmf_sdk::ZmqPipelineBackendClient::command_invoke(&self, req: lxmf_sdk::domain::RemoteCommandRequest) -> core::result::Result<lxmf_sdk::domain::RemoteCommandResponse, lxmf_sdk::SdkError>
+pub fn lxmf_sdk::ZmqPipelineBackendClient::command_reply(&self, correlation_id: alloc::string::String, reply: lxmf_sdk::domain::RemoteCommandResponse) -> core::result::Result<lxmf_sdk::Ack, lxmf_sdk::SdkError>
+pub fn lxmf_sdk::ZmqPipelineBackendClient::command_session_get(&self, correlation_id: alloc::string::String) -> core::result::Result<core::option::Option<lxmf_sdk::domain::RemoteCommandSession>, lxmf_sdk::SdkError>
+pub fn lxmf_sdk::ZmqPipelineBackendClient::command_session_list(&self, req: lxmf_sdk::domain::RemoteCommandSessionListRequest) -> core::result::Result<lxmf_sdk::domain::RemoteCommandSessionListResult, lxmf_sdk::SdkError>
+pub fn lxmf_sdk::ZmqPipelineBackendClient::configure(&self, expected_revision: u64, patch: lxmf_sdk::ConfigPatch) -> core::result::Result<lxmf_sdk::Ack, lxmf_sdk::SdkError>
+pub fn lxmf_sdk::ZmqPipelineBackendClient::envelope_execute(&self, envelope: lxmf_sdk::app::Envelope) -> core::result::Result<lxmf_sdk::app::EnvelopeResponse, lxmf_sdk::SdkError>
+pub fn lxmf_sdk::ZmqPipelineBackendClient::identity_activate(&self, identity: lxmf_sdk::domain::IdentityRef) -> core::result::Result<lxmf_sdk::Ack, lxmf_sdk::SdkError>
+pub fn lxmf_sdk::ZmqPipelineBackendClient::identity_announce(&self, req: lxmf_sdk::domain::IdentityAnnounceRequest) -> core::result::Result<lxmf_sdk::domain::IdentityAnnounceResult, lxmf_sdk::SdkError>
+pub fn lxmf_sdk::ZmqPipelineBackendClient::identity_announce_now(&self) -> core::result::Result<lxmf_sdk::Ack, lxmf_sdk::SdkError>
+pub fn lxmf_sdk::ZmqPipelineBackendClient::identity_bootstrap(&self, req: lxmf_sdk::domain::IdentityBootstrapRequest) -> core::result::Result<lxmf_sdk::domain::ContactRecord, lxmf_sdk::SdkError>
+pub fn lxmf_sdk::ZmqPipelineBackendClient::identity_contact_list(&self, req: lxmf_sdk::domain::ContactListRequest) -> core::result::Result<lxmf_sdk::domain::ContactListResult, lxmf_sdk::SdkError>
+pub fn lxmf_sdk::ZmqPipelineBackendClient::identity_contact_update(&self, req: lxmf_sdk::domain::ContactUpdateRequest) -> core::result::Result<lxmf_sdk::domain::ContactRecord, lxmf_sdk::SdkError>
+pub fn lxmf_sdk::ZmqPipelineBackendClient::identity_export(&self, identity: lxmf_sdk::domain::IdentityRef) -> core::result::Result<lxmf_sdk::domain::IdentityImportRequest, lxmf_sdk::SdkError>
+pub fn lxmf_sdk::ZmqPipelineBackendClient::identity_import(&self, req: lxmf_sdk::domain::IdentityImportRequest) -> core::result::Result<lxmf_sdk::domain::IdentityBundle, lxmf_sdk::SdkError>
+pub fn lxmf_sdk::ZmqPipelineBackendClient::identity_list(&self) -> core::result::Result<alloc::vec::Vec<lxmf_sdk::domain::IdentityBundle>, lxmf_sdk::SdkError>
+pub fn lxmf_sdk::ZmqPipelineBackendClient::identity_presence_list(&self, req: lxmf_sdk::domain::PresenceListRequest) -> core::result::Result<lxmf_sdk::domain::PresenceListResult, lxmf_sdk::SdkError>
+pub fn lxmf_sdk::ZmqPipelineBackendClient::identity_resolve(&self, req: lxmf_sdk::domain::IdentityResolveRequest) -> core::result::Result<core::option::Option<lxmf_sdk::domain::IdentityRef>, lxmf_sdk::SdkError>
+pub fn lxmf_sdk::ZmqPipelineBackendClient::marker_create(&self, req: lxmf_sdk::domain::MarkerCreateRequest) -> core::result::Result<lxmf_sdk::domain::MarkerRecord, lxmf_sdk::SdkError>
+pub fn lxmf_sdk::ZmqPipelineBackendClient::marker_delete(&self, req: lxmf_sdk::domain::MarkerDeleteRequest) -> core::result::Result<lxmf_sdk::Ack, lxmf_sdk::SdkError>
+pub fn lxmf_sdk::ZmqPipelineBackendClient::marker_list(&self, req: lxmf_sdk::domain::MarkerListRequest) -> core::result::Result<lxmf_sdk::domain::MarkerListResult, lxmf_sdk::SdkError>
+pub fn lxmf_sdk::ZmqPipelineBackendClient::marker_update_position(&self, req: lxmf_sdk::domain::MarkerUpdatePositionRequest) -> core::result::Result<lxmf_sdk::domain::MarkerRecord, lxmf_sdk::SdkError>
+pub fn lxmf_sdk::ZmqPipelineBackendClient::negotiate(&self, req: lxmf_sdk::capability::NegotiationRequest) -> core::result::Result<lxmf_sdk::capability::NegotiationResponse, lxmf_sdk::SdkError>
+pub fn lxmf_sdk::ZmqPipelineBackendClient::operation_registry(&self) -> core::result::Result<lxmf_sdk::app::OperationRegistry, lxmf_sdk::SdkError>
+pub fn lxmf_sdk::ZmqPipelineBackendClient::paper_decode(&self, envelope: lxmf_sdk::domain::PaperMessageEnvelope) -> core::result::Result<lxmf_sdk::Ack, lxmf_sdk::SdkError>
+pub fn lxmf_sdk::ZmqPipelineBackendClient::paper_decode_with_metadata(&self, envelope: lxmf_sdk::domain::PaperMessageEnvelope) -> core::result::Result<lxmf_sdk::domain::PaperDecodeResult, lxmf_sdk::SdkError>
+pub fn lxmf_sdk::ZmqPipelineBackendClient::paper_encode(&self, message_id: lxmf_sdk::MessageId) -> core::result::Result<lxmf_sdk::domain::PaperMessageEnvelope, lxmf_sdk::SdkError>
+pub fn lxmf_sdk::ZmqPipelineBackendClient::peer_connect(&self, req: lxmf_sdk::domain::PeerConnectionRequest) -> core::result::Result<lxmf_sdk::domain::PeerConnectionResult, lxmf_sdk::SdkError>
+pub fn lxmf_sdk::ZmqPipelineBackendClient::peer_disconnect(&self, req: lxmf_sdk::domain::PeerConnectionRequest) -> core::result::Result<lxmf_sdk::domain::PeerConnectionResult, lxmf_sdk::SdkError>
+pub fn lxmf_sdk::ZmqPipelineBackendClient::peer_reconnect(&self, req: lxmf_sdk::domain::PeerConnectionRequest) -> core::result::Result<lxmf_sdk::domain::PeerConnectionResult, lxmf_sdk::SdkError>
+pub fn lxmf_sdk::ZmqPipelineBackendClient::poll_events(&self, cursor: core::option::Option<lxmf_sdk::event::EventCursor>, max: usize) -> core::result::Result<lxmf_sdk::event::EventBatch, lxmf_sdk::SdkError>
+pub fn lxmf_sdk::ZmqPipelineBackendClient::router_stats(&self) -> core::result::Result<lxmf_sdk::domain::RouterStats, lxmf_sdk::SdkError>
+pub fn lxmf_sdk::ZmqPipelineBackendClient::router_storage_policy(&self) -> core::result::Result<lxmf_sdk::domain::RouterStoragePolicy, lxmf_sdk::SdkError>
+pub fn lxmf_sdk::ZmqPipelineBackendClient::send(&self, req: lxmf_sdk::SendRequest) -> core::result::Result<lxmf_sdk::MessageId, lxmf_sdk::SdkError>
+pub fn lxmf_sdk::ZmqPipelineBackendClient::set_router_storage_policy(&self, patch: lxmf_sdk::domain::RouterStoragePolicyPatch) -> core::result::Result<lxmf_sdk::domain::RouterStoragePolicy, lxmf_sdk::SdkError>
+pub fn lxmf_sdk::ZmqPipelineBackendClient::shutdown(&self, mode: lxmf_sdk::ShutdownMode) -> core::result::Result<lxmf_sdk::Ack, lxmf_sdk::SdkError>
+pub fn lxmf_sdk::ZmqPipelineBackendClient::snapshot(&self) -> core::result::Result<lxmf_sdk::RuntimeSnapshot, lxmf_sdk::SdkError>
+pub fn lxmf_sdk::ZmqPipelineBackendClient::status(&self, id: lxmf_sdk::MessageId) -> core::result::Result<core::option::Option<lxmf_sdk::DeliverySnapshot>, lxmf_sdk::SdkError>
+pub fn lxmf_sdk::ZmqPipelineBackendClient::telemetry_query(&self, query: lxmf_sdk::domain::TelemetryQuery) -> core::result::Result<alloc::vec::Vec<lxmf_sdk::domain::TelemetryPoint>, lxmf_sdk::SdkError>
+pub fn lxmf_sdk::ZmqPipelineBackendClient::telemetry_subscribe(&self, query: lxmf_sdk::domain::TelemetryQuery) -> core::result::Result<lxmf_sdk::Ack, lxmf_sdk::SdkError>
+pub fn lxmf_sdk::ZmqPipelineBackendClient::tick(&self, budget: lxmf_sdk::TickBudget) -> core::result::Result<lxmf_sdk::TickResult, lxmf_sdk::SdkError>
+pub fn lxmf_sdk::ZmqPipelineBackendClient::topic_create(&self, req: lxmf_sdk::domain::TopicCreateRequest) -> core::result::Result<lxmf_sdk::domain::TopicRecord, lxmf_sdk::SdkError>
+pub fn lxmf_sdk::ZmqPipelineBackendClient::topic_get(&self, topic_id: lxmf_sdk::domain::TopicId) -> core::result::Result<core::option::Option<lxmf_sdk::domain::TopicRecord>, lxmf_sdk::SdkError>
+pub fn lxmf_sdk::ZmqPipelineBackendClient::topic_list(&self, req: lxmf_sdk::domain::TopicListRequest) -> core::result::Result<lxmf_sdk::domain::TopicListResult, lxmf_sdk::SdkError>
+pub fn lxmf_sdk::ZmqPipelineBackendClient::topic_publish(&self, req: lxmf_sdk::domain::TopicPublishRequest) -> core::result::Result<lxmf_sdk::Ack, lxmf_sdk::SdkError>
+pub fn lxmf_sdk::ZmqPipelineBackendClient::topic_subscribe(&self, req: lxmf_sdk::domain::TopicSubscriptionRequest) -> core::result::Result<lxmf_sdk::Ack, lxmf_sdk::SdkError>
+pub fn lxmf_sdk::ZmqPipelineBackendClient::topic_unsubscribe(&self, topic_id: lxmf_sdk::domain::TopicId) -> core::result::Result<lxmf_sdk::Ack, lxmf_sdk::SdkError>
+pub fn lxmf_sdk::ZmqPipelineBackendClient::voice_session_close(&self, session_id: lxmf_sdk::domain::VoiceSessionId) -> core::result::Result<lxmf_sdk::Ack, lxmf_sdk::SdkError>
+pub fn lxmf_sdk::ZmqPipelineBackendClient::voice_session_open(&self, req: lxmf_sdk::domain::VoiceSessionOpenRequest) -> core::result::Result<lxmf_sdk::domain::VoiceSessionId, lxmf_sdk::SdkError>
+pub fn lxmf_sdk::ZmqPipelineBackendClient::voice_session_update(&self, req: lxmf_sdk::domain::VoiceSessionUpdateRequest) -> core::result::Result<lxmf_sdk::domain::VoiceSessionState, lxmf_sdk::SdkError>
 pub trait lxmf_sdk::SdkBackendAsyncEvents: lxmf_sdk::SdkBackend
 pub fn lxmf_sdk::SdkBackendAsyncEvents::open_event_stream(&self, _subscription: &lxmf_sdk::event::EventSubscription) -> core::result::Result<core::option::Option<lxmf_sdk::SdkEventStream>, lxmf_sdk::SdkError>
 pub fn lxmf_sdk::SdkBackendAsyncEvents::subscribe_events(&self, start: lxmf_sdk::event::SubscriptionStart) -> core::result::Result<lxmf_sdk::event::EventSubscription, lxmf_sdk::SdkError>
 impl lxmf_sdk::SdkBackendAsyncEvents for lxmf_sdk::RpcBackendClient
 pub fn lxmf_sdk::RpcBackendClient::open_event_stream(&self, subscription: &lxmf_sdk::event::EventSubscription) -> core::result::Result<core::option::Option<lxmf_sdk::SdkEventStream>, lxmf_sdk::SdkError>
 pub fn lxmf_sdk::RpcBackendClient::subscribe_events(&self, start: lxmf_sdk::event::SubscriptionStart) -> core::result::Result<lxmf_sdk::event::EventSubscription, lxmf_sdk::SdkError>
+impl lxmf_sdk::SdkBackendAsyncEvents for lxmf_sdk::ZmqPipelineBackendClient
+pub fn lxmf_sdk::ZmqPipelineBackendClient::open_event_stream(&self, subscription: &lxmf_sdk::event::EventSubscription) -> core::result::Result<core::option::Option<lxmf_sdk::SdkEventStream>, lxmf_sdk::SdkError>
+pub fn lxmf_sdk::ZmqPipelineBackendClient::subscribe_events(&self, start: lxmf_sdk::event::SubscriptionStart) -> core::result::Result<lxmf_sdk::event::EventSubscription, lxmf_sdk::SdkError>
 pub trait lxmf_sdk::SdkBackendAsyncOps: lxmf_sdk::SdkBackend
+pub fn lxmf_sdk::SdkBackendAsyncOps::cancel_async(&self, id: lxmf_sdk::MessageId) -> lxmf_sdk::SdkBoxFuture<'_, lxmf_sdk::CancelResult>
+pub fn lxmf_sdk::SdkBackendAsyncOps::configure_async(&self, expected_revision: u64, patch: lxmf_sdk::ConfigPatch) -> lxmf_sdk::SdkBoxFuture<'_, lxmf_sdk::Ack>
 pub fn lxmf_sdk::SdkBackendAsyncOps::negotiate_async(&self, req: lxmf_sdk::capability::NegotiationRequest) -> lxmf_sdk::SdkBoxFuture<'_, lxmf_sdk::capability::NegotiationResponse>
+pub fn lxmf_sdk::SdkBackendAsyncOps::poll_events_async(&self, cursor: core::option::Option<lxmf_sdk::event::EventCursor>, max: usize) -> lxmf_sdk::SdkBoxFuture<'_, lxmf_sdk::event::EventBatch>
 pub fn lxmf_sdk::SdkBackendAsyncOps::send_async(&self, req: lxmf_sdk::SendRequest) -> lxmf_sdk::SdkBoxFuture<'_, lxmf_sdk::MessageId>
 pub fn lxmf_sdk::SdkBackendAsyncOps::shutdown_async(&self, mode: lxmf_sdk::ShutdownMode) -> lxmf_sdk::SdkBoxFuture<'_, lxmf_sdk::Ack>
 pub fn lxmf_sdk::SdkBackendAsyncOps::snapshot_async(&self) -> lxmf_sdk::SdkBoxFuture<'_, lxmf_sdk::RuntimeSnapshot>
@@ -3792,6 +4121,15 @@ pub fn lxmf_sdk::RpcBackendClient::send_async(&self, req: lxmf_sdk::SendRequest)
 pub fn lxmf_sdk::RpcBackendClient::shutdown_async(&self, mode: lxmf_sdk::ShutdownMode) -> lxmf_sdk::SdkBoxFuture<'_, lxmf_sdk::Ack>
 pub fn lxmf_sdk::RpcBackendClient::snapshot_async(&self) -> lxmf_sdk::SdkBoxFuture<'_, lxmf_sdk::RuntimeSnapshot>
 pub fn lxmf_sdk::RpcBackendClient::status_async(&self, id: lxmf_sdk::MessageId) -> lxmf_sdk::SdkBoxFuture<'_, core::option::Option<lxmf_sdk::DeliverySnapshot>>
+impl lxmf_sdk::SdkBackendAsyncOps for lxmf_sdk::ZmqPipelineBackendClient
+pub fn lxmf_sdk::ZmqPipelineBackendClient::cancel_async(&self, id: lxmf_sdk::MessageId) -> lxmf_sdk::SdkBoxFuture<'_, lxmf_sdk::CancelResult>
+pub fn lxmf_sdk::ZmqPipelineBackendClient::configure_async(&self, expected_revision: u64, patch: lxmf_sdk::ConfigPatch) -> lxmf_sdk::SdkBoxFuture<'_, lxmf_sdk::Ack>
+pub fn lxmf_sdk::ZmqPipelineBackendClient::negotiate_async(&self, req: lxmf_sdk::capability::NegotiationRequest) -> lxmf_sdk::SdkBoxFuture<'_, lxmf_sdk::capability::NegotiationResponse>
+pub fn lxmf_sdk::ZmqPipelineBackendClient::poll_events_async(&self, cursor: core::option::Option<lxmf_sdk::event::EventCursor>, max: usize) -> lxmf_sdk::SdkBoxFuture<'_, lxmf_sdk::event::EventBatch>
+pub fn lxmf_sdk::ZmqPipelineBackendClient::send_async(&self, req: lxmf_sdk::SendRequest) -> lxmf_sdk::SdkBoxFuture<'_, lxmf_sdk::MessageId>
+pub fn lxmf_sdk::ZmqPipelineBackendClient::shutdown_async(&self, mode: lxmf_sdk::ShutdownMode) -> lxmf_sdk::SdkBoxFuture<'_, lxmf_sdk::Ack>
+pub fn lxmf_sdk::ZmqPipelineBackendClient::snapshot_async(&self) -> lxmf_sdk::SdkBoxFuture<'_, lxmf_sdk::RuntimeSnapshot>
+pub fn lxmf_sdk::ZmqPipelineBackendClient::status_async(&self, id: lxmf_sdk::MessageId) -> lxmf_sdk::SdkBoxFuture<'_, core::option::Option<lxmf_sdk::DeliverySnapshot>>
 pub trait lxmf_sdk::SdkBackendKeyManagement: lxmf_sdk::SdkBackend
 pub fn lxmf_sdk::SdkBackendKeyManagement::key_delete(&self, _key_id: &str) -> core::result::Result<lxmf_sdk::Ack, lxmf_sdk::SdkError>
 pub fn lxmf_sdk::SdkBackendKeyManagement::key_get(&self, _key_id: &str) -> core::result::Result<core::option::Option<lxmf_sdk::SdkStoredKey>, lxmf_sdk::SdkError>

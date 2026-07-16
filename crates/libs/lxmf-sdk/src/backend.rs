@@ -440,7 +440,23 @@ pub trait SdkBackendAsyncOps: SdkBackend {
 
     fn send_async(&self, req: SendRequest) -> SdkBoxFuture<'_, MessageId>;
 
+    fn cancel_async(&self, id: MessageId) -> SdkBoxFuture<'_, CancelResult> {
+        Box::pin(async move { self.cancel(id) })
+    }
+
     fn status_async(&self, id: MessageId) -> SdkBoxFuture<'_, Option<DeliverySnapshot>>;
+
+    fn configure_async(&self, expected_revision: u64, patch: ConfigPatch) -> SdkBoxFuture<'_, Ack> {
+        Box::pin(async move { self.configure(expected_revision, patch) })
+    }
+
+    fn poll_events_async(
+        &self,
+        cursor: Option<EventCursor>,
+        max: usize,
+    ) -> SdkBoxFuture<'_, EventBatch> {
+        Box::pin(async move { self.poll_events(cursor, max) })
+    }
 
     fn snapshot_async(&self) -> SdkBoxFuture<'_, RuntimeSnapshot>;
 

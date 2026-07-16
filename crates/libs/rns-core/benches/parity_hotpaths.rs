@@ -1,7 +1,9 @@
 use criterion::{black_box, criterion_group, criterion_main, Criterion};
 use rand_core::OsRng;
 use rns_core::destination::{DestinationAnnounce, DestinationName, SingleInputDestination};
+use rns_core::hash::AddressHash;
 use rns_core::identity::{lxmf_sign, lxmf_verify, PrivateIdentity};
+use rns_core::packet::{Packet, PacketDataBuffer};
 use rns_core::ratchets::{
     decrypt_with_identity_into, encrypt_for_public_key, encrypt_for_public_key_into,
 };
@@ -147,6 +149,58 @@ fn bench_identity_decrypt(c: &mut Criterion) {
     });
 }
 
+fn sample_packet() -> Packet {
+    Packet {
+        destination: AddressHash::new([0x42; 16]),
+        data: PacketDataBuffer::new_from_slice(&[0x51; 128]),
+        ..Default::default()
+    }
+}
+
+fn bench_packet_pack(c: &mut Criterion) {
+    let packet = sample_packet();
+    c.bench_function("rns_core/packet_pack", |b| {
+        b.iter(|| {
+            let packed = packet.to_bytes().expect("packet pack should succeed");
+            black_box(packed);
+        });
+    });
+}
+
+fn bench_packet_unpack(c: &mut Criterion) {
+    let packed = sample_packet().to_bytes().expect("packet pack should succeed");
+    c.bench_function("rns_core/packet_unpack", |b| {
+        b.iter(|| {
+            let packet = Packet::from_bytes(black_box(&packed)).expect("packet unpack should work");
+            black_box(packet);
+        });
+    });
+}
+
+fn bench_resource_segment_16k(c: &mut Criterion) {
+    let payload = vec![0x73; 16_384];
+    c.bench_function("rns_transport/resource_segment_16k", |b| {
+        b.iter(|| {
+            let packets =
+                Packet::fragment_for_lxmf(black_box(&payload)).expect("segmentation should work");
+            black_box(packets);
+        });
+    });
+}
+
+fn bench_resource_reassemble_16k(c: &mut Criterion) {
+    let packets = Packet::fragment_for_lxmf(&vec![0x73; 16_384]).expect("segmentation should work");
+    c.bench_function("rns_transport/resource_reassemble_16k", |b| {
+        b.iter(|| {
+            let mut payload = Vec::with_capacity(16_384);
+            for packet in black_box(&packets) {
+                payload.extend_from_slice(packet.data.as_slice());
+            }
+            black_box(payload);
+        });
+    });
+}
+
 criterion_group!(
     benches,
     bench_announce_create,
@@ -155,6 +209,10 @@ criterion_group!(
     bench_identity_sign,
     bench_identity_verify,
     bench_identity_encrypt,
-    bench_identity_decrypt
+    bench_identity_decrypt,
+    bench_packet_pack,
+    bench_packet_unpack,
+    bench_resource_segment_16k,
+    bench_resource_reassemble_16k
 );
 criterion_main!(benches);

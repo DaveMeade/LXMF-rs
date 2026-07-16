@@ -1,6 +1,6 @@
 # Reticulum Parity Matrix
 
-Last reassessed: 2026-07-10
+Last reassessed: 2026-07-16
 
 This is the maintained row-level status for Python Reticulum compatibility.
 Repository-level posture and execution order live in
@@ -16,6 +16,12 @@ Parity is recorded on two independent axes:
 
 Workspace paths are used for navigation. Published package names are
 `reticulum-rs-core`, `reticulum-rs-transport`, and `reticulum-rs-rpc`.
+
+v0.9.5 exposes software-controlled daemon operations through capability-gated
+`RnsSdkRuntime`, `RnsSdkTransport`, `RnsSdkInterfaces`, and
+`RnsSdkDataPlane` traits over both HTTP/Unix and canonical ZeroMQ. Pure
+cryptography/wire behavior remains local-library access. Physical equipment and
+human-operated validation remain the explicit v1.0 boundary.
 
 ## Surface Matrix
 

@@ -1,4 +1,5 @@
 use super::*;
+use crate::backend::SdkBackendAsyncOps;
 
 #[test]
 fn cancel_uses_zmq_sdk_method_and_decodes_result() {
@@ -22,6 +23,31 @@ fn cancel_uses_zmq_sdk_method_and_decodes_result() {
     let request = captured.as_ref().expect("zmq request");
     assert_eq!(request.method, "sdk_cancel_message_v2");
     assert_eq!(request.params.as_ref().expect("params")["message_id"], json!("msg-cancel"));
+    server.join().expect("server joined");
+}
+
+#[tokio::test]
+async fn cancel_async_uses_native_zmq_request_path() {
+    let _guard = zmq_cancel_async_test_guard().await;
+    let command_endpoint = unused_loopback_endpoint();
+    let response_endpoint = unused_loopback_endpoint();
+    let captured = Arc::new(Mutex::new(None));
+    let server = spawn_single_response_zmq_server(
+        command_endpoint.clone(),
+        json!({ "message_id": "msg-async-cancel", "result": "Accepted" }),
+        Arc::clone(&captured),
+    );
+    let mut config = ZmqPipelineBackendConfig::local_tcp(command_endpoint, response_endpoint);
+    config.request_timeout = std::time::Duration::from_secs(2);
+    let client = ZmqPipelineBackendClient::new(config).expect("zmq client");
+
+    let result =
+        client.cancel_async(MessageId("msg-async-cancel".to_owned())).await.expect("async cancel");
+
+    assert_eq!(result, CancelResult::Accepted);
+    let captured = captured.lock().expect("captured request");
+    let request = captured.as_ref().expect("zmq request");
+    assert_eq!(request.method, "sdk_cancel_message_v2");
     server.join().expect("server joined");
 }
 

@@ -29,6 +29,16 @@ pub struct ZmqPipelineBackendConfig {
 }
 
 impl ZmqPipelineBackendConfig {
+    /// Connect to the canonical single-endpoint local ROUTER/DEALER service.
+    pub fn local(endpoint: impl Into<String>) -> Self {
+        Self::single_endpoint(endpoint.into(), None)
+    }
+
+    /// Connect to a remote single-endpoint service using fail-closed token authentication.
+    pub fn remote(endpoint: impl Into<String>, token_auth: ZmqPipelineTokenAuth) -> Self {
+        Self::single_endpoint(endpoint.into(), Some(token_auth))
+    }
+
     pub fn local_tcp(
         command_endpoint: impl Into<String>,
         response_endpoint: impl Into<String>,
@@ -46,7 +56,9 @@ impl ZmqPipelineBackendConfig {
 
     pub fn validate(&self) -> Result<(), SdkError> {
         validate_endpoint_security(&self.command_endpoint, self.token_auth.is_some())?;
-        validate_endpoint_security(&self.response_endpoint, self.token_auth.is_some())?;
+        if !self.response_endpoint.is_empty() {
+            validate_endpoint_security(&self.response_endpoint, self.token_auth.is_some())?;
+        }
         if self.max_envelope_bytes > zmq::ZMQ_RPC_MAX_ENVELOPE_BYTES {
             return Err(SdkError::new(
                 code::VALIDATION_INVALID_ARGUMENT,
@@ -55,6 +67,22 @@ impl ZmqPipelineBackendConfig {
             ));
         }
         Ok(())
+    }
+
+    pub(crate) fn is_single_endpoint(&self) -> bool {
+        self.response_endpoint.is_empty()
+    }
+
+    fn single_endpoint(endpoint: String, token_auth: Option<ZmqPipelineTokenAuth>) -> Self {
+        Self {
+            command_endpoint: normalize_loopback_endpoint(endpoint),
+            command_role: ZmqEndpointRole::Connect,
+            response_endpoint: String::new(),
+            response_role: ZmqEndpointRole::Connect,
+            request_timeout: Duration::from_secs(5),
+            max_envelope_bytes: zmq::ZMQ_RPC_MAX_ENVELOPE_BYTES,
+            token_auth,
+        }
     }
 }
 

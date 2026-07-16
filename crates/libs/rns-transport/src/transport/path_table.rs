@@ -489,11 +489,7 @@ fn path_timeout_for_mode(mode: InterfaceMode) -> Duration {
     }
 }
 
-impl Default for PathTable {
-    fn default() -> Self {
-        Self::new()
-    }
-}
+include!("path_table_default.rs");
 
 include!("path_table_tunnel_restore.rs");
 

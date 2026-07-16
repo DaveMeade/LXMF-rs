@@ -5,11 +5,26 @@ from __future__ import annotations
 import argparse
 import json
 import statistics
+import subprocess
 import tempfile
 import time
 from pathlib import Path
 
 ANNOUNCE_BATCH_SIZE = 64
+FIXTURES = json.loads(
+    (Path(__file__).resolve().parents[2] / "tools/benchmarks/fixtures.json").read_text(
+        encoding="utf-8"
+    )
+)
+
+
+def fixture_private_key(name: str) -> bytes:
+    return bytes.fromhex(FIXTURES["identities"][name])
+
+
+def fixture_repeated_payload(length_key: str) -> bytes:
+    payloads = FIXTURES["payloads"]
+    return bytes.fromhex(payloads["resource_pattern_hex"]) * int(payloads[length_key])
 
 
 def percentile(values: list[int], p: float) -> float:
@@ -71,15 +86,15 @@ def build_lxmf_fixtures():
         message = LXMessage(
             destination,
             source,
-            content="bench-content-payload",
-            title="bench-title",
+            content=FIXTURES["payloads"]["message_content"],
+            title=FIXTURES["payloads"]["message_title"],
             desired_method=LXMessage.DIRECT,
         )
         message.pack()
         return message
 
     packed_message = pack_message().packed
-    large_content = "x" * 2048
+    large_content = "x" * int(FIXTURES["payloads"]["large_content_length"])
 
     def pack_large_message():
         message = LXMessage(
@@ -93,7 +108,28 @@ def build_lxmf_fixtures():
         return message
 
     packed_large_message = pack_large_message().packed
-    return pack_message, packed_message, pack_large_message, packed_large_message
+    resource_content = "x" * int(FIXTURES["payloads"]["resource_content_length"])
+
+    def pack_resource_message():
+        message = LXMessage(
+            destination,
+            source,
+            content=resource_content,
+            title="bench-resource-title",
+            desired_method=LXMessage.DIRECT,
+        )
+        message.pack()
+        return message
+
+    packed_resource_message = pack_resource_message().packed
+    return (
+        pack_message,
+        packed_message,
+        pack_large_message,
+        packed_large_message,
+        pack_resource_message,
+        packed_resource_message,
+    )
 
 
 def build_rns_fixtures():
@@ -185,8 +221,10 @@ def build_rns_fixtures():
 
     resource_link = BenchLink()
     resource_payload = bytearray()
-    for index in range(6):
-        resource_payload.extend(bytes([index % 251]) * RNS.Packet.MDU)
+    for _ in range(6):
+        resource_payload.extend(
+            bytes.fromhex(FIXTURES["payloads"]["resource_pattern_hex"]) * RNS.Packet.MDU
+        )
 
     resource = Resource(
         bytes(resource_payload),
@@ -225,6 +263,42 @@ def build_rns_fixtures():
         resource.request(request_data)
         return resource.sent_parts
 
+    packet_destination = RNS.Destination(
+        None, RNS.Destination.OUT, RNS.Destination.PLAIN, "lxmf", "packet-benchmark"
+    )
+
+    def packet_pack():
+        packet = RNS.Packet(
+            packet_destination,
+            fixture_repeated_payload("large_content_length")[:128],
+            create_receipt=False,
+        )
+        packet.pack()
+        return packet.raw
+
+    packed_packet = packet_pack()
+
+    def packet_unpack():
+        packet = RNS.Packet(None, packed_packet)
+        packet.unpack()
+        return packet
+
+    segmentation_payload = fixture_repeated_payload("resource_content_length")
+    segment_size = RNS.Packet.ENCRYPTED_MDU
+    segmentation_parts = tuple(
+        segmentation_payload[index : index + segment_size]
+        for index in range(0, len(segmentation_payload), segment_size)
+    )
+
+    def resource_segment():
+        return tuple(
+            segmentation_payload[index : index + segment_size]
+            for index in range(0, len(segmentation_payload), segment_size)
+        )
+
+    def resource_reassemble():
+        return b"".join(segmentation_parts)
+
     return (
         announce_create,
         announce_packet,
@@ -234,7 +308,27 @@ def build_rns_fixtures():
         identity_verify,
         identity_encrypt,
         identity_decrypt,
+        packet_pack,
+        packet_unpack,
+        resource_segment,
+        resource_reassemble,
     )
+
+
+def verify_module_revision(name: str, module_path: Path, expected: str | None) -> None:
+    if expected is None:
+        return
+    try:
+        actual = subprocess.run(
+            ["git", "-C", str(module_path.parent), "rev-parse", "HEAD"],
+            check=True,
+            capture_output=True,
+            text=True,
+        ).stdout.strip()
+    except (OSError, subprocess.CalledProcessError) as exc:
+        raise SystemExit(f"cannot verify pinned {name} revision for {module_path}: {exc}") from exc
+    if actual != expected:
+        raise SystemExit(f"pinned {name} revision mismatch: expected {expected}, imported {actual}")
 
 
 def main() -> int:
@@ -247,6 +341,8 @@ def main() -> int:
         default=2000,
         help="Number of iterations per benchmark (default: 2000).",
     )
+    parser.add_argument("--expected-rns-ref", help="Required git revision for the imported RNS")
+    parser.add_argument("--expected-lxmf-ref", help="Required git revision for the imported LXMF")
     parser.add_argument(
         "--output",
         type=Path,
@@ -260,10 +356,14 @@ def main() -> int:
     args = parser.parse_args()
 
     try:
-        import RNS  # noqa: F401
+        import RNS
+        import LXMF
         from LXMF import LXMessage
     except ImportError as exc:
         raise SystemExit(f"python benchmark prerequisites missing: {exc}") from exc
+
+    verify_module_revision("RNS", Path(RNS.__file__).resolve(), args.expected_rns_ref)
+    verify_module_revision("LXMF", Path(LXMF.__file__).resolve(), args.expected_lxmf_ref)
 
     config_dir = tempfile.mkdtemp(prefix="lxmf-python-bench-")
     reticulum = RNS.Reticulum(configdir=config_dir, loglevel=0)
@@ -281,6 +381,8 @@ def main() -> int:
                 packed_message,
                 pack_large_message,
                 packed_large_message,
+                pack_resource_message,
+                packed_resource_message,
             ) = build_lxmf_fixtures()
             benchmark_factories = {
                 "python_lxmf/message_to_wire": lambda: run_benchmark(
@@ -299,6 +401,16 @@ def main() -> int:
                     args.iterations,
                     lambda: LXMessage.unpack_from_bytes(packed_large_message),
                 ),
+                "python_lxmf/resource_message_to_wire": lambda: run_benchmark(
+                    "python_lxmf/resource_message_to_wire",
+                    args.iterations,
+                    pack_resource_message,
+                ),
+                "python_lxmf/resource_message_from_wire": lambda: run_benchmark(
+                    "python_lxmf/resource_message_from_wire",
+                    args.iterations,
+                    lambda: LXMessage.unpack_from_bytes(packed_resource_message),
+                ),
             }
         elif args.benchmark.startswith("python_rns/"):
             (
@@ -310,6 +422,10 @@ def main() -> int:
                 identity_verify,
                 identity_encrypt,
                 identity_decrypt,
+                packet_pack,
+                packet_unpack,
+                resource_segment,
+                resource_reassemble,
             ) = build_rns_fixtures()
             benchmark_factories = {
                 "python_rns/announce_create": lambda: run_benchmark(
@@ -342,6 +458,18 @@ def main() -> int:
                 "python_rns/identity_decrypt": lambda: run_benchmark(
                     "python_rns/identity_decrypt", args.iterations, identity_decrypt
                 ),
+                "python_rns/packet_pack": lambda: run_benchmark(
+                    "python_rns/packet_pack", args.iterations, packet_pack
+                ),
+                "python_rns/packet_unpack": lambda: run_benchmark(
+                    "python_rns/packet_unpack", args.iterations, packet_unpack
+                ),
+                "python_rns/resource_segment_16k": lambda: run_benchmark(
+                    "python_rns/resource_segment_16k", args.iterations, resource_segment
+                ),
+                "python_rns/resource_reassemble_16k": lambda: run_benchmark(
+                    "python_rns/resource_reassemble_16k", args.iterations, resource_reassemble
+                ),
             }
         else:
             raise SystemExit(f"unsupported benchmark: {args.benchmark}")
@@ -355,6 +483,8 @@ def main() -> int:
             packed_message,
             pack_large_message,
             packed_large_message,
+            pack_resource_message,
+            packed_resource_message,
         ) = build_lxmf_fixtures()
         (
             announce_create,
@@ -365,6 +495,10 @@ def main() -> int:
             identity_verify,
             identity_encrypt,
             identity_decrypt,
+            packet_pack,
+            packet_unpack,
+            resource_segment,
+            resource_reassemble,
         ) = build_rns_fixtures()
         benchmark_factories = {
             "python_lxmf/message_to_wire": lambda: run_benchmark(
@@ -382,6 +516,14 @@ def main() -> int:
                 "python_lxmf/large_message_from_wire",
                 args.iterations,
                 lambda: LXMessage.unpack_from_bytes(packed_large_message),
+            ),
+            "python_lxmf/resource_message_to_wire": lambda: run_benchmark(
+                "python_lxmf/resource_message_to_wire", args.iterations, pack_resource_message
+            ),
+            "python_lxmf/resource_message_from_wire": lambda: run_benchmark(
+                "python_lxmf/resource_message_from_wire",
+                args.iterations,
+                lambda: LXMessage.unpack_from_bytes(packed_resource_message),
             ),
             "python_rns/announce_create": lambda: run_benchmark(
                 "python_rns/announce_create", args.iterations, announce_create
@@ -412,6 +554,18 @@ def main() -> int:
             ),
             "python_rns/identity_decrypt": lambda: run_benchmark(
                 "python_rns/identity_decrypt", args.iterations, identity_decrypt
+            ),
+            "python_rns/packet_pack": lambda: run_benchmark(
+                "python_rns/packet_pack", args.iterations, packet_pack
+            ),
+            "python_rns/packet_unpack": lambda: run_benchmark(
+                "python_rns/packet_unpack", args.iterations, packet_unpack
+            ),
+            "python_rns/resource_segment_16k": lambda: run_benchmark(
+                "python_rns/resource_segment_16k", args.iterations, resource_segment
+            ),
+            "python_rns/resource_reassemble_16k": lambda: run_benchmark(
+                "python_rns/resource_reassemble_16k", args.iterations, resource_reassemble
             ),
         }
         results = [factory() for factory in benchmark_factories.values()]

@@ -7,7 +7,7 @@ This contract defines deterministic client generation inputs for cross-language 
 ## Goals
 
 1. Generate stable client surfaces from a versioned OpenRPC contract with JSON Schema components.
-2. Keep Go/JavaScript/Python clients aligned with SDK v2.5 contracts.
+2. Keep Go/JavaScript/Python clients aligned with SDK v2.6 contracts while accepting v2.5 requests.
 3. Prevent silent drift between schema contracts and generated client stubs.
 
 ## Source of Truth

@@ -244,7 +244,7 @@ fn successful_negotiation() -> Result<NegotiationResponse, SdkError> {
             max_extension_keys: 32,
             idempotency_ttl_ms: 86_400_000,
         },
-        contract_release: "v2.5".to_owned(),
+        contract_release: "v2.6".to_owned(),
         schema_namespace: "v2".to_owned(),
         sdk_version: crate::SDK_VERSION.to_owned(),
         python_reference: crate::ParityReference::default(),

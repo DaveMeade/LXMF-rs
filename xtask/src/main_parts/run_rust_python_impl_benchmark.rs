@@ -52,12 +52,102 @@ fn run_rust_python_impl_benchmark(name: &str, iterations: usize) -> Result<Pytho
                 samples.push(started.elapsed().as_nanos() as f64);
             }
         }
+        "lxmf_core_resource_message_from_wire" => {
+            let content = "x".repeat(16_384);
+            let mut message = Message::new();
+            message.destination_hash = Some([0xd4; 16]);
+            message.source_hash = Some([0xe5; 16]);
+            message.signature = Some([0xf6; 64]);
+            message.timestamp = Some(1_770_000_201.0);
+            message.set_title_from_string("wire-resource-title");
+            message.set_content_from_string(&content);
+            let wire = message.to_wire(None).context("encode resource-sized message")?;
+            for _ in 0..iterations {
+                let started = Instant::now();
+                let decoded =
+                    Message::from_wire(black_box(&wire)).context("decode should succeed")?;
+                black_box(decoded);
+                samples.push(started.elapsed().as_nanos() as f64);
+            }
+        }
+        "lxmf_core_resource_message_to_wire" => {
+            let content = "x".repeat(16_384);
+            for _ in 0..iterations {
+                let started = Instant::now();
+                let mut message = Message::new();
+                message.destination_hash = Some([0xd4; 16]);
+                message.source_hash = Some([0xe5; 16]);
+                message.signature = Some([0xf6; 64]);
+                message.timestamp = Some(1_770_000_201.0);
+                message.set_title_from_string("wire-resource-title");
+                message.set_content_from_string(black_box(&content));
+                let wire = message.to_wire(None).context("encode should succeed")?;
+                black_box(wire);
+                samples.push(started.elapsed().as_nanos() as f64);
+            }
+        }
+        "rns_core_packet_pack" => {
+            let packet = Packet {
+                destination: AddressHash::new([0x42; 16]),
+                data: PacketDataBuffer::new_from_slice(&[0x51; 128]),
+                ..Default::default()
+            };
+            for _ in 0..iterations {
+                let started = Instant::now();
+                let packed = packet
+                    .to_bytes()
+                    .map_err(|error| anyhow!("packet pack should succeed: {error:?}"))?;
+                black_box(packed);
+                samples.push(started.elapsed().as_nanos() as f64);
+            }
+        }
+        "rns_core_packet_unpack" => {
+            let packet = Packet {
+                destination: AddressHash::new([0x42; 16]),
+                data: PacketDataBuffer::new_from_slice(&[0x51; 128]),
+                ..Default::default()
+            };
+            let packed = packet
+                .to_bytes()
+                .map_err(|error| anyhow!("packet pack should succeed: {error:?}"))?;
+            for _ in 0..iterations {
+                let started = Instant::now();
+                let unpacked = Packet::from_bytes(black_box(&packed))
+                    .map_err(|error| anyhow!("packet unpack should succeed: {error:?}"))?;
+                black_box(unpacked);
+                samples.push(started.elapsed().as_nanos() as f64);
+            }
+        }
+        "rns_transport_resource_segment_16k" => {
+            let payload = shared_fixture_payload("resource_content_length");
+            for _ in 0..iterations {
+                let started = Instant::now();
+                let packets = Packet::fragment_for_lxmf(black_box(&payload))
+                    .map_err(|error| anyhow!("resource segmentation should succeed: {error:?}"))?;
+                black_box(packets);
+                samples.push(started.elapsed().as_nanos() as f64);
+            }
+        }
+        "rns_transport_resource_reassemble_16k" => {
+            let packets = Packet::fragment_for_lxmf(&shared_fixture_payload("resource_content_length"))
+                .map_err(|error| anyhow!("resource segmentation should succeed: {error:?}"))?;
+            for _ in 0..iterations {
+                let started = Instant::now();
+                let mut payload = Vec::with_capacity(16_384);
+                for packet in black_box(&packets) {
+                    payload.extend_from_slice(packet.data.as_slice());
+                }
+                black_box(payload);
+                samples.push(started.elapsed().as_nanos() as f64);
+            }
+        }
         "rns_core_announce_create" => {
             let mut destination = rust_sample_destination();
+            let app_data = shared_fixture_announce_data();
             for _ in 0..iterations {
                 let started = Instant::now();
                 let packet = destination
-                    .announce(OsRng, black_box(Some(b"rust-announce-app-data".as_slice())))
+                    .announce(OsRng, black_box(Some(app_data.as_slice())))
                     .map_err(|err| anyhow!("announce should succeed: {err:?}"))?;
                 black_box(packet);
                 samples.push(started.elapsed().as_nanos() as f64);
@@ -65,8 +155,9 @@ fn run_rust_python_impl_benchmark(name: &str, iterations: usize) -> Result<Pytho
         }
         "rns_core_announce_validate" => {
             let mut destination = rust_sample_destination();
+            let app_data = shared_fixture_announce_data();
             let packet = destination
-                .announce(OsRng, Some(b"rust-announce-app-data".as_slice()))
+                .announce(OsRng, Some(app_data.as_slice()))
                 .map_err(|err| anyhow!("announce should succeed: {err:?}"))?;
             for _ in 0..iterations {
                 let started = Instant::now();
@@ -201,119 +292,6 @@ fn python_benchmark_from_samples(
     let p99_ns = percentile(&tail_samples, 0.99);
     let throughput_ops_per_sec = 1_000_000_000.0 / p50_ns.max(1.0);
     PythonBenchmark { name, iterations, mean_ns, p50_ns, p95_ns, p99_ns, throughput_ops_per_sec }
-}
-
-fn rust_sample_wire_payload() -> (Vec<u8>, [u8; 16]) {
-    let mut message = Message::new();
-    let destination = [0x11; 16];
-    let source = [0x22; 16];
-    message.destination_hash = Some(destination);
-    message.source_hash = Some(source);
-    message.signature = Some([0x33; 64]);
-    message.timestamp = Some(1_770_000_000.0);
-    message.set_title_from_string("bench-title");
-    message.set_content_from_string("bench-content-payload");
-    let wire = message.to_wire(None).expect("sample message must encode");
-    (wire, destination)
-}
-
-fn rust_sample_large_wire_payload() -> (Vec<u8>, [u8; 16]) {
-    let mut message = Message::new();
-    let destination = [0x77; 16];
-    let source = [0x88; 16];
-    message.destination_hash = Some(destination);
-    message.source_hash = Some(source);
-    message.signature = Some([0x99; 64]);
-    message.timestamp = Some(1_770_000_100.0);
-    message.set_title_from_string("bench-large-title");
-    message.set_content_from_string(&"x".repeat(2048));
-    let wire = message.to_wire(None).expect("large sample message must encode");
-    (wire, destination)
-}
-
-fn rust_sample_destination() -> SingleInputDestination {
-    let identity = PrivateIdentity::new_from_rand(OsRng);
-    SingleInputDestination::new(
-        identity,
-        DestinationName::new("example_utilities", "announcesample.fruits"),
-    )
-}
-
-fn rust_announce_batch_packets() -> Result<Vec<rns_core::Packet>> {
-    const ANNOUNCE_BATCH_SIZE: usize = 64;
-    let mut packets = Vec::with_capacity(ANNOUNCE_BATCH_SIZE);
-    for index in 0..ANNOUNCE_BATCH_SIZE {
-        let mut destination = rust_sample_destination();
-        let app_data = format!("rust-announce-app-data-{index}");
-        let packet = destination
-            .announce(OsRng, Some(app_data.as_bytes()))
-            .map_err(|err| anyhow!("announce should succeed: {err:?}"))?;
-        packets.push(packet);
-    }
-    Ok(packets)
-}
-
-fn rust_active_link_pair() -> Result<(Link, Link, Vec<u8>)> {
-    let sender = PrivateIdentity::new_from_rand(OsRng);
-    let receiver = PrivateIdentity::new_from_rand(OsRng);
-
-    let _sender = to_transport_private_identity(&sender);
-    let receiver = to_transport_private_identity(&receiver);
-
-    let destination = DestinationDesc {
-        identity: *receiver.as_identity(),
-        address_hash: *receiver.address_hash(),
-        name: TransportDestinationName::new("lxmf", "delivery"),
-    };
-
-    let (tx, _) = tokio::sync::broadcast::channel(16);
-    let mut outbound = Link::new(destination, tx.clone());
-    let request = outbound.request();
-
-    let mut inbound =
-        Link::new_from_request(&request, receiver.sign_key().clone(), destination, tx)
-            .map_err(|err| anyhow!("input link: {err:?}"))?;
-    let proof = inbound.prove();
-    let proof_iface = AddressHash::new_from_rand(OsRng);
-    if !matches!(outbound.handle_packet(&proof, proof_iface), LinkHandleResult::Activated) {
-        bail!("link activation did not succeed");
-    }
-
-    let payload = vec![0x2a; 128];
-    Ok((outbound, inbound, payload))
-}
-
-fn rust_decrypt_resource_packet(link: &Link, packet: &Packet) -> Result<Packet> {
-    let mut plain_packet = packet.clone();
-    let mut buffer = PacketDataBuffer::new();
-    let plain_len = {
-        let plaintext = link
-            .decrypt(packet.data.as_slice(), buffer.accuire_buf_max())
-            .map_err(|err| anyhow!("decrypt should succeed: {err:?}"))?;
-        plaintext.len()
-    };
-    buffer.resize(plain_len);
-    plain_packet.data = buffer;
-    Ok(plain_packet)
-}
-
-fn rust_resource_manager_request_fixture() -> Result<(Link, ResourceManager, Packet)> {
-    let (sender_link, mut receiver_link, _) = rust_active_link_pair()?;
-    let mut sender_manager = ResourceManager::new();
-    let mut receiver_manager = ResourceManager::new();
-    let resource_data = vec![0x5a; PACKET_MDU * 6];
-
-    let (_, advertisement_packet) = sender_manager
-        .start_send(&sender_link, resource_data, None)
-        .map_err(|err| anyhow!("resource send should succeed: {err:?}"))?;
-    let plain_advertisement = rust_decrypt_resource_packet(&receiver_link, &advertisement_packet)?;
-
-    let mut responses = Vec::new();
-    receiver_manager.handle_packet_into(&plain_advertisement, &mut receiver_link, &mut responses);
-    let request_packet = responses.pop().context("resource request packet")?;
-    let plain_request = rust_decrypt_resource_packet(&sender_link, &request_packet)?;
-
-    Ok((sender_link, sender_manager, plain_request))
 }
 
 fn collect_python_impl_resource_measurements(

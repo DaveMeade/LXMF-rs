@@ -1,7 +1,11 @@
-# SDK Contract v2.5 (Backend SPI)
+# SDK Contract v2.6 (Backend SPI)
 
 Status: Draft, implementation target  
-Contract release: `v2.5`  
+Contract release: `v2.6`
+
+ZeroMQ ROUTER/DEALER at `tcp://127.0.0.1:9100` is the canonical desktop SDK
+transport. HTTP/Unix and the legacy dual-endpoint ZeroMQ adapter remain
+compatible. Remote ZeroMQ endpoints require token authentication.
 Schema namespace: `v2`
 
 ## Design Intent

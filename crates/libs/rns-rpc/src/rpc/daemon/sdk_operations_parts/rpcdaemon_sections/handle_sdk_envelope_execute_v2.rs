@@ -147,7 +147,7 @@ impl RpcDaemon {
                 "timeout_ms": parsed.timeout_ms,
                 "extensions": parsed.extensions,
             }),
-            _ => JsonValue::Null,
+            _ => parsed.payload,
         };
 
         let delegated =

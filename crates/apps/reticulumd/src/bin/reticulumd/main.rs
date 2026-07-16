@@ -65,6 +65,10 @@ struct Args {
     #[arg(long, default_value = DEFAULT_RPC_UNIX_PATH)]
     rpc_unix: Option<PathBuf>,
     #[cfg(feature = "zmq-pipeline-rpc")]
+    #[arg(long, value_name = "ENDPOINT")]
+    zmq_rpc_endpoint: Option<String>,
+    /// Legacy dual-endpoint PUSH/PULL command ingress.
+    #[cfg(feature = "zmq-pipeline-rpc")]
     #[arg(long)]
     zmq_rpc_command: Option<String>,
 }
@@ -77,10 +81,12 @@ async fn main() {
     let args = Args::parse();
     #[cfg(feature = "zmq-pipeline-rpc")]
     let zmq_rpc_command = args.zmq_rpc_command.clone();
+    #[cfg(feature = "zmq-pipeline-rpc")]
+    let zmq_rpc_endpoint = args.zmq_rpc_endpoint.clone();
     let context = bootstrap::bootstrap(args).await;
     #[cfg(feature = "zmq-pipeline-rpc")]
     {
-        run_daemon_loops(context, zmq_rpc_command).await;
+        run_daemon_loops(context, zmq_rpc_endpoint, zmq_rpc_command).await;
     }
     #[cfg(not(feature = "zmq-pipeline-rpc"))]
     {
@@ -93,7 +99,11 @@ async fn main() {
 }
 
 #[cfg(feature = "zmq-pipeline-rpc")]
-async fn run_daemon_loops(context: bootstrap::BootstrapContext, zmq_rpc_command: Option<String>) {
+async fn run_daemon_loops(
+    context: bootstrap::BootstrapContext,
+    zmq_rpc_endpoint: Option<String>,
+    zmq_rpc_command: Option<String>,
+) {
     let bootstrap::BootstrapContext { rpc_addr, rpc_unix, daemon, rpc_tls, path_table_persistence } =
         context;
     let (shutdown_tx, shutdown_rx) = tokio::sync::watch::channel(false);
@@ -108,6 +118,19 @@ async fn run_daemon_loops(context: bootstrap::BootstrapContext, zmq_rpc_command:
             }
         }
     });
+
+    if let Some(zmq_rpc_endpoint) = zmq_rpc_endpoint {
+        let daemon = daemon.clone();
+        let shutdown = shutdown_rx.clone();
+        tokio::spawn(async move {
+            if let Err(err) =
+                zmq_rpc_loop::run_zmq_router_loop_until(zmq_rpc_endpoint, true, daemon, shutdown)
+                    .await
+            {
+                log::error!("[daemon] canonical zmq rpc loop stopped: {}", err);
+            }
+        });
+    }
 
     if let Some(command_endpoint) = zmq_rpc_command {
         let daemon = daemon.clone();

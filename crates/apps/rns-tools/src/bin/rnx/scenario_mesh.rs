@@ -4,7 +4,7 @@ use std::io;
 use std::path::PathBuf;
 use std::process::Child;
 use std::process::Command as ProcessCommand;
-use std::time::Duration;
+use std::time::{Duration, Instant};
 
 use crate::harness::{
     cleanup_child, derive_preferred_transport_port, ensure_rpc_ok, poll_for_peer, reserve_port,
@@ -278,7 +278,8 @@ fn start_mesh_nodes(
 
 fn announce_mesh_nodes(node_processes: &[MeshNodeProcess], request_id: &mut u64) -> io::Result<()> {
     for node in node_processes {
-        rpc_call(&node.rpc, *request_id, "announce_now", None)?;
+        let response = rpc_call(&node.rpc, *request_id, "announce_now", None)?;
+        ensure_rpc_ok(response, "announce_now (mesh)")?;
         *request_id = (*request_id).wrapping_add(1);
     }
     Ok(())
@@ -294,7 +295,7 @@ fn wait_for_mesh_peer_visibility(
             if expected.destination_hash == node.destination_hash {
                 continue;
             }
-            if !poll_for_peer(&node.rpc, &expected.destination_hash, timeout, *request_id)? {
+            if !wait_for_peer_with_reannounce(node, expected, timeout, request_id)? {
                 return Err(io::Error::new(
                     io::ErrorKind::TimedOut,
                     format!(
@@ -303,10 +304,37 @@ fn wait_for_mesh_peer_visibility(
                     ),
                 ));
             }
-            *request_id = (*request_id).wrapping_add(1);
         }
     }
     Ok(())
+}
+
+fn wait_for_peer_with_reannounce(
+    observer: &MeshNodeProcess,
+    expected: &MeshNodeProcess,
+    timeout: Duration,
+    request_id: &mut u64,
+) -> io::Result<bool> {
+    let deadline = Instant::now() + timeout;
+    loop {
+        let response = rpc_call(&expected.rpc, *request_id, "announce_now", None)?;
+        ensure_rpc_ok(response, "announce_now (mesh discovery retry)")?;
+        *request_id = (*request_id).wrapping_add(1);
+
+        let remaining = deadline.saturating_duration_since(Instant::now());
+        if remaining.is_zero() {
+            return Ok(false);
+        }
+        let probe_window = remaining.min(Duration::from_secs(2));
+        if poll_for_peer(&observer.rpc, &expected.destination_hash, probe_window, *request_id)? {
+            *request_id = (*request_id).wrapping_add(1);
+            return Ok(true);
+        }
+        *request_id = (*request_id).wrapping_add(1);
+        if Instant::now() >= deadline {
+            return Ok(false);
+        }
+    }
 }
 
 fn run_rnpath_binary(
@@ -342,130 +370,7 @@ fn run_rnpath_binary(
     Ok(output.stdout)
 }
 
-fn parse_rnpath_output(output: &[u8], destination_hash: &str) -> io::Result<serde_json::Value> {
-    let result: serde_json::Value = serde_json::from_slice(output)?;
-    if result.get("path_found").and_then(serde_json::Value::as_bool) != Some(true) {
-        return Err(io::Error::new(
-            io::ErrorKind::InvalidData,
-            format!("rnpath-rs did not report path_found=true: {result}"),
-        ));
-    }
-    if result.get("status").and_then(serde_json::Value::as_str) != Some("found") {
-        return Err(io::Error::new(
-            io::ErrorKind::InvalidData,
-            format!("rnpath-rs did not report status=found: {result}"),
-        ));
-    }
-    if result.get("destination_hash").and_then(serde_json::Value::as_str) != Some(destination_hash)
-    {
-        return Err(io::Error::new(
-            io::ErrorKind::InvalidData,
-            format!("rnpath-rs reported unexpected destination hash: {result}"),
-        ));
-    }
-    Ok(result)
-}
-
-fn validate_scoped_rnpath_result(
-    result: &serde_json::Value,
-    on_iface: &str,
-    tag_hex: &str,
-    expected_next_hop: &str,
-    expected_hops: Option<u64>,
-) -> io::Result<()> {
-    let reported_iface = required_path_field(result, "on_iface")?;
-    if reported_iface != on_iface {
-        return Err(io::Error::new(
-            io::ErrorKind::InvalidData,
-            format!("rnpath-rs reported unexpected on_iface: {result}"),
-        ));
-    }
-    let interface_scope = required_path_field(result, "interface_scope")?;
-    if interface_scope != on_iface {
-        return Err(io::Error::new(
-            io::ErrorKind::InvalidData,
-            format!("rnpath-rs reported unexpected interface_scope: {result}"),
-        ));
-    }
-    let reported_tag = required_path_field(result, "tag_hex")?;
-    if reported_tag != tag_hex {
-        return Err(io::Error::new(
-            io::ErrorKind::InvalidData,
-            format!("rnpath-rs reported unexpected tag_hex: {result}"),
-        ));
-    }
-    let next_hop = required_path_field(result, "next_hop")?;
-    if next_hop != expected_next_hop {
-        return Err(io::Error::new(
-            io::ErrorKind::InvalidData,
-            format!("scoped rnpath-rs result changed next_hop: {result}"),
-        ));
-    }
-    let interface = normalized_hash_field(result, "interface")?;
-    if interface != on_iface {
-        return Err(io::Error::new(
-            io::ErrorKind::InvalidData,
-            format!("scoped rnpath-rs result changed interface metadata: {result}"),
-        ));
-    }
-    if result.get("hops").and_then(serde_json::Value::as_u64) != expected_hops {
-        return Err(io::Error::new(
-            io::ErrorKind::InvalidData,
-            format!("scoped rnpath-rs result changed hop metadata: {result}"),
-        ));
-    }
-    Ok(())
-}
-
-fn normalized_hash_field(result: &serde_json::Value, key: &str) -> io::Result<String> {
-    let value = required_path_field(result, key)?;
-    let normalized =
-        value.strip_prefix('/').and_then(|stripped| stripped.strip_suffix('/')).unwrap_or(value);
-    if normalized.len() != 32 || !normalized.as_bytes().iter().all(u8::is_ascii_hexdigit) {
-        return Err(io::Error::new(
-            io::ErrorKind::InvalidData,
-            format!("rnpath-rs reported non-hash {key}: {result}"),
-        ));
-    }
-    Ok(normalized.to_ascii_lowercase())
-}
-
-fn required_path_field<'a>(result: &'a serde_json::Value, key: &str) -> io::Result<&'a str> {
-    let value = result.get(key).and_then(serde_json::Value::as_str).ok_or_else(|| {
-        io::Error::new(io::ErrorKind::InvalidData, format!("rnpath-rs omitted {key}: {result}"))
-    })?;
-    if value.is_empty() {
-        return Err(io::Error::new(
-            io::ErrorKind::InvalidData,
-            format!("rnpath-rs reported empty {key}: {result}"),
-        ));
-    }
-    Ok(value)
-}
-
-fn rnpath_rs_path() -> io::Result<PathBuf> {
-    let binary_name = format!("rnpath-rs{}", std::env::consts::EXE_SUFFIX);
-    let exe = std::env::current_exe()?;
-    let dir = exe.parent().ok_or_else(|| io::Error::other("missing exe parent"))?;
-    let candidate = dir.join(&binary_name);
-    if candidate.exists() {
-        return Ok(candidate);
-    }
-
-    if let Some(path) = std::env::var_os("PATH") {
-        for dir in std::env::split_paths(&path) {
-            let candidate = dir.join(&binary_name);
-            if candidate.exists() {
-                return Ok(candidate);
-            }
-        }
-    }
-
-    Err(io::Error::new(
-        io::ErrorKind::NotFound,
-        "rnpath-rs binary not found; build it with `cargo build -p reticulumd --bin reticulumd -p rns-tools --bin rnx --bin rnpath-rs` before running `rnx rnpath-smoke`",
-    ))
-}
+include!("scenario_mesh_path_helpers.rs");
 
 fn cleanup_mesh_children(node_processes: &mut [MeshNodeProcess], keep: bool) {
     for node in node_processes {

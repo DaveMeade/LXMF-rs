@@ -7,7 +7,7 @@
     "effective_limits": {
       "max_poll_events": 256
     },
-    "contract_release": "v2.5",
+    "contract_release": "v2.6",
     "schema_namespace": "v2",
     "sdk_version": "0.2.1",
     "python_reference": {

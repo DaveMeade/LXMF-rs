@@ -1,0 +1,95 @@
+name: Release performance comparison
+
+on:
+  workflow_dispatch:
+    inputs:
+      candidate_ref:
+        description: Candidate SHA or ref
+        required: true
+        default: main
+  push:
+    tags:
+      - v0.9.5-rc.*
+
+permissions:
+  contents: read
+
+jobs:
+  same-runner-comparison:
+    runs-on: ubuntu-latest
+    timeout-minutes: 180
+    steps:
+      - name: Resolve candidate ref
+        id: candidate
+        shell: bash
+        run: echo "ref=${{ inputs.candidate_ref || github.sha }}" >> "$GITHUB_OUTPUT"
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ steps.candidate.outputs.ref }}
+          path: candidate
+      - uses: actions/checkout@v4
+        with:
+          ref: v0.9.1
+          path: baseline
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install build dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y pkg-config libdbus-1-dev
+      - name: Check out pinned Python references
+        run: |
+          git clone https://github.com/markqvist/Reticulum.git refs/Reticulum
+          git -C refs/Reticulum checkout 15320e4d2cfabb143c1db20ca887e275fd521585
+          git clone https://github.com/markqvist/LXMF.git refs/LXMF
+          git -C refs/LXMF checkout 727830cefda83d9c6e3982b48675425f3f988f9c
+          mkdir -p candidate/target/python-references
+          ln -s "$GITHUB_WORKSPACE/refs/Reticulum" candidate/target/python-references/Reticulum
+          ln -s "$GITHUB_WORKSPACE/refs/LXMF" candidate/target/python-references/LXMF
+      - name: Measure v0.9.1 baseline
+        working-directory: baseline
+        env:
+          PYTHONPATH: ${{ github.workspace }}/refs/Reticulum:${{ github.workspace }}/refs/LXMF
+        run: cargo xtask python-impl-bench-report
+      - name: Measure release candidate
+        working-directory: candidate
+        env:
+          PYTHONPATH: ${{ github.workspace }}/refs/Reticulum:${{ github.workspace }}/refs/LXMF
+        run: cargo xtask python-impl-bench-report
+      - name: Measure ZeroMQ and HTTP SDK transports
+        working-directory: candidate
+        run: |
+          cargo build --release -p reticulumd --bin reticulumd
+          cargo build --release -p lxmf-sdk --example sdk_transport_benchmark
+          python3 tools/scripts/sdk_transport_bench.py \
+            --output target/performance/sdk-transport.json
+      - name: Measure matched E2E workloads
+        working-directory: candidate
+        run: python3 tools/scripts/e2e_performance.py --profile report --output target/performance/e2e.json
+      - name: Generate candidate publication dataset
+        working-directory: candidate
+        run: |
+          python3 tools/scripts/performance_docs.py \
+            --release v0.9.5 \
+            --report target/criterion/python-impl-report/report.json \
+            --sdk-transport-report target/performance/sdk-transport.json \
+            --e2e-report target/performance/e2e.json
+          cp docs/performance/v0.9.5.json target/performance/candidate.json
+      - name: Apply release regression budgets
+        working-directory: candidate
+        run: |
+          python3 tools/scripts/performance_release_gate.py \
+            --candidate target/performance/candidate.json \
+            --baseline ../baseline/target/criterion/python-impl-report/report.json \
+            --output target/performance/release-gate.json
+      - uses: actions/upload-artifact@v4
+        with:
+          name: v0.9.5-performance-${{ github.run_id }}
+          path: |
+            candidate/target/criterion/python-impl-report/**
+            baseline/target/criterion/python-impl-report/**
+            candidate/target/performance/**
+            candidate/docs/performance.md
+          if-no-files-found: error

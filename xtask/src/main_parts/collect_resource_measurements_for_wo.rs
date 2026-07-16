@@ -408,7 +408,7 @@ fn load_python_impl_bench_config() -> Result<PythonImplBenchConfig> {
     toml::from_str(&raw).with_context(|| format!("parse {PYTHON_IMPL_BENCH_CONFIG_PATH}"))
 }
 
-fn capture_python_impl_environment() -> Result<PythonImplEnvironment> {
+fn capture_python_impl_environment(config: &PythonImplBenchConfig) -> Result<PythonImplEnvironment> {
     let git_commit = Command::new("git")
         .args(["rev-parse", "HEAD"])
         .output()
@@ -429,8 +429,26 @@ fn capture_python_impl_environment() -> Result<PythonImplEnvironment> {
             "python3",
             &["-c", "import LXMF; print(getattr(LXMF, '__file__', 'unknown'))"],
         )?,
+        python_rns_revision: config.references.reticulum.clone(),
+        python_lxmf_revision: config.references.lxmf.clone(),
         uname: capture_platform_descriptor()?,
+        cpu: capture_cpu_descriptor(),
+        timestamp_utc: capture_command_stdout("date", &["-u", "+%Y-%m-%dT%H:%M:%SZ"] )?,
         git_commit,
         benchmark_config_path: PYTHON_IMPL_BENCH_CONFIG_PATH.to_string(),
     })
+}
+
+fn capture_cpu_descriptor() -> String {
+    fs::read_to_string("/proc/cpuinfo")
+        .ok()
+        .and_then(|cpuinfo| {
+            cpuinfo.lines().find_map(|line| {
+                line.strip_prefix("model name\t:")
+                    .or_else(|| line.strip_prefix("Hardware\t:"))
+                    .map(str::trim)
+                    .map(str::to_owned)
+            })
+        })
+        .unwrap_or_else(|| format!("{} {}", std::env::consts::ARCH, std::env::consts::OS))
 }

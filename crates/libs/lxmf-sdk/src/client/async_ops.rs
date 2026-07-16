@@ -177,6 +177,64 @@ impl<B: SdkBackendAsyncOps> Client<B> {
         self.backend.status_async(id).await
     }
 
+    pub async fn cancel_async(&self, id: MessageId) -> Result<CancelResult, SdkError> {
+        {
+            let lifecycle = self.lifecycle.lock().expect("lifecycle mutex poisoned");
+            lifecycle.ensure_method_legal(SdkMethod::Cancel)?;
+        }
+        self.backend.cancel_async(id).await
+    }
+
+    pub async fn configure_async(
+        &self,
+        expected_revision: u64,
+        patch: ConfigPatch,
+    ) -> Result<Ack, SdkError> {
+        if patch.is_empty() {
+            return Err(SdkError::new(
+                code::VALIDATION_INVALID_ARGUMENT,
+                ErrorCategory::Validation,
+                "config patch must contain at least one key",
+            )
+            .with_user_actionable(true));
+        }
+        {
+            let lifecycle = self.lifecycle.lock().expect("lifecycle mutex poisoned");
+            lifecycle.ensure_method_legal(SdkMethod::Configure)?;
+        }
+        self.backend.configure_async(expected_revision, patch).await
+    }
+
+    pub async fn poll_events_async(
+        &self,
+        cursor: Option<EventCursor>,
+        max: usize,
+    ) -> Result<EventBatch, SdkError> {
+        {
+            let lifecycle = self.lifecycle.lock().expect("lifecycle mutex poisoned");
+            lifecycle.ensure_method_legal(SdkMethod::PollEvents)?;
+        }
+        if max == 0 {
+            return Err(SdkError::new(
+                code::VALIDATION_INVALID_ARGUMENT,
+                ErrorCategory::Validation,
+                "poll max must be greater than zero",
+            )
+            .with_user_actionable(true));
+        }
+        if let Some(limits) = self.current_limits().ok().flatten() {
+            if max > limits.max_poll_events {
+                return Err(SdkError::new(
+                    code::VALIDATION_MAX_POLL_EVENTS_EXCEEDED,
+                    ErrorCategory::Validation,
+                    "poll max exceeds negotiated effective_limits.max_poll_events",
+                )
+                .with_user_actionable(true));
+            }
+        }
+        self.backend.poll_events_async(cursor, max).await
+    }
+
     pub async fn snapshot_async(&self) -> Result<RuntimeSnapshot, SdkError> {
         {
             let lifecycle = self.lifecycle.lock().expect("lifecycle mutex poisoned");

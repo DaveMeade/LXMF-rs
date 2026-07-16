@@ -6,7 +6,7 @@ fn write_python_impl_compare_report(
         .with_context(|| format!("read {}", paths.python_report_path.display()))?;
     let python_report: PythonBenchReport = serde_json::from_str(&python_raw)
         .with_context(|| format!("parse {}", paths.python_report_path.display()))?;
-    let environment = capture_python_impl_environment()?;
+    let environment = capture_python_impl_environment(config)?;
     fs::write(
         paths.environment_path,
         serde_json::to_string_pretty(&environment)

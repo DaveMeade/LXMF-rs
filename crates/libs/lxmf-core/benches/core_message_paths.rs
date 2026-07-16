@@ -30,6 +30,17 @@ fn sample_large_wire_payload() -> (Vec<u8>, [u8; 16]) {
     (wire, destination)
 }
 
+fn sample_resource_wire_payload() -> Vec<u8> {
+    let mut message = Message::new();
+    message.destination_hash = Some([0xd4; 16]);
+    message.source_hash = Some([0xe5; 16]);
+    message.signature = Some([0xf6; 64]);
+    message.timestamp = Some(1_770_000_201.0);
+    message.set_title_from_string("wire-resource-title");
+    message.set_content_from_string(&"x".repeat(16_384));
+    message.to_wire(None).expect("resource-sized sample message must encode")
+}
+
 fn bench_message_from_wire(c: &mut Criterion) {
     let (wire, _) = sample_wire_payload();
     c.bench_function("lxmf_core/message_from_wire", |b| {
@@ -98,12 +109,41 @@ fn bench_large_message_to_wire(c: &mut Criterion) {
     });
 }
 
+fn bench_resource_message_from_wire(c: &mut Criterion) {
+    let wire = sample_resource_wire_payload();
+    c.bench_function("lxmf_core/resource_message_from_wire", |b| {
+        b.iter(|| {
+            let decoded = Message::from_wire(black_box(&wire)).expect("decode should succeed");
+            black_box(decoded);
+        });
+    });
+}
+
+fn bench_resource_message_to_wire(c: &mut Criterion) {
+    let content = "x".repeat(16_384);
+    c.bench_function("lxmf_core/resource_message_to_wire", |b| {
+        b.iter(|| {
+            let mut message = Message::new();
+            message.destination_hash = Some([0xd4; 16]);
+            message.source_hash = Some([0xe5; 16]);
+            message.signature = Some([0xf6; 64]);
+            message.timestamp = Some(1_770_000_201.0);
+            message.set_title_from_string("wire-resource-title");
+            message.set_content_from_string(black_box(&content));
+            let wire = message.to_wire(None).expect("encode should succeed");
+            black_box(wire);
+        });
+    });
+}
+
 criterion_group!(
     benches,
     bench_message_from_wire,
     bench_decode_inbound_message,
     bench_message_to_wire,
     bench_large_message_from_wire,
-    bench_large_message_to_wire
+    bench_large_message_to_wire,
+    bench_resource_message_from_wire,
+    bench_resource_message_to_wire
 );
 criterion_main!(benches);

@@ -1,0 +1,4043 @@
+{
+  "compare_runs": 5,
+  "comparisons": [
+    {
+      "context": {
+        "batch_size": 1,
+        "payload_size_bytes": 21,
+        "workload_class": "protocol_core"
+      },
+      "dispersion": {
+        "python": {
+          "p50_mad_ns": 2066.0,
+          "p50_relative_mad": 0.023867561603955593,
+          "run_p50_ns": [
+            94213.0,
+            86561.0,
+            90391.0,
+            84846.0,
+            84495.0
+          ]
+        },
+        "rust": {
+          "p50_mad_ns": 4.874538678629392,
+          "p50_relative_mad": 0.03246984790852761,
+          "run_p50_ns": [
+            150.12508504387492,
+            149.12261366341346,
+            155.3111410079267,
+            142.48675650045212,
+            154.9996237225043
+          ]
+        }
+      },
+      "label": "LXMF message decode",
+      "python": {
+        "iterations": 10000,
+        "mean_ns": 87875.5499,
+        "p50_ns": 86561.0,
+        "p95_ns": 90953.0,
+        "p99_ns": 92445.0,
+        "sample_count": 10000,
+        "throughput_ops_per_sec": 11552.546758933007
+      },
+      "python_benchmark": "python_lxmf/message_from_wire",
+      "python_resources": {
+        "iterations_per_run": 10000,
+        "max_peak_rss_bytes": 40165376,
+        "mean_cpu_seconds_per_1k_ops": 0.103,
+        "mean_peak_rss_bytes": 39911424.0,
+        "mean_sys_cpu_seconds": 0.02,
+        "mean_user_cpu_seconds": 1.01,
+        "median_cpu_seconds_per_1k_ops": 0.105,
+        "median_peak_rss_bytes": 39903232,
+        "median_sys_cpu_seconds": 0.02,
+        "median_user_cpu_seconds": 1.03,
+        "runs": 3
+      },
+      "rust": {
+        "iterations": 19534650,
+        "mean_ns": 150.39153893069223,
+        "p50_ns": 150.12508504387492,
+        "p95_ns": 152.85653871429125,
+        "p99_ns": 153.07161440733884,
+        "sample_count": 30,
+        "throughput_ops_per_sec": 6661111.963451972
+      },
+      "rust_advantage_vs_python": {
+        "mean_latency_reduction": 0.9982885849465314,
+        "mean_speedup": 584.3117939001697,
+        "p50_latency_reduction": 0.9982656729353419,
+        "p50_speedup": 576.5925126683662,
+        "p95_latency_reduction": 0.9983193898088651,
+        "p95_speedup": 595.0219778952537,
+        "p99_latency_reduction": 0.9983441871987956,
+        "p99_speedup": 603.9330045477578,
+        "throughput_gain": 576.5925126683661
+      },
+      "rust_benchmark": "lxmf_core_message_from_wire",
+      "rust_resource_advantage_vs_python": {
+        "cpu_time_reduction": 0.9981413084810836,
+        "rss_reduction": -0.41449394374871695
+      },
+      "rust_resources": {
+        "iterations_per_run": 3330556,
+        "max_peak_rss_bytes": 56463360,
+        "mean_cpu_seconds_per_1k_ops": 0.00019516260948622391,
+        "mean_peak_rss_bytes": 56326826.666666664,
+        "mean_sys_cpu_seconds": 0.023333333333333334,
+        "mean_user_cpu_seconds": 0.6266666666666666,
+        "median_cpu_seconds_per_1k_ops": 0.00019516260948622391,
+        "median_peak_rss_bytes": 56442880,
+        "median_sys_cpu_seconds": 0.02,
+        "median_user_cpu_seconds": 0.63,
+        "runs": 3
+      }
+    },
+    {
+      "context": {
+        "batch_size": 1,
+        "payload_size_bytes": 12,
+        "workload_class": "protocol_core"
+      },
+      "dispersion": {
+        "python": {
+          "p50_mad_ns": 838.0,
+          "p50_relative_mad": 0.02310513110369737,
+          "run_p50_ns": [
+            39752.0,
+            36269.0,
+            37107.0,
+            35598.0,
+            35242.0
+          ]
+        },
+        "rust": {
+          "p50_mad_ns": 6.6683565555304085,
+          "p50_relative_mad": 0.02566516431454617,
+          "run_p50_ns": [
+            266.4896642940904,
+            260.18985766056085,
+            259.82130773856,
+            236.5570124574464,
+            240.8347417329661
+          ]
+        }
+      },
+      "label": "LXMF message encode",
+      "python": {
+        "iterations": 10000,
+        "mean_ns": 37679.0346,
+        "p50_ns": 36269.0,
+        "p95_ns": 39866.0,
+        "p99_ns": 41152.0,
+        "sample_count": 10000,
+        "throughput_ops_per_sec": 27571.75549367228
+      },
+      "python_benchmark": "python_lxmf/message_to_wire",
+      "python_resources": {
+        "iterations_per_run": 13786,
+        "max_peak_rss_bytes": 40382464,
+        "mean_cpu_seconds_per_1k_ops": 0.04618211712365202,
+        "mean_peak_rss_bytes": 40278698.666666664,
+        "mean_sys_cpu_seconds": 0.02,
+        "mean_user_cpu_seconds": 0.6166666666666667,
+        "median_cpu_seconds_per_1k_ops": 0.04569853474539388,
+        "median_peak_rss_bytes": 40325120,
+        "median_sys_cpu_seconds": 0.02,
+        "median_user_cpu_seconds": 0.61,
+        "runs": 3
+      },
+      "rust": {
+        "iterations": 11514330,
+        "mean_ns": 258.17944946361916,
+        "p50_ns": 259.82130773856,
+        "p95_ns": 263.182220076434,
+        "p99_ns": 268.26393291955816,
+        "sample_count": 30,
+        "throughput_ops_per_sec": 3848799.040786254
+      },
+      "rust_advantage_vs_python": {
+        "mean_latency_reduction": 0.9931479282257508,
+        "mean_speedup": 145.94126170103814,
+        "p50_latency_reduction": 0.9928362704309862,
+        "p50_speedup": 139.59209241027668,
+        "p95_latency_reduction": 0.9933983288999039,
+        "p95_speedup": 151.47679804669943,
+        "p99_latency_reduction": 0.9934811447093809,
+        "p99_speedup": 153.40116560633544,
+        "throughput_gain": 139.59209241027665
+      },
+      "rust_benchmark": "lxmf_core_message_to_wire",
+      "rust_resource_advantage_vs_python": {
+        "cpu_time_reduction": 0.9936321855008199,
+        "rss_reduction": 0.13082783138649057
+      },
+      "rust_resources": {
+        "iterations_per_run": 1924400,
+        "max_peak_rss_bytes": 35115008,
+        "mean_cpu_seconds_per_1k_ops": 0.00028753550890320794,
+        "mean_peak_rss_bytes": 34970282.666666664,
+        "mean_sys_cpu_seconds": 0.006666666666666667,
+        "mean_user_cpu_seconds": 0.5466666666666667,
+        "median_cpu_seconds_per_1k_ops": 0.0002909997921430056,
+        "median_peak_rss_bytes": 35049472,
+        "median_sys_cpu_seconds": 0.01,
+        "median_user_cpu_seconds": 0.55,
+        "runs": 3
+      }
+    },
+    {
+      "context": {
+        "batch_size": 1,
+        "payload_size_bytes": 2048,
+        "workload_class": "protocol_core"
+      },
+      "dispersion": {
+        "python": {
+          "p50_mad_ns": 2725.0,
+          "p50_relative_mad": 0.02931841411587498,
+          "run_p50_ns": [
+            98021.0,
+            90220.0,
+            94122.0,
+            92945.0,
+            89641.0
+          ]
+        },
+        "rust": {
+          "p50_mad_ns": 8.421822558953323,
+          "p50_relative_mad": 0.03366927024909572,
+          "run_p50_ns": [
+            274.48127630242345,
+            241.71197887618516,
+            282.8214031560082,
+            246.51404025864235,
+            250.13380143513848
+          ]
+        }
+      },
+      "label": "LXMF large message decode",
+      "python": {
+        "iterations": 10000,
+        "mean_ns": 94847.6577,
+        "p50_ns": 92945.0,
+        "p95_ns": 97826.0,
+        "p99_ns": 101027.0,
+        "sample_count": 10000,
+        "throughput_ops_per_sec": 10759.05105169724
+      },
+      "python_benchmark": "python_lxmf/large_message_from_wire",
+      "python_resources": {
+        "iterations_per_run": 10000,
+        "max_peak_rss_bytes": 40157184,
+        "mean_cpu_seconds_per_1k_ops": 0.103,
+        "mean_peak_rss_bytes": 40039765.333333336,
+        "mean_sys_cpu_seconds": 0.030000000000000002,
+        "mean_user_cpu_seconds": 1.0,
+        "median_cpu_seconds_per_1k_ops": 0.103,
+        "median_peak_rss_bytes": 40017920,
+        "median_sys_cpu_seconds": 0.03,
+        "median_user_cpu_seconds": 0.99,
+        "runs": 3
+      },
+      "rust": {
+        "iterations": 11059560,
+        "mean_ns": 258.28684683771155,
+        "p50_ns": 250.13380143513848,
+        "p95_ns": 279.41196817983933,
+        "p99_ns": 280.5511319111885,
+        "sample_count": 30,
+        "throughput_ops_per_sec": 3997860.322205622
+      },
+      "rust_advantage_vs_python": {
+        "mean_latency_reduction": 0.9972768241925946,
+        "mean_speedup": 367.2183034531189,
+        "p50_latency_reduction": 0.9973087976606042,
+        "p50_speedup": 371.5811276474016,
+        "p95_latency_reduction": 0.9971437862308605,
+        "p95_speedup": 350.1138503023455,
+        "p99_latency_reduction": 0.9972230083847765,
+        "p99_speedup": 360.1019155110063,
+        "throughput_gain": 371.58112764740156
+      },
+      "rust_benchmark": "lxmf_core_large_message_from_wire",
+      "rust_resource_advantage_vs_python": {
+        "cpu_time_reduction": 0.9973286692610986,
+        "rss_reduction": 0.0994882292732856
+      },
+      "rust_resources": {
+        "iterations_per_run": 1998931,
+        "max_peak_rss_bytes": 36216832,
+        "mean_cpu_seconds_per_1k_ops": 0.00027681462408323914,
+        "mean_peak_rss_bytes": 36005205.333333336,
+        "mean_sys_cpu_seconds": 0.006666666666666667,
+        "mean_user_cpu_seconds": 0.5466666666666667,
+        "median_cpu_seconds_per_1k_ops": 0.0002751470661068341,
+        "median_peak_rss_bytes": 36036608,
+        "median_sys_cpu_seconds": 0.01,
+        "median_user_cpu_seconds": 0.55,
+        "runs": 3
+      }
+    },
+    {
+      "context": {
+        "batch_size": 1,
+        "payload_size_bytes": 2048,
+        "workload_class": "protocol_core"
+      },
+      "dispersion": {
+        "python": {
+          "p50_mad_ns": 868.0,
+          "p50_relative_mad": 0.019985264321237796,
+          "run_p50_ns": [
+            46512.0,
+            43327.0,
+            44300.0,
+            43432.0,
+            41872.0
+          ]
+        },
+        "rust": {
+          "p50_mad_ns": 10.41139842196344,
+          "p50_relative_mad": 0.020842629063825963,
+          "run_p50_ns": [
+            489.1128405826662,
+            526.6812009017535,
+            499.52423900462964,
+            501.128226509023,
+            465.7810488825943
+          ]
+        }
+      },
+      "label": "LXMF large message encode",
+      "python": {
+        "iterations": 10000,
+        "mean_ns": 44142.2349,
+        "p50_ns": 43432.0,
+        "p95_ns": 45885.0,
+        "p99_ns": 46700.0,
+        "sample_count": 10000,
+        "throughput_ops_per_sec": 23024.498065942164
+      },
+      "python_benchmark": "python_lxmf/large_message_to_wire",
+      "python_resources": {
+        "iterations_per_run": 11513,
+        "max_peak_rss_bytes": 40140800,
+        "mean_cpu_seconds_per_1k_ops": 0.05558933379657779,
+        "mean_peak_rss_bytes": 40079360.0,
+        "mean_sys_cpu_seconds": 0.02,
+        "mean_user_cpu_seconds": 0.62,
+        "median_cpu_seconds_per_1k_ops": 0.05645791713714931,
+        "median_peak_rss_bytes": 40087552,
+        "median_sys_cpu_seconds": 0.02,
+        "median_user_cpu_seconds": 0.63,
+        "runs": 3
+      },
+      "rust": {
+        "iterations": 5978040,
+        "mean_ns": 500.6008764002025,
+        "p50_ns": 499.5242390046296,
+        "p95_ns": 504.197822265625,
+        "p99_ns": 504.7318724185406,
+        "sample_count": 30,
+        "throughput_ops_per_sec": 2001904.856494325
+      },
+      "rust_advantage_vs_python": {
+        "mean_latency_reduction": 0.9886593672129591,
+        "mean_speedup": 88.17850103944035,
+        "p50_latency_reduction": 0.9884987051251467,
+        "p50_speedup": 86.94673172726154,
+        "p95_latency_reduction": 0.9890117070444453,
+        "p95_speedup": 91.00594642359749,
+        "p99_latency_reduction": 0.989192036993179,
+        "p99_speedup": 92.52437294325411,
+        "throughput_gain": 86.94673172726152
+      },
+      "rust_benchmark": "lxmf_core_large_message_to_wire",
+      "rust_resource_advantage_vs_python": {
+        "cpu_time_reduction": 0.9923909591082775,
+        "rss_reduction": 0.4834985184428323
+      },
+      "rust_resources": {
+        "iterations_per_run": 1000953,
+        "max_peak_rss_bytes": 21172224,
+        "mean_cpu_seconds_per_1k_ops": 0.0004295906001580494,
+        "mean_peak_rss_bytes": 20858197.333333332,
+        "mean_sys_cpu_seconds": 0.0,
+        "mean_user_cpu_seconds": 0.43,
+        "median_cpu_seconds_per_1k_ops": 0.0004295906001580494,
+        "median_peak_rss_bytes": 20705280,
+        "median_sys_cpu_seconds": 0.0,
+        "median_user_cpu_seconds": 0.43,
+        "runs": 3
+      }
+    },
+    {
+      "context": {
+        "batch_size": 1,
+        "payload_size_bytes": 16384,
+        "workload_class": "protocol_core"
+      },
+      "dispersion": {
+        "python": {
+          "p50_mad_ns": 321.0,
+          "p50_relative_mad": 0.002814283585099201,
+          "run_p50_ns": [
+            122510.0,
+            113740.0,
+            116520.0,
+            114061.0,
+            113912.0
+          ]
+        },
+        "rust": {
+          "p50_mad_ns": 16.35563443528099,
+          "p50_relative_mad": 0.031126334469432086,
+          "run_p50_ns": [
+            543.8298173727635,
+            517.3936461467566,
+            541.9720633199283,
+            525.459702019947,
+            509.10406758466604
+          ]
+        }
+      },
+      "label": "LXMF resource-sized message decode",
+      "python": {
+        "iterations": 10000,
+        "mean_ns": 117962.2244,
+        "p50_ns": 114061.0,
+        "p95_ns": 124097.0,
+        "p99_ns": 126475.0,
+        "sample_count": 10000,
+        "throughput_ops_per_sec": 8767.238582863556
+      },
+      "python_benchmark": "python_lxmf/resource_message_from_wire",
+      "python_resources": {
+        "iterations_per_run": 10000,
+        "max_peak_rss_bytes": 40103936,
+        "mean_cpu_seconds_per_1k_ops": 0.12233333333333334,
+        "mean_peak_rss_bytes": 40011093.333333336,
+        "mean_sys_cpu_seconds": 0.023333333333333334,
+        "mean_user_cpu_seconds": 1.2,
+        "median_cpu_seconds_per_1k_ops": 0.122,
+        "median_peak_rss_bytes": 39993344,
+        "median_sys_cpu_seconds": 0.02,
+        "median_user_cpu_seconds": 1.2,
+        "runs": 3
+      },
+      "rust": {
+        "iterations": 5717175,
+        "mean_ns": 526.0276706997247,
+        "p50_ns": 525.459702019947,
+        "p95_ns": 529.3199668270029,
+        "p99_ns": 531.3597943274175,
+        "sample_count": 30,
+        "throughput_ops_per_sec": 1903095.5107610496
+      },
+      "rust_advantage_vs_python": {
+        "mean_latency_reduction": 0.9955407108218305,
+        "mean_speedup": 224.2509871069825,
+        "p50_latency_reduction": 0.9953931694267107,
+        "p50_speedup": 217.06897705291607,
+        "p95_latency_reduction": 0.9957346272123662,
+        "p95_speedup": 234.44609645824772,
+        "p99_latency_reduction": 0.9957986970205384,
+        "p99_speedup": 238.0213959546733,
+        "throughput_gain": 217.06897705291607
+      },
+      "rust_benchmark": "lxmf_core_resource_message_from_wire",
+      "rust_resource_advantage_vs_python": {
+        "cpu_time_reduction": 0.9958652361945922,
+        "rss_reduction": 0.4768537484637444
+      },
+      "rust_resources": {
+        "iterations_per_run": 951548,
+        "max_peak_rss_bytes": 21278720,
+        "mean_cpu_seconds_per_1k_ops": 0.0005079442480393352,
+        "mean_peak_rss_bytes": 20997461.333333332,
+        "mean_sys_cpu_seconds": 0.0,
+        "mean_user_cpu_seconds": 0.48333333333333334,
+        "median_cpu_seconds_per_1k_ops": 0.0005044411842597536,
+        "median_peak_rss_bytes": 20922368,
+        "median_sys_cpu_seconds": 0.0,
+        "median_user_cpu_seconds": 0.48,
+        "runs": 3
+      }
+    },
+    {
+      "context": {
+        "batch_size": 1,
+        "payload_size_bytes": 16384,
+        "workload_class": "protocol_core"
+      },
+      "dispersion": {
+        "python": {
+          "p50_mad_ns": 1693.0,
+          "p50_relative_mad": 0.020564085122922942,
+          "run_p50_ns": [
+            87555.0,
+            80635.0,
+            82978.0,
+            82328.0,
+            78843.0
+          ]
+        },
+        "rust": {
+          "p50_mad_ns": 38.555964405425584,
+          "p50_relative_mad": 0.024029367579110228,
+          "run_p50_ns": [
+            1635.1603157626687,
+            1565.9791644734532,
+            1604.5351288788788,
+            1547.7797056277057,
+            1698.1759934495024
+          ]
+        }
+      },
+      "label": "LXMF resource-sized message encode",
+      "python": {
+        "iterations": 10000,
+        "mean_ns": 83786.7818,
+        "p50_ns": 82328.0,
+        "p95_ns": 88143.0,
+        "p99_ns": 90223.0,
+        "sample_count": 10000,
+        "throughput_ops_per_sec": 12146.535807987562
+      },
+      "python_benchmark": "python_lxmf/resource_message_to_wire",
+      "python_resources": {
+        "iterations_per_run": 10000,
+        "max_peak_rss_bytes": 40161280,
+        "mean_cpu_seconds_per_1k_ops": 0.09533333333333334,
+        "mean_peak_rss_bytes": 39918250.666666664,
+        "mean_sys_cpu_seconds": 0.023333333333333334,
+        "mean_user_cpu_seconds": 0.93,
+        "median_cpu_seconds_per_1k_ops": 0.09500000000000001,
+        "median_peak_rss_bytes": 39931904,
+        "median_sys_cpu_seconds": 0.02,
+        "median_user_cpu_seconds": 0.93,
+        "runs": 3
+      },
+      "rust": {
+        "iterations": 1858140,
+        "mean_ns": 1606.4980735582824,
+        "p50_ns": 1604.5351288788788,
+        "p95_ns": 1620.7651937651938,
+        "p99_ns": 1631.8273642839597,
+        "sample_count": 30,
+        "throughput_ops_per_sec": 623233.4724255743
+      },
+      "rust_advantage_vs_python": {
+        "mean_latency_reduction": 0.9808263542405411,
+        "mean_speedup": 52.15492205005765,
+        "p50_latency_reduction": 0.9805104566018987,
+        "p50_speedup": 51.30956531785268,
+        "p95_latency_reduction": 0.9816120940543753,
+        "p95_speedup": 54.38357162349675,
+        "p99_latency_reduction": 0.9819133994182863,
+        "p99_speedup": 55.289549602319326,
+        "throughput_gain": 51.30956531785268
+      },
+      "rust_benchmark": "lxmf_core_resource_message_to_wire",
+      "rust_resource_advantage_vs_python": {
+        "cpu_time_reduction": 0.9841235605854217,
+        "rss_reduction": 0.7314596368858344
+      },
+      "rust_resources": {
+        "iterations_per_run": 311617,
+        "max_peak_rss_bytes": 11010048,
+        "mean_cpu_seconds_per_1k_ops": 0.0015724430952098248,
+        "mean_peak_rss_bytes": 10797056.0,
+        "mean_sys_cpu_seconds": 0.0,
+        "mean_user_cpu_seconds": 0.49,
+        "median_cpu_seconds_per_1k_ops": 0.001508261744384934,
+        "median_peak_rss_bytes": 10723328,
+        "median_sys_cpu_seconds": 0.0,
+        "median_user_cpu_seconds": 0.47,
+        "runs": 3
+      }
+    },
+    {
+      "context": {
+        "batch_size": 1,
+        "payload_size_bytes": 128,
+        "workload_class": "protocol_core"
+      },
+      "dispersion": {
+        "python": {
+          "p50_mad_ns": 35.0,
+          "p50_relative_mad": 0.020636792452830188,
+          "run_p50_ns": [
+            1696.0,
+            1696.0,
+            1798.0,
+            1661.0,
+            1622.0
+          ]
+        },
+        "rust": {
+          "p50_mad_ns": 0.6125759152298169,
+          "p50_relative_mad": 0.04301929699735515,
+          "run_p50_ns": [
+            14.852137181595431,
+            13.517973283999256,
+            14.239561266365614,
+            13.324755468731784,
+            14.767562968652106
+          ]
+        }
+      },
+      "label": "Reticulum packet pack",
+      "python": {
+        "iterations": 10000,
+        "mean_ns": 1766.6417,
+        "p50_ns": 1696.0,
+        "p95_ns": 1907.0,
+        "p99_ns": 2055.0,
+        "sample_count": 10000,
+        "throughput_ops_per_sec": 589622.641509434
+      },
+      "python_benchmark": "python_rns/packet_pack",
+      "python_resources": {
+        "iterations_per_run": 294812,
+        "max_peak_rss_bytes": 54317056,
+        "mean_cpu_seconds_per_1k_ops": 0.002283941404465671,
+        "mean_peak_rss_bytes": 54191445.333333336,
+        "mean_sys_cpu_seconds": 0.03,
+        "mean_user_cpu_seconds": 0.6433333333333334,
+        "median_cpu_seconds_per_1k_ops": 0.002272634763849504,
+        "median_peak_rss_bytes": 54312960,
+        "median_sys_cpu_seconds": 0.03,
+        "median_user_cpu_seconds": 0.64,
+        "runs": 3
+      },
+      "rust": {
+        "iterations": 212985345,
+        "mean_ns": 14.248356558653615,
+        "p50_ns": 14.239561266365614,
+        "p95_ns": 14.517534762779102,
+        "p99_ns": 14.53424862400744,
+        "sample_count": 30,
+        "throughput_ops_per_sec": 70226882.78760654
+      },
+      "rust_advantage_vs_python": {
+        "mean_latency_reduction": 0.9919347785356513,
+        "mean_speedup": 123.98915571263167,
+        "p50_latency_reduction": 0.9916040322721901,
+        "p50_speedup": 119.10479320778067,
+        "p95_latency_reduction": 0.99238723924343,
+        "p95_speedup": 131.35839046786904,
+        "p99_latency_reduction": 0.9929273729323564,
+        "p99_speedup": 141.39017799692678,
+        "throughput_gain": 119.10479320778069
+      },
+      "rust_benchmark": "rns_core_packet_pack",
+      "rust_resource_advantage_vs_python": {
+        "cpu_time_reduction": 0.9699248229474449,
+        "rss_reduction": -1.0
+      },
+      "rust_resources": {
+        "iterations_per_run": 35113442,
+        "max_peak_rss_bytes": 539734016,
+        "mean_cpu_seconds_per_1k_ops": 6.797017127135149e-05,
+        "mean_peak_rss_bytes": 539678037.3333334,
+        "mean_sys_cpu_seconds": 0.23666666666666666,
+        "mean_user_cpu_seconds": 2.15,
+        "median_cpu_seconds_per_1k_ops": 6.834989289856575e-05,
+        "median_peak_rss_bytes": 539672576,
+        "median_sys_cpu_seconds": 0.24,
+        "median_user_cpu_seconds": 2.16,
+        "runs": 3
+      }
+    },
+    {
+      "context": {
+        "batch_size": 1,
+        "payload_size_bytes": 128,
+        "workload_class": "protocol_core"
+      },
+      "dispersion": {
+        "python": {
+          "p50_mad_ns": 55.0,
+          "p50_relative_mad": 0.04968383017163505,
+          "run_p50_ns": [
+            1107.0,
+            1109.0,
+            1181.0,
+            1022.0,
+            1052.0
+          ]
+        },
+        "rust": {
+          "p50_mad_ns": 2.2594123819027416,
+          "p50_relative_mad": 0.038333190656593644,
+          "run_p50_ns": [
+            59.98309886157262,
+            58.94141195142343,
+            56.68199956952069,
+            56.45529581681285,
+            61.59533777637147
+          ]
+        }
+      },
+      "label": "Reticulum packet unpack",
+      "python": {
+        "iterations": 10000,
+        "mean_ns": 1124.5012,
+        "p50_ns": 1107.0,
+        "p95_ns": 1202.0,
+        "p99_ns": 1236.0,
+        "sample_count": 10000,
+        "throughput_ops_per_sec": 903342.3667570008
+      },
+      "python_benchmark": "python_rns/packet_unpack",
+      "python_resources": {
+        "iterations_per_run": 451672,
+        "max_peak_rss_bytes": 62361600,
+        "mean_cpu_seconds_per_1k_ops": 0.001490757304710793,
+        "mean_peak_rss_bytes": 62180010.666666664,
+        "mean_sys_cpu_seconds": 0.03666666666666667,
+        "mean_user_cpu_seconds": 0.6366666666666667,
+        "median_cpu_seconds_per_1k_ops": 0.001483377318053809,
+        "median_peak_rss_bytes": 62341120,
+        "median_sys_cpu_seconds": 0.04,
+        "median_user_cpu_seconds": 0.63,
+        "runs": 3
+      },
+      "rust": {
+        "iterations": 51044910,
+        "mean_ns": 59.0319714705525,
+        "p50_ns": 58.94141195142343,
+        "p95_ns": 60.96742298003296,
+        "p99_ns": 61.114221358027066,
+        "sample_count": 30,
+        "throughput_ops_per_sec": 16966000.08198226
+      },
+      "rust_advantage_vs_python": {
+        "mean_latency_reduction": 0.9475038608491013,
+        "mean_speedup": 19.049019912217332,
+        "p50_latency_reduction": 0.9467557254278017,
+        "p50_speedup": 18.78136209075436,
+        "p95_latency_reduction": 0.9492783502661956,
+        "p95_speedup": 19.715447057581212,
+        "p99_latency_reduction": 0.9505548370889749,
+        "p99_speedup": 20.2244252243534,
+        "throughput_gain": 18.781362090754364
+      },
+      "rust_benchmark": "rns_core_packet_unpack",
+      "rust_resource_advantage_vs_python": {
+        "cpu_time_reduction": 0.9499344032303325,
+        "rss_reduction": -1.0
+      },
+      "rust_resources": {
+        "iterations_per_run": 8483001,
+        "max_peak_rss_bytes": 134750208,
+        "mean_cpu_seconds_per_1k_ops": 7.38732279610325e-05,
+        "mean_peak_rss_bytes": 134721536.0,
+        "mean_sys_cpu_seconds": 0.049999999999999996,
+        "mean_user_cpu_seconds": 0.5766666666666667,
+        "median_cpu_seconds_per_1k_ops": 7.426617066295287e-05,
+        "median_peak_rss_bytes": 134725632,
+        "median_sys_cpu_seconds": 0.05,
+        "median_user_cpu_seconds": 0.58,
+        "runs": 3
+      }
+    },
+    {
+      "context": {
+        "batch_size": 43,
+        "payload_size_bytes": 16384,
+        "workload_class": "transport_hotpath"
+      },
+      "dispersion": {
+        "python": {
+          "p50_mad_ns": 126.0,
+          "p50_relative_mad": 0.04261075414271221,
+          "run_p50_ns": [
+            3083.0,
+            2993.0,
+            2957.0,
+            2731.0,
+            2823.0
+          ]
+        },
+        "rust": {
+          "p50_mad_ns": 31.122090140980845,
+          "p50_relative_mad": 0.026840823735279257,
+          "run_p50_ns": [
+            1291.0758655842646,
+            1148.1814974258832,
+            1190.627865668814,
+            1159.505775527833,
+            1112.901901375095
+          ]
+        }
+      },
+      "label": "Reticulum resource segmentation 16 KiB",
+      "python": {
+        "iterations": 10000,
+        "mean_ns": 3077.4328,
+        "p50_ns": 2957.0,
+        "p95_ns": 3261.0,
+        "p99_ns": 3368.0,
+        "sample_count": 10000,
+        "throughput_ops_per_sec": 338180.5884342239
+      },
+      "python_benchmark": "python_rns/resource_segment_16k",
+      "python_resources": {
+        "iterations_per_run": 169091,
+        "max_peak_rss_bytes": 48349184,
+        "mean_cpu_seconds_per_1k_ops": 0.00388351045689402,
+        "mean_peak_rss_bytes": 48235861.333333336,
+        "mean_sys_cpu_seconds": 0.02,
+        "mean_user_cpu_seconds": 0.6366666666666667,
+        "median_cpu_seconds_per_1k_ops": 0.003903223707944243,
+        "median_peak_rss_bytes": 48316416,
+        "median_sys_cpu_seconds": 0.02,
+        "median_user_cpu_seconds": 0.64,
+        "runs": 3
+      },
+      "rust": {
+        "iterations": 2571915,
+        "mean_ns": 1154.563093457029,
+        "p50_ns": 1159.505775527833,
+        "p95_ns": 1183.7441268714126,
+        "p99_ns": 1203.6591213162176,
+        "sample_count": 30,
+        "throughput_ops_per_sec": 862436.4113622267
+      },
+      "rust_advantage_vs_python": {
+        "mean_latency_reduction": 0.6248291454302336,
+        "mean_speedup": 2.6654522541383634,
+        "p50_latency_reduction": 0.6078776545391162,
+        "p50_speedup": 2.5502244683981043,
+        "p95_latency_reduction": 0.6369996544399226,
+        "p95_speedup": 2.75481831417292,
+        "p99_latency_reduction": 0.6426190257374651,
+        "p99_speedup": 2.7981344056256114,
+        "throughput_gain": 2.5502244683981043
+      },
+      "rust_benchmark": "rns_transport_resource_segment_16k",
+      "rust_resource_advantage_vs_python": {
+        "cpu_time_reduction": 0.6732306167709061,
+        "rss_reduction": 0.7434723635130553
+      },
+      "rust_resources": {
+        "iterations_per_run": 431219,
+        "max_peak_rss_bytes": 12460032,
+        "mean_cpu_seconds_per_1k_ops": 0.0012754540036501174,
+        "mean_peak_rss_bytes": 12374016.0,
+        "mean_sys_cpu_seconds": 0.0,
+        "mean_user_cpu_seconds": 0.5499999999999999,
+        "median_cpu_seconds_per_1k_ops": 0.0012754540036501174,
+        "median_peak_rss_bytes": 12394496,
+        "median_sys_cpu_seconds": 0.0,
+        "median_user_cpu_seconds": 0.55,
+        "runs": 3
+      }
+    },
+    {
+      "context": {
+        "batch_size": 43,
+        "payload_size_bytes": 16384,
+        "workload_class": "transport_hotpath"
+      },
+      "dispersion": {
+        "python": {
+          "p50_mad_ns": 16.0,
+          "p50_relative_mad": 0.0299625468164794,
+          "run_p50_ns": [
+            534.0,
+            550.0,
+            549.0,
+            497.0,
+            492.0
+          ]
+        },
+        "rust": {
+          "p50_mad_ns": 2.89352272382456,
+          "p50_relative_mad": 0.013135853839234405,
+          "run_p50_ns": [
+            220.84203803238535,
+            220.27671434514096,
+            223.17023706896552,
+            209.62427857502175,
+            205.4259504862953
+          ]
+        }
+      },
+      "label": "Reticulum resource reassembly 16 KiB",
+      "python": {
+        "iterations": 10000,
+        "mean_ns": 537.4648,
+        "p50_ns": 534.0,
+        "p95_ns": 563.0,
+        "p99_ns": 569.0,
+        "sample_count": 10000,
+        "throughput_ops_per_sec": 1872659.1760299625
+      },
+      "python_benchmark": "python_rns/resource_reassemble_16k",
+      "python_resources": {
+        "iterations_per_run": 936330,
+        "max_peak_rss_bytes": 85979136,
+        "mean_cpu_seconds_per_1k_ops": 0.0008116796428609571,
+        "mean_peak_rss_bytes": 85143552.0,
+        "mean_sys_cpu_seconds": 0.03666666666666667,
+        "mean_user_cpu_seconds": 0.7233333333333333,
+        "median_cpu_seconds_per_1k_ops": 0.0008009996475601551,
+        "median_peak_rss_bytes": 84926464,
+        "median_sys_cpu_seconds": 0.04,
+        "median_user_cpu_seconds": 0.72,
+        "runs": 3
+      },
+      "rust": {
+        "iterations": 13669140,
+        "mean_ns": 220.91048555335473,
+        "p50_ns": 220.27671434514096,
+        "p95_ns": 222.2970986071303,
+        "p99_ns": 223.49032030975008,
+        "sample_count": 30,
+        "throughput_ops_per_sec": 4539744.488984652
+      },
+      "rust_advantage_vs_python": {
+        "mean_latency_reduction": 0.5889768305694536,
+        "mean_speedup": 2.432952870723696,
+        "p50_latency_reduction": 0.587496789615841,
+        "p50_speedup": 2.424223557117804,
+        "p95_latency_reduction": 0.605156130360337,
+        "p95_speedup": 2.532646640588864,
+        "p99_latency_reduction": 0.6072226356594902,
+        "p99_speedup": 2.545971562488188,
+        "throughput_gain": 2.4242235571178044
+      },
+      "rust_benchmark": "rns_transport_resource_reassemble_16k",
+      "rust_resource_advantage_vs_python": {
+        "cpu_time_reduction": 0.7029976566970928,
+        "rss_reduction": 0.5270570078132536
+      },
+      "rust_resources": {
+        "iterations_per_run": 2269873,
+        "max_peak_rss_bytes": 40423424,
+        "mean_cpu_seconds_per_1k_ops": 0.00024083579419054136,
+        "mean_peak_rss_bytes": 40218624.0,
+        "mean_sys_cpu_seconds": 0.01,
+        "mean_user_cpu_seconds": 0.5366666666666667,
+        "median_cpu_seconds_per_1k_ops": 0.0002378987723101689,
+        "median_peak_rss_bytes": 40165376,
+        "median_sys_cpu_seconds": 0.01,
+        "median_user_cpu_seconds": 0.53,
+        "runs": 3
+      }
+    },
+    {
+      "context": {
+        "batch_size": 1,
+        "payload_size_bytes": 22,
+        "workload_class": "protocol_core"
+      },
+      "dispersion": {
+        "python": {
+          "p50_mad_ns": 1060.0,
+          "p50_relative_mad": 0.03189120885733197,
+          "run_p50_ns": [
+            34298.0,
+            32777.0,
+            33238.0,
+            31985.0,
+            35310.0
+          ]
+        },
+        "rust": {
+          "p50_mad_ns": 479.0526352575762,
+          "p50_relative_mad": 0.03397152281282263,
+          "run_p50_ns": [
+            14690.74002942138,
+            14101.594382361824,
+            14575.516214177978,
+            13622.541747104247,
+            13569.718542417917
+          ]
+        }
+      },
+      "label": "Reticulum announce create",
+      "python": {
+        "iterations": 10000,
+        "mean_ns": 33700.516,
+        "p50_ns": 33238.0,
+        "p95_ns": 35776.0,
+        "p99_ns": 36450.0,
+        "sample_count": 10000,
+        "throughput_ops_per_sec": 30086.046091822613
+      },
+      "python_benchmark": "python_rns/announce_create",
+      "python_resources": {
+        "iterations_per_run": 15044,
+        "max_peak_rss_bytes": 40669184,
+        "mean_cpu_seconds_per_1k_ops": 0.04187716032969955,
+        "mean_peak_rss_bytes": 40589994.666666664,
+        "mean_sys_cpu_seconds": 0.03333333333333333,
+        "mean_user_cpu_seconds": 0.5966666666666667,
+        "median_cpu_seconds_per_1k_ops": 0.0412124434990694,
+        "median_peak_rss_bytes": 40669184,
+        "median_sys_cpu_seconds": 0.03,
+        "median_user_cpu_seconds": 0.6,
+        "runs": 3
+      },
+      "rust": {
+        "iterations": 206460,
+        "mean_ns": 13952.662656294257,
+        "p50_ns": 14101.594382361824,
+        "p95_ns": 14562.72972972973,
+        "p99_ns": 14800.641700404858,
+        "sample_count": 30,
+        "throughput_ops_per_sec": 70913.96709373467
+      },
+      "rust_advantage_vs_python": {
+        "mean_latency_reduction": 0.585980741176359,
+        "mean_speedup": 2.415346577937738,
+        "p50_latency_reduction": 0.5757387814440753,
+        "p50_speedup": 2.357038438261553,
+        "p95_latency_reduction": 0.5929469552289319,
+        "p95_speedup": 2.456682274818539,
+        "p99_latency_reduction": 0.5939467297556966,
+        "p99_speedup": 2.462731058410997,
+        "throughput_gain": 2.357038438261553
+      },
+      "rust_benchmark": "rns_core_announce_create",
+      "rust_resource_advantage_vs_python": {
+        "cpu_time_reduction": 0.6441450662183272,
+        "rss_reduction": 0.8437909155000504
+      },
+      "rust_resources": {
+        "iterations_per_run": 35457,
+        "max_peak_rss_bytes": 6410240,
+        "mean_cpu_seconds_per_1k_ops": 0.014571640766750335,
+        "mean_peak_rss_bytes": 6351530.666666667,
+        "mean_sys_cpu_seconds": 0.01,
+        "mean_user_cpu_seconds": 0.5066666666666667,
+        "median_cpu_seconds_per_1k_ops": 0.014665651352342273,
+        "median_peak_rss_bytes": 6352896,
+        "median_sys_cpu_seconds": 0.01,
+        "median_user_cpu_seconds": 0.51,
+        "runs": 3
+      }
+    },
+    {
+      "context": {
+        "batch_size": 1,
+        "payload_size_bytes": 22,
+        "workload_class": "protocol_core"
+      },
+      "dispersion": {
+        "python": {
+          "p50_mad_ns": 263.0,
+          "p50_relative_mad": 0.0030510086889943273,
+          "run_p50_ns": [
+            88329.0,
+            86464.0,
+            86201.0,
+            83505.0,
+            86197.0
+          ]
+        },
+        "rust": {
+          "p50_mad_ns": 2190.245225849736,
+          "p50_relative_mad": 0.06108519512295636,
+          "run_p50_ns": [
+            38045.827277131786,
+            38021.65882352941,
+            35855.58205128205,
+            33219.09533678756,
+            33282.70529683612
+          ]
+        }
+      },
+      "label": "Reticulum announce validate",
+      "python": {
+        "iterations": 10000,
+        "mean_ns": 87428.6747,
+        "p50_ns": 86201.0,
+        "p95_ns": 91774.0,
+        "p99_ns": 93523.0,
+        "sample_count": 10000,
+        "throughput_ops_per_sec": 11600.793494275007
+      },
+      "python_benchmark": "python_rns/announce_validate",
+      "python_resources": {
+        "iterations_per_run": 10000,
+        "max_peak_rss_bytes": 40075264,
+        "mean_cpu_seconds_per_1k_ops": 0.09533333333333334,
+        "mean_peak_rss_bytes": 39948288.0,
+        "mean_sys_cpu_seconds": 0.02,
+        "mean_user_cpu_seconds": 0.9333333333333332,
+        "median_cpu_seconds_per_1k_ops": 0.096,
+        "median_peak_rss_bytes": 40034304,
+        "median_sys_cpu_seconds": 0.02,
+        "median_user_cpu_seconds": 0.94,
+        "runs": 3
+      },
+      "rust": {
+        "iterations": 83700,
+        "mean_ns": 35978.523049751544,
+        "p50_ns": 35855.58205128205,
+        "p95_ns": 36505.51111111111,
+        "p99_ns": 36680.577203065135,
+        "sample_count": 30,
+        "throughput_ops_per_sec": 27889.660208827765
+      },
+      "rust_advantage_vs_python": {
+        "mean_latency_reduction": 0.5884814315988762,
+        "mean_speedup": 2.4300240056853517,
+        "p50_latency_reduction": 0.5840467970060434,
+        "p50_speedup": 2.404116599661162,
+        "p95_latency_reduction": 0.6022238203509588,
+        "p95_speedup": 2.513976580705014,
+        "p99_latency_reduction": 0.6077908407229757,
+        "p99_speedup": 2.549659987143958,
+        "throughput_gain": 2.4041165996611626
+      },
+      "rust_benchmark": "rns_core_announce_validate",
+      "rust_resource_advantage_vs_python": {
+        "cpu_time_reduction": 0.6115692601888371,
+        "rss_reduction": 0.8504194802537344
+      },
+      "rust_resources": {
+        "iterations_per_run": 13945,
+        "max_peak_rss_bytes": 6066176,
+        "mean_cpu_seconds_per_1k_ops": 0.03752838532329389,
+        "mean_peak_rss_bytes": 5948757.333333333,
+        "mean_sys_cpu_seconds": 0.0,
+        "mean_user_cpu_seconds": 0.5233333333333333,
+        "median_cpu_seconds_per_1k_ops": 0.03728935102187164,
+        "median_peak_rss_bytes": 5988352,
+        "median_sys_cpu_seconds": 0.0,
+        "median_user_cpu_seconds": 0.52,
+        "runs": 3
+      }
+    },
+    {
+      "context": {
+        "batch_size": 64,
+        "payload_size_bytes": 22,
+        "workload_class": "protocol_core"
+      },
+      "dispersion": {
+        "python": {
+          "p50_mad_ns": 62214.0,
+          "p50_relative_mad": 0.011379185276379732,
+          "run_p50_ns": [
+            5716248.0,
+            5470229.0,
+            5405137.0,
+            5467351.0,
+            5309545.0
+          ]
+        },
+        "rust": {
+          "p50_mad_ns": 42472.27443609014,
+          "p50_relative_mad": 0.018266414250654697,
+          "run_p50_ns": [
+            2425578.0,
+            2325156.6428571427,
+            2282684.3684210526,
+            2152080.25,
+            2350556.9111111113
+          ]
+        }
+      },
+      "label": "Reticulum announce validate batch 64",
+      "python": {
+        "iterations": 10000,
+        "mean_ns": 5496295.1204,
+        "p50_ns": 5467351.0,
+        "p95_ns": 5749268.0,
+        "p99_ns": 5820617.0,
+        "sample_count": 10000,
+        "throughput_ops_per_sec": 182.90393281865383
+      },
+      "python_benchmark": "python_rns/announce_validate_batch_64",
+      "python_resources": {
+        "iterations_per_run": 10000,
+        "max_peak_rss_bytes": 40353792,
+        "mean_cpu_seconds_per_1k_ops": 5.403333333333333,
+        "mean_peak_rss_bytes": 40082090.666666664,
+        "mean_sys_cpu_seconds": 0.04666666666666667,
+        "mean_user_cpu_seconds": 53.98666666666666,
+        "median_cpu_seconds_per_1k_ops": 5.345999999999999,
+        "median_peak_rss_bytes": 40128512,
+        "median_sys_cpu_seconds": 0.05,
+        "median_user_cpu_seconds": 53.41,
+        "runs": 3
+      },
+      "rust": {
+        "iterations": 1395,
+        "mean_ns": 2329017.8146257424,
+        "p50_ns": 2325156.6428571427,
+        "p95_ns": 2354294.714285714,
+        "p99_ns": 2363761.6666666665,
+        "sample_count": 30,
+        "throughput_ops_per_sec": 430.07855108256456
+      },
+      "rust_advantage_vs_python": {
+        "mean_latency_reduction": 0.5762567759541549,
+        "mean_speedup": 2.3599197420837323,
+        "p50_latency_reduction": 0.5747197056020104,
+        "p50_speedup": 2.3513903963398106,
+        "p95_latency_reduction": 0.5905053105394088,
+        "p95_speedup": 2.442034111156007,
+        "p99_latency_reduction": 0.5938984360821771,
+        "p99_speedup": 2.4624381899754417,
+        "throughput_gain": 2.3513903963398106
+      },
+      "rust_benchmark": "rns_core_announce_validate_batch_64",
+      "rust_resource_advantage_vs_python": {
+        "cpu_time_reduction": 0.579685746352413,
+        "rss_reduction": 0.8498519955088293
+      },
+      "rust_resources": {
+        "iterations_per_run": 10000,
+        "max_peak_rss_bytes": 6393856,
+        "mean_cpu_seconds_per_1k_ops": 2.2283333333333335,
+        "mean_peak_rss_bytes": 6146730.666666667,
+        "mean_sys_cpu_seconds": 0.0,
+        "mean_user_cpu_seconds": 22.28333333333333,
+        "median_cpu_seconds_per_1k_ops": 2.247,
+        "median_peak_rss_bytes": 6025216,
+        "median_sys_cpu_seconds": 0.0,
+        "median_user_cpu_seconds": 22.47,
+        "runs": 3
+      }
+    },
+    {
+      "context": {
+        "batch_size": 1,
+        "payload_size_bytes": 2048,
+        "workload_class": "protocol_core"
+      },
+      "dispersion": {
+        "python": {
+          "p50_mad_ns": 862.0,
+          "p50_relative_mad": 0.0267934850180281,
+          "run_p50_ns": [
+            33034.0,
+            32421.0,
+            31020.0,
+            32172.0,
+            30819.0
+          ]
+        },
+        "rust": {
+          "p50_mad_ns": 440.7336006381229,
+          "p50_relative_mad": 0.02353219041739471,
+          "run_p50_ns": [
+            19446.893474426808,
+            18346.235195530728,
+            18728.966272189347,
+            19169.69987282747,
+            17673.052125870767
+          ]
+        }
+      },
+      "label": "Reticulum identity sign",
+      "python": {
+        "iterations": 10000,
+        "mean_ns": 32551.144,
+        "p50_ns": 32172.0,
+        "p95_ns": 33811.0,
+        "p99_ns": 34878.0,
+        "sample_count": 10000,
+        "throughput_ops_per_sec": 31082.929255253013
+      },
+      "python_benchmark": "python_rns/identity_sign",
+      "python_resources": {
+        "iterations_per_run": 15542,
+        "max_peak_rss_bytes": 40615936,
+        "mean_cpu_seconds_per_1k_ops": 0.04032085102732381,
+        "mean_peak_rss_bytes": 40494421.333333336,
+        "mean_sys_cpu_seconds": 0.016666666666666666,
+        "mean_user_cpu_seconds": 0.61,
+        "median_cpu_seconds_per_1k_ops": 0.040535323639171277,
+        "median_peak_rss_bytes": 40464384,
+        "median_sys_cpu_seconds": 0.02,
+        "median_user_cpu_seconds": 0.61,
+        "runs": 3
+      },
+      "rust": {
+        "iterations": 157170,
+        "mean_ns": 18873.442969428495,
+        "p50_ns": 18728.966272189347,
+        "p95_ns": 19004.530486236177,
+        "p99_ns": 19150.201183431953,
+        "sample_count": 30,
+        "throughput_ops_per_sec": 53393.22979533049
+      },
+      "rust_advantage_vs_python": {
+        "mean_latency_reduction": 0.42019110082802325,
+        "mean_speedup": 1.7247061944514768,
+        "p50_latency_reduction": 0.4178488663375187,
+        "p50_speedup": 1.7177669889753724,
+        "p95_latency_reduction": 0.437918710294396,
+        "p95_speedup": 1.7791020948656031,
+        "p99_latency_reduction": 0.4509375198282025,
+        "p99_speedup": 1.8212863492094882,
+        "throughput_gain": 1.7177669889753726
+      },
+      "rust_benchmark": "rns_core_identity_sign",
+      "rust_resource_advantage_vs_python": {
+        "cpu_time_reduction": 0.519484681412988,
+        "rss_reduction": 0.8431015284947869
+      },
+      "rust_resources": {
+        "iterations_per_run": 26697,
+        "max_peak_rss_bytes": 6381568,
+        "mean_cpu_seconds_per_1k_ops": 0.019228128004395,
+        "mean_peak_rss_bytes": 6309205.333333333,
+        "mean_sys_cpu_seconds": 0.0,
+        "mean_user_cpu_seconds": 0.5133333333333333,
+        "median_cpu_seconds_per_1k_ops": 0.019477843952504025,
+        "median_peak_rss_bytes": 6348800,
+        "median_sys_cpu_seconds": 0.0,
+        "median_user_cpu_seconds": 0.52,
+        "runs": 3
+      }
+    },
+    {
+      "context": {
+        "batch_size": 1,
+        "payload_size_bytes": 2048,
+        "workload_class": "protocol_core"
+      },
+      "dispersion": {
+        "python": {
+          "p50_mad_ns": 685.0,
+          "p50_relative_mad": 0.009094530005310674,
+          "run_p50_ns": [
+            75371.0,
+            76005.0,
+            73790.0,
+            75320.0,
+            72125.0
+          ]
+        },
+        "rust": {
+          "p50_mad_ns": 324.52898036979605,
+          "p50_relative_mad": 0.009385366831689078,
+          "run_p50_ns": [
+            34210.1916690121,
+            34578.18817204301,
+            35302.742094861664,
+            34553.53064243449,
+            34902.717152412806
+          ]
+        }
+      },
+      "label": "Reticulum identity verify",
+      "python": {
+        "iterations": 10000,
+        "mean_ns": 76608.5384,
+        "p50_ns": 75320.0,
+        "p95_ns": 79376.0,
+        "p99_ns": 81293.0,
+        "sample_count": 10000,
+        "throughput_ops_per_sec": 13276.68613913967
+      },
+      "python_benchmark": "python_rns/identity_verify",
+      "python_resources": {
+        "iterations_per_run": 10000,
+        "max_peak_rss_bytes": 40419328,
+        "mean_cpu_seconds_per_1k_ops": 0.08800000000000001,
+        "mean_peak_rss_bytes": 40196778.666666664,
+        "mean_sys_cpu_seconds": 0.02666666666666667,
+        "mean_user_cpu_seconds": 0.8533333333333334,
+        "median_cpu_seconds_per_1k_ops": 0.089,
+        "median_peak_rss_bytes": 40275968,
+        "median_sys_cpu_seconds": 0.03,
+        "median_user_cpu_seconds": 0.86,
+        "runs": 3
+      },
+      "rust": {
+        "iterations": 85560,
+        "mean_ns": 34680.31800979658,
+        "p50_ns": 34578.18817204301,
+        "p95_ns": 35131.201726844585,
+        "p99_ns": 35368.54895104895,
+        "sample_count": 30,
+        "throughput_ops_per_sec": 28919.965240067588
+      },
+      "rust_advantage_vs_python": {
+        "mean_latency_reduction": 0.547304794816493,
+        "mean_speedup": 2.2089918085053153,
+        "p50_latency_reduction": 0.5409162483796732,
+        "p50_speedup": 2.1782517818818907,
+        "p95_latency_reduction": 0.5574077589341289,
+        "p95_speedup": 2.2594160204701144,
+        "p99_latency_reduction": 0.5649250371981727,
+        "p99_speedup": 2.298454486004268,
+        "throughput_gain": 2.1782517818818907
+      },
+      "rust_benchmark": "rns_core_identity_verify",
+      "rust_resource_advantage_vs_python": {
+        "cpu_time_reduction": 0.5881703886739087,
+        "rss_reduction": 0.8535543577748398
+      },
+      "rust_resources": {
+        "iterations_per_run": 14460,
+        "max_peak_rss_bytes": 5967872,
+        "mean_cpu_seconds_per_1k_ops": 0.03665283540802213,
+        "mean_peak_rss_bytes": 5909162.666666667,
+        "mean_sys_cpu_seconds": 0.0,
+        "mean_user_cpu_seconds": 0.53,
+        "median_cpu_seconds_per_1k_ops": 0.03665283540802213,
+        "median_peak_rss_bytes": 5898240,
+        "median_sys_cpu_seconds": 0.0,
+        "median_user_cpu_seconds": 0.53,
+        "runs": 3
+      }
+    },
+    {
+      "context": {
+        "batch_size": 1,
+        "payload_size_bytes": 2048,
+        "workload_class": "protocol_core"
+      },
+      "dispersion": {
+        "python": {
+          "p50_mad_ns": 612.0,
+          "p50_relative_mad": 0.008879474195841737,
+          "run_p50_ns": [
+            69535.0,
+            69053.0,
+            68923.0,
+            67956.0,
+            66598.0
+          ]
+        },
+        "rust": {
+          "p50_mad_ns": 572.0266160405808,
+          "p50_relative_mad": 0.010519915881984698,
+          "run_p50_ns": [
+            56926.43587416818,
+            53779.43891402715,
+            54112.82960048426,
+            54375.588403722264,
+            54947.615019762845
+          ]
+        }
+      },
+      "label": "Reticulum identity encrypt",
+      "python": {
+        "iterations": 10000,
+        "mean_ns": 69811.9612,
+        "p50_ns": 68923.0,
+        "p95_ns": 73138.0,
+        "p99_ns": 74521.0,
+        "sample_count": 10000,
+        "throughput_ops_per_sec": 14508.944764447282
+      },
+      "python_benchmark": "python_rns/identity_encrypt",
+      "python_resources": {
+        "iterations_per_run": 10000,
+        "max_peak_rss_bytes": 40230912,
+        "mean_cpu_seconds_per_1k_ops": 0.08133333333333335,
+        "mean_peak_rss_bytes": 40093013.333333336,
+        "mean_sys_cpu_seconds": 0.03,
+        "mean_user_cpu_seconds": 0.7833333333333333,
+        "median_cpu_seconds_per_1k_ops": 0.081,
+        "median_peak_rss_bytes": 40067072,
+        "median_sys_cpu_seconds": 0.03,
+        "median_user_cpu_seconds": 0.77,
+        "runs": 3
+      },
+      "rust": {
+        "iterations": 54870,
+        "mean_ns": 54837.65677695927,
+        "p50_ns": 54375.588403722264,
+        "p95_ns": 55470.27391304348,
+        "p99_ns": 55518.22782608696,
+        "sample_count": 30,
+        "throughput_ops_per_sec": 18390.60558895111
+      },
+      "rust_advantage_vs_python": {
+        "mean_latency_reduction": 0.21449482532286646,
+        "mean_speedup": 1.273066088216453,
+        "p50_latency_reduction": 0.21106759131607356,
+        "p50_speedup": 1.2675357090072776,
+        "p95_latency_reduction": 0.2415669841526501,
+        "p95_speedup": 1.3185080015046053,
+        "p99_latency_reduction": 0.2549988885537371,
+        "p99_speedup": 1.3422798766819426,
+        "throughput_gain": 1.2675357090072774
+      },
+      "rust_benchmark": "rns_core_identity_encrypt",
+      "rust_resource_advantage_vs_python": {
+        "cpu_time_reduction": 0.308641975308642,
+        "rss_reduction": 0.8539153547331834
+      },
+      "rust_resources": {
+        "iterations_per_run": 10000,
+        "max_peak_rss_bytes": 6250496,
+        "mean_cpu_seconds_per_1k_ops": 0.056,
+        "mean_peak_rss_bytes": 5967872.0,
+        "mean_sys_cpu_seconds": 0.0,
+        "mean_user_cpu_seconds": 0.56,
+        "median_cpu_seconds_per_1k_ops": 0.056,
+        "median_peak_rss_bytes": 5853184,
+        "median_sys_cpu_seconds": 0.0,
+        "median_user_cpu_seconds": 0.56,
+        "runs": 3
+      }
+    },
+    {
+      "context": {
+        "batch_size": 1,
+        "payload_size_bytes": 2048,
+        "workload_class": "protocol_core"
+      },
+      "dispersion": {
+        "python": {
+          "p50_mad_ns": 192.0,
+          "p50_relative_mad": 0.004844081138359067,
+          "run_p50_ns": [
+            40332.0,
+            39444.0,
+            39636.0,
+            39773.0,
+            38169.0
+          ]
+        },
+        "rust": {
+          "p50_mad_ns": 193.95310559005884,
+          "p50_relative_mad": 0.004874124142222519,
+          "run_p50_ns": [
+            41831.638392857145,
+            39986.35476190476,
+            39792.4016563147,
+            39787.13660714286,
+            37331.49273255814
+          ]
+        }
+      },
+      "label": "Reticulum identity decrypt",
+      "python": {
+        "iterations": 10000,
+        "mean_ns": 40258.072,
+        "p50_ns": 39636.0,
+        "p95_ns": 42044.0,
+        "p99_ns": 42900.0,
+        "sample_count": 10000,
+        "throughput_ops_per_sec": 25229.58926228681
+      },
+      "python_benchmark": "python_rns/identity_decrypt",
+      "python_resources": {
+        "iterations_per_run": 12615,
+        "max_peak_rss_bytes": 40325120,
+        "mean_cpu_seconds_per_1k_ops": 0.04967631126965253,
+        "mean_peak_rss_bytes": 40153088.0,
+        "mean_sys_cpu_seconds": 0.02666666666666667,
+        "mean_user_cpu_seconds": 0.6,
+        "median_cpu_seconds_per_1k_ops": 0.049147839873166864,
+        "median_peak_rss_bytes": 40112128,
+        "median_sys_cpu_seconds": 0.03,
+        "median_user_cpu_seconds": 0.6,
+        "runs": 3
+      },
+      "rust": {
+        "iterations": 74400,
+        "mean_ns": 39807.79103284977,
+        "p50_ns": 39792.4016563147,
+        "p95_ns": 40202.59489302967,
+        "p99_ns": 40226.58159232072,
+        "sample_count": 30,
+        "throughput_ops_per_sec": 25130.425869666225
+      },
+      "rust_advantage_vs_python": {
+        "mean_latency_reduction": 0.011184861688116388,
+        "mean_speedup": 1.0113113778852652,
+        "p50_latency_reduction": -0.003945949548761263,
+        "p50_speedup": 0.9960695597700904,
+        "p95_latency_reduction": 0.04379709606532034,
+        "p95_speedup": 1.0458031406149255,
+        "p99_latency_reduction": 0.06231744540044948,
+        "p99_speedup": 1.0664590005378343,
+        "throughput_gain": 0.9960695597700906
+      },
+      "rust_benchmark": "rns_core_identity_decrypt",
+      "rust_resource_advantage_vs_python": {
+        "cpu_time_reduction": 0.1742117747326375,
+        "rss_reduction": 0.8519350556519963
+      },
+      "rust_resources": {
+        "iterations_per_run": 12566,
+        "max_peak_rss_bytes": 5955584,
+        "mean_cpu_seconds_per_1k_ops": 0.04085097352644703,
+        "mean_peak_rss_bytes": 5936469.333333333,
+        "mean_sys_cpu_seconds": 0.0,
+        "mean_user_cpu_seconds": 0.5133333333333333,
+        "median_cpu_seconds_per_1k_ops": 0.04058570746458698,
+        "median_peak_rss_bytes": 5939200,
+        "median_sys_cpu_seconds": 0.0,
+        "median_user_cpu_seconds": 0.51,
+        "runs": 3
+      }
+    },
+    {
+      "context": {
+        "batch_size": 6,
+        "payload_size_bytes": null,
+        "workload_class": "transport_hotpath"
+      },
+      "dispersion": {
+        "python": {
+          "p50_mad_ns": 48.0,
+          "p50_relative_mad": 0.023762376237623763,
+          "run_p50_ns": [
+            2068.0,
+            2020.0,
+            1930.0,
+            2035.0,
+            1894.0
+          ]
+        },
+        "rust": {
+          "p50_mad_ns": 0.3079907143244007,
+          "p50_relative_mad": 0.014866317367469604,
+          "run_p50_ns": [
+            22.94450428627108,
+            20.717350955949883,
+            21.57169911276755,
+            20.41826129573973,
+            20.409360241625482
+          ]
+        }
+      },
+      "label": "Reticulum resource request window",
+      "python": {
+        "iterations": 10000,
+        "mean_ns": 2077.3736,
+        "p50_ns": 2020.0,
+        "p95_ns": 2198.0,
+        "p99_ns": 2270.0,
+        "sample_count": 10000,
+        "throughput_ops_per_sec": 495049.50495049503
+      },
+      "python_benchmark": "python_rns/resource_request_window",
+      "python_resources": {
+        "iterations_per_run": 247525,
+        "max_peak_rss_bytes": 51896320,
+        "mean_cpu_seconds_per_1k_ops": 0.0028549304784028554,
+        "mean_peak_rss_bytes": 51705173.333333336,
+        "mean_sys_cpu_seconds": 0.02666666666666667,
+        "mean_user_cpu_seconds": 0.68,
+        "median_cpu_seconds_per_1k_ops": 0.0028279971720028283,
+        "median_peak_rss_bytes": 51630080,
+        "median_sys_cpu_seconds": 0.03,
+        "median_user_cpu_seconds": 0.67,
+        "runs": 3
+      },
+      "rust": {
+        "iterations": 141323730,
+        "mean_ns": 21.292930074817356,
+        "p50_ns": 20.717350955949883,
+        "p95_ns": 22.281395178857753,
+        "p99_ns": 22.61937321113958,
+        "sample_count": 30,
+        "throughput_ops_per_sec": 48268719.399803706
+      },
+      "rust_advantage_vs_python": {
+        "mean_latency_reduction": 0.9897500718817177,
+        "mean_speedup": 97.56165979509134,
+        "p50_latency_reduction": 0.9897438856653713,
+        "p50_speedup": 97.5028131876035,
+        "p95_latency_reduction": 0.9898628775346416,
+        "p95_speedup": 98.64732357898423,
+        "p99_latency_reduction": 0.9900355184091896,
+        "p99_speedup": 100.35645014611065,
+        "throughput_gain": 97.5028131876035
+      },
+      "rust_benchmark": "rns_transport_resource_manager_request_window_reuse",
+      "rust_resource_advantage_vs_python": {
+        "cpu_time_reduction": 0.9745062049057266,
+        "rss_reduction": -1.0
+      },
+      "rust_resources": {
+        "iterations_per_run": 24134360,
+        "max_peak_rss_bytes": 372682752,
+        "mean_cpu_seconds_per_1k_ops": 7.182014908758025e-05,
+        "mean_peak_rss_bytes": 372494336.0,
+        "mean_sys_cpu_seconds": 0.16,
+        "mean_user_cpu_seconds": 1.5733333333333333,
+        "median_cpu_seconds_per_1k_ops": 7.20963804302248e-05,
+        "median_peak_rss_bytes": 372629504,
+        "median_sys_cpu_seconds": 0.16,
+        "median_user_cpu_seconds": 1.59,
+        "runs": 3
+      }
+    }
+  ],
+  "e2e_comparisons": [
+    {
+      "label": "Loopback TCP cold destination discovery",
+      "payload_size_bytes": 0,
+      "python": {
+        "bytes_per_second": 0.0,
+        "dispersion": {
+          "cpu_seconds": [
+            2.92,
+            3.4899999999999998,
+            1.8299999999999998,
+            1.74,
+            2.15
+          ],
+          "p50_relative_mad": 0.012207988338650447,
+          "peak_rss_bytes": [
+            84488192.0,
+            84611072.0,
+            84185088.0,
+            83972096.0,
+            84279296.0
+          ],
+          "samples_ns": [
+            2858139197.0,
+            2648703382.0,
+            2621980158.0,
+            2616368042.0,
+            2717256441.0
+          ],
+          "unstable_retry_performed": false
+        },
+        "median_cpu_seconds": 2.15,
+        "median_peak_rss_bytes": 84279296.0,
+        "messages_per_second": 0.3775432186162399,
+        "p50_ns": 2648703382.0,
+        "p95_ns": 2858139197.0,
+        "p99_ns": 2858139197.0,
+        "sample_count": 5
+      },
+      "route_state": "cold",
+      "rust": {
+        "bytes_per_second": 0.0,
+        "dispersion": {
+          "cpu_seconds": [
+            3.5,
+            2.2800000000000002,
+            2.19,
+            2.68,
+            2.2199999999999998
+          ],
+          "p50_relative_mad": 0.011799270049046177,
+          "peak_rss_bytes": [
+            84611072.0,
+            83914752.0,
+            84140032.0,
+            84094976.0,
+            84348928.0
+          ],
+          "samples_ns": [
+            400397651.0,
+            354065860.0,
+            369436328.0,
+            370720970.0,
+            365077249.0
+          ],
+          "unstable_retry_performed": false
+        },
+        "median_cpu_seconds": 2.2800000000000002,
+        "median_peak_rss_bytes": 84140032.0,
+        "messages_per_second": 2.7068263844372122,
+        "p50_ns": 369436328.0,
+        "p95_ns": 400397651.0,
+        "p99_ns": 400397651.0,
+        "sample_count": 5
+      },
+      "rust_p50_speedup_vs_python": 7.169580198945676,
+      "timed_boundary": "cold_path_request_to_route_available",
+      "topology": "two-node loopback TCP, one Rust and one pinned-Python endpoint"
+    },
+    {
+      "label": "Loopback TCP direct delivery",
+      "payload_size_bytes": 256,
+      "python": {
+        "bytes_per_second": 571.6072369673941,
+        "dispersion": {
+          "cpu_seconds": [
+            3.81,
+            1.53,
+            1.94,
+            1.51,
+            1.6099999999999999
+          ],
+          "p50_relative_mad": 0.017210415121494335,
+          "peak_rss_bytes": [
+            84303872.0,
+            84369408.0,
+            83914752.0,
+            84041728.0,
+            84008960.0
+          ],
+          "samples_ns": [
+            461804248.0,
+            447859970.0,
+            440152114.0,
+            449936340.0,
+            438184013.0
+          ],
+          "unstable_retry_performed": false
+        },
+        "median_cpu_seconds": 1.6099999999999999,
+        "median_peak_rss_bytes": 84041728.0,
+        "messages_per_second": 2.232840769403883,
+        "p50_ns": 447859970.0,
+        "p95_ns": 461804248.0,
+        "p99_ns": 461804248.0,
+        "sample_count": 5
+      },
+      "route_state": "warm",
+      "rust": {
+        "bytes_per_second": 498.21241676785036,
+        "dispersion": {
+          "cpu_seconds": [
+            5.22,
+            4.67,
+            5.4799999999999995,
+            4.79,
+            4.59
+          ],
+          "p50_relative_mad": 0.01644392896671856,
+          "peak_rss_bytes": [
+            84553728.0,
+            84684800.0,
+            83795968.0,
+            83955712.0,
+            84566016.0
+          ],
+          "samples_ns": [
+            522286553.0,
+            508320566.0,
+            489242855.0,
+            545518592.0,
+            513837053.0
+          ],
+          "unstable_retry_performed": false
+        },
+        "median_cpu_seconds": 4.79,
+        "median_peak_rss_bytes": 84553728.0,
+        "messages_per_second": 1.9461422529994155,
+        "p50_ns": 513837053.0,
+        "p95_ns": 545518592.0,
+        "p99_ns": 545518592.0,
+        "sample_count": 5
+      },
+      "rust_p50_speedup_vs_python": 0.8715992110440506,
+      "timed_boundary": "enqueue_to_receiver_evidence",
+      "topology": "two-node loopback TCP, one Rust and one pinned-Python endpoint"
+    },
+    {
+      "label": "Loopback TCP opportunistic delivery",
+      "payload_size_bytes": 256,
+      "python": {
+        "bytes_per_second": 494.9483339964642,
+        "dispersion": {
+          "cpu_seconds": [
+            3.12,
+            3.1,
+            2.11,
+            1.63,
+            3.64
+          ],
+          "p50_relative_mad": 0.1677110930428761,
+          "peak_rss_bytes": [
+            84594688.0,
+            84209664.0,
+            83812352.0,
+            84484096.0,
+            84656128.0
+          ],
+          "samples_ns": [
+            517225703.0,
+            532805806.0,
+            430481215.0,
+            430267866.0,
+            748352295.0
+          ],
+          "unstable_retry_performed": false
+        },
+        "median_cpu_seconds": 3.1,
+        "median_peak_rss_bytes": 84484096.0,
+        "messages_per_second": 1.9333919296736883,
+        "p50_ns": 517225703.0,
+        "p95_ns": 748352295.0,
+        "p99_ns": 748352295.0,
+        "sample_count": 5
+      },
+      "route_state": "warm",
+      "rust": {
+        "bytes_per_second": 392.4593750966872,
+        "dispersion": {
+          "cpu_seconds": [
+            6.86,
+            5.279999999999999,
+            4.4,
+            7.08,
+            8.5,
+            6.07
+          ],
+          "p50_relative_mad": 0.1819100238622352,
+          "peak_rss_bytes": [
+            84398080.0,
+            84459520.0,
+            84430848.0,
+            84516864.0,
+            84340736.0,
+            84516864.0
+          ],
+          "samples_ns": [
+            1220021977.0,
+            519966961.0,
+            547308009.0,
+            1565549196.0,
+            730941118.0,
+            573652510.0
+          ],
+          "unstable_retry_performed": true
+        },
+        "median_cpu_seconds": 6.465,
+        "median_peak_rss_bytes": 84445184.0,
+        "messages_per_second": 1.5330444339714344,
+        "p50_ns": 652296814.0,
+        "p95_ns": 1565549196.0,
+        "p99_ns": 1565549196.0,
+        "sample_count": 6
+      },
+      "rust_p50_speedup_vs_python": 0.7929299850911122,
+      "timed_boundary": "enqueue_to_receiver_evidence",
+      "topology": "two-node loopback TCP, one Rust and one pinned-Python endpoint"
+    },
+    {
+      "label": "Loopback TCP propagated delivery",
+      "payload_size_bytes": 256,
+      "python": {
+        "bytes_per_second": 32.57641062559078,
+        "dispersion": {
+          "cpu_seconds": [
+            2.41,
+            6.48,
+            18.209999999999997,
+            9.17,
+            2.4299999999999997
+          ],
+          "p50_relative_mad": 0.0006641740951631412,
+          "peak_rss_bytes": [
+            84099072.0,
+            83787776.0,
+            84283392.0,
+            83922944.0,
+            84541440.0
+          ],
+          "samples_ns": [
+            7873640434.0,
+            7870970984.0,
+            7853227735.0,
+            7858447112.0,
+            7853591135.0
+          ],
+          "unstable_retry_performed": false
+        },
+        "median_cpu_seconds": 6.48,
+        "median_peak_rss_bytes": 84099072.0,
+        "messages_per_second": 0.127251604006214,
+        "p50_ns": 7858447112.0,
+        "p95_ns": 7873640434.0,
+        "p99_ns": 7873640434.0,
+        "sample_count": 5
+      },
+      "route_state": "warm",
+      "rust": {
+        "bytes_per_second": 354.9590134096139,
+        "dispersion": {
+          "cpu_seconds": [
+            6.3500000000000005,
+            3.57,
+            3.4400000000000004,
+            3.31,
+            3.16
+          ],
+          "p50_relative_mad": 0.0349242426229825,
+          "peak_rss_bytes": [
+            84598784.0,
+            84463616.0,
+            84238336.0,
+            84353024.0,
+            84201472.0
+          ],
+          "samples_ns": [
+            890081300.0,
+            699649865.0,
+            721210028.0,
+            746397742.0,
+            649226022.0
+          ],
+          "unstable_retry_performed": false
+        },
+        "median_cpu_seconds": 3.4400000000000004,
+        "median_peak_rss_bytes": 84353024.0,
+        "messages_per_second": 1.3865586461313042,
+        "p50_ns": 721210028.0,
+        "p95_ns": 890081300.0,
+        "p99_ns": 890081300.0,
+        "sample_count": 5
+      },
+      "rust_p50_speedup_vs_python": 10.896197788309177,
+      "timed_boundary": "enqueue_to_receiver_evidence",
+      "topology": "two-node loopback TCP, one Rust and one pinned-Python endpoint"
+    },
+    {
+      "label": "Loopback TCP resource delivery",
+      "payload_size_bytes": 16384,
+      "python": {
+        "bytes_per_second": 20049.25942980677,
+        "dispersion": {
+          "cpu_seconds": [
+            1.87,
+            1.9,
+            1.87,
+            1.8900000000000001,
+            1.8699999999999999
+          ],
+          "p50_relative_mad": 0.005676043975578666,
+          "peak_rss_bytes": [
+            83767296.0,
+            84291584.0,
+            84393984.0,
+            84430848.0,
+            84013056.0
+          ],
+          "samples_ns": [
+            819538420.0,
+            836281710.0,
+            812548900.0,
+            817187291.0,
+            799598512.0
+          ],
+          "unstable_retry_performed": false
+        },
+        "median_cpu_seconds": 1.87,
+        "median_peak_rss_bytes": 84291584.0,
+        "messages_per_second": 1.2237096819950422,
+        "p50_ns": 817187291.0,
+        "p95_ns": 836281710.0,
+        "p99_ns": 836281710.0,
+        "sample_count": 5
+      },
+      "route_state": "warm",
+      "rust": {
+        "bytes_per_second": 31928.573100472986,
+        "dispersion": {
+          "cpu_seconds": [
+            4.6899999999999995,
+            4.67,
+            4.67,
+            4.66,
+            4.86
+          ],
+          "p50_relative_mad": 0.00989740944509358,
+          "peak_rss_bytes": [
+            84307968.0,
+            84574208.0,
+            84135936.0,
+            84574208.0,
+            84258816.0
+          ],
+          "samples_ns": [
+            524796289.0,
+            510351129.0,
+            508066577.0,
+            513145387.0,
+            596142775.0
+          ],
+          "unstable_retry_performed": false
+        },
+        "median_cpu_seconds": 4.67,
+        "median_peak_rss_bytes": 84307968.0,
+        "messages_per_second": 1.9487654480269156,
+        "p50_ns": 513145387.0,
+        "p95_ns": 596142775.0,
+        "p99_ns": 596142775.0,
+        "sample_count": 5
+      },
+      "rust_p50_speedup_vs_python": 1.5925063572675164,
+      "timed_boundary": "enqueue_to_receiver_evidence",
+      "topology": "two-node loopback TCP, one Rust and one pinned-Python endpoint"
+    }
+  ],
+  "e2e_profile": "report",
+  "e2e_runs": 5,
+  "environment": {
+    "benchmark_config_path": "tools/benchmarks/python_impl.toml",
+    "cargo_version": "cargo 1.96.0 (30a34c682 2026-05-25)",
+    "cpu": "Intel(R) Core(TM) Ultra 7 165H",
+    "git_commit": "4b866454b5b1cd41e1c75983a199e5e0d0f45275",
+    "python_lxmf_module": "/home/pgiuseppe/Documents/LXMF-rs/target/python-references/LXMF/LXMF/__init__.py",
+    "python_lxmf_revision": "727830cefda83d9c6e3982b48675425f3f988f9c",
+    "python_rns_module": "/home/pgiuseppe/Documents/LXMF-rs/target/python-references/Reticulum/RNS/__init__.py",
+    "python_rns_revision": "15320e4d2cfabb143c1db20ca887e275fd521585",
+    "python_version": "Python 3.14.4",
+    "rustc_version": "rustc 1.96.0 (ac68faa20 2026-05-25)",
+    "timestamp_utc": "2026-07-16T13:58:22Z",
+    "uname": "Linux pgiuseppe-AI 7.0.0-27-generic #27-Ubuntu SMP PREEMPT_DYNAMIC Thu Jun 18 19:13:49 UTC 2026 x86_64 GNU/Linux"
+  },
+  "profile": "report",
+  "python_lxmf_revision": "727830cefda83d9c6e3982b48675425f3f988f9c",
+  "python_rns_revision": "15320e4d2cfabb143c1db20ca887e275fd521585",
+  "resource_iterations": 10000,
+  "resource_runs": 3,
+  "sdk_transport_comparisons": [
+    {
+      "http_p50_ns": 188929.0,
+      "http_p95_ns": 345290.0,
+      "http_unix_p50_ns": 188929.0,
+      "http_unix_p50_relative_mad": 0.06520968194401071,
+      "http_unix_p95_ns": 345290.0,
+      "iterations_per_run": 10,
+      "operation": "negotiate",
+      "raw_runs": {
+        "http": [
+          {
+            "iterations": 10,
+            "operation": "negotiate",
+            "p50_ns": 205692.0,
+            "p95_ns": 443521.0,
+            "p99_ns": 443521.0,
+            "samples_ns": [
+              155083.0,
+              156956.0,
+              169389.0,
+              170902.0,
+              177121.0,
+              205692.0,
+              223280.0,
+              236075.0,
+              259520.0,
+              443521.0
+            ],
+            "transport": "http"
+          },
+          {
+            "iterations": 10,
+            "operation": "negotiate",
+            "p50_ns": 201249.0,
+            "p95_ns": 281235.0,
+            "p99_ns": 281235.0,
+            "samples_ns": [
+              143965.0,
+              153295.0,
+              162664.0,
+              185216.0,
+              198823.0,
+              201249.0,
+              232232.0,
+              232790.0,
+              235442.0,
+              281235.0
+            ],
+            "transport": "http"
+          },
+          {
+            "iterations": 10,
+            "operation": "negotiate",
+            "p50_ns": 188929.0,
+            "p95_ns": 345290.0,
+            "p99_ns": 345290.0,
+            "samples_ns": [
+              151684.0,
+              157325.0,
+              158104.0,
+              166110.0,
+              177802.0,
+              188929.0,
+              200735.0,
+              219255.0,
+              286353.0,
+              345290.0
+            ],
+            "transport": "http"
+          },
+          {
+            "iterations": 10,
+            "operation": "negotiate",
+            "p50_ns": 144218.0,
+            "p95_ns": 347037.0,
+            "p99_ns": 347037.0,
+            "samples_ns": [
+              130367.0,
+              130739.0,
+              132629.0,
+              137456.0,
+              144204.0,
+              144218.0,
+              149168.0,
+              158321.0,
+              174838.0,
+              347037.0
+            ],
+            "transport": "http"
+          },
+          {
+            "iterations": 10,
+            "operation": "negotiate",
+            "p50_ns": 184378.0,
+            "p95_ns": 279739.0,
+            "p99_ns": 279739.0,
+            "samples_ns": [
+              151223.0,
+              160660.0,
+              169455.0,
+              171190.0,
+              177224.0,
+              184378.0,
+              188380.0,
+              190292.0,
+              203107.0,
+              279739.0
+            ],
+            "transport": "http"
+          }
+        ],
+        "unix": [
+          {
+            "iterations": 10,
+            "operation": "negotiate",
+            "p50_ns": 226426.0,
+            "p95_ns": 355936.0,
+            "p99_ns": 355936.0,
+            "samples_ns": [
+              128422.0,
+              143681.0,
+              143788.0,
+              145604.0,
+              162236.0,
+              226426.0,
+              249708.0,
+              261015.0,
+              281879.0,
+              355936.0
+            ],
+            "transport": "unix"
+          },
+          {
+            "iterations": 10,
+            "operation": "negotiate",
+            "p50_ns": 115573.0,
+            "p95_ns": 164568.0,
+            "p99_ns": 164568.0,
+            "samples_ns": [
+              100798.0,
+              104971.0,
+              107477.0,
+              109620.0,
+              110959.0,
+              115573.0,
+              116748.0,
+              120274.0,
+              126055.0,
+              164568.0
+            ],
+            "transport": "unix"
+          },
+          {
+            "iterations": 10,
+            "operation": "negotiate",
+            "p50_ns": 92957.0,
+            "p95_ns": 245854.0,
+            "p99_ns": 245854.0,
+            "samples_ns": [
+              78195.0,
+              78772.0,
+              84152.0,
+              84891.0,
+              92469.0,
+              92957.0,
+              94340.0,
+              123749.0,
+              224482.0,
+              245854.0
+            ],
+            "transport": "unix"
+          },
+          {
+            "iterations": 10,
+            "operation": "negotiate",
+            "p50_ns": 109686.0,
+            "p95_ns": 165506.0,
+            "p99_ns": 165506.0,
+            "samples_ns": [
+              104266.0,
+              106053.0,
+              106089.0,
+              106229.0,
+              107727.0,
+              109686.0,
+              118374.0,
+              120118.0,
+              125840.0,
+              165506.0
+            ],
+            "transport": "unix"
+          },
+          {
+            "iterations": 10,
+            "operation": "negotiate",
+            "p50_ns": 117522.0,
+            "p95_ns": 173713.0,
+            "p99_ns": 173713.0,
+            "samples_ns": [
+              96269.0,
+              112368.0,
+              115770.0,
+              116079.0,
+              117338.0,
+              117522.0,
+              118165.0,
+              120912.0,
+              126430.0,
+              173713.0
+            ],
+            "transport": "unix"
+          }
+        ],
+        "zmq": [
+          {
+            "iterations": 10,
+            "operation": "negotiate",
+            "p50_ns": 222329.0,
+            "p95_ns": 776557.0,
+            "p99_ns": 776557.0,
+            "samples_ns": [
+              84459.0,
+              104314.0,
+              119875.0,
+              205600.0,
+              222021.0,
+              222329.0,
+              245112.0,
+              279799.0,
+              447047.0,
+              776557.0
+            ],
+            "transport": "zmq"
+          },
+          {
+            "iterations": 10,
+            "operation": "negotiate",
+            "p50_ns": 197322.0,
+            "p95_ns": 279935.0,
+            "p99_ns": 279935.0,
+            "samples_ns": [
+              71857.0,
+              73121.0,
+              78068.0,
+              178136.0,
+              195957.0,
+              197322.0,
+              204460.0,
+              221351.0,
+              222407.0,
+              279935.0
+            ],
+            "transport": "zmq"
+          },
+          {
+            "iterations": 10,
+            "operation": "negotiate",
+            "p50_ns": 222279.0,
+            "p95_ns": 637927.0,
+            "p99_ns": 637927.0,
+            "samples_ns": [
+              87236.0,
+              98889.0,
+              99152.0,
+              198482.0,
+              201671.0,
+              222279.0,
+              236892.0,
+              271994.0,
+              369436.0,
+              637927.0
+            ],
+            "transport": "zmq"
+          },
+          {
+            "iterations": 10,
+            "operation": "negotiate",
+            "p50_ns": 196928.0,
+            "p95_ns": 322065.0,
+            "p99_ns": 322065.0,
+            "samples_ns": [
+              75853.0,
+              79099.0,
+              91966.0,
+              183437.0,
+              186839.0,
+              196928.0,
+              204973.0,
+              215733.0,
+              233406.0,
+              322065.0
+            ],
+            "transport": "zmq"
+          },
+          {
+            "iterations": 10,
+            "operation": "negotiate",
+            "p50_ns": 206859.0,
+            "p95_ns": 254787.0,
+            "p99_ns": 254787.0,
+            "samples_ns": [
+              77194.0,
+              81686.0,
+              84151.0,
+              171246.0,
+              187192.0,
+              206859.0,
+              213753.0,
+              222989.0,
+              244299.0,
+              254787.0
+            ],
+            "transport": "zmq"
+          }
+        ]
+      },
+      "runs": 5,
+      "unix_p50_ns": 115573.0,
+      "unix_p50_relative_mad": 0.05093750270391874,
+      "unix_p95_ns": 173713.0,
+      "zmq_p50_ns": 206859.0,
+      "zmq_p50_relative_mad": 0.048008546884592884,
+      "zmq_p95_ns": 322065.0
+    },
+    {
+      "automatic_retry": true,
+      "http_p50_ns": 193383.0,
+      "http_p95_ns": 414689.0,
+      "http_unix_p50_ns": 193383.0,
+      "http_unix_p50_relative_mad": 0.1350584074091311,
+      "http_unix_p95_ns": 414689.0,
+      "iterations_per_run": 10,
+      "operation": "snapshot",
+      "raw_runs": {
+        "http": [
+          {
+            "iterations": 10,
+            "operation": "snapshot",
+            "p50_ns": 212253.0,
+            "p95_ns": 385246.0,
+            "p99_ns": 385246.0,
+            "samples_ns": [
+              178996.0,
+              184646.0,
+              189879.0,
+              191932.0,
+              197738.0,
+              212253.0,
+              216314.0,
+              229373.0,
+              373508.0,
+              385246.0
+            ],
+            "transport": "http"
+          },
+          {
+            "iterations": 10,
+            "operation": "snapshot",
+            "p50_ns": 127044.0,
+            "p95_ns": 414689.0,
+            "p99_ns": 414689.0,
+            "samples_ns": [
+              112855.0,
+              116717.0,
+              120451.0,
+              120710.0,
+              121369.0,
+              127044.0,
+              134247.0,
+              179871.0,
+              191441.0,
+              414689.0
+            ],
+            "transport": "http"
+          },
+          {
+            "iterations": 10,
+            "operation": "snapshot",
+            "p50_ns": 193383.0,
+            "p95_ns": 767415.0,
+            "p99_ns": 767415.0,
+            "samples_ns": [
+              139208.0,
+              147039.0,
+              173291.0,
+              180213.0,
+              189144.0,
+              193383.0,
+              206312.0,
+              219841.0,
+              390847.0,
+              767415.0
+            ],
+            "transport": "http"
+          },
+          {
+            "iterations": 10,
+            "operation": "snapshot",
+            "p50_ns": 146740.0,
+            "p95_ns": 223403.0,
+            "p99_ns": 223403.0,
+            "samples_ns": [
+              120714.0,
+              121111.0,
+              125188.0,
+              128479.0,
+              129798.0,
+              146740.0,
+              148277.0,
+              153215.0,
+              173131.0,
+              223403.0
+            ],
+            "transport": "http"
+          },
+          {
+            "iterations": 10,
+            "operation": "snapshot",
+            "p50_ns": 219501.0,
+            "p95_ns": 609223.0,
+            "p99_ns": 609223.0,
+            "samples_ns": [
+              183912.0,
+              197438.0,
+              198870.0,
+              207900.0,
+              218768.0,
+              219501.0,
+              309187.0,
+              359130.0,
+              368775.0,
+              609223.0
+            ],
+            "transport": "http"
+          }
+        ],
+        "unix": [
+          {
+            "iterations": 10,
+            "operation": "snapshot",
+            "p50_ns": 154421.0,
+            "p95_ns": 328811.0,
+            "p99_ns": 328811.0,
+            "samples_ns": [
+              134008.0,
+              137816.0,
+              143950.0,
+              145026.0,
+              146943.0,
+              154421.0,
+              174399.0,
+              198323.0,
+              321654.0,
+              328811.0
+            ],
+            "transport": "unix"
+          },
+          {
+            "iterations": 10,
+            "operation": "snapshot",
+            "p50_ns": 94208.0,
+            "p95_ns": 145752.0,
+            "p99_ns": 145752.0,
+            "samples_ns": [
+              83490.0,
+              84734.0,
+              88028.0,
+              89430.0,
+              92057.0,
+              94208.0,
+              96571.0,
+              99870.0,
+              109156.0,
+              145752.0
+            ],
+            "transport": "unix"
+          },
+          {
+            "iterations": 10,
+            "operation": "snapshot",
+            "p50_ns": 177720.0,
+            "p95_ns": 435942.0,
+            "p99_ns": 435942.0,
+            "samples_ns": [
+              129635.0,
+              132681.0,
+              134402.0,
+              142743.0,
+              159855.0,
+              177720.0,
+              185964.0,
+              194825.0,
+              216005.0,
+              435942.0
+            ],
+            "transport": "unix"
+          },
+          {
+            "iterations": 10,
+            "operation": "snapshot",
+            "p50_ns": 137012.0,
+            "p95_ns": 188944.0,
+            "p99_ns": 188944.0,
+            "samples_ns": [
+              113551.0,
+              113751.0,
+              118283.0,
+              121223.0,
+              122370.0,
+              137012.0,
+              137282.0,
+              139248.0,
+              154517.0,
+              188944.0
+            ],
+            "transport": "unix"
+          },
+          {
+            "iterations": 10,
+            "operation": "snapshot",
+            "p50_ns": 251892.0,
+            "p95_ns": 360396.0,
+            "p99_ns": 360396.0,
+            "samples_ns": [
+              168615.0,
+              168697.0,
+              191288.0,
+              208451.0,
+              222996.0,
+              251892.0,
+              265559.0,
+              267244.0,
+              319200.0,
+              360396.0
+            ],
+            "transport": "unix"
+          }
+        ],
+        "zmq": [
+          {
+            "iterations": 10,
+            "operation": "snapshot",
+            "p50_ns": 254896.0,
+            "p95_ns": 896271.0,
+            "p99_ns": 896271.0,
+            "samples_ns": [
+              96837.0,
+              97156.0,
+              102936.0,
+              229555.0,
+              240592.0,
+              254896.0,
+              256542.0,
+              286126.0,
+              544855.0,
+              896271.0
+            ],
+            "transport": "zmq"
+          },
+          {
+            "iterations": 10,
+            "operation": "snapshot",
+            "p50_ns": 221634.0,
+            "p95_ns": 293439.0,
+            "p99_ns": 293439.0,
+            "samples_ns": [
+              92253.0,
+              105837.0,
+              123300.0,
+              159123.0,
+              181339.0,
+              221634.0,
+              235667.0,
+              248199.0,
+              249260.0,
+              293439.0
+            ],
+            "transport": "zmq"
+          },
+          {
+            "iterations": 10,
+            "operation": "snapshot",
+            "p50_ns": 238521.0,
+            "p95_ns": 347611.0,
+            "p99_ns": 347611.0,
+            "samples_ns": [
+              72402.0,
+              83980.0,
+              90370.0,
+              230360.0,
+              231277.0,
+              238521.0,
+              245698.0,
+              257311.0,
+              260160.0,
+              347611.0
+            ],
+            "transport": "zmq"
+          },
+          {
+            "iterations": 10,
+            "operation": "snapshot",
+            "p50_ns": 358971.0,
+            "p95_ns": 891300.0,
+            "p99_ns": 891300.0,
+            "samples_ns": [
+              138053.0,
+              143394.0,
+              163668.0,
+              256353.0,
+              268016.0,
+              358971.0,
+              628182.0,
+              670631.0,
+              851333.0,
+              891300.0
+            ],
+            "transport": "zmq"
+          },
+          {
+            "iterations": 10,
+            "operation": "snapshot",
+            "p50_ns": 411990.0,
+            "p95_ns": 618006.0,
+            "p99_ns": 618006.0,
+            "samples_ns": [
+              92653.0,
+              97634.0,
+              100961.0,
+              228038.0,
+              322808.0,
+              411990.0,
+              448459.0,
+              489291.0,
+              549863.0,
+              618006.0
+            ],
+            "transport": "zmq"
+          }
+        ]
+      },
+      "runs": 5,
+      "unix_p50_ns": 154421.0,
+      "unix_p50_relative_mad": 0.15087973785948802,
+      "unix_p95_ns": 328811.0,
+      "zmq_p50_ns": 254896.0,
+      "zmq_p50_relative_mad": 0.13049243613081413,
+      "zmq_p95_ns": 618006.0
+    },
+    {
+      "http_p50_ns": 257420.0,
+      "http_p95_ns": 412488.0,
+      "http_unix_p50_ns": 257420.0,
+      "http_unix_p50_relative_mad": 0.03213814000466164,
+      "http_unix_p95_ns": 412488.0,
+      "iterations_per_run": 10,
+      "operation": "status",
+      "raw_runs": {
+        "http": [
+          {
+            "iterations": 10,
+            "operation": "status",
+            "p50_ns": 259157.0,
+            "p95_ns": 504610.0,
+            "p99_ns": 504610.0,
+            "samples_ns": [
+              116306.0,
+              131036.0,
+              139537.0,
+              142766.0,
+              178288.0,
+              259157.0,
+              275403.0,
+              315903.0,
+              413279.0,
+              504610.0
+            ],
+            "transport": "http"
+          },
+          {
+            "iterations": 10,
+            "operation": "status",
+            "p50_ns": 265693.0,
+            "p95_ns": 482582.0,
+            "p99_ns": 482582.0,
+            "samples_ns": [
+              136895.0,
+              150565.0,
+              154821.0,
+              154952.0,
+              169145.0,
+              265693.0,
+              277310.0,
+              298159.0,
+              299117.0,
+              482582.0
+            ],
+            "transport": "http"
+          },
+          {
+            "iterations": 10,
+            "operation": "status",
+            "p50_ns": 123500.0,
+            "p95_ns": 234471.0,
+            "p99_ns": 234471.0,
+            "samples_ns": [
+              107282.0,
+              108450.0,
+              111110.0,
+              112286.0,
+              113886.0,
+              123500.0,
+              127353.0,
+              135909.0,
+              212688.0,
+              234471.0
+            ],
+            "transport": "http"
+          },
+          {
+            "iterations": 10,
+            "operation": "status",
+            "p50_ns": 257420.0,
+            "p95_ns": 412488.0,
+            "p99_ns": 412488.0,
+            "samples_ns": [
+              130054.0,
+              152527.0,
+              156820.0,
+              198205.0,
+              199461.0,
+              257420.0,
+              275141.0,
+              287042.0,
+              321983.0,
+              412488.0
+            ],
+            "transport": "http"
+          },
+          {
+            "iterations": 10,
+            "operation": "status",
+            "p50_ns": 175787.0,
+            "p95_ns": 303038.0,
+            "p99_ns": 303038.0,
+            "samples_ns": [
+              105769.0,
+              117037.0,
+              127080.0,
+              136211.0,
+              142095.0,
+              175787.0,
+              184913.0,
+              228984.0,
+              231277.0,
+              303038.0
+            ],
+            "transport": "http"
+          }
+        ],
+        "unix": [
+          {
+            "iterations": 10,
+            "operation": "status",
+            "p50_ns": 67522.0,
+            "p95_ns": 123130.0,
+            "p99_ns": 123130.0,
+            "samples_ns": [
+              61051.0,
+              62627.0,
+              63860.0,
+              66324.0,
+              66551.0,
+              67522.0,
+              67924.0,
+              76126.0,
+              79801.0,
+              123130.0
+            ],
+            "transport": "unix"
+          },
+          {
+            "iterations": 10,
+            "operation": "status",
+            "p50_ns": 93220.0,
+            "p95_ns": 141127.0,
+            "p99_ns": 141127.0,
+            "samples_ns": [
+              76988.0,
+              80596.0,
+              82664.0,
+              83627.0,
+              87796.0,
+              93220.0,
+              95772.0,
+              97884.0,
+              101496.0,
+              141127.0
+            ],
+            "transport": "unix"
+          },
+          {
+            "iterations": 10,
+            "operation": "status",
+            "p50_ns": 94153.0,
+            "p95_ns": 294421.0,
+            "p99_ns": 294421.0,
+            "samples_ns": [
+              77285.0,
+              77778.0,
+              77814.0,
+              87406.0,
+              88340.0,
+              94153.0,
+              102124.0,
+              105917.0,
+              230479.0,
+              294421.0
+            ],
+            "transport": "unix"
+          },
+          {
+            "iterations": 10,
+            "operation": "status",
+            "p50_ns": 132236.0,
+            "p95_ns": 361224.0,
+            "p99_ns": 361224.0,
+            "samples_ns": [
+              93117.0,
+              98697.0,
+              102985.0,
+              108121.0,
+              114591.0,
+              132236.0,
+              139963.0,
+              235562.0,
+              261029.0,
+              361224.0
+            ],
+            "transport": "unix"
+          },
+          {
+            "iterations": 10,
+            "operation": "status",
+            "p50_ns": 97396.0,
+            "p95_ns": 156521.0,
+            "p99_ns": 156521.0,
+            "samples_ns": [
+              83231.0,
+              84441.0,
+              89800.0,
+              91615.0,
+              91864.0,
+              97396.0,
+              99328.0,
+              106248.0,
+              120741.0,
+              156521.0
+            ],
+            "transport": "unix"
+          }
+        ],
+        "zmq": [
+          {
+            "iterations": 10,
+            "operation": "status",
+            "p50_ns": 228053.0,
+            "p95_ns": 339826.0,
+            "p99_ns": 339826.0,
+            "samples_ns": [
+              97962.0,
+              101998.0,
+              188362.0,
+              195695.0,
+              226192.0,
+              228053.0,
+              232670.0,
+              244426.0,
+              247040.0,
+              339826.0
+            ],
+            "transport": "zmq"
+          },
+          {
+            "iterations": 10,
+            "operation": "status",
+            "p50_ns": 197534.0,
+            "p95_ns": 451825.0,
+            "p99_ns": 451825.0,
+            "samples_ns": [
+              74379.0,
+              81236.0,
+              87133.0,
+              189311.0,
+              189710.0,
+              197534.0,
+              203503.0,
+              225271.0,
+              386089.0,
+              451825.0
+            ],
+            "transport": "zmq"
+          },
+          {
+            "iterations": 10,
+            "operation": "status",
+            "p50_ns": 208149.0,
+            "p95_ns": 675974.0,
+            "p99_ns": 675974.0,
+            "samples_ns": [
+              79895.0,
+              80546.0,
+              81139.0,
+              178818.0,
+              186566.0,
+              208149.0,
+              228418.0,
+              298282.0,
+              562459.0,
+              675974.0
+            ],
+            "transport": "zmq"
+          },
+          {
+            "iterations": 10,
+            "operation": "status",
+            "p50_ns": 217569.0,
+            "p95_ns": 296353.0,
+            "p99_ns": 296353.0,
+            "samples_ns": [
+              80974.0,
+              89069.0,
+              94557.0,
+              206454.0,
+              216844.0,
+              217569.0,
+              224561.0,
+              250935.0,
+              293154.0,
+              296353.0
+            ],
+            "transport": "zmq"
+          },
+          {
+            "iterations": 10,
+            "operation": "status",
+            "p50_ns": 197409.0,
+            "p95_ns": 300411.0,
+            "p99_ns": 300411.0,
+            "samples_ns": [
+              74152.0,
+              78088.0,
+              83712.0,
+              185466.0,
+              187365.0,
+              197409.0,
+              202571.0,
+              203611.0,
+              215834.0,
+              300411.0
+            ],
+            "transport": "zmq"
+          }
+        ]
+      },
+      "runs": 5,
+      "unix_p50_ns": 94153.0,
+      "unix_p50_relative_mad": 0.03444393699616582,
+      "unix_p95_ns": 156521.0,
+      "zmq_p50_ns": 208149.0,
+      "zmq_p50_relative_mad": 0.050997122253770136,
+      "zmq_p95_ns": 339826.0
+    },
+    {
+      "automatic_retry": true,
+      "http_p50_ns": 135498.0,
+      "http_p95_ns": 381803.0,
+      "http_unix_p50_ns": 135498.0,
+      "http_unix_p50_relative_mad": 0.18477763509424494,
+      "http_unix_p95_ns": 381803.0,
+      "iterations_per_run": 10,
+      "operation": "poll_events",
+      "raw_runs": {
+        "http": [
+          {
+            "iterations": 10,
+            "operation": "poll_events",
+            "p50_ns": 135498.0,
+            "p95_ns": 308920.0,
+            "p99_ns": 308920.0,
+            "samples_ns": [
+              107254.0,
+              112522.0,
+              113369.0,
+              118632.0,
+              119325.0,
+              135498.0,
+              139777.0,
+              146202.0,
+              232610.0,
+              308920.0
+            ],
+            "transport": "http"
+          },
+          {
+            "iterations": 10,
+            "operation": "poll_events",
+            "p50_ns": 238726.0,
+            "p95_ns": 436397.0,
+            "p99_ns": 436397.0,
+            "samples_ns": [
+              126516.0,
+              147659.0,
+              176048.0,
+              212076.0,
+              222110.0,
+              238726.0,
+              305782.0,
+              343294.0,
+              376633.0,
+              436397.0
+            ],
+            "transport": "http"
+          },
+          {
+            "iterations": 10,
+            "operation": "poll_events",
+            "p50_ns": 122043.0,
+            "p95_ns": 348778.0,
+            "p99_ns": 348778.0,
+            "samples_ns": [
+              104503.0,
+              107693.0,
+              108188.0,
+              114778.0,
+              118928.0,
+              122043.0,
+              147117.0,
+              155667.0,
+              160493.0,
+              348778.0
+            ],
+            "transport": "http"
+          },
+          {
+            "iterations": 10,
+            "operation": "poll_events",
+            "p50_ns": 110461.0,
+            "p95_ns": 434518.0,
+            "p99_ns": 434518.0,
+            "samples_ns": [
+              100818.0,
+              102715.0,
+              104546.0,
+              107933.0,
+              108331.0,
+              110461.0,
+              110982.0,
+              118926.0,
+              288770.0,
+              434518.0
+            ],
+            "transport": "http"
+          },
+          {
+            "iterations": 10,
+            "operation": "poll_events",
+            "p50_ns": 166223.0,
+            "p95_ns": 381803.0,
+            "p99_ns": 381803.0,
+            "samples_ns": [
+              124887.0,
+              127650.0,
+              131990.0,
+              138978.0,
+              141933.0,
+              166223.0,
+              272123.0,
+              331162.0,
+              365764.0,
+              381803.0
+            ],
+            "transport": "http"
+          }
+        ],
+        "unix": [
+          {
+            "iterations": 10,
+            "operation": "poll_events",
+            "p50_ns": 90961.0,
+            "p95_ns": 234778.0,
+            "p99_ns": 234778.0,
+            "samples_ns": [
+              81763.0,
+              83474.0,
+              86584.0,
+              88906.0,
+              90650.0,
+              90961.0,
+              97250.0,
+              112108.0,
+              180665.0,
+              234778.0
+            ],
+            "transport": "unix"
+          },
+          {
+            "iterations": 10,
+            "operation": "poll_events",
+            "p50_ns": 94923.0,
+            "p95_ns": 259186.0,
+            "p99_ns": 259186.0,
+            "samples_ns": [
+              79917.0,
+              87866.0,
+              89300.0,
+              91352.0,
+              92250.0,
+              94923.0,
+              102544.0,
+              109132.0,
+              239710.0,
+              259186.0
+            ],
+            "transport": "unix"
+          },
+          {
+            "iterations": 10,
+            "operation": "poll_events",
+            "p50_ns": 84020.0,
+            "p95_ns": 117334.0,
+            "p99_ns": 117334.0,
+            "samples_ns": [
+              75202.0,
+              76216.0,
+              76584.0,
+              80143.0,
+              81633.0,
+              84020.0,
+              84844.0,
+              85995.0,
+              93586.0,
+              117334.0
+            ],
+            "transport": "unix"
+          },
+          {
+            "iterations": 10,
+            "operation": "poll_events",
+            "p50_ns": 88364.0,
+            "p95_ns": 282463.0,
+            "p99_ns": 282463.0,
+            "samples_ns": [
+              72107.0,
+              74116.0,
+              75182.0,
+              79971.0,
+              81602.0,
+              88364.0,
+              88531.0,
+              100072.0,
+              122582.0,
+              282463.0
+            ],
+            "transport": "unix"
+          },
+          {
+            "iterations": 10,
+            "operation": "poll_events",
+            "p50_ns": 54515.0,
+            "p95_ns": 175458.0,
+            "p99_ns": 175458.0,
+            "samples_ns": [
+              49411.0,
+              49435.0,
+              49499.0,
+              50435.0,
+              51523.0,
+              54515.0,
+              56485.0,
+              59223.0,
+              74440.0,
+              175458.0
+            ],
+            "transport": "unix"
+          }
+        ],
+        "zmq": [
+          {
+            "iterations": 10,
+            "operation": "poll_events",
+            "p50_ns": 182150.0,
+            "p95_ns": 518336.0,
+            "p99_ns": 518336.0,
+            "samples_ns": [
+              51787.0,
+              56711.0,
+              58082.0,
+              165596.0,
+              180030.0,
+              182150.0,
+              182497.0,
+              226436.0,
+              236076.0,
+              518336.0
+            ],
+            "transport": "zmq"
+          },
+          {
+            "iterations": 10,
+            "operation": "poll_events",
+            "p50_ns": 172793.0,
+            "p95_ns": 264027.0,
+            "p99_ns": 264027.0,
+            "samples_ns": [
+              49561.0,
+              51091.0,
+              54729.0,
+              150533.0,
+              168032.0,
+              172793.0,
+              176635.0,
+              181807.0,
+              190242.0,
+              264027.0
+            ],
+            "transport": "zmq"
+          },
+          {
+            "iterations": 10,
+            "operation": "poll_events",
+            "p50_ns": 176762.0,
+            "p95_ns": 447609.0,
+            "p99_ns": 447609.0,
+            "samples_ns": [
+              57209.0,
+              57889.0,
+              58217.0,
+              171769.0,
+              176600.0,
+              176762.0,
+              177512.0,
+              181125.0,
+              217422.0,
+              447609.0
+            ],
+            "transport": "zmq"
+          },
+          {
+            "iterations": 10,
+            "operation": "poll_events",
+            "p50_ns": 160492.0,
+            "p95_ns": 546287.0,
+            "p99_ns": 546287.0,
+            "samples_ns": [
+              46384.0,
+              50564.0,
+              55076.0,
+              143760.0,
+              144110.0,
+              160492.0,
+              162518.0,
+              215561.0,
+              508507.0,
+              546287.0
+            ],
+            "transport": "zmq"
+          },
+          {
+            "iterations": 10,
+            "operation": "poll_events",
+            "p50_ns": 176873.0,
+            "p95_ns": 352460.0,
+            "p99_ns": 352460.0,
+            "samples_ns": [
+              55929.0,
+              60075.0,
+              61623.0,
+              169283.0,
+              173467.0,
+              176873.0,
+              179356.0,
+              198612.0,
+              202932.0,
+              352460.0
+            ],
+            "transport": "zmq"
+          }
+        ]
+      },
+      "runs": 5,
+      "unix_p50_ns": 88364.0,
+      "unix_p50_relative_mad": 0.04916029152143407,
+      "unix_p95_ns": 234778.0,
+      "zmq_p50_ns": 176762.0,
+      "zmq_p50_relative_mad": 0.022453921091637342,
+      "zmq_p95_ns": 447609.0
+    },
+    {
+      "http_p50_ns": 1306289.0,
+      "http_p95_ns": 1753856.0,
+      "http_unix_p50_ns": 1306289.0,
+      "http_unix_p50_relative_mad": 0.06622424287427973,
+      "http_unix_p95_ns": 1753856.0,
+      "iterations_per_run": 10,
+      "operation": "operation_registry",
+      "raw_runs": {
+        "http": [
+          {
+            "iterations": 10,
+            "operation": "operation_registry",
+            "p50_ns": 1419241.0,
+            "p95_ns": 1784256.0,
+            "p99_ns": 1784256.0,
+            "samples_ns": [
+              706142.0,
+              796633.0,
+              875148.0,
+              1158391.0,
+              1403334.0,
+              1419241.0,
+              1493929.0,
+              1567811.0,
+              1574365.0,
+              1784256.0
+            ],
+            "transport": "http"
+          },
+          {
+            "iterations": 10,
+            "operation": "operation_registry",
+            "p50_ns": 1219781.0,
+            "p95_ns": 1404779.0,
+            "p99_ns": 1404779.0,
+            "samples_ns": [
+              1034057.0,
+              1054263.0,
+              1167319.0,
+              1205257.0,
+              1212632.0,
+              1219781.0,
+              1292419.0,
+              1355073.0,
+              1393092.0,
+              1404779.0
+            ],
+            "transport": "http"
+          },
+          {
+            "iterations": 10,
+            "operation": "operation_registry",
+            "p50_ns": 1347526.0,
+            "p95_ns": 1805750.0,
+            "p99_ns": 1805750.0,
+            "samples_ns": [
+              750170.0,
+              812707.0,
+              1131155.0,
+              1205054.0,
+              1248211.0,
+              1347526.0,
+              1378313.0,
+              1587316.0,
+              1637052.0,
+              1805750.0
+            ],
+            "transport": "http"
+          },
+          {
+            "iterations": 10,
+            "operation": "operation_registry",
+            "p50_ns": 794232.0,
+            "p95_ns": 1422040.0,
+            "p99_ns": 1422040.0,
+            "samples_ns": [
+              677434.0,
+              681573.0,
+              682464.0,
+              684794.0,
+              747775.0,
+              794232.0,
+              1059700.0,
+              1214274.0,
+              1349531.0,
+              1422040.0
+            ],
+            "transport": "http"
+          },
+          {
+            "iterations": 10,
+            "operation": "operation_registry",
+            "p50_ns": 1306289.0,
+            "p95_ns": 1753856.0,
+            "p99_ns": 1753856.0,
+            "samples_ns": [
+              854292.0,
+              950123.0,
+              992519.0,
+              1125379.0,
+              1296297.0,
+              1306289.0,
+              1316652.0,
+              1332190.0,
+              1440806.0,
+              1753856.0
+            ],
+            "transport": "http"
+          }
+        ],
+        "unix": [
+          {
+            "iterations": 10,
+            "operation": "operation_registry",
+            "p50_ns": 1196350.0,
+            "p95_ns": 1501869.0,
+            "p99_ns": 1501869.0,
+            "samples_ns": [
+              779177.0,
+              806810.0,
+              930084.0,
+              1158921.0,
+              1172637.0,
+              1196350.0,
+              1214197.0,
+              1373685.0,
+              1397950.0,
+              1501869.0
+            ],
+            "transport": "unix"
+          },
+          {
+            "iterations": 10,
+            "operation": "operation_registry",
+            "p50_ns": 1020862.0,
+            "p95_ns": 1489698.0,
+            "p99_ns": 1489698.0,
+            "samples_ns": [
+              855757.0,
+              856166.0,
+              898283.0,
+              940849.0,
+              1007799.0,
+              1020862.0,
+              1113957.0,
+              1121279.0,
+              1199161.0,
+              1489698.0
+            ],
+            "transport": "unix"
+          },
+          {
+            "iterations": 10,
+            "operation": "operation_registry",
+            "p50_ns": 1247735.0,
+            "p95_ns": 1462066.0,
+            "p99_ns": 1462066.0,
+            "samples_ns": [
+              944089.0,
+              1153358.0,
+              1163679.0,
+              1193756.0,
+              1206467.0,
+              1247735.0,
+              1264425.0,
+              1396466.0,
+              1400328.0,
+              1462066.0
+            ],
+            "transport": "unix"
+          },
+          {
+            "iterations": 10,
+            "operation": "operation_registry",
+            "p50_ns": 879953.0,
+            "p95_ns": 1592319.0,
+            "p99_ns": 1592319.0,
+            "samples_ns": [
+              638721.0,
+              649916.0,
+              715727.0,
+              810716.0,
+              836689.0,
+              879953.0,
+              1095412.0,
+              1411378.0,
+              1493332.0,
+              1592319.0
+            ],
+            "transport": "unix"
+          },
+          {
+            "iterations": 10,
+            "operation": "operation_registry",
+            "p50_ns": 1241048.0,
+            "p95_ns": 1733761.0,
+            "p99_ns": 1733761.0,
+            "samples_ns": [
+              1106886.0,
+              1123151.0,
+              1127153.0,
+              1127951.0,
+              1131171.0,
+              1241048.0,
+              1354955.0,
+              1451078.0,
+              1597070.0,
+              1733761.0
+            ],
+            "transport": "unix"
+          }
+        ],
+        "zmq": [
+          {
+            "iterations": 10,
+            "operation": "operation_registry",
+            "p50_ns": 1227334.0,
+            "p95_ns": 1546615.0,
+            "p99_ns": 1546615.0,
+            "samples_ns": [
+              983918.0,
+              991922.0,
+              1004094.0,
+              1196609.0,
+              1220140.0,
+              1227334.0,
+              1279381.0,
+              1370852.0,
+              1414826.0,
+              1546615.0
+            ],
+            "transport": "zmq"
+          },
+          {
+            "iterations": 10,
+            "operation": "operation_registry",
+            "p50_ns": 1190517.0,
+            "p95_ns": 1352995.0,
+            "p99_ns": 1352995.0,
+            "samples_ns": [
+              900456.0,
+              910866.0,
+              925393.0,
+              1109649.0,
+              1116744.0,
+              1190517.0,
+              1199688.0,
+              1294736.0,
+              1333812.0,
+              1352995.0
+            ],
+            "transport": "zmq"
+          },
+          {
+            "iterations": 10,
+            "operation": "operation_registry",
+            "p50_ns": 1196945.0,
+            "p95_ns": 1443665.0,
+            "p99_ns": 1443665.0,
+            "samples_ns": [
+              1107506.0,
+              1123985.0,
+              1127950.0,
+              1128279.0,
+              1134335.0,
+              1196945.0,
+              1275998.0,
+              1365960.0,
+              1368961.0,
+              1443665.0
+            ],
+            "transport": "zmq"
+          },
+          {
+            "iterations": 10,
+            "operation": "operation_registry",
+            "p50_ns": 811571.0,
+            "p95_ns": 1550581.0,
+            "p99_ns": 1550581.0,
+            "samples_ns": [
+              585801.0,
+              591186.0,
+              612305.0,
+              710273.0,
+              739852.0,
+              811571.0,
+              919093.0,
+              1033148.0,
+              1293664.0,
+              1550581.0
+            ],
+            "transport": "zmq"
+          },
+          {
+            "iterations": 10,
+            "operation": "operation_registry",
+            "p50_ns": 1022068.0,
+            "p95_ns": 1490744.0,
+            "p99_ns": 1490744.0,
+            "samples_ns": [
+              711794.0,
+              781603.0,
+              793508.0,
+              836259.0,
+              925776.0,
+              1022068.0,
+              1326611.0,
+              1329670.0,
+              1487388.0,
+              1490744.0
+            ],
+            "transport": "zmq"
+          }
+        ]
+      },
+      "runs": 5,
+      "unix_p50_ns": 1196350.0,
+      "unix_p50_relative_mad": 0.04295147741045681,
+      "unix_p95_ns": 1501869.0,
+      "zmq_p50_ns": 1190517.0,
+      "zmq_p50_relative_mad": 0.030925219883462394,
+      "zmq_p95_ns": 1490744.0
+    },
+    {
+      "http_p50_ns": 125995.0,
+      "http_p95_ns": 316353.0,
+      "http_unix_p50_ns": 125995.0,
+      "http_unix_p50_relative_mad": 0.14121988967816182,
+      "http_unix_p95_ns": 316353.0,
+      "iterations_per_run": 10,
+      "operation": "router_stats",
+      "raw_runs": {
+        "http": [
+          {
+            "iterations": 10,
+            "operation": "router_stats",
+            "p50_ns": 91980.0,
+            "p95_ns": 327179.0,
+            "p99_ns": 327179.0,
+            "samples_ns": [
+              87882.0,
+              88631.0,
+              88660.0,
+              89260.0,
+              91825.0,
+              91980.0,
+              92731.0,
+              94133.0,
+              109571.0,
+              327179.0
+            ],
+            "transport": "http"
+          },
+          {
+            "iterations": 10,
+            "operation": "router_stats",
+            "p50_ns": 155189.0,
+            "p95_ns": 411219.0,
+            "p99_ns": 411219.0,
+            "samples_ns": [
+              121851.0,
+              125629.0,
+              132387.0,
+              133557.0,
+              137475.0,
+              155189.0,
+              159367.0,
+              185751.0,
+              343000.0,
+              411219.0
+            ],
+            "transport": "http"
+          },
+          {
+            "iterations": 10,
+            "operation": "router_stats",
+            "p50_ns": 143788.0,
+            "p95_ns": 315354.0,
+            "p99_ns": 315354.0,
+            "samples_ns": [
+              109324.0,
+              109752.0,
+              114683.0,
+              120873.0,
+              132040.0,
+              143788.0,
+              150760.0,
+              158558.0,
+              251783.0,
+              315354.0
+            ],
+            "transport": "http"
+          },
+          {
+            "iterations": 10,
+            "operation": "router_stats",
+            "p50_ns": 119403.0,
+            "p95_ns": 316353.0,
+            "p99_ns": 316353.0,
+            "samples_ns": [
+              106347.0,
+              116303.0,
+              116317.0,
+              116619.0,
+              117444.0,
+              119403.0,
+              128880.0,
+              147379.0,
+              233465.0,
+              316353.0
+            ],
+            "transport": "http"
+          },
+          {
+            "iterations": 10,
+            "operation": "router_stats",
+            "p50_ns": 125995.0,
+            "p95_ns": 186907.0,
+            "p99_ns": 186907.0,
+            "samples_ns": [
+              115381.0,
+              117483.0,
+              119091.0,
+              121846.0,
+              123234.0,
+              125995.0,
+              127200.0,
+              133616.0,
+              148669.0,
+              186907.0
+            ],
+            "transport": "http"
+          }
+        ],
+        "unix": [
+          {
+            "iterations": 10,
+            "operation": "router_stats",
+            "p50_ns": 88009.0,
+            "p95_ns": 386693.0,
+            "p99_ns": 386693.0,
+            "samples_ns": [
+              83733.0,
+              84386.0,
+              85486.0,
+              85792.0,
+              86317.0,
+              88009.0,
+              95146.0,
+              105547.0,
+              123650.0,
+              386693.0
+            ],
+            "transport": "unix"
+          },
+          {
+            "iterations": 10,
+            "operation": "router_stats",
+            "p50_ns": 74089.0,
+            "p95_ns": 109892.0,
+            "p99_ns": 109892.0,
+            "samples_ns": [
+              67660.0,
+              68407.0,
+              69464.0,
+              70198.0,
+              70319.0,
+              74089.0,
+              79171.0,
+              84801.0,
+              85126.0,
+              109892.0
+            ],
+            "transport": "unix"
+          },
+          {
+            "iterations": 10,
+            "operation": "router_stats",
+            "p50_ns": 136737.0,
+            "p95_ns": 327475.0,
+            "p99_ns": 327475.0,
+            "samples_ns": [
+              108910.0,
+              112685.0,
+              113152.0,
+              114927.0,
+              124422.0,
+              136737.0,
+              149169.0,
+              165776.0,
+              318021.0,
+              327475.0
+            ],
+            "transport": "unix"
+          },
+          {
+            "iterations": 10,
+            "operation": "router_stats",
+            "p50_ns": 100724.0,
+            "p95_ns": 298236.0,
+            "p99_ns": 298236.0,
+            "samples_ns": [
+              71677.0,
+              72160.0,
+              81998.0,
+              87328.0,
+              96716.0,
+              100724.0,
+              125232.0,
+              155292.0,
+              169799.0,
+              298236.0
+            ],
+            "transport": "unix"
+          },
+          {
+            "iterations": 10,
+            "operation": "router_stats",
+            "p50_ns": 81121.0,
+            "p95_ns": 141402.0,
+            "p99_ns": 141402.0,
+            "samples_ns": [
+              73995.0,
+              78388.0,
+              78406.0,
+              78856.0,
+              80888.0,
+              81121.0,
+              83117.0,
+              89094.0,
+              104494.0,
+              141402.0
+            ],
+            "transport": "unix"
+          }
+        ],
+        "zmq": [
+          {
+            "iterations": 10,
+            "operation": "router_stats",
+            "p50_ns": 194432.0,
+            "p95_ns": 332337.0,
+            "p99_ns": 332337.0,
+            "samples_ns": [
+              59060.0,
+              62537.0,
+              73324.0,
+              189980.0,
+              193250.0,
+              194432.0,
+              199910.0,
+              203436.0,
+              224018.0,
+              332337.0
+            ],
+            "transport": "zmq"
+          },
+          {
+            "iterations": 10,
+            "operation": "router_stats",
+            "p50_ns": 215850.0,
+            "p95_ns": 330800.0,
+            "p99_ns": 330800.0,
+            "samples_ns": [
+              67209.0,
+              69792.0,
+              94587.0,
+              190297.0,
+              201154.0,
+              215850.0,
+              227603.0,
+              252831.0,
+              312831.0,
+              330800.0
+            ],
+            "transport": "zmq"
+          },
+          {
+            "iterations": 10,
+            "operation": "router_stats",
+            "p50_ns": 180246.0,
+            "p95_ns": 434716.0,
+            "p99_ns": 434716.0,
+            "samples_ns": [
+              51811.0,
+              55192.0,
+              61882.0,
+              163832.0,
+              167234.0,
+              180246.0,
+              190226.0,
+              190913.0,
+              227458.0,
+              434716.0
+            ],
+            "transport": "zmq"
+          },
+          {
+            "iterations": 10,
+            "operation": "router_stats",
+            "p50_ns": 150067.0,
+            "p95_ns": 446443.0,
+            "p99_ns": 446443.0,
+            "samples_ns": [
+              54143.0,
+              56266.0,
+              57846.0,
+              140809.0,
+              147319.0,
+              150067.0,
+              150271.0,
+              171523.0,
+              199926.0,
+              446443.0
+            ],
+            "transport": "zmq"
+          },
+          {
+            "iterations": 10,
+            "operation": "router_stats",
+            "p50_ns": 285613.0,
+            "p95_ns": 578188.0,
+            "p99_ns": 578188.0,
+            "samples_ns": [
+              62951.0,
+              64194.0,
+              69256.0,
+              193584.0,
+              212583.0,
+              285613.0,
+              301661.0,
+              478312.0,
+              538929.0,
+              578188.0
+            ],
+            "transport": "zmq"
+          }
+        ]
+      },
+      "runs": 5,
+      "unix_p50_ns": 88009.0,
+      "unix_p50_relative_mad": 0.14447386062789033,
+      "unix_p95_ns": 298236.0,
+      "zmq_p50_ns": 194432.0,
+      "zmq_p50_relative_mad": 0.11015676431863068,
+      "zmq_p95_ns": 434716.0
+    }
+  ]
+}

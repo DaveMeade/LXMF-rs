@@ -116,7 +116,7 @@ impl SdkBackend for BenchBackend {
             "active_contract_version": 2,
             "effective_capabilities": effective_capabilities,
             "effective_limits": effective_limits,
-            "contract_release": "v2.5",
+            "contract_release": "v2.6",
             "schema_namespace": "v2"
         })))
     }

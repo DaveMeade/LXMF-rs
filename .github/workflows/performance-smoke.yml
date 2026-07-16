@@ -1,0 +1,57 @@
+name: Performance smoke
+
+on:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  fixture-and-report-smoke:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install build dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y pkg-config libdbus-1-dev
+      - name: Check out exact Python references
+        run: |
+          mkdir -p target/python-references
+          git clone https://github.com/markqvist/Reticulum.git target/python-references/Reticulum
+          git -C target/python-references/Reticulum checkout 15320e4d2cfabb143c1db20ca887e275fd521585
+          git clone https://github.com/markqvist/LXMF.git target/python-references/LXMF
+          git -C target/python-references/LXMF checkout 727830cefda83d9c6e3982b48675425f3f988f9c
+      - name: Core fixture, schema, and report smoke
+        env:
+          PYTHONPATH: ${{ github.workspace }}/target/python-references/Reticulum:${{ github.workspace }}/target/python-references/LXMF
+        run: cargo xtask python-impl-bench-report --compare-runs 1 --resource-runs 1 --resource-iterations 2000
+      - name: SDK transport workload smoke
+        run: |
+          cargo build --release -p reticulumd --bin reticulumd
+          cargo build --release -p lxmf-sdk --example sdk_transport_benchmark
+          python3 tools/scripts/sdk_transport_bench.py \
+            --runs 1 --iterations 10 \
+            --output target/performance/sdk-transport.json
+      - name: Same-topology workload smoke
+        run: python3 tools/scripts/e2e_performance.py --profile smoke --output target/performance/e2e.json
+      - name: Generate and verify report schema
+        run: |
+          python3 tools/scripts/performance_docs.py \
+            --release v0.9.5 \
+            --report target/criterion/python-impl-report/report.json \
+            --sdk-transport-report target/performance/sdk-transport.json \
+            --e2e-report target/performance/e2e.json
+          python3 tools/scripts/performance_docs.py --check
+      - uses: actions/upload-artifact@v4
+        with:
+          name: performance-smoke-${{ github.run_id }}
+          path: |
+            target/criterion/python-impl-report/**
+            target/performance/**

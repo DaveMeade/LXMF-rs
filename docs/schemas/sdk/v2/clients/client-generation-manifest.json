@@ -3,7 +3,7 @@
   "$id": "https://weft.tak/contracts/sdk/v2/clients/client-generation-manifest.json",
   "title": "LXMF SDK v2 Client Generation Manifest",
   "version": 1,
-  "contract_release": "v2.5",
+  "contract_release": "v2.6",
   "schema_namespace": "v2",
   "generator_backend": {
     "name": "openapi",

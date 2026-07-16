@@ -176,6 +176,11 @@ impl RpcDaemon {
             "sdk.capability.group_delivery".to_string(),
             "sdk.capability.event_sink_bridge".to_string(),
             "sdk.capability.shared_instance_rpc_auth".to_string(),
+            "sdk.capability.rns_runtime".to_string(),
+            "sdk.capability.rns_transport".to_string(),
+            "sdk.capability.rns_interfaces".to_string(),
+            "sdk.capability.rns_data_plane".to_string(),
+            "sdk.capability.router_management".to_string(),
         ]
     }
 

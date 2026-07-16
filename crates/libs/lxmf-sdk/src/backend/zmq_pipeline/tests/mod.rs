@@ -10,6 +10,7 @@ mod cancel;
 mod delivery_stamp_policy;
 mod delivery_trace;
 mod destination;
+mod domains;
 mod history;
 mod propagation;
 mod propagation_payload;
@@ -1080,6 +1081,11 @@ fn zmq_cancel_test_guard() -> std::sync::MutexGuard<'static, ()> {
     GUARD.lock().expect("zmq cancel test mutex poisoned")
 }
 
+async fn zmq_cancel_async_test_guard() -> tokio::sync::OwnedMutexGuard<()> {
+    static GUARD: std::sync::OnceLock<Arc<tokio::sync::Mutex<()>>> = std::sync::OnceLock::new();
+    Arc::clone(GUARD.get_or_init(|| Arc::new(tokio::sync::Mutex::new(())))).lock_owned().await
+}
+
 fn spawn_single_response_zmq_server(
     command_endpoint: String,
     response: JsonValue,
@@ -1183,3 +1189,4 @@ async fn recv_request_envelope(commands: &mut PullSocket) -> Option<ZmqRpcEnvelo
     let bytes = Vec::<u8>::try_from(message).ok()?;
     zmq::decode_envelope(&bytes).ok()
 }
+use std::collections::BTreeMap;

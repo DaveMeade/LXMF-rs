@@ -43,7 +43,12 @@ fn run_python_impl_bench_report(
             compare_report_path: &compare_report_path,
             compare_json_path: &compare_json_path,
         };
-        run_python_impl_bench_compare_with_paths(&config, profile_config, &paths)
+        run_python_impl_bench_compare_with_paths(
+            &config,
+            profile_config,
+            &paths,
+            run_index % 2 == 0,
+        )
             .with_context(|| format!("benchmark report run {}", run_index + 1))?;
         per_run_reports.push(load_python_impl_compare_report(paths.compare_json_path)?);
     }
@@ -102,13 +107,15 @@ fn run_python_impl_bench_compare_with_paths(
     config: &PythonImplBenchConfig,
     profile_config: &PythonImplBenchProfileConfig,
     paths: &PythonImplOutputPaths<'_>,
+    rust_first: bool,
 ) -> Result<()> {
     let sample_size = profile_config.criterion.sample_size.to_string();
     let warm_up_time = profile_config.criterion.warm_up_time_seconds.to_string();
     let measurement_time = profile_config.criterion.measurement_time_seconds.to_string();
     let python_iterations = profile_config.python.iterations.to_string();
 
-    run(
+    let run_rust = || -> Result<()> {
+        run(
         "cargo",
         &[
             "bench",
@@ -117,6 +124,7 @@ fn run_python_impl_bench_compare_with_paths(
             "--bench",
             "core_message_paths",
             "--",
+            "lxmf_core/(message_from_wire|message_to_wire|large_message_from_wire|large_message_to_wire|resource_message_from_wire|resource_message_to_wire)$",
             "--sample-size",
             &sample_size,
             "--warm-up-time",
@@ -124,8 +132,8 @@ fn run_python_impl_bench_compare_with_paths(
             "--measurement-time",
             &measurement_time,
         ],
-    )?;
-    run(
+        )?;
+        run(
         "cargo",
         &[
             "bench",
@@ -134,6 +142,7 @@ fn run_python_impl_bench_compare_with_paths(
             "--bench",
             "parity_hotpaths",
             "--",
+            "(rns_core/(announce_create|announce_validate|announce_validate_batch_64|identity_sign|identity_verify|identity_encrypt|identity_decrypt|packet_pack|packet_unpack)|rns_transport/(resource_segment_16k|resource_reassemble_16k))$",
             "--sample-size",
             &sample_size,
             "--warm-up-time",
@@ -141,8 +150,8 @@ fn run_python_impl_bench_compare_with_paths(
             "--measurement-time",
             &measurement_time,
         ],
-    )?;
-    run(
+        )?;
+        run(
         "cargo",
         &[
             "bench",
@@ -151,6 +160,7 @@ fn run_python_impl_bench_compare_with_paths(
             "--bench",
             "link_hotpaths",
             "--",
+            "rns_transport/resource_manager_request_window_reuse$",
             "--sample-size",
             &sample_size,
             "--warm-up-time",
@@ -158,8 +168,10 @@ fn run_python_impl_bench_compare_with_paths(
             "--measurement-time",
             &measurement_time,
         ],
-    )?;
-    run(
+        )
+    };
+    let run_python = || -> Result<()> {
+        run(
         "python3",
         &[
             "tools/scripts/python_impl_benchmarks.py",
@@ -170,8 +182,20 @@ fn run_python_impl_bench_compare_with_paths(
                 .python_report_path
                 .to_str()
                 .context("python benchmark output path must be utf-8")?,
+            "--expected-rns-ref",
+            &config.references.reticulum,
+            "--expected-lxmf-ref",
+            &config.references.lxmf,
         ],
-    )?;
+        )
+    };
+    if rust_first {
+        run_rust()?;
+        run_python()?;
+    } else {
+        run_python()?;
+        run_rust()?;
+    }
     write_python_impl_compare_report(config, paths)
 }
 

@@ -1,12 +1,80 @@
 use super::{sdk_error, ZmqPipelineBackendClient};
 use crate::capability::{EffectiveLimits, ParityReference};
 use crate::error::{code, ErrorCategory, SdkError};
-use crate::event::Severity;
+use crate::event::{EventBatch, EventCursor, SdkEvent, Severity};
 use crate::types::{Ack, CancelResult, DeliveryState, RuntimeState};
 use serde::de::DeserializeOwned;
 use serde_json::Value as JsonValue;
+use std::collections::BTreeMap;
 
 impl ZmqPipelineBackendClient {
+    pub(super) fn parse_event_batch(result: &JsonValue) -> Result<EventBatch, SdkError> {
+        let events = result
+            .get("events")
+            .and_then(JsonValue::as_array)
+            .map(|rows| {
+                rows.iter()
+                    .map(|row| {
+                        Ok(SdkEvent {
+                            event_id: Self::parse_required_string(row, "event_id")?,
+                            runtime_id: Self::parse_required_string(row, "runtime_id")?,
+                            stream_id: Self::parse_required_string(row, "stream_id")?,
+                            seq_no: Self::parse_required_u64(row, "seq_no")?,
+                            contract_version: Self::parse_required_u16(row, "contract_version")?,
+                            ts_ms: Self::parse_required_u64(row, "ts_ms")?,
+                            event_type: Self::parse_required_string(row, "event_type")?,
+                            severity: row
+                                .get("severity")
+                                .and_then(JsonValue::as_str)
+                                .map(Self::parse_severity)
+                                .unwrap_or(Severity::Info),
+                            source_component: row
+                                .get("source_component")
+                                .and_then(JsonValue::as_str)
+                                .unwrap_or("rns-rpc")
+                                .to_owned(),
+                            operation_id: row
+                                .get("operation_id")
+                                .and_then(JsonValue::as_str)
+                                .map(str::to_owned),
+                            message_id: row
+                                .get("message_id")
+                                .and_then(JsonValue::as_str)
+                                .map(str::to_owned),
+                            peer_id: row
+                                .get("peer_id")
+                                .and_then(JsonValue::as_str)
+                                .map(str::to_owned),
+                            correlation_id: row
+                                .get("correlation_id")
+                                .and_then(JsonValue::as_str)
+                                .map(str::to_owned),
+                            trace_id: row
+                                .get("trace_id")
+                                .and_then(JsonValue::as_str)
+                                .map(str::to_owned),
+                            payload: row
+                                .get("payload")
+                                .cloned()
+                                .unwrap_or(JsonValue::Object(serde_json::Map::new())),
+                            extensions: BTreeMap::new(),
+                        })
+                    })
+                    .collect::<Result<Vec<_>, SdkError>>()
+            })
+            .transpose()?
+            .unwrap_or_default();
+        Ok(EventBatch {
+            events,
+            next_cursor: EventCursor(Self::parse_required_string(result, "next_cursor")?),
+            dropped_count: result.get("dropped_count").and_then(JsonValue::as_u64).unwrap_or(0),
+            snapshot_high_watermark_seq_no: result
+                .get("snapshot_high_watermark_seq_no")
+                .and_then(JsonValue::as_u64),
+            extensions: BTreeMap::new(),
+        })
+    }
+
     pub(super) fn parse_required_string(
         value: &JsonValue,
         key: &'static str,

@@ -1,6 +1,6 @@
 # Current Roadmap Status
 
-Last reassessed: 2026-07-10
+Last reassessed: 2026-07-16
 
 This file is the repository-level source of truth for parity posture, release
 confidence, and execution order. Detailed row-level status lives in:
@@ -18,10 +18,10 @@ override these status files.
 
 ## Current Position
 
-LXMF-rs is a usable Rust implementation of Reticulum and LXMF with strong core
-protocol coverage and repeatable interoperability against pinned Python
-references. It is not yet a complete drop-in replacement for every Python
-Reticulum/LXMF runtime, interface, router, and utility behavior.
+LXMF-rs has complete mapped software implementation parity against the pinned
+Python inventory. v0.9.5 closes the separate SDK-access axis by making the
+single-endpoint ZeroMQ backend the canonical desktop transport while retaining
+HTTP/Unix and legacy dual-endpoint compatibility.
 
 The project is best described by capability level:
 
@@ -30,8 +30,9 @@ The project is best described by capability level:
 | Wire compatible | achieved | Core Reticulum packet/identity primitives and LXMF message encodings are implemented and tested. |
 | Direct-message interoperable | achieved | Selected bidirectional Rust/Python direct, link, channel, paper, and daemon paths are exercised in CI. |
 | Propagation interoperable | achieved | Propagated delivery, complete Python-only `LXMPeer.py` lifecycle coverage, and Python-reference propagation router fetch/download/sync lifecycle coverage are implemented and tested. |
-| Operationally substitutable | partial | `reticulumd` is deployable and supports several production interfaces, but runtime, interface, and utility breadth remains narrower than Python. |
-| Full Python surface parity | not achieved | Remaining gaps are tracked in the two parity matrices. |
+| Operationally substitutable | software-complete | Software-controlled runtime, interface, router, utility, and SDK operations are mapped; attached hardware and public-network evidence remain bounded. |
+| Full Python software surface parity | achieved | The strict inventory reports 1,664 complete, 0 partial, and 1 provenance-backed not-applicable entry. |
+| ZeroMQ SDK-access parity | achieved in v0.9.5 implementation | Generated classification and daemon-operation inventory live in `sdk-zmq-parity.json`; release evidence must still pass all gates. |
 
 The 2026-07-10 integration pass reconciled the outstanding parity branches as
 one compatible Rust surface. Reticulum configuration now keeps
@@ -50,7 +51,27 @@ Inbound routing now resolves full-wire packets and resources received over an
 outbound LXMF delivery link back to the local delivery destination, which keeps
 direct backchannel reuse bidirectional in two-node and multi-hop mesh runs.
 
-## v0.9.0 Full Software-Parity Release Focus
+## v0.9.5 Complete ZeroMQ SDK and Measured Performance
+
+v0.9.5 keeps software implementation parity separate from transport access.
+The release requires the generated 1,665-row SDK-access classification, the
+daemon operation inventory, canonical concurrent ROUTER/DEALER transport,
+native async events, typed RNS/LXMF control traits, five-node mesh and soak
+evidence, and generated performance documentation from pinned Python revisions.
+
+The SDK contract release is additive `v2.6`; schema namespace `v2`, protocol
+version `2`, and v2.5 request compatibility remain unchanged. Pure wire and
+cryptography helpers remain local Rust APIs.
+
+## v1.0 human and equipment boundary
+
+Physical RNode/RNodeMulti, Weave, VR-N76, BLE/serial/radio validation, public
+I2P/network soak, third-party clients, manual mobile/operator workflows, and
+interactive signing ceremonies are explicitly deferred to v1.0. Until then
+they remain hardware-unverified or human-validation targets and are not v0.9.5
+release blockers.
+
+## v0.9.0 Full Software-Parity Baseline
 
 The v0.9.0 release criterion is zero partial or unmapped entries in the
 generated pinned-Python surface manifest. The scope is the full public

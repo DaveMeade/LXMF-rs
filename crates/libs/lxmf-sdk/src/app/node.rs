@@ -75,6 +75,17 @@ impl Client<crate::RpcBackendClient> {
     }
 }
 
+#[cfg(feature = "zmq-pipeline-backend")]
+impl Client<crate::ZmqPipelineBackendClient> {
+    pub fn zmq(config: crate::ZmqPipelineBackendConfig) -> Result<Self, crate::SdkError> {
+        crate::ZmqPipelineBackendClient::new(config).map(Self::new)
+    }
+
+    pub fn zmq_local(endpoint: impl Into<String>) -> Result<Self, crate::SdkError> {
+        Self::zmq(crate::ZmqPipelineBackendConfig::local(endpoint))
+    }
+}
+
 #[cfg(test)]
 #[path = "node_tests.rs"]
 mod node_tests;

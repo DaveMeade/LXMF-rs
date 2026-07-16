@@ -1,8 +1,13 @@
 #![allow(dead_code)]
 
+mod router;
+mod support;
+
+pub(super) use router::run_zmq_router_loop_until;
+use support::*;
+
 use rns_rpc::rpc::zmq::{self, ZmqRpcEnvelope, ZmqRpcEnvelopeKind};
 use rns_rpc::{RpcDaemon, RpcError, RpcResponse};
-use std::borrow::Cow;
 use std::collections::HashMap;
 use std::io;
 use std::sync::Arc;
@@ -143,6 +148,21 @@ fn handle_zmq_command_message(
         }
     };
     let response_endpoint_is_local = is_local_zmq_endpoint(response_endpoint.as_str());
+    let response = handle_zmq_request_envelope(
+        daemon,
+        envelope,
+        command_endpoint_requires_auth,
+        response_endpoint_is_local,
+    )?;
+    Ok(ZmqOutboundResponse { endpoint: response_endpoint, envelope: response })
+}
+
+fn handle_zmq_request_envelope(
+    daemon: &RpcDaemon,
+    envelope: ZmqRpcEnvelope,
+    command_endpoint_requires_auth: bool,
+    response_endpoint_is_local: bool,
+) -> Result<ZmqRpcEnvelope, &'static str> {
     if let Err(error) = authorize_zmq_envelope(
         daemon,
         &envelope,
@@ -150,10 +170,7 @@ fn handle_zmq_command_message(
         response_endpoint_is_local,
     ) {
         if response_endpoint_is_local {
-            return Ok(ZmqOutboundResponse {
-                endpoint: response_endpoint,
-                envelope: rpc_error_envelope(envelope.session_id, envelope.request_id, error),
-            });
+            return Ok(rpc_error_envelope(envelope.session_id, envelope.request_id, error));
         }
         log::warn!(
             "[daemon] zmq rpc command rejected request_id={} code={} reason=remote_response_auth_failed",
@@ -163,15 +180,12 @@ fn handle_zmq_command_message(
         return Err("remote auth failed");
     }
     if envelope.kind != ZmqRpcEnvelopeKind::Request {
-        return Ok(ZmqOutboundResponse {
-            endpoint: response_endpoint,
-            envelope: error_envelope(
-                envelope.session_id,
-                envelope.request_id,
-                "SDK_TRANSPORT_ZMQ_INVALID_KIND",
-                "zmq command ingress accepts request envelopes only",
-            ),
-        });
+        return Ok(error_envelope(
+            envelope.session_id,
+            envelope.request_id,
+            "SDK_TRANSPORT_ZMQ_INVALID_KIND",
+            "zmq command ingress accepts request envelopes only",
+        ));
     }
     let response_payload =
         daemon.handle_framed_request(envelope.payload.as_slice()).unwrap_or_else(|err| {
@@ -182,14 +196,7 @@ fn handle_zmq_command_message(
             };
             encode_rpc_response_frame(&response)
         });
-    Ok(ZmqOutboundResponse {
-        endpoint: response_endpoint,
-        envelope: ZmqRpcEnvelope::response(
-            envelope.session_id,
-            envelope.request_id,
-            response_payload,
-        ),
-    })
+    Ok(ZmqRpcEnvelope::response(envelope.session_id, envelope.request_id, response_payload))
 }
 
 #[allow(clippy::result_large_err)]
@@ -248,53 +255,11 @@ fn encode_rpc_response_frame(response: &RpcResponse) -> Vec<u8> {
 }
 
 fn validate_zmq_loop_config(config: &ZmqRpcLoopConfig, daemon: &RpcDaemon) -> io::Result<()> {
-    if config.require_auth_for_remote
-        && !is_local_zmq_endpoint(&config.command_endpoint)
-        && !daemon.remote_rpc_token_auth_configured()
-    {
-        return Err(io::Error::new(
-            io::ErrorKind::PermissionDenied,
-            "remote zmq endpoints require explicit token authentication",
-        ));
-    }
-    Ok(())
-}
-
-fn validate_zmq_response_endpoint(endpoint: &str) -> io::Result<()> {
-    if is_local_zmq_endpoint(endpoint) {
-        return Ok(());
-    }
-    Err(io::Error::new(
-        io::ErrorKind::PermissionDenied,
-        "remote zmq response endpoints require explicit authentication",
-    ))
-}
-
-fn is_local_zmq_endpoint(endpoint: &str) -> bool {
-    endpoint.starts_with("inproc://")
-        || endpoint.starts_with("tcp://127.")
-        || endpoint.starts_with("tcp://localhost:")
-        || endpoint.starts_with("tcp://[::1]:")
-}
-
-fn zmq_response_connect_endpoint(endpoint: &str) -> Cow<'_, str> {
-    if let Some(port) = endpoint.strip_prefix("tcp://localhost:") {
-        return Cow::Owned(format!("tcp://127.0.0.1:{port}"));
-    }
-    Cow::Borrowed(endpoint)
-}
-
-fn zmq_io_error(err: impl std::fmt::Display) -> io::Error {
-    io::Error::other(err.to_string())
-}
-
-fn is_recoverable_zmq_transport_error(err: &zeromq::ZmqError) -> bool {
-    let text = err.to_string();
-    text.contains("connection was aborted")
-        || text.contains("connection was forcibly closed")
-        || text.contains("connection reset")
-        || text.contains("(os error 10053)")
-        || text.contains("(os error 10054)")
+    validate_zmq_bind_security(
+        config.command_endpoint.as_str(),
+        config.require_auth_for_remote,
+        daemon,
+    )
 }
 
 #[cfg(test)]

@@ -9,23 +9,22 @@ use crate::domain::{
     PresenceListResult,
 };
 use crate::error::{code, ErrorCategory, SdkError};
-use crate::event::{EventBatch, EventCursor, SdkEvent, Severity};
+use crate::event::{EventBatch, EventCursor};
 use crate::types::{
     Ack, CancelResult, ConfigPatch, DeliverySnapshot, DeliveryState, MessageId, RuntimeSnapshot,
     SendRequest, ShutdownMode,
 };
-use hmac::{Hmac, Mac};
 use rns_rpc::e2e_harness::{build_rpc_frame, parse_rpc_frame};
 use rns_rpc::rpc::zmq::{self, ZmqRpcAuthMetadata, ZmqRpcEnvelope};
-use rns_rpc::RpcError;
 use serde_json::{json, Value as JsonValue};
-use sha2::Sha256;
-use std::collections::BTreeMap;
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::RwLock;
 use std::time::{SystemTime, UNIX_EPOCH};
 use tokio::runtime::Runtime;
 
+#[cfg(feature = "sdk-async")]
+#[path = "zmq_pipeline/async_backend.rs"]
+mod async_backend;
 #[path = "zmq_pipeline/batch.rs"]
 mod batch;
 #[path = "zmq_pipeline/config.rs"]
@@ -34,6 +33,8 @@ mod config;
 mod destination;
 #[path = "zmq_pipeline/discovery.rs"]
 mod discovery;
+#[path = "zmq_pipeline/domains.rs"]
+mod domains;
 #[path = "zmq_pipeline/history.rs"]
 mod history;
 #[path = "zmq_pipeline/identity.rs"]
@@ -52,6 +53,8 @@ mod propagation;
 mod router;
 #[path = "zmq_pipeline/send.rs"]
 mod send;
+#[path = "zmq_pipeline/support.rs"]
+mod support;
 #[path = "zmq_pipeline/ticket.rs"]
 mod ticket;
 #[path = "zmq_pipeline/transport.rs"]
@@ -63,16 +66,40 @@ mod workflow;
 #[path = "zmq_pipeline/tests/mod.rs"]
 mod tests;
 
+include!("zmq_pipeline/backend_domain_methods.rs");
+
 pub use config::{ZmqEndpointRole, ZmqPipelineBackendConfig, ZmqPipelineTokenAuth};
 use negotiation::new_session_id;
-use transport::ZmqPipelineTransport;
+use support::{map_rpc_error, sdk_error, token_signature};
+use transport::{ZmqDealerTransport, ZmqPipelineTransport};
+const ZMQ_DEALER_POOL_SIZE: usize = 8;
 pub struct ZmqPipelineBackendClient {
     config: ZmqPipelineBackendConfig,
     session_id: String,
     next_request_id: AtomicU64,
     negotiated_capabilities: RwLock<Vec<String>>,
-    runtime: Runtime,
+    manual_tick_cursor: RwLock<Option<EventCursor>>,
+    runtime: Option<Runtime>,
     transport: tokio::sync::Mutex<Option<ZmqPipelineTransport>>,
+    dealer_pool: Vec<tokio::sync::Mutex<Option<ZmqDealerTransport>>>,
+}
+
+impl Drop for ZmqPipelineBackendClient {
+    fn drop(&mut self) {
+        let Some(runtime) = self.runtime.take() else {
+            return;
+        };
+        if tokio::runtime::Handle::try_current().is_ok() {
+            // Tokio rejects dropping a blocking-capable runtime from an async task. Finish its
+            // shutdown on a plain thread so a client can safely be constructed and dropped in
+            // either synchronous or asynchronous applications.
+            let _ = std::thread::Builder::new()
+                .name("lxmf-sdk-zmq-runtime-drop".to_owned())
+                .spawn(move || drop(runtime));
+        } else {
+            drop(runtime);
+        }
+    }
 }
 impl ZmqPipelineBackendClient {
     pub fn new(config: ZmqPipelineBackendConfig) -> Result<Self, SdkError> {
@@ -84,8 +111,24 @@ impl ZmqPipelineBackendClient {
             session_id: new_session_id(),
             next_request_id: AtomicU64::new(1),
             negotiated_capabilities: RwLock::new(Vec::new()),
-            runtime,
+            manual_tick_cursor: RwLock::new(None),
+            runtime: Some(runtime),
             transport: tokio::sync::Mutex::new(None),
+            dealer_pool: (0..ZMQ_DEALER_POOL_SIZE).map(|_| tokio::sync::Mutex::new(None)).collect(),
+        })
+    }
+
+    fn new_async_only(config: ZmqPipelineBackendConfig) -> Result<Self, SdkError> {
+        config.validate()?;
+        Ok(Self {
+            config,
+            session_id: new_session_id(),
+            next_request_id: AtomicU64::new(1),
+            negotiated_capabilities: RwLock::new(Vec::new()),
+            manual_tick_cursor: RwLock::new(None),
+            runtime: None,
+            transport: tokio::sync::Mutex::new(None),
+            dealer_pool: (0..ZMQ_DEALER_POOL_SIZE).map(|_| tokio::sync::Mutex::new(None)).collect(),
         })
     }
 
@@ -127,7 +170,10 @@ impl ZmqPipelineBackendClient {
             ));
         }
 
-        let response = self.runtime.block_on(self.send_and_recv(encoded, request_id))?;
+        let runtime = self.runtime.as_ref().ok_or_else(|| {
+            sdk_error(ErrorCategory::Internal, "sync call attempted on async-only zmq client")
+        })?;
+        let response = runtime.block_on(self.send_and_recv(encoded, request_id))?;
         let rpc_response = parse_rpc_frame(&response.payload)
             .map_err(|err| sdk_error(ErrorCategory::Transport, err.to_string()))?;
         if let Some(error) = rpc_response.error {
@@ -268,70 +314,7 @@ impl SdkBackend for ZmqPipelineBackendClient {
             "sdk_poll_events_v2",
             Some(json!({ "cursor": cursor.map(|cursor| cursor.0), "max": max })),
         )?;
-        let events = result
-            .get("events")
-            .and_then(JsonValue::as_array)
-            .map(|rows| {
-                rows.iter()
-                    .map(|row| {
-                        Ok(SdkEvent {
-                            event_id: Self::parse_required_string(row, "event_id")?,
-                            runtime_id: Self::parse_required_string(row, "runtime_id")?,
-                            stream_id: Self::parse_required_string(row, "stream_id")?,
-                            seq_no: Self::parse_required_u64(row, "seq_no")?,
-                            contract_version: Self::parse_required_u16(row, "contract_version")?,
-                            ts_ms: Self::parse_required_u64(row, "ts_ms")?,
-                            event_type: Self::parse_required_string(row, "event_type")?,
-                            severity: row
-                                .get("severity")
-                                .and_then(JsonValue::as_str)
-                                .map(Self::parse_severity)
-                                .unwrap_or(Severity::Info),
-                            source_component: row
-                                .get("source_component")
-                                .and_then(JsonValue::as_str)
-                                .unwrap_or("rns-rpc")
-                                .to_owned(),
-                            operation_id: row
-                                .get("operation_id")
-                                .and_then(JsonValue::as_str)
-                                .map(str::to_owned),
-                            message_id: row
-                                .get("message_id")
-                                .and_then(JsonValue::as_str)
-                                .map(str::to_owned),
-                            peer_id: row
-                                .get("peer_id")
-                                .and_then(JsonValue::as_str)
-                                .map(str::to_owned),
-                            correlation_id: row
-                                .get("correlation_id")
-                                .and_then(JsonValue::as_str)
-                                .map(str::to_owned),
-                            trace_id: row
-                                .get("trace_id")
-                                .and_then(JsonValue::as_str)
-                                .map(str::to_owned),
-                            payload: row
-                                .get("payload")
-                                .cloned()
-                                .unwrap_or(JsonValue::Object(serde_json::Map::new())),
-                            extensions: BTreeMap::new(),
-                        })
-                    })
-                    .collect::<Result<Vec<_>, SdkError>>()
-            })
-            .transpose()?
-            .unwrap_or_default();
-        Ok(EventBatch {
-            events,
-            next_cursor: EventCursor(Self::parse_required_string(&result, "next_cursor")?),
-            dropped_count: result.get("dropped_count").and_then(JsonValue::as_u64).unwrap_or(0),
-            snapshot_high_watermark_seq_no: result
-                .get("snapshot_high_watermark_seq_no")
-                .and_then(JsonValue::as_u64),
-            extensions: BTreeMap::new(),
-        })
+        Self::parse_event_batch(&result)
     }
     fn identity_announce_now(&self) -> Result<Ack, SdkError> {
         let result = self.call_rpc("sdk_identity_announce_now_v2", Some(json!({})))?;
@@ -467,34 +450,6 @@ impl SdkBackend for ZmqPipelineBackendClient {
     ) -> Result<crate::RouterStoragePolicy, SdkError> {
         self.set_router_storage_policy_impl(patch)
     }
-}
 
-fn sdk_error(category: ErrorCategory, message: impl Into<String>) -> SdkError {
-    SdkError::new(code::INTERNAL, category, message)
-}
-
-fn token_signature(secret: &str, payload: &str) -> String {
-    let mut mac = Hmac::<Sha256>::new_from_slice(secret.as_bytes())
-        .expect("token shared secret must be non-empty");
-    mac.update(payload.as_bytes());
-    hex::encode(mac.finalize().into_bytes())
-}
-
-fn map_rpc_error(error: RpcError) -> SdkError {
-    let category = match error.category.as_deref() {
-        Some("Validation") => ErrorCategory::Validation,
-        Some("Capability") => ErrorCategory::Capability,
-        Some("Config") => ErrorCategory::Config,
-        Some("Policy") => ErrorCategory::Policy,
-        Some("Security") => ErrorCategory::Security,
-        Some("Transport") => ErrorCategory::Transport,
-        Some("Timeout") => ErrorCategory::Timeout,
-        Some("Runtime") => ErrorCategory::Runtime,
-        _ => ErrorCategory::Internal,
-    };
-    SdkError::new(
-        error.machine_code.as_deref().unwrap_or(error.code.as_str()),
-        category,
-        error.message,
-    )
+    zmq_backend_domain_methods!();
 }

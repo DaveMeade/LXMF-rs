@@ -1,4 +1,5 @@
 use super::*;
+use crate::{RnsSdkTransport, RnsTransportOperation, SdkControlRequest};
 
 #[test]
 fn operation_registry_uses_zmq_sdk_method_for_chat_peer_and_propagation_operations() {
@@ -67,6 +68,47 @@ fn operation_registry_uses_zmq_sdk_method_for_chat_peer_and_propagation_operatio
     let request = captured.as_ref().expect("zmq request");
     assert_eq!(request.method, "sdk_operation_registry_v2");
     assert_eq!(request.params, Some(json!({})));
+    server.join().expect("server joined");
+}
+
+#[test]
+fn rns_transport_extension_uses_typed_zmq_envelope() {
+    let command_endpoint = unused_loopback_endpoint();
+    let response_endpoint = unused_loopback_endpoint();
+    let captured = Arc::new(Mutex::new(None));
+    let server = spawn_single_response_zmq_server(
+        command_endpoint.clone(),
+        json!({
+            "response": {
+                "operation_id": "rns.transport.path.status",
+                "kind": "result",
+                "accepted": true,
+                "correlation_id": null,
+                "payload": { "status": "found", "hops": 2 },
+                "extensions": {}
+            }
+        }),
+        Arc::clone(&captured),
+    );
+    let config = ZmqPipelineBackendConfig::local_tcp(command_endpoint, response_endpoint);
+    let client = crate::Client::new(ZmqPipelineBackendClient::new(config).expect("zmq client"));
+
+    let result = client
+        .rns_transport(SdkControlRequest::new(
+            RnsTransportOperation::PathStatus,
+            json!({ "destination": "00112233" }),
+        ))
+        .expect("typed RNS transport request");
+
+    assert!(result.accepted);
+    assert_eq!(result.value["status"], json!("found"));
+    let captured = captured.lock().expect("captured request");
+    let request = captured.as_ref().expect("zmq request");
+    assert_eq!(request.method, "sdk_envelope_execute_v2");
+    assert_eq!(
+        request.params.as_ref().and_then(|value| value.get("operation_id")),
+        Some(&json!("rns.transport.path.status"))
+    );
     server.join().expect("server joined");
 }
 

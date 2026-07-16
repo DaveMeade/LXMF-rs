@@ -8,13 +8,13 @@
     },
     {
       "path": "docs/contracts/baselines/lxmf-sdk-public-api.txt",
-      "bytes": 347140,
-      "sha256": "39664efe1f56c39348d8ee3352f56f1fae3d46c457411aefcd32ceb0bb5c4b72"
+      "bytes": 394488,
+      "sha256": "9aa0ad3a947a562d01d7e415f1f2763c407d4e668769f22fab09720751cd67b3"
     },
     {
       "path": "docs/contracts/baselines/schema-client-generation-baseline.json",
       "bytes": 373,
-      "sha256": "e94226574c18783ee23df7b774112f97543abe925a5be2643f946d20bb876173"
+      "sha256": "7de835d9ce1550179fa825e71b8478dccfa79f1ccc92b25f1bb7475a2b1623ef"
     },
     {
       "path": "docs/contracts/ble-camera-wire-v1.md",
@@ -118,8 +118,8 @@
     },
     {
       "path": "docs/contracts/schema-driven-clients.md",
-      "bytes": 2658,
-      "sha256": "ff7a4f74e5658796e91c5cd9084a97d27d66956eb88a3c03eb02a2225abf0ce0"
+      "bytes": 2688,
+      "sha256": "2e55ac8105cbe11efaf7205c4bb7c4aed78c11aeb7604c03bf32ab6d76c5ead9"
     },
     {
       "path": "docs/contracts/sdk-app-api-v1.md",
@@ -153,8 +153,8 @@
     },
     {
       "path": "docs/contracts/sdk-v2-backends.md",
-      "bytes": 8092,
-      "sha256": "bd8fc9b3ecdce30959ed643aa514933d8512cfd4424bd59488d3dcd7293a2119"
+      "bytes": 8305,
+      "sha256": "235c5920a1662b8b5d8d8d4b448a48295ec444b4aeed8c3b117af1397262f5d8"
     },
     {
       "path": "docs/contracts/sdk-v2-commands.md",
@@ -173,8 +173,8 @@
     },
     {
       "path": "docs/contracts/sdk-v2-feature-matrix.md",
-      "bytes": 10566,
-      "sha256": "3b83156cd7c5d4faf5432db36b06b176030d4adc07fd26e7015696c37ecb9b6f"
+      "bytes": 10564,
+      "sha256": "81563f8d770b4295d0174b13238b36fe793ec8346c2738b0b0b8aac2f1abc989"
     },
     {
       "path": "docs/contracts/sdk-v2-identity.md",
@@ -218,8 +218,8 @@
     },
     {
       "path": "docs/contracts/sdk-v2.md",
-      "bytes": 13085,
-      "sha256": "fd3c99517faa8f94dfdb119e4834ff9325508a7819b901978881d66e8f7a1318"
+      "bytes": 13239,
+      "sha256": "c3590d74f0bce7f9f31823e30192549e04427abbc4c7966085928e3a8ad1cfc5"
     },
     {
       "path": "docs/contracts/support-policy.md",
@@ -1354,7 +1354,7 @@
     {
       "path": "docs/fixtures/sdk-v2/rpc/replay_known_send_cancel.v1.json",
       "bytes": 2808,
-      "sha256": "a0f3cc5d43dfab5e4c0806d9b3baca0a6cd0217b73c3e80978bf92ed52c0e037"
+      "sha256": "8764dd6966c9ea656990f04aca3142736e6a2ac489e53225b644d4225994f7a3"
     },
     {
       "path": "docs/fixtures/sdk-v2/rpc/sdk_cancel_message_v2.request.invalid.json",
@@ -1399,7 +1399,7 @@
     {
       "path": "docs/fixtures/sdk-v2/rpc/sdk_negotiate_v2.response.valid.json",
       "bytes": 1139,
-      "sha256": "c43079a8032b2367672b7a55983f49e3b731a1e413e87dd5dd6ba22219cc7753"
+      "sha256": "864b7f190434f6f129b9e4492fd74f2f01617b41f1ee1f01f7b918a0721b7239"
     },
     {
       "path": "docs/fixtures/sdk-v2/rpc/sdk_poll_events_v2.request.invalid.json",
@@ -1529,7 +1529,7 @@
     {
       "path": "docs/schemas/sdk/v2/clients/client-generation-manifest.json",
       "bytes": 1855,
-      "sha256": "74d13018027ef68dada70930f487aaed67665736d2cdf57cfc03d6d0ec5ba186"
+      "sha256": "2823c2424ba5de208279cdc8dee385364d61a09ab1682e6cebff01287016f586"
     },
     {
       "path": "docs/schemas/sdk/v2/clients/client-generation-manifest.schema.json",
@@ -1539,7 +1539,7 @@
     {
       "path": "docs/schemas/sdk/v2/clients/smoke-requests.json",
       "bytes": 2151,
-      "sha256": "8792f0679b06ceb992c60812cc2a4cacc4ab899ab9071b3572d057acb55a3574"
+      "sha256": "6190ea18aa2a2ed3f6c181edead8af330ac2da76f8075c058f1510accb98fae8"
     },
     {
       "path": "docs/schemas/sdk/v2/command-plugin.schema.json",

@@ -1,7 +1,7 @@
-# SDK Contract v2.5 (Feature Matrix)
+# SDK Contract v2.6 (Feature Matrix)
 
 Status: Draft, implementation target  
-Contract release: `v2.5`  
+Contract release: `v2.6`
 Schema namespace: `v2`
 
 Legend:

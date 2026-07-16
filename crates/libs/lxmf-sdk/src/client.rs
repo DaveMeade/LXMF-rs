@@ -47,6 +47,8 @@ pub struct Client<B: SdkBackend> {
 #[cfg(feature = "sdk-async")]
 #[path = "client/async_ops.rs"]
 mod async_ops;
+#[path = "client/control.rs"]
+mod control;
 #[path = "client/domains.rs"]
 mod domains;
 #[path = "client/group.rs"]

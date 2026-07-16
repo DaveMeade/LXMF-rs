@@ -8,7 +8,9 @@ fn run_ci_stage(stage: CiStage, timeout_secs: Option<u64>) -> Result<()> {
         CiStage::TestIntegration => run("cargo", &["test", "--workspace", "--tests"]),
         CiStage::Doc => {
             run("cargo", &["doc", "--workspace", "--no-deps", "--lib"])?;
-            run_python_surface_parity_check(true)
+            run_python_surface_parity_check(true)?;
+            run_sdk_zmq_parity_check()?;
+            run_performance_docs_check()
         }
         CiStage::Security => {
             run_cargo_deny_policy_check()?;
@@ -104,6 +106,8 @@ fn run_release_check() -> Result<()> {
     run_correctness_check()?;
     run("cargo", &["doc", "--workspace", "--no-deps", "--lib"])?;
     run_python_surface_parity_check(true)?;
+    run_sdk_zmq_parity_check()?;
+    run_performance_docs_check()?;
     run_sdk_docs_check()?;
     run_sdk_cookbook_check()?;
     run_sdk_ergonomics_check()?;
@@ -173,6 +177,26 @@ fn run_python_surface_parity_check(require_complete: bool) -> Result<()> {
         args.push("--require-complete");
     }
     run("python3", &args)
+}
+
+fn run_sdk_zmq_parity_check() -> Result<()> {
+    run("python3", &["tools/scripts/sdk_zmq_parity.py", "--check"])
+}
+
+fn run_performance_docs_check() -> Result<()> {
+    run("python3", &["tools/scripts/performance_docs.py", "--check"])?;
+    run(
+        "python3",
+        &[
+            "tools/scripts/performance_release_gate.py",
+            "--candidate",
+            "docs/performance/v0.9.5.json",
+            "--baseline",
+            "docs/performance/v0.9.5.json",
+            "--output",
+            "target/performance/release-gate-smoke.json",
+        ],
+    )
 }
 
 fn run_interfaces_required() -> Result<()> {

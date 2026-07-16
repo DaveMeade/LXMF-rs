@@ -404,7 +404,7 @@ impl RpcDaemon {
                 "active_contract_version": active_contract_version,
                 "effective_capabilities": effective_capabilities,
                 "effective_limits": limits,
-                "contract_release": "v2.5",
+                "contract_release": "v2.6",
                 "schema_namespace": "v2",
                 "sdk_version": SDK_VERSION,
                 "python_reference": python_reference_meta(),

@@ -323,13 +323,11 @@ impl RpcDaemon {
                 method: method.to_owned(),
                 params: Some(params),
             })?,
-            _ => {
-                return Ok(self.sdk_error_response(
-                    request_id,
-                    "SDK_RUNTIME_NOT_SUPPORTED",
-                    "operation is not implemented by the rpc daemon",
-                ))
-            }
+            _ => self.handle_rpc(RpcRequest {
+                id: request_id,
+                method: method.to_owned(),
+                params: Some(params),
+            })?,
         };
 
         if let Some(error) = delegated.error {

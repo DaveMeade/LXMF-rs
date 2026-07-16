@@ -98,7 +98,7 @@ impl RpcDaemon {
         };
 
         let envelope = RpcEventSinkEnvelope {
-            contract_release: "v2.5".to_string(),
+            contract_release: "v2.6".to_string(),
             runtime_id: self.identity_hash.clone(),
             stream_id: SDK_STREAM_ID.to_string(),
             seq_no,

@@ -3,7 +3,7 @@
 [![Ask DeepWiki](https://deepwiki.com/badge.svg)](https://deepwiki.com/FreeTAKTeam/LXMF-rs)
 
 Rust monorepo for LXMF and Reticulum with strict library/app boundaries and
-enterprise quality gates. The `0.9.1` line is a usable sub-1.0
+enterprise quality gates. The `0.9.5` line is a usable sub-1.0
 daemon/product release with substantially expanded RNS/LXMF software parity,
 published crates, GitHub tool bundles, and improved existing typed SDK
 communication for REM/RCH clients; it is not a compatibility layer or a
@@ -13,25 +13,25 @@ complete drop-in replacement for every Python Reticulum/LXMF behavior.
 
 - Contributor workflow: `CONTRIBUTING.md`
 - Current status and execution order: `docs/status/current-roadmap.md`
-- Release notes: `docs/release-notes-v0.9.1.md`
+- Release notes: `docs/release-notes-v0.9.5.md`
 - Docs map and retention rules: `docs/README.md`
 - SDK guide: `docs/sdk/README.md`
 - Support policy: `docs/contracts/support-policy.md`
 
 ## Release Status
 
-Current release train: `0.9.1`.
+Current release train: `0.9.5`.
 
-Use `docs/release-notes-v0.9.1.md` for the release summary and
+Use `docs/release-notes-v0.9.5.md` for the release summary and
 `docs/runbooks/release-readiness.md` for the release gate record. The
 repository-level parity source of truth remains
 `docs/status/current-roadmap.md`; the detailed parity supplements are
 `docs/status/reticulum-parity-matrix.md` and
 `docs/status/lxmf-parity-matrix.md`.
 
-The `0.9.1` release scope covers the Rust libraries, SDK entry points, `lxmd`,
+The `0.9.5` release scope covers the Rust libraries, SDK entry points, `lxmd`,
 `reticulumd`, and `rns-tools`, plus host-native GitHub bundles for all
-implemented user-facing tools. The `0.9.1` train is SDK-first: it improves the
+implemented user-facing tools. The `0.9.5` train is SDK-first: it improves the
 existing typed SDK communication path, event/status metadata, and release
 alignment while preserving the explicit boundary that this is not a separate
 compatibility layer. Operational substitutability is materially stronger but
@@ -186,7 +186,7 @@ cargo run -p xtask -- architecture-checks
 cargo run -p xtask -- sdk-docs-check
 cargo run -p xtask -- sdk-migration-check
 cargo xtask release-check
-cargo xtask package-daemon-bundle --version 0.9.1
+cargo xtask package-daemon-bundle --version 0.9.5
 cargo xtask api-diff
 cargo xtask python-impl-bench-compare
 cargo xtask python-impl-bench-compare --profile report
@@ -198,7 +198,7 @@ For fast local iteration on one binary, prefer narrow commands:
 ```bash
 make check-bin PKG=lxmf-cli BIN=lxmd
 make run-bin PKG=rns-tools BIN=rnsd ARGS="--help"
-make package-daemon-bundle VERSION=0.9.1
+make package-daemon-bundle VERSION=0.9.5
 make python-lxmd-smoke
 ```
 
@@ -234,7 +234,7 @@ cargo run -p rns-tools --bin rnx -- e2e --timeout-secs 20
 - Extension registry: `docs/contracts/extension-registry.md`
 - RPC contract: `docs/contracts/rpc-contract.md`
 - Payload contract: `docs/contracts/payload-contract.md`
-- Historical performance comparison report: `docs/PerformancesComparison.html`
+- Historical performance comparison archive: `docs/PerformancesComparison.html`; current generated results: [`docs/performance.md`](docs/performance.md)
 - reticulumd operational deployment: `docs/runbooks/reticulumd-operational-deployment.md`
 - Logging and diagnostics: `docs/runbooks/logging-and-diagnostics.md`
 - crates.io publish plan: `docs/runbooks/crates-io-publish-plan.md`
@@ -247,16 +247,16 @@ workspace directory names:
 
 ```toml
 [dependencies]
-lxmf = "0.9.1"
-reticulum-rs = "0.9.1"
+lxmf = "0.9.5"
+reticulum-rs = "0.9.5"
 ```
 
 Or depend on the component crates directly:
 
 ```toml
 [dependencies]
-lxmf-sdk = "0.9.1"
-reticulum-rs-rpc = "0.9.1"
+lxmf-sdk = "0.9.5"
+reticulum-rs-rpc = "0.9.5"
 ```
 
 ## SDK Guide
@@ -387,9 +387,9 @@ Release artifacts are published on the GitHub releases page:
 
 [https://github.com/FreeTAKTeam/LXMF-rs/releases](https://github.com/FreeTAKTeam/LXMF-rs/releases)
 
-For `v0.9.1`, use the release at:
+For `v0.9.5`, use the release at:
 
-[https://github.com/FreeTAKTeam/LXMF-rs/releases/tag/v0.9.1](https://github.com/FreeTAKTeam/LXMF-rs/releases/tag/v0.9.1)
+[https://github.com/FreeTAKTeam/LXMF-rs/releases/tag/v0.9.5](https://github.com/FreeTAKTeam/LXMF-rs/releases/tag/v0.9.5)
 
 1. Open the release page and download the package and matching `.sha256` file
    for your platform.
@@ -397,19 +397,19 @@ For `v0.9.1`, use the release at:
 2. Linux/macOS
 
 ```bash
-sha256sum -c lxmf-rs-tools-v0.9.1-linux-x64.tar.gz.sha256
-tar -xzf lxmf-rs-tools-v0.9.1-linux-x64.tar.gz
+sha256sum -c lxmf-rs-tools-v0.9.5-linux-x64.tar.gz.sha256
+tar -xzf lxmf-rs-tools-v0.9.5-linux-x64.tar.gz
 
-sha256sum -c lxmf-rs-tools-v0.9.1-macos-arm64.tar.gz.sha256
-tar -xzf lxmf-rs-tools-v0.9.1-macos-arm64.tar.gz
+sha256sum -c lxmf-rs-tools-v0.9.5-macos-arm64.tar.gz.sha256
+tar -xzf lxmf-rs-tools-v0.9.5-macos-arm64.tar.gz
 ```
 
 3. Windows
 
 ```powershell
-Get-FileHash .\lxmf-rs-tools-v0.9.1-windows-x64.zip -Algorithm SHA256
-Get-Content .\lxmf-rs-tools-v0.9.1-windows-x64.zip.sha256
-Expand-Archive .\lxmf-rs-tools-v0.9.1-windows-x64.zip .
+Get-FileHash .\lxmf-rs-tools-v0.9.5-windows-x64.zip -Algorithm SHA256
+Get-Content .\lxmf-rs-tools-v0.9.5-windows-x64.zip.sha256
+Expand-Archive .\lxmf-rs-tools-v0.9.5-windows-x64.zip .
 ```
 
 4. Run directly for validation
@@ -436,6 +436,21 @@ If you are using Linux and the Linux daemon guide above, point `--config` at the
   `docs/runbooks/python-impl-benchmarking.md`.
 - For daemon-level mixed-runtime smoke coverage, `make python-lxmd-smoke`
   launches a Rust `lxmd` node and an installed Python `lxmd` node together.
+
+<!-- performance-summary:start -->
+## Measured performance
+
+Release dataset: `v0.9.5` at `4b866454b5b1cd41e1c75983a199e5e0d0f45275`; Python Reticulum `15320e4d2cfa` and LXMF `727830cefda8`.
+
+| Matched workload | Rust p50 | Python p50 | Rust/Python |
+|---|---:|---:|---:|
+| LXMF message decode | 150 ns | 86.56 us | 576.59x |
+| LXMF message encode | 260 ns | 36.27 us | 139.59x |
+| LXMF large message decode | 250 ns | 92.94 us | 371.58x |
+| LXMF large message encode | 500 ns | 43.43 us | 86.95x |
+
+These are matched-workload comparisons, not a claim of whole-system superiority. See [methodology, complete results, variability, and limitations](docs/performance.md).
+<!-- performance-summary:end -->
 
 ## License
 

@@ -5,6 +5,7 @@ pub mod app;
 mod backend;
 pub mod capability;
 mod client;
+mod control;
 pub mod domain;
 mod error;
 pub mod event;
@@ -52,6 +53,12 @@ pub use capability::{
 };
 // Stability class: internal
 pub use client::Client;
+pub use control::{
+    LxmfPropagationOperation, LxmfRouterOperation, LxmfSdkPropagation, LxmfSdkRouter,
+    RnsDataPlaneOperation, RnsInterfacesOperation, RnsRuntimeOperation, RnsSdkDataPlane,
+    RnsSdkInterfaces, RnsSdkRuntime, RnsSdkTransport, RnsTransportOperation, SdkControlRequest,
+    SdkControlResult,
+};
 // Stability class: stable
 pub use domain::{
     AttachmentDownloadChunk, AttachmentDownloadChunkRequest, AttachmentId, AttachmentListRequest,
@@ -116,7 +123,7 @@ pub use types::{
     StoreForwardPatch, TickBudget, TickResult,
 };
 
-pub const CONTRACT_RELEASE: &str = "v2.5";
+pub const CONTRACT_RELEASE: &str = "v2.6";
 pub const SCHEMA_NAMESPACE: &str = "v2";
 pub const SDK_VERSION: &str = env!("CARGO_PKG_VERSION");
 pub use lxmf_reference::{

@@ -1,7 +1,7 @@
-# SDK Contract v2.5 (Core)
+# SDK Contract v2.6 (Core)
 
 Status: Draft, implementation target  
-Contract release: `v2.5`  
+Contract release: `v2.6`
 Schema namespace: `v2`
 
 ## Purpose
@@ -33,7 +33,10 @@ Out of scope:
 
 The SDK reports:
 
-- `contract_release` (example: `v2.5`)
+- `contract_release` (example: `v2.6`)
+
+The schema namespace and active wire protocol remain `v2` and `2`. Daemons
+accept v2.5 request payloads; v2.6 is additive and does not remove v2.5 fields.
 - `schema_namespace` (example: `v2`)
 - `active_contract_version` (numeric negotiation value)
 
@@ -236,7 +239,7 @@ Rules:
 - `NotFound`
 - `TooLateToCancel`
 7. Cancel/send races resolve by first terminal CAS commit.
-8. Conformant `v2.5` profiles must not return `Unsupported` for `cancel`.
+8. Conformant `v2.6` profiles must not return `Unsupported` for `cancel`.
 
 ## Group Delivery Semantics
 

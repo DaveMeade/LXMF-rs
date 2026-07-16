@@ -1,6 +1,6 @@
 # LXMF Parity Matrix
 
-Last reassessed: 2026-07-10
+Last reassessed: 2026-07-16
 
 This is the maintained row-level status for Python LXMF compatibility.
 Repository-level posture and execution order live in
@@ -14,6 +14,12 @@ Parity is recorded on two independent axes:
 
 Workspace paths are used for navigation. `crates/libs/lxmf-core` publishes as
 `lxmf-wire`; `crates/libs/rns-rpc` publishes as `reticulum-rs-rpc`.
+
+SDK access is independently complete for software-controlled LXMF operations:
+ZeroMQ now implements every `SdkBackend` domain, native async operations and
+cursor-replaying events, and the `LxmfSdkRouter`/`LxmfSdkPropagation` extension
+traits. Row-level transport classification is generated in
+`docs/status/sdk-zmq-parity.json`.
 
 ## Module Matrix
 
