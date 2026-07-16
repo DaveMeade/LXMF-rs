@@ -440,7 +440,7 @@ If you are using Linux and the Linux daemon guide above, point `--config` at the
 <!-- performance-summary:start -->
 ## Measured performance
 
-Release dataset: `v0.9.5` at `4b866454b5b1cd41e1c75983a199e5e0d0f45275`; Python Reticulum `15320e4d2cfa` and LXMF `727830cefda8`.
+Release dataset: `v0.9.5` at `c4fd18761e41caf2f7d2c7307d49c37aa6dc43ca`; Python Reticulum `15320e4d2cfa` and LXMF `727830cefda8`.
 
 | Matched workload | Rust p50 | Python p50 | Rust/Python |
 |---|---:|---:|---:|

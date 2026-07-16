@@ -2077,7 +2077,7 @@
     "benchmark_config_path": "tools/benchmarks/python_impl.toml",
     "cargo_version": "cargo 1.96.0 (30a34c682 2026-05-25)",
     "cpu": "Intel(R) Core(TM) Ultra 7 165H",
-    "git_commit": "4b866454b5b1cd41e1c75983a199e5e0d0f45275",
+    "git_commit": "c4fd18761e41caf2f7d2c7307d49c37aa6dc43ca",
     "python_lxmf_module": "/home/pgiuseppe/Documents/LXMF-rs/target/python-references/LXMF/LXMF/__init__.py",
     "python_lxmf_revision": "727830cefda83d9c6e3982b48675425f3f988f9c",
     "python_rns_module": "/home/pgiuseppe/Documents/LXMF-rs/target/python-references/Reticulum/RNS/__init__.py",

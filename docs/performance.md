@@ -2,7 +2,7 @@
 
 <!-- GENERATED: tools/scripts/performance_docs.py -->
 
-Dataset: [`docs/performance/v0.9.5.json`](performance/v0.9.5.json). All numbers below originate from release SHA `4b866454b5b1cd41e1c75983a199e5e0d0f45275`.
+Dataset: [`docs/performance/v0.9.5.json`](performance/v0.9.5.json). All numbers below originate from release SHA `c4fd18761e41caf2f7d2c7307d49c37aa6dc43ca`.
 
 ## Methodology
 
@@ -11,7 +11,7 @@ The report uses `5` interleaved comparison runs and `3` isolated resource runs. 
 ## Environment
 
 - Timestamp: `2026-07-16T13:58:22Z`
-- Release SHA: `4b866454b5b1cd41e1c75983a199e5e0d0f45275`
+- Release SHA: `c4fd18761e41caf2f7d2c7307d49c37aa6dc43ca`
 - Python Reticulum: `15320e4d2cfabb143c1db20ca887e275fd521585`
 - Python LXMF: `727830cefda83d9c6e3982b48675425f3f988f9c`
 - Rust: `rustc 1.96.0 (ac68faa20 2026-05-25)`
