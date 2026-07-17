@@ -2,6 +2,7 @@ use super::path::send_to_next_hop;
 use super::resource_wire;
 use super::wire_encryption::should_encrypt_packet;
 use super::*;
+use crate::packet::Header;
 use ed25519_dalek::{Signature, SIGNATURE_LENGTH};
 
 fn validate_destination_receipt_proof(
@@ -476,6 +477,76 @@ pub(super) async fn handle_data<'a>(
                     interface: packet.transport.map(|value| value.as_slice().to_vec()),
                 })
                 .ok();
+
+            // Generates the automatic delivery proof this branch was
+            // missing: it decrypts and forwards a plain `Single`/`Data`
+            // packet (e.g. a direct LXMF message) above, but never told
+            // the sender it arrived. The receive-side validation this
+            // proof round-trips through
+            // (`validated_receipt_hash`/`validate_destination_receipt_proof`,
+            // same file) already handles it correctly, so this is the one
+            // missing half. Wire format matches what that validation
+            // function already expects: `packet_hash(32B) ++
+            // Ed25519_signature(64B)`, signed by this destination's own
+            // private identity over the hash of the packet just received.
+            // Replied on the same interface the original packet arrived
+            // on — this is correct, not a shortcut: Reticulum's own proof
+            // relay is hop-by-hop reversal (each node along a path replies
+            // on the interface it received on), not a fresh path-table
+            // lookup by the proof's own destination (which here is *this*
+            // destination's own hash, not a remote one any path table
+            // would have an entry for). See #479.
+            //
+            // Whether a proof actually gets sent is gated by this
+            // destination's own `proof_strategy` (mirrors Python
+            // Reticulum's `PROVE_NONE`/`PROVE_APP`/`PROVE_ALL` —
+            // see `ProofStrategy`'s doc comment) — a receiver-owned policy
+            // decision, not something the crate imposes unconditionally.
+            // `context: None` is still checked first regardless of
+            // strategy: `Request`/`Response` already have the response
+            // itself as their own delivery acknowledgement;
+            // `Resource`/`KeepAlive`/`CacheRequest` (the same set
+            // `should_encrypt_packet` above already excludes, for the same
+            // underlying reason — they're each a sub-protocol with its own
+            // semantics, not a plain opportunistic app message) have their
+            // own dedicated completion/ack mechanisms elsewhere in this
+            // crate. Proving those too would be redundant at best and
+            // could plausibly confuse a peer expecting exactly one
+            // specific ack shape per context.
+            if packet.context == PacketContext::None {
+                let packet_hash = packet.hash();
+                let signature = {
+                    let destination_guard = destination.lock().await;
+                    let should_prove = match destination_guard.proof_strategy {
+                        ProofStrategy::None => false,
+                        ProofStrategy::All => true,
+                        ProofStrategy::App => destination_guard
+                            .proof_requested_callback
+                            .as_ref()
+                            .is_some_and(|cb| cb.proof_requested(packet)),
+                    };
+                    should_prove.then(|| destination_guard.identity.sign(&packet_hash.to_bytes()))
+                };
+                if let Some(signature) = signature {
+                    let mut proof_data = Vec::with_capacity(HASH_SIZE + SIGNATURE_LENGTH);
+                    proof_data.extend_from_slice(&packet_hash.to_bytes());
+                    proof_data.extend_from_slice(&signature.to_bytes());
+                    let proof_packet = Packet {
+                        header: Header { packet_type: PacketType::Proof, ..Default::default() },
+                        ifac: None,
+                        destination: packet.destination,
+                        transport: None,
+                        context: PacketContext::None,
+                        data: PacketDataBuffer::new_from_slice(&proof_data),
+                    };
+                    handler
+                        .send(TxMessage {
+                            tx_type: TxMessageType::Direct(iface),
+                            packet: proof_packet,
+                        })
+                        .await;
+                }
+            }
         } else {
             data_handled = send_to_next_hop(packet, &handler, None).await;
         }

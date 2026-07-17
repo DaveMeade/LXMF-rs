@@ -27,3 +27,5 @@ include!("tests_parts/blackhole_path_eviction.rs");
 include!("tests_parts/reticulum_runtime_management.rs");
 
 include!("tests_parts/packet_proof_correlation.rs");
+
+include!("tests_parts/single_destination_delivery_proof.rs");

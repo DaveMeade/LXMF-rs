@@ -21,6 +21,8 @@ use std::collections::{BTreeMap, VecDeque};
 
 use std::path::Path;
 
+use std::sync::Arc;
+
 use std::time::Instant;
 
 use x25519_dalek::PublicKey;

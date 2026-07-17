@@ -32,6 +32,7 @@ use crate::destination::DestinationAnnounce;
 use crate::destination::DestinationDesc;
 use crate::destination::DestinationHandleStatus;
 use crate::destination::DestinationName;
+use crate::destination::ProofStrategy;
 use crate::destination::SingleInputDestination;
 use crate::destination::SingleOutputDestination;
 

@@ -17,6 +17,42 @@ pub const PATH_RESPONSE_TAG_CAP: usize = 64;
 pub const MIN_ANNOUNCE_DATA_LENGTH: usize =
     PUBLIC_KEY_LENGTH * 2 + NAME_HASH_LENGTH + RAND_HASH_LENGTH + SIGNATURE_LENGTH;
 
+/// Mirrors Python Reticulum's `RNS.Destination.PROVE_NONE`/`PROVE_APP`/
+/// `PROVE_ALL` (`RNS/Destination.py`) — whether this destination
+/// automatically generates a delivery proof for a plain opportunistic
+/// `Data` packet it receives (`transport::wire::handle_data`). `None` (the
+/// default, matching Python's own default) never proves; `All` always
+/// proves; `App` defers to `proof_requested_callback`, called per-packet.
+#[derive(Copy, Clone, Debug, PartialEq, Eq, Default)]
+pub enum ProofStrategy {
+    #[default]
+    None,
+    App,
+    All,
+}
+
+/// Mirrors Python Reticulum's `Destination.set_proof_requested_callback` —
+/// registered via `Destination::set_proof_requested_callback`, consulted by
+/// `transport::wire::handle_data` only when `proof_strategy ==
+/// ProofStrategy::App`. Implemented generically for any `Fn(&Packet) ->
+/// bool + Send + Sync` closure below, so callers can pass a closure
+/// directly; a named trait (rather than a bare `dyn Fn` field) matches this
+/// crate's existing `ReceiptHandler` convention (`transport::core`).
+///
+/// Runs synchronously, inline, while both the transport handler's lock and
+/// this destination's own lock are held (see `handle_data`) — must not
+/// block and must not attempt to re-lock the destination it was registered
+/// on; `tokio::sync::Mutex` is not reentrant.
+pub trait ProofRequestedHandler: Send + Sync {
+    fn proof_requested(&self, packet: &Packet) -> bool;
+}
+
+impl<F: Fn(&Packet) -> bool + Send + Sync> ProofRequestedHandler for F {
+    fn proof_requested(&self, packet: &Packet) -> bool {
+        self(packet)
+    }
+}
+
 #[derive(Copy, Clone)]
 pub struct DestinationName {
     pub hash: Hash,
@@ -202,6 +238,8 @@ pub struct Destination<I: HashIdentity, D: Direction, T: Type> {
     ratchet_state: RatchetState,
     path_responses: BTreeMap<Vec<u8>, (Instant, Packet)>,
     path_response_queue: VecDeque<(Vec<u8>, Instant)>,
+    pub(crate) proof_strategy: ProofStrategy,
+    pub(crate) proof_requested_callback: Option<Arc<dyn ProofRequestedHandler>>,
 }
 
 impl<I: HashIdentity, D: Direction, T: Type> Destination<I, D, T> {
