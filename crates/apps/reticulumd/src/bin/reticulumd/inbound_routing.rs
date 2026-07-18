@@ -158,8 +158,8 @@ fn is_lxmf_propagation_link_destination(destination: &DestinationDesc) -> bool {
 mod tests {
     use super::{
         destination_for_outbound_link, is_lxmf_delivery_destination,
-        is_lxmf_propagation_link_destination, should_skip_resolved_control_payload,
-        InboundLxmfDestination,
+        is_lxmf_propagation_link_destination, resolve_resource_destination,
+        should_skip_resolved_control_payload, InboundLxmfDestination,
     };
     use rand_core::OsRng;
     use rns_transport::destination::{DestinationDesc, DestinationName};
@@ -227,6 +227,135 @@ mod tests {
         assert_eq!(
             destination_for_outbound_link(&remote_destination, Some(local_destination)),
             Some(InboundLxmfDestination::Delivery(local_destination))
+        );
+    }
+
+    // Live-reproduction check for PR #482 / issue #481: does a genuine
+    // plain (non-Request, non-Response) Resource transfer, completed over a
+    // real Link the sender opened to our own registered `lxmf.delivery`
+    // destination, actually resolve via THIS function the way
+    // `spawn_inbound_worker`'s pre-existing `resource_events()` consumer
+    // already relies on? No synthetic destination descriptors here — a
+    // real inbound Link, built the same way `handle_link_request_as_destination`
+    // builds one in production, carrying a real completed Resource transfer.
+    #[tokio::test]
+    async fn plain_resource_over_a_real_link_resolves_to_local_delivery_destination() {
+        use rns_transport::iface::{IfaceSource, RxMessage};
+        use rns_transport::resource::ResourceEventKind;
+        use rns_transport::transport::{Transport, TransportConfig};
+        use tokio::time::{timeout, Duration};
+
+        let receiver_identity = PrivateIdentity::new_from_rand(OsRng);
+        let mut receiver_transport =
+            Transport::new(TransportConfig::new("receiver", &receiver_identity, true));
+        let receiver_iface = receiver_transport.iface_manager().lock().await.new_channel(64);
+        let own_destination = receiver_transport
+            .add_destination(receiver_identity.clone(), DestinationName::new("lxmf", "delivery"))
+            .await;
+        let own_desc = own_destination.lock().await.desc;
+        let mut destination_hash = [0u8; 16];
+        destination_hash.copy_from_slice(own_desc.address_hash.as_slice());
+
+        let sender_identity = PrivateIdentity::new_from_rand(OsRng);
+        let sender_transport =
+            Transport::new(TransportConfig::new("sender", &sender_identity, true));
+        let sender_iface = sender_transport.iface_manager().lock().await.new_channel(64);
+
+        // Autonomously relay whatever each side transmits to the other, so
+        // the real Link handshake and Resource transfer run to completion
+        // exactly as they would over a real network — no manual packet
+        // stepping.
+        let (mut receiver_tx, receiver_rx_channel, receiver_addr) =
+            (receiver_iface.tx_channel, receiver_iface.rx_channel, receiver_iface.address);
+        let (mut sender_tx, sender_rx_channel, sender_addr) =
+            (sender_iface.tx_channel, sender_iface.rx_channel, sender_iface.address);
+        tokio::spawn({
+            let sender_rx_channel = sender_rx_channel.clone();
+            async move {
+                while let Some(msg) = receiver_tx.recv().await {
+                    let _ = sender_rx_channel
+                        .send(RxMessage {
+                            address: sender_addr,
+                            packet: msg.packet,
+                            source: IfaceSource::None,
+                        })
+                        .await;
+                }
+            }
+        });
+        tokio::spawn({
+            let receiver_rx_channel = receiver_rx_channel.clone();
+            async move {
+                while let Some(msg) = sender_tx.recv().await {
+                    let _ = receiver_rx_channel
+                        .send(RxMessage {
+                            address: receiver_addr,
+                            packet: msg.packet,
+                            source: IfaceSource::None,
+                        })
+                        .await;
+                }
+            }
+        });
+
+        let out_link = sender_transport.link(own_desc).await;
+        let link_id = *out_link.lock().await.id();
+        for _ in 0..200 {
+            if out_link.lock().await.status()
+                == rns_transport::destination::link::LinkStatus::Active
+            {
+                break;
+            }
+            tokio::time::sleep(Duration::from_millis(10)).await;
+        }
+        assert_eq!(
+            out_link.lock().await.status(),
+            rns_transport::destination::link::LinkStatus::Active,
+            "real Link handshake should complete over the relayed virtual ifaces"
+        );
+
+        // Large enough to force genuine multi-part chunking over the Link's
+        // MTU, matching the motivating "large message" scenario in #481 —
+        // not just a single-packet resource that might trivially round-trip
+        // regardless of whether the real chunked-transfer machinery works.
+        let payload: Vec<u8> = (0..20_000).map(|i| (i % 256) as u8).collect();
+        let mut resource_events = receiver_transport.resource_events();
+        sender_transport
+            .send_resource(&link_id, payload.clone(), None)
+            .await
+            .expect("plain resource send should succeed over the active link");
+
+        let event = timeout(Duration::from_secs(5), async {
+            loop {
+                let event = resource_events.recv().await.expect("resource event stream open");
+                if let ResourceEventKind::Complete(_) = &event.kind {
+                    return event;
+                }
+            }
+        })
+        .await
+        .expect("receiver should observe a real ResourceEventKind::Complete");
+
+        let ResourceEventKind::Complete(ref complete) = event.kind else { unreachable!() };
+        assert_eq!(
+            complete.data, payload,
+            "the full, untruncated large payload should have reassembled correctly"
+        );
+        assert!(!complete.is_request && !complete.is_response, "this is a plain resource send");
+
+        let resolved = resolve_resource_destination(
+            &receiver_transport,
+            &event.link_id,
+            Some(destination_hash),
+        )
+        .await;
+
+        assert_eq!(
+            resolved,
+            Some(InboundLxmfDestination::Delivery(destination_hash)),
+            "a plain Resource completed over a real Link to our own registered lxmf.delivery \
+             destination should resolve via resolve_resource_destination the same way \
+             spawn_inbound_worker's pre-existing resource_events() consumer already depends on"
         );
     }
 }
