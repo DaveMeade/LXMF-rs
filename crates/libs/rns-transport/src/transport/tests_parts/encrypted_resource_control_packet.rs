@@ -125,14 +125,29 @@ async fn handle_inbound_for_test_accepts_valid_destination_proof() {
     let count = Arc::new(AtomicUsize::new(0));
     transport.set_receipt_handler(Box::new(CountingReceiptHandler { count: count.clone() })).await;
 
-    let packet_hash = [0x55u8; HASH_SIZE];
-    let signature = remote_destination.identity.sign(&packet_hash).to_bytes();
+    // Send a real packet to the remote destination first, so `PacketCache`
+    // actually tracks this hash as one we sent (the fix for the
+    // forged-receipt bug in `wire.rs::validated_receipt_hash`: a proof is
+    // only trusted for a hash this instance tracked sending/relaying, never
+    // just any hash paired with a signature from a known identity).
+    let outbound = Packet {
+        destination: announce.destination,
+        data: PacketDataBuffer::new_from_slice(b"hello from the local sender"),
+        ..Packet::default()
+    };
+    let trace = transport.send_packet_with_trace(outbound).await;
+    let packet_hash = trace.packet_hash.expect("packet hash computed during send");
+
+    let signature = remote_destination.identity.sign(packet_hash.as_slice()).to_bytes();
     let mut data = PacketDataBuffer::new();
-    data.safe_write(&packet_hash);
+    data.safe_write(packet_hash.as_slice());
     data.safe_write(&signature);
     let packet = Packet {
         header: Header { packet_type: PacketType::Proof, ..Default::default() },
-        destination: announce.destination,
+        // Real (and this crate's own) proof packets address to the hash of
+        // the packet being proved, not the proving destination's real
+        // address — see wire.rs's "meshage fork" comment.
+        destination: AddressHash::new_from_hash(&packet_hash),
         context: PacketContext::None,
         data,
         ..Default::default()
@@ -141,6 +156,57 @@ async fn handle_inbound_for_test_accepts_valid_destination_proof() {
     transport.handle_inbound_for_test(packet).await;
 
     assert_eq!(count.load(Ordering::SeqCst), 1);
+}
+
+#[tokio::test]
+async fn handle_inbound_for_test_rejects_untracked_hash_even_with_a_known_identitys_signature() {
+    // Regression test for a forged-receipt bug: a known peer could sign any
+    // hash it had merely observed (e.g. one addressed to a different
+    // destination) and have it accepted as a delivery receipt, because the
+    // old fallback in `validated_receipt_hash` tried every known
+    // destination's identity against an explicit proof whenever there was
+    // no cached record for it. It must now be rejected outright — the
+    // signature is valid, but this instance never sent or relayed anything
+    // with this hash, so there's nothing to check the proof against.
+    let local_identity = PrivateIdentity::new_from_rand(OsRng);
+    let config = TransportConfig::new("test", &local_identity, true);
+    let mut transport = Transport::new(config);
+    let handler = transport.get_handler();
+
+    let remote_identity = PrivateIdentity::new_from_rand(OsRng);
+    let mut remote_destination =
+        SingleInputDestination::new(remote_identity, DestinationName::new("lxmf", "delivery"));
+    let announce = remote_destination.announce(OsRng, None).expect("valid announce packet");
+    handle_announce(
+        &announce,
+        handler.lock().await,
+        AddressHash::new_from_rand(OsRng),
+        crate::iface::IfaceSource::None,
+    )
+    .await;
+
+    let count = Arc::new(AtomicUsize::new(0));
+    transport.set_receipt_handler(Box::new(CountingReceiptHandler { count: count.clone() })).await;
+
+    // Never sent or relayed — a hash the remote destination is happy to
+    // sign (it's genuinely valid under its own identity) but that this
+    // instance has no record of ever transmitting.
+    let untracked_hash = [0x55u8; HASH_SIZE];
+    let signature = remote_destination.identity.sign(&untracked_hash).to_bytes();
+    let mut data = PacketDataBuffer::new();
+    data.safe_write(&untracked_hash);
+    data.safe_write(&signature);
+    let packet = Packet {
+        header: Header { packet_type: PacketType::Proof, ..Default::default() },
+        destination: AddressHash::new_from_hash(&Hash::new(untracked_hash)),
+        context: PacketContext::None,
+        data,
+        ..Default::default()
+    };
+
+    transport.handle_inbound_for_test(packet).await;
+
+    assert_eq!(count.load(Ordering::SeqCst), 0);
 }
 
 #[tokio::test]

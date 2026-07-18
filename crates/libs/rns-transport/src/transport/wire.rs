@@ -125,24 +125,28 @@ pub(super) async fn validated_receipt_hash(
     // corrected proof-generation in `handle_data`, ever addresses a proof
     // to a real destination hash.
     //
-    // Two cases, matching who is receiving this proof:
+    // Two cases, matching who is receiving this proof, both resolved the same
+    // way: via the packet_cache reverse lookup the implicit branch above
+    // already uses, cross-checking the embedded hash against the tracked one
+    // first (mirroring Python's own `receipt.hash == proof_hash` gate), then
+    // verifying *only* against the destination we actually tracked for that
+    // hash.
     //
-    // - We relayed the original packet (`handle_data`'s unconditional
+    // - We relayed the original packet: `handle_data`'s unconditional
     //   `packet_cache.note_source` call ran for it, whether or not we also
-    //   host a local destination it happened to match): resolve via the
-    //   same packet_cache reverse lookup the implicit branch above already
-    //   uses, cross-checking the embedded hash against the tracked one
-    //   first, mirroring Python's own `receipt.hash == proof_hash` gate.
-    // - We are the *original sender*, receiving this proof directly from
-    //   its prover (the common case — we never called `handle_data` on our
-    //   own outbound packet, so packet_cache has nothing for it, matching
-    //   real Reticulum: `Transport.receipts` isn't keyed by the proof's
-    //   destination field either, Python just tries every outstanding
-    //   receipt). This crate doesn't track "packets we're awaiting a proof
-    //   for" itself (that's `pending_receipts`, application-level), but the
-    //   explicit shape carries its own hash, so it's safe to just try every
-    //   locally known destination's identity against it — a wrong identity
-    //   fails signature verification harmlessly.
+    //   host a local destination it happened to match.
+    // - We are the *original sender*, receiving this proof directly from its
+    //   prover: `PacketCache::update` (run for every outbound packet we send)
+    //   records the same reverse mapping for our own Data sends, so this
+    //   case has a cache entry too.
+    //
+    // Without a tracked entry, there is no cached record of us ever sending
+    // or relaying a packet with this hash, so there's nothing to check the
+    // proof against — do NOT fall back to trying every known destination's
+    // identity against the embedded hash. That would accept a signature from
+    // *any* peer we happen to know, over a hash they could have observed on
+    // a packet addressed to someone else entirely, letting them forge a
+    // delivery receipt for a message they never received.
     if packet.data.len() == HASH_SIZE + SIGNATURE_LENGTH {
         let proof_context = {
             let packet_cache = handler.packet_cache.lock().await;
@@ -178,22 +182,6 @@ pub(super) async fn validated_receipt_hash(
                 }
                 if destination_checked {
                     return Err(RnsError::CryptoError);
-                }
-            }
-        } else {
-            for destination in handler.single_out_destinations.values() {
-                let destination = destination.lock().await;
-                if let Ok(hash) = validate_destination_receipt_proof(&destination.identity, packet)
-                {
-                    return Ok(Some(hash.to_bytes()));
-                }
-            }
-            for destination in handler.single_in_destinations.values() {
-                let destination = destination.lock().await;
-                if let Ok(hash) =
-                    validate_destination_receipt_proof(destination.identity.as_identity(), packet)
-                {
-                    return Ok(Some(hash.to_bytes()));
                 }
             }
         }
