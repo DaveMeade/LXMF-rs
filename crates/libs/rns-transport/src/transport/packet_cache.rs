@@ -4,7 +4,7 @@ use std::{
     time::{Duration, Instant},
 };
 
-use crate::{hash::AddressHash, hash::Hash, packet::Packet};
+use crate::{hash::AddressHash, hash::Hash, packet::Packet, packet::PacketType};
 
 pub struct PacketTrack {
     pub time: Instant,
@@ -42,6 +42,18 @@ impl PacketCache {
 
     pub fn update(&mut self, packet: &Packet) -> bool {
         let hash = packet.hash();
+
+        // Track outbound Data packets by their would-be proof destination too,
+        // not just ones we've seen inbound via `note_source`. Without this, a
+        // packet we originate ourselves (never passed to `note_source`, which
+        // only runs for received Data packets) has no cache entry, and an
+        // explicit delivery proof for it falls through to the fallback in
+        // `validate_destination_receipt_proof` callers that trusted any known
+        // identity's signature — letting a peer forge a receipt for a packet
+        // addressed to someone else. See `wire.rs::validated_receipt_hash`.
+        if packet.header.packet_type == PacketType::Data {
+            self.by_proof_destination.insert(AddressHash::new_from_hash(&hash), hash);
+        }
 
         let mut is_new_packet = false;
 

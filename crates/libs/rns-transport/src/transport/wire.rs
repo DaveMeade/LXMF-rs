@@ -2,6 +2,7 @@ use super::path::send_to_next_hop;
 use super::resource_wire;
 use super::wire_encryption::should_encrypt_packet;
 use super::*;
+use crate::packet::Header;
 use ed25519_dalek::{Signature, SIGNATURE_LENGTH};
 
 fn validate_destination_receipt_proof(
@@ -113,29 +114,80 @@ pub(super) async fn validated_receipt_hash(
         }
     }
 
-    let mut found_destination = false;
-    if let Some(destination) = handler.single_out_destinations.get(&packet.destination).cloned() {
-        found_destination = true;
-        let destination = destination.lock().await;
-        if let Ok(hash) = validate_destination_receipt_proof(&destination.identity, packet) {
-            return Ok(Some(hash.to_bytes()));
-        }
-    }
-    if let Some(destination) = handler.single_in_destinations.get(&packet.destination).cloned() {
-        found_destination = true;
-        let destination = destination.lock().await;
-        if let Ok(hash) =
-            validate_destination_receipt_proof(destination.identity.as_identity(), packet)
-        {
-            return Ok(Some(hash.to_bytes()));
+    // meshage fork — explicit proofs (`packet_hash(32B) ++ signature(64B)`)
+    // are addressed the same way implicit ones are: to
+    // `AddressHash::new_from_hash(&original_packet_hash)`
+    // (`RNS/Packet.py::ProofDestination`, `RNS/Identity.py::prove` —
+    // confirmed applies to both proof shapes, not just implicit), so a
+    // direct lookup of `packet.destination` against this instance's own
+    // registered destinations (the old behavior here) can never match a
+    // real proof again — no real Reticulum peer, nor this crate's own
+    // corrected proof-generation in `handle_data`, ever addresses a proof
+    // to a real destination hash.
+    //
+    // Two cases, matching who is receiving this proof, both resolved the same
+    // way: via the packet_cache reverse lookup the implicit branch above
+    // already uses, cross-checking the embedded hash against the tracked one
+    // first (mirroring Python's own `receipt.hash == proof_hash` gate), then
+    // verifying *only* against the destination we actually tracked for that
+    // hash.
+    //
+    // - We relayed the original packet: `handle_data`'s unconditional
+    //   `packet_cache.note_source` call ran for it, whether or not we also
+    //   host a local destination it happened to match.
+    // - We are the *original sender*, receiving this proof directly from its
+    //   prover: `PacketCache::update` (run for every outbound packet we send)
+    //   records the same reverse mapping for our own Data sends, so this
+    //   case has a cache entry too.
+    //
+    // Without a tracked entry, there is no cached record of us ever sending
+    // or relaying a packet with this hash, so there's nothing to check the
+    // proof against — do NOT fall back to trying every known destination's
+    // identity against the embedded hash. That would accept a signature from
+    // *any* peer we happen to know, over a hash they could have observed on
+    // a packet addressed to someone else entirely, letting them forge a
+    // delivery receipt for a message they never received.
+    if packet.data.len() == HASH_SIZE + SIGNATURE_LENGTH {
+        let proof_context = {
+            let packet_cache = handler.packet_cache.lock().await;
+            packet_cache.proof_context_for_destination(&packet.destination)
+        };
+        if let Some((receipt_hash, proved_destination, _)) = proof_context {
+            let mut embedded_hash = [0u8; HASH_SIZE];
+            embedded_hash.copy_from_slice(&packet.data.as_slice()[..HASH_SIZE]);
+            if embedded_hash == receipt_hash.to_bytes() {
+                let mut destination_checked = false;
+                if let Some(destination) =
+                    handler.single_out_destinations.get(&proved_destination).cloned()
+                {
+                    destination_checked = true;
+                    let destination = destination.lock().await;
+                    if let Ok(hash) =
+                        validate_destination_receipt_proof(&destination.identity, packet)
+                    {
+                        return Ok(Some(hash.to_bytes()));
+                    }
+                }
+                if let Some(destination) =
+                    handler.single_in_destinations.get(&proved_destination).cloned()
+                {
+                    destination_checked = true;
+                    let destination = destination.lock().await;
+                    if let Ok(hash) = validate_destination_receipt_proof(
+                        destination.identity.as_identity(),
+                        packet,
+                    ) {
+                        return Ok(Some(hash.to_bytes()));
+                    }
+                }
+                if destination_checked {
+                    return Err(RnsError::CryptoError);
+                }
+            }
         }
     }
 
-    if found_destination {
-        Err(RnsError::CryptoError)
-    } else {
-        Ok(None)
-    }
+    Ok(None)
 }
 
 async fn should_forward_link_request_proof(
@@ -476,6 +528,99 @@ pub(super) async fn handle_data<'a>(
                     interface: packet.transport.map(|value| value.as_slice().to_vec()),
                 })
                 .ok();
+
+            // Generates the automatic delivery proof this branch was
+            // missing: it decrypts and forwards a plain `Single`/`Data`
+            // packet (e.g. a direct LXMF message) above, but never told
+            // the sender it arrived. The receive-side validation this
+            // proof round-trips through
+            // (`validated_receipt_hash`/`validate_destination_receipt_proof`,
+            // same file) already handles it correctly, so this is the one
+            // missing half. Wire format matches what that validation
+            // function already expects: `packet_hash(32B) ++
+            // Ed25519_signature(64B)`, signed by this destination's own
+            // private identity over the hash of the packet just received.
+            // Replied on the same interface the original packet arrived
+            // on — this is correct, not a shortcut: Reticulum's own proof
+            // relay is hop-by-hop reversal (each node along a path replies
+            // on the interface it received on), not a fresh path-table
+            // lookup by the proof's own destination (which here is *this*
+            // destination's own hash, not a remote one any path table
+            // would have an entry for). See #479.
+            //
+            // Whether a proof actually gets sent is gated by this
+            // destination's own `proof_strategy` (mirrors Python
+            // Reticulum's `PROVE_NONE`/`PROVE_APP`/`PROVE_ALL` —
+            // see `ProofStrategy`'s doc comment) — a receiver-owned policy
+            // decision, not something the crate imposes unconditionally.
+            // `context: None` is still checked first regardless of
+            // strategy: `Request`/`Response` already have the response
+            // itself as their own delivery acknowledgement;
+            // `Resource`/`KeepAlive`/`CacheRequest` (the same set
+            // `should_encrypt_packet` above already excludes, for the same
+            // underlying reason — they're each a sub-protocol with its own
+            // semantics, not a plain opportunistic app message) have their
+            // own dedicated completion/ack mechanisms elsewhere in this
+            // crate. Proving those too would be redundant at best and
+            // could plausibly confuse a peer expecting exactly one
+            // specific ack shape per context.
+            if packet.context == PacketContext::None {
+                let packet_hash = packet.hash();
+                let signature = {
+                    let destination_guard = destination.lock().await;
+                    let should_prove = match destination_guard.proof_strategy {
+                        ProofStrategy::None => false,
+                        ProofStrategy::All => true,
+                        ProofStrategy::App => destination_guard
+                            .proof_requested_callback
+                            .as_ref()
+                            .is_some_and(|cb| cb.proof_requested(packet)),
+                    };
+                    should_prove.then(|| destination_guard.identity.sign(&packet_hash.to_bytes()))
+                };
+                if let Some(signature) = signature {
+                    let mut proof_data = Vec::with_capacity(HASH_SIZE + SIGNATURE_LENGTH);
+                    proof_data.extend_from_slice(&packet_hash.to_bytes());
+                    proof_data.extend_from_slice(&signature.to_bytes());
+                    let proof_packet = Packet {
+                        header: Header { packet_type: PacketType::Proof, ..Default::default() },
+                        ifac: None,
+                        // Real Reticulum always addresses a proof to
+                        // `Packet.generate_proof_destination()` — the
+                        // truncated hash of the *proved* packet, not the
+                        // proving destination's own real address hash —
+                        // for both explicit and implicit proof shapes
+                        // alike (`RNS/Identity.py::prove`,
+                        // `RNS/Packet.py::ProofDestination`). This crate's
+                        // own reverse-routing table for proofs
+                        // (`PacketCache::note_source`/
+                        // `by_proof_destination`) is keyed the same way.
+                        // Addressing this to our own real destination hash
+                        // instead "worked" for direct connections (Python's
+                        // local receipt validation in `Transport.py`
+                        // matches by scanning `Transport.receipts`, not by
+                        // this field), but silently broke reachability the
+                        // moment the proof needed to traverse any
+                        // intermediate Transport/relay hop back to the
+                        // original sender — that hop's own reverse-routing
+                        // table would never have an entry under our real
+                        // address hash. Confirmed against
+                        // `RNS/Identity.py::prove` and
+                        // `RNS/Transport.py`'s inbound-proof handling
+                        // directly.
+                        destination: AddressHash::new_from_hash(&packet_hash),
+                        transport: None,
+                        context: PacketContext::None,
+                        data: PacketDataBuffer::new_from_slice(&proof_data),
+                    };
+                    handler
+                        .send(TxMessage {
+                            tx_type: TxMessageType::Direct(iface),
+                            packet: proof_packet,
+                        })
+                        .await;
+                }
+            }
         } else {
             data_handled = send_to_next_hop(packet, &handler, None).await;
         }

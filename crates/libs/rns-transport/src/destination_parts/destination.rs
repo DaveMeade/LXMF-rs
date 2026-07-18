@@ -11,7 +11,25 @@ impl Destination<PrivateIdentity, Input, Single> {
             ratchet_state: RatchetState::default(),
             path_responses: BTreeMap::new(),
             path_response_queue: VecDeque::new(),
+            proof_strategy: ProofStrategy::default(),
+            proof_requested_callback: None,
         }
+    }
+
+    /// Sets whether this destination automatically proves a plain
+    /// opportunistic `Data` packet it receives. Defaults to
+    /// `ProofStrategy::None` (never prove), matching Python Reticulum's own
+    /// default — must be set explicitly to `All` or `App` to enable
+    /// delivery confirmation. See `ProofStrategy`'s own doc comment.
+    pub fn set_proof_strategy(&mut self, strategy: ProofStrategy) {
+        self.proof_strategy = strategy;
+    }
+
+    /// Registers the callback consulted when `proof_strategy ==
+    /// ProofStrategy::App`. See `ProofRequestedHandler`'s doc comment for
+    /// the reentrancy/blocking constraints this callback must honor.
+    pub fn set_proof_requested_callback(&mut self, handler: Box<dyn ProofRequestedHandler>) {
+        self.proof_requested_callback = Some(Arc::from(handler));
     }
 
     pub fn enable_ratchets<P: AsRef<Path>>(&mut self, path: P) -> Result<(), RnsError> {
@@ -230,6 +248,8 @@ impl Destination<Identity, Output, Single> {
             ratchet_state: RatchetState::default(),
             path_responses: BTreeMap::new(),
             path_response_queue: VecDeque::new(),
+            proof_strategy: ProofStrategy::default(),
+            proof_requested_callback: None,
         }
     }
 }
@@ -245,6 +265,8 @@ impl<D: Direction> Destination<EmptyIdentity, D, Plain> {
             ratchet_state: RatchetState::default(),
             path_responses: BTreeMap::new(),
             path_response_queue: VecDeque::new(),
+            proof_strategy: ProofStrategy::default(),
+            proof_requested_callback: None,
         }
     }
 }
