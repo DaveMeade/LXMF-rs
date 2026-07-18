@@ -1,4 +1,3 @@
-use ed25519_dalek::Signature;
 use rns_transport::destination::link::{Link, LinkStatus};
 use rns_transport::destination::DestinationName;
 use rns_transport::hash::AddressHash;
@@ -62,23 +61,6 @@ impl DirectBackchannelLinks {
     }
 }
 
-pub(super) fn parse_link_identify_payload(
-    payload: &[u8],
-    link_id: &AddressHash,
-) -> Result<Identity, &'static str> {
-    if payload.len() < 32 + 32 + 64 {
-        return Err("payload too short");
-    }
-    let identity = Identity::new_from_slices(&payload[..32], &payload[32..64]);
-    let signature =
-        Signature::from_slice(&payload[64..128]).map_err(|_| "invalid signature bytes")?;
-    let mut signed = Vec::with_capacity(16 + 64);
-    signed.extend_from_slice(link_id.as_slice());
-    signed.extend_from_slice(&payload[..64]);
-    identity.verify(&signed, &signature).map_err(|_| "signature verification failed")?;
-    Ok(identity)
-}
-
 fn delivery_destination_hash_for_identity(identity: &Identity) -> AddressHash {
     let name = DestinationName::new("lxmf", "delivery");
     let hash = sha2::Sha256::new()
@@ -98,46 +80,6 @@ mod tests {
     use rns_transport::identity::PrivateIdentity;
     use rns_transport::iface::IfaceRole;
     use rns_transport::transport::TransportConfig;
-
-    #[test]
-    fn parses_valid_link_identify_payload() {
-        let identity = PrivateIdentity::new_from_rand(OsRng);
-        let link_id = AddressHash::new([9u8; 16]);
-        let mut public_key = Vec::new();
-        public_key.extend_from_slice(identity.as_identity().public_key.as_bytes());
-        public_key.extend_from_slice(identity.as_identity().verifying_key.as_bytes());
-        let mut signed = Vec::new();
-        signed.extend_from_slice(link_id.as_slice());
-        signed.extend_from_slice(&public_key);
-        let signature = identity.sign(&signed);
-        let mut payload = public_key;
-        payload.extend_from_slice(signature.to_bytes().as_slice());
-
-        let parsed = parse_link_identify_payload(&payload, &link_id).expect("valid payload");
-
-        assert_eq!(parsed.address_hash, identity.as_identity().address_hash);
-    }
-
-    #[test]
-    fn rejects_link_identify_payload_signed_for_other_link() {
-        let identity = PrivateIdentity::new_from_rand(OsRng);
-        let signed_link_id = AddressHash::new([9u8; 16]);
-        let checked_link_id = AddressHash::new([8u8; 16]);
-        let mut public_key = Vec::new();
-        public_key.extend_from_slice(identity.as_identity().public_key.as_bytes());
-        public_key.extend_from_slice(identity.as_identity().verifying_key.as_bytes());
-        let mut signed = Vec::new();
-        signed.extend_from_slice(signed_link_id.as_slice());
-        signed.extend_from_slice(&public_key);
-        let signature = identity.sign(&signed);
-        let mut payload = public_key;
-        payload.extend_from_slice(signature.to_bytes().as_slice());
-
-        match parse_link_identify_payload(&payload, &checked_link_id) {
-            Ok(_) => panic!("link id is part of the signature"),
-            Err(error) => assert_eq!(error, "signature verification failed"),
-        }
-    }
 
     #[test]
     fn records_identified_link_by_lxmf_delivery_destination() {

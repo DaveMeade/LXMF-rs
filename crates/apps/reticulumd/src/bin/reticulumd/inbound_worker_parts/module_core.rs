@@ -1,7 +1,7 @@
 use reticulum_daemon::receipt_bridge::ReceiptEvent;
 
 use crate::bridge::emit_receipt_event;
-use crate::direct_backchannel::{parse_link_identify_payload, DirectBackchannelLinks};
+use crate::direct_backchannel::DirectBackchannelLinks;
 
 use rns_rpc::{RpcDaemon, RpcRequest};
 
@@ -287,6 +287,42 @@ fn spawn_packet_inbound_worker(
     control: PropagationControlContext,
     direct_backchannel_links: Option<DirectBackchannelLinks>,
 ) {
+    // meshage fork — `LinkIdentify` packets stopped surfacing as plain
+    // `received_data_events()` payloads once #477 gave them their own
+    // dedicated `LinkEvent::PeerIdentified` event (matching upstream
+    // Python Reticulum's own separate identify handling), so the direct
+    // backchannel cache has to be populated from that event directly
+    // instead — the crate now hands back an already-parsed, already-
+    // signature-verified `Identity`, so this no longer needs its own
+    // `parse_link_identify_payload` reimplementation. A backchannel link
+    // can be either side's outbound link to the other, so both event
+    // streams are covered, mirroring how `Transport::new`'s own
+    // `spawn_link_data_forwarder` covers both directions. See #477's
+    // review discussion.
+    if let Some(backchannel_links) = direct_backchannel_links.clone() {
+        for mut rx in [transport.in_link_events(), transport.out_link_events()] {
+            let backchannel_links = backchannel_links.clone();
+            tokio::spawn(async move {
+                loop {
+                    match rx.recv().await {
+                        Ok(event) => {
+                            if let LinkEvent::PeerIdentified(identity) = event.event {
+                                backchannel_links.record_identified_link(&identity, event.id);
+                                log::debug!(
+                                    "[daemon-rx] direct backchannel available destination={} link={}",
+                                    identity.address_hash,
+                                    event.id
+                                );
+                            }
+                        }
+                        Err(tokio::sync::broadcast::error::RecvError::Closed) => break,
+                        Err(tokio::sync::broadcast::error::RecvError::Lagged(_)) => continue,
+                    }
+                }
+            });
+        }
+    }
+
     let daemon_inbound = daemon;
     let inbound_transport = transport;
     tokio::spawn(async move {
@@ -352,29 +388,6 @@ fn spawn_packet_inbound_worker(
                             continue;
                         }
                         InboundLxmfDestination::Delivery(destination) => {
-                            if event.context == Some(PacketContext::LinkIdentify) {
-                                if let Some(backchannel_links) = direct_backchannel_links.as_ref() {
-                                    match parse_link_identify_payload(data, &event.destination) {
-                                        Ok(identity) => {
-                                            backchannel_links
-                                                .record_identified_link(&identity, event.destination);
-                                            log::debug!(
-                                                "[daemon-rx] direct backchannel available destination={} link={}",
-                                                identity.address_hash,
-                                                event.destination
-                                            );
-                                        }
-                                        Err(err) => {
-                                            log::warn!(
-                                                "[daemon-rx] invalid direct backchannel identify link={} err={}",
-                                                event.destination,
-                                                err
-                                            );
-                                        }
-                                    }
-                                }
-                                continue;
-                            }
                             delivery_events::accept_delivery_packet(
                                 daemon_inbound.as_ref(),
                                 inbound_transport.as_ref(),
