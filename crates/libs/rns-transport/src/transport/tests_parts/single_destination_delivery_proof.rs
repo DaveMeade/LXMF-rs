@@ -129,7 +129,12 @@ async fn proof_strategy_all_generates_a_valid_delivery_proof() {
         .expect("a delivery proof should be sent back on the same interface")
         .expect("tx channel open");
     assert_eq!(proof_message.packet.header.packet_type, PacketType::Proof);
-    assert_eq!(proof_message.packet.destination, own_hash);
+    // Real Reticulum always addresses a proof to the truncated hash of the
+    // packet being proved (`Packet.generate_proof_destination()`), not the
+    // proving destination's own real address hash — needed for proofs that
+    // traverse a Transport/relay hop back to the sender. See wire.rs's own
+    // "meshage fork" comment on this proof_packet construction.
+    assert_eq!(proof_message.packet.destination, AddressHash::new_from_hash(&encrypted_packet_hash));
     assert_eq!(proof_message.packet.data.len(), HASH_SIZE + ed25519_dalek::SIGNATURE_LENGTH);
     assert_eq!(&proof_message.packet.data.as_slice()[..HASH_SIZE], encrypted_packet_hash.to_bytes().as_slice());
 
