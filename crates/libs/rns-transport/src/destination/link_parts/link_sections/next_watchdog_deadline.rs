@@ -82,7 +82,10 @@ impl Link {
         Ok(())
     }
 
-    fn post_event(&self, event: LinkEvent) {
+    fn post_event(&mut self, event: LinkEvent) {
+        if let LinkEvent::PeerIdentified(identity) = &event {
+            self.identified_peer_identity = Some(**identity);
+        }
         let _ = self.event_tx.send(LinkEventData {
             id: self.id,
             address_hash: self.destination.address_hash,
@@ -98,6 +101,7 @@ impl Link {
         self.channel_open = false;
         self.status = LinkStatus::Closed;
         self.peer_identity = Identity::default();
+        self.identified_peer_identity = None;
         self.derived_key = DerivedKey::new_empty();
         self.session_cipher = None;
         self.last_keepalive = None;
@@ -140,6 +144,7 @@ impl Link {
         self.channel_rx_ring.clear();
         self.status = LinkStatus::Pending;
         self.peer_identity = Identity::default();
+        self.identified_peer_identity = None;
         self.derived_key = DerivedKey::new_empty();
         self.session_cipher = None;
         self.activated_at = None;

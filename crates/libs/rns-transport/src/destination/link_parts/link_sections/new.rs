@@ -1,5 +1,4 @@
 impl Link {
-
     pub fn new(
         destination: DestinationDesc,
         event_tx: tokio::sync::broadcast::Sender<LinkEventData>,
@@ -10,6 +9,7 @@ impl Link {
             ingress_iface: None,
             priv_identity: PrivateIdentity::new_from_rand(OsRng),
             peer_identity: Identity::default(),
+            identified_peer_identity: None,
             derived_key: DerivedKey::new_empty(),
             session_cipher: None,
             signalling: None,
@@ -77,6 +77,7 @@ impl Link {
             ingress_iface: None,
             priv_identity: PrivateIdentity::new(StaticSecret::random_from_rng(OsRng), signing_key),
             peer_identity,
+            identified_peer_identity: None,
             derived_key: DerivedKey::new_empty(),
             session_cipher: None,
             signalling,
@@ -230,7 +231,6 @@ impl Link {
         if self.status != LinkStatus::Active {
             log::warn!("link({}): handling data packet in inactive state", self.id);
         }
-        self.note_inbound(packet.context);
 
         match packet.context {
             PacketContext::Channel => {
@@ -239,22 +239,33 @@ impl Link {
                     return LinkHandleResult::None;
                 }
 
-                let proof = self.prove_packet(packet);
                 let mut buffer = [0u8; PACKET_MDU];
                 if let Ok(plain_text) = self.decrypt(packet.data.as_slice(), &mut buffer[..]) {
+                    self.note_inbound(packet.context);
                     log::trace!("link({}): data {}B", self.id, plain_text.len());
                     self.handle_channel_frame(plain_text);
-                } else {
-                    log::error!("link({}): can't decrypt packet", self.id);
+                    return LinkHandleResult::Proof(self.prove_packet(packet));
                 }
-                return LinkHandleResult::Proof(proof);
+                log::error!("link({}): can't decrypt packet", self.id);
+                return LinkHandleResult::None;
             }
-            PacketContext::None
-            | PacketContext::Request
-            | PacketContext::Response
-            | PacketContext::LinkIdentify => {
+            PacketContext::LinkIdentify => {
                 let mut buffer = [0u8; PACKET_MDU];
                 if let Ok(plain_text) = self.decrypt(packet.data.as_slice(), &mut buffer[..]) {
+                    if let Some(identity) = parse_link_identify_payload(plain_text, &self.id) {
+                        self.note_inbound(packet.context);
+                        self.post_event(LinkEvent::PeerIdentified(Box::new(identity)));
+                    } else {
+                        log::warn!("link({}): invalid identify payload, dropping", self.id);
+                    }
+                } else {
+                    log::error!("link({}): can't decrypt identify packet", self.id);
+                }
+            }
+            PacketContext::None | PacketContext::Request | PacketContext::Response => {
+                let mut buffer = [0u8; PACKET_MDU];
+                if let Ok(plain_text) = self.decrypt(packet.data.as_slice(), &mut buffer[..]) {
+                    self.note_inbound(packet.context);
                     log::trace!("link({}): data {}B", self.id, plain_text.len());
                     let request_id = if packet.context == PacketContext::Request {
                         let hash = packet.hash().to_bytes();
@@ -280,12 +291,14 @@ impl Link {
                 }
             }
             PacketContext::KeepAlive => {
-                if !packet.data.is_empty() && packet.data.as_slice()[0] == 0xFF {
+                if packet.data.as_slice() == [0xFF] {
+                    self.note_inbound(packet.context);
                     self.request_time = Instant::now();
                     log::trace!("link({}): keep-alive request", self.id);
                     return LinkHandleResult::KeepAlive;
                 }
-                if !packet.data.is_empty() && packet.data.as_slice()[0] == 0xFE {
+                if packet.data.as_slice() == [0xFE] {
+                    self.note_inbound(packet.context);
                     log::trace!("link({}): keep-alive response", self.id);
                     return LinkHandleResult::None;
                 }
@@ -294,6 +307,7 @@ impl Link {
                 let mut buffer = [0u8; PACKET_MDU];
                 match self.decrypt(packet.data.as_slice(), &mut buffer[..]) {
                     Ok(plain_text) if plain_text == self.id.as_slice() => {
+                        self.note_inbound(packet.context);
                         self.finalize_local_close();
                     }
                     Ok(plain_text) => {
@@ -314,12 +328,21 @@ impl Link {
                 if let Ok(plain_text) = self.decrypt(packet.data.as_slice(), &mut buffer[..]) {
                     let mut cursor = std::io::Cursor::new(plain_text);
                     if let Ok(peer_rtt) = rmp::decode::read_f32(&mut cursor) {
-                        let measured_rtt = self.request_time.elapsed().as_secs_f32();
-                        self.rtt = Duration::from_secs_f32(measured_rtt.max(peer_rtt));
-                        self.update_keepalive_timing();
-                        self.refresh_channel_flow_control();
-                        if self.activated_at.is_none() {
-                            self.activated_at = Some(Instant::now());
+                        let consumed_all = cursor.position() == plain_text.len() as u64;
+                        if consumed_all
+                            && peer_rtt.is_finite()
+                            && (0.0..=KEEPALIVE_MAX_SECS).contains(&peer_rtt)
+                        {
+                            let measured_rtt = self.request_time.elapsed().as_secs_f32();
+                            self.rtt = Duration::from_secs_f32(measured_rtt.max(peer_rtt));
+                            self.update_keepalive_timing();
+                            self.refresh_channel_flow_control();
+                            if self.activated_at.is_none() {
+                                self.activated_at = Some(Instant::now());
+                            }
+                            self.note_inbound(packet.context);
+                        } else {
+                            log::warn!("link({}): invalid RTT payload", self.id);
                         }
                     }
                 }
@@ -411,6 +434,13 @@ impl Link {
         self.packet_with_context(data, PacketContext::Channel)
     }
 
+    /// Build a link peer identification packet (context = 0xFB LinkIdentify).
+    /// Payload: `public_key ++ verifying_key ++
+    /// sign(link_id ++ public_key ++ verifying_key)`.
+    pub fn identify_packet(&self, payload: &[u8]) -> Result<Packet, RnsError> {
+        self.packet_with_context(payload, PacketContext::LinkIdentify)
+    }
+
     pub fn register_channel_handler<F>(&mut self, msg_type: u16, handler: F) -> HandlerId
     where
         F: FnMut(ChannelEnvelope) -> bool + Send + 'static,
@@ -424,4 +454,25 @@ impl Link {
             .push(RegisteredChannelHandler { id, handler: Box::new(handler) });
         id
     }
+}
+
+const LINK_IDENTIFY_PAYLOAD_LENGTH: usize = PUBLIC_KEY_LENGTH * 2 + SIGNATURE_LENGTH;
+
+fn parse_link_identify_payload(payload: &[u8], link_id: &AddressHash) -> Option<Identity> {
+    if payload.len() != LINK_IDENTIFY_PAYLOAD_LENGTH {
+        return None;
+    }
+    let identity = Identity::new_from_slices(
+        &payload[..PUBLIC_KEY_LENGTH],
+        &payload[PUBLIC_KEY_LENGTH..PUBLIC_KEY_LENGTH * 2],
+    );
+    let signature = Signature::from_slice(
+        &payload[PUBLIC_KEY_LENGTH * 2..PUBLIC_KEY_LENGTH * 2 + SIGNATURE_LENGTH],
+    )
+    .ok()?;
+    let mut signed = Vec::with_capacity(ADDRESS_HASH_SIZE + PUBLIC_KEY_LENGTH * 2);
+    signed.extend_from_slice(link_id.as_slice());
+    signed.extend_from_slice(&payload[..PUBLIC_KEY_LENGTH * 2]);
+    identity.verify(&signed, &signature).ok()?;
+    Some(identity)
 }

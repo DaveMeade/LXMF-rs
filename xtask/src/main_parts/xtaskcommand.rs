@@ -114,8 +114,12 @@ enum XtaskCommand {
         profile: PythonImplBenchProfile,
     },
     PythonImplBenchReport {
+        #[arg(long, value_enum, default_value_t = PythonImplBenchProfile::Report)]
+        profile: PythonImplBenchProfile,
         #[arg(long)]
         compare_runs: Option<usize>,
+        #[arg(long)]
+        python_iterations: Option<usize>,
         #[arg(long)]
         resource_runs: Option<usize>,
         #[arg(long)]
@@ -357,10 +361,18 @@ fn main() -> Result<()> {
         XtaskCommand::SdkPerfBudgetCheck => run_sdk_perf_budget_check(),
         XtaskCommand::PythonImplBenchCompare { profile } => run_python_impl_bench_compare(profile),
         XtaskCommand::PythonImplBenchReport {
+            profile,
             compare_runs,
+            python_iterations,
             resource_runs,
             resource_iterations,
-        } => run_python_impl_bench_report(compare_runs, resource_runs, resource_iterations),
+        } => run_python_impl_bench_report(
+            profile,
+            compare_runs,
+            python_iterations,
+            resource_runs,
+            resource_iterations,
+        ),
         XtaskCommand::PythonImplBenchWorkload { implementation, benchmark, iterations, output } => {
             run_python_impl_bench_workload(implementation, &benchmark, iterations, &output)
         }
