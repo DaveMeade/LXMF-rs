@@ -48,7 +48,19 @@ impl Transport {
         self.handler.lock().await.resource_manager.remove_link_state(link_id);
     }
 
-    pub(crate) async fn send_link_packet_on_bound_iface(
+    /// The correct way to send any packet addressed to an already-open
+    /// Link (`destination_type: Link` — identify, keepalive, channel,
+    /// plain data) rather than a fresh destination. `Transport::
+    /// send_packet`/`send_packet_with_outcome` route via the path table,
+    /// keyed by real announced destination hashes — never by a Link's own
+    /// ephemeral id, which is what a Link-context packet's `destination`
+    /// field actually holds. Public (not `pub(crate)`) specifically so a
+    /// downstream consumer building its own Link-context packet via
+    /// `Link::identify_packet`/`data_packet`/`channel_packet` — anything
+    /// this crate doesn't already wrap in a higher-level helper like
+    /// `crate::delivery::send_on_link_observed` — has a correct way to
+    /// send it at all.
+    pub async fn send_link_packet_on_bound_iface(
         &self,
         link: &Arc<Mutex<Link>>,
         packet: Packet,
@@ -102,171 +114,160 @@ impl Transport {
             .unwrap_or(crate::resource::DEFAULT_RESOURCE_INTERFACE_MTU)
     }
 
+    /// **Must route via each link's own bound interface, never
+    /// `TransportHandler::send_packet`.** That generic path resolves the
+    /// next hop through `route_outbound_packet`, which looks
+    /// `packet.destination` up in the path table — but a Link-context
+    /// packet (`data_packet`/`channel_packet`) sets `packet.destination` to
+    /// the link's own ephemeral id, which is never a path-table entry
+    /// (those come from real, announced destination-hash paths). For any
+    /// `Transport` configured with `broadcast: false` (the common case —
+    /// see `TransportConfig::new`'s own doc comment; a client that isn't
+    /// itself acting as a transport node has no reason to enable it), that
+    /// lookup miss falls straight through to `SendPacketOutcome::
+    /// DroppedNoRoute` with no broadcast fallback either — every packet
+    /// these six methods built was silently dropped before ever reaching
+    /// an interface. `send_link_packet_on_bound_iface` (below) is the
+    /// crate's own correct mechanism for this — already used by
+    /// `crate::delivery::send_on_link_observed` — but these six were never
+    /// wired to call it.
     pub async fn send_to_all_out_links(&self, payload: &[u8]) {
-        let packets = {
+        let pairs = {
             let handler = self.handler.lock().await;
-            let mut packets = Vec::new();
+            let mut pairs = Vec::new();
             for link in handler.out_links.values() {
-                let link = link.lock().await;
-                if link.status() == LinkStatus::Active {
-                    if let Ok(packet) = link.data_packet(payload) {
-                        packets.push(packet);
-                    }
+                let guard = link.lock().await;
+                if guard.status() != LinkStatus::Active {
+                    continue;
                 }
+                let Ok(packet) = guard.data_packet(payload) else { continue };
+                drop(guard);
+                pairs.push((link.clone(), packet));
             }
-            packets
+            pairs
         };
-        if packets.is_empty() {
-            return;
-        }
-        let mut handler = self.handler.lock().await;
-        for packet in packets {
-            handler.send_packet(packet).await;
+        for (link, packet) in pairs {
+            self.send_link_packet_on_bound_iface(&link, packet).await;
         }
     }
 
     pub async fn send_channel_to_all_out_links(&self, payload: &[u8]) {
-        let packets = {
+        let pairs = {
             let handler = self.handler.lock().await;
-            let mut packets = Vec::new();
+            let mut pairs = Vec::new();
             for link in handler.out_links.values() {
-                let link = link.lock().await;
-                if link.status() == LinkStatus::Active {
-                    if let Ok(packet) = link.channel_packet(payload) {
-                        packets.push(packet);
-                    }
+                let guard = link.lock().await;
+                if guard.status() != LinkStatus::Active {
+                    continue;
                 }
+                let Ok(packet) = guard.channel_packet(payload) else { continue };
+                drop(guard);
+                pairs.push((link.clone(), packet));
             }
-            packets
+            pairs
         };
-        if packets.is_empty() {
-            return;
-        }
-        let mut handler = self.handler.lock().await;
-        for packet in packets {
-            handler.send_packet(packet).await;
+        for (link, packet) in pairs {
+            self.send_link_packet_on_bound_iface(&link, packet).await;
         }
     }
 
     pub async fn send_to_out_links(&self, destination: &AddressHash, payload: &[u8]) {
-        let mut count = 0usize;
-        let packets = {
+        let pairs = {
             let handler = self.handler.lock().await;
-            let mut packets = Vec::new();
+            let mut pairs = Vec::new();
             for link in handler.out_links.values() {
-                let link = link.lock().await;
-                if link.destination().address_hash == *destination
-                    && link.status() == LinkStatus::Active
-                {
-                    if let Ok(packet) = link.data_packet(payload) {
-                        packets.push(packet);
-                    }
+                let guard = link.lock().await;
+                if guard.destination().address_hash != *destination || guard.status() != LinkStatus::Active {
+                    continue;
                 }
+                let Ok(packet) = guard.data_packet(payload) else { continue };
+                drop(guard);
+                pairs.push((link.clone(), packet));
             }
-            packets
+            pairs
         };
-        if !packets.is_empty() {
-            let mut handler = self.handler.lock().await;
-            for packet in packets {
-                handler.send_packet(packet).await;
-                count += 1;
-            }
-        }
 
-        if count == 0 {
+        if pairs.is_empty() {
             log::trace!("tp({}): no output links for {} destination", self.name, destination);
+            return;
+        }
+        for (link, packet) in pairs {
+            self.send_link_packet_on_bound_iface(&link, packet).await;
         }
     }
 
     pub async fn send_channel_to_out_links(&self, destination: &AddressHash, payload: &[u8]) {
-        let mut count = 0usize;
-        let packets = {
+        let pairs = {
             let handler = self.handler.lock().await;
-            let mut packets = Vec::new();
+            let mut pairs = Vec::new();
             for link in handler.out_links.values() {
-                let link = link.lock().await;
-                if link.destination().address_hash == *destination
-                    && link.status() == LinkStatus::Active
-                {
-                    if let Ok(packet) = link.channel_packet(payload) {
-                        packets.push(packet);
-                    }
+                let guard = link.lock().await;
+                if guard.destination().address_hash != *destination || guard.status() != LinkStatus::Active {
+                    continue;
                 }
+                let Ok(packet) = guard.channel_packet(payload) else { continue };
+                drop(guard);
+                pairs.push((link.clone(), packet));
             }
-            packets
+            pairs
         };
-        if !packets.is_empty() {
-            let mut handler = self.handler.lock().await;
-            for packet in packets {
-                handler.send_packet(packet).await;
-                count += 1;
-            }
-        }
 
-        if count == 0 {
+        if pairs.is_empty() {
             log::trace!("tp({}): no output links for {} destination", self.name, destination);
+            return;
+        }
+        for (link, packet) in pairs {
+            self.send_link_packet_on_bound_iface(&link, packet).await;
         }
     }
 
     pub async fn send_to_in_links(&self, destination: &AddressHash, payload: &[u8]) {
-        let mut count = 0usize;
-        let packets = {
+        let pairs = {
             let handler = self.handler.lock().await;
-            let mut packets = Vec::new();
+            let mut pairs = Vec::new();
             for link in handler.in_links.values() {
-                let link = link.lock().await;
-
-                if link.destination().address_hash == *destination
-                    && link.status() == LinkStatus::Active
-                {
-                    if let Ok(packet) = link.data_packet(payload) {
-                        packets.push(packet);
-                    }
+                let guard = link.lock().await;
+                if guard.destination().address_hash != *destination || guard.status() != LinkStatus::Active {
+                    continue;
                 }
+                let Ok(packet) = guard.data_packet(payload) else { continue };
+                drop(guard);
+                pairs.push((link.clone(), packet));
             }
-            packets
+            pairs
         };
-        if !packets.is_empty() {
-            let mut handler = self.handler.lock().await;
-            for packet in packets {
-                handler.send_packet(packet).await;
-                count += 1;
-            }
-        }
 
-        if count == 0 {
+        if pairs.is_empty() {
             log::trace!("tp({}): no input links for {} destination", self.name, destination);
+            return;
+        }
+        for (link, packet) in pairs {
+            self.send_link_packet_on_bound_iface(&link, packet).await;
         }
     }
 
     pub async fn send_channel_to_in_links(&self, destination: &AddressHash, payload: &[u8]) {
-        let mut count = 0usize;
-        let packets = {
+        let pairs = {
             let handler = self.handler.lock().await;
-            let mut packets = Vec::new();
+            let mut pairs = Vec::new();
             for link in handler.in_links.values() {
-                let link = link.lock().await;
-
-                if link.destination().address_hash == *destination
-                    && link.status() == LinkStatus::Active
-                {
-                    if let Ok(packet) = link.channel_packet(payload) {
-                        packets.push(packet);
-                    }
+                let guard = link.lock().await;
+                if guard.destination().address_hash != *destination || guard.status() != LinkStatus::Active {
+                    continue;
                 }
+                let Ok(packet) = guard.channel_packet(payload) else { continue };
+                drop(guard);
+                pairs.push((link.clone(), packet));
             }
-            packets
+            pairs
         };
-        if !packets.is_empty() {
-            let mut handler = self.handler.lock().await;
-            for packet in packets {
-                handler.send_packet(packet).await;
-                count += 1;
-            }
-        }
 
-        if count == 0 {
+        if pairs.is_empty() {
             log::trace!("tp({}): no input links for {} destination", self.name, destination);
+            return;
+        }
+        for (link, packet) in pairs {
+            self.send_link_packet_on_bound_iface(&link, packet).await;
         }
     }
 
