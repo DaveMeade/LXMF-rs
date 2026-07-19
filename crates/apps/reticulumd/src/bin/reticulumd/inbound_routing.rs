@@ -146,7 +146,11 @@ fn destination_hash(destination: &AddressHash) -> [u8; 16] {
     hash
 }
 
-fn is_lxmf_delivery_destination(destination: &DestinationDesc) -> bool {
+// `pub(super)` — the direct-backchannel `PeerIdentified` consumer in
+// `module_core.rs` (included into this same `inbound_worker` module via
+// `include!`) needs this to gate which links get cached as a peer's
+// delivery backchannel (see its call site's doc comment for why).
+pub(super) fn is_lxmf_delivery_destination(destination: &DestinationDesc) -> bool {
     destination.name.hash == DestinationName::new("lxmf", "delivery").hash
 }
 
