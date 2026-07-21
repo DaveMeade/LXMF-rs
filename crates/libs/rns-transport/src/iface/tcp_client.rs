@@ -1375,7 +1375,8 @@ mod tests {
         });
 
         let mut manager = InterfaceManager::new(8);
-        let client = TcpClient::new(addr.to_string()).with_connect_timeout(Duration::from_millis(200));
+        let client =
+            TcpClient::new(addr.to_string()).with_connect_timeout(Duration::from_millis(200));
         let runtime_status = client.runtime_status_handle();
         let context = manager.new_context(client);
         let iface_stop = context.channel.stop.clone();
