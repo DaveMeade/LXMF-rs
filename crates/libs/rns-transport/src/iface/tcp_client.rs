@@ -1062,6 +1062,19 @@ impl TcpClient {
 
             log::info!("disconnected from <{}>", addr);
 
+            // A deliberate shutdown requested during those first couple of
+            // seconds (context.cancel/iface_stop already cancelled) is not
+            // evidence of an unstable peer — it's the reason
+            // run_hdlc_stream_with_runtime just returned in the first
+            // place. Falling through to the loop's own top-of-iteration
+            // check breaks cleanly without polluting failed_connect_attempts
+            // or runtime status with a spurious "treating as a failed
+            // attempt" — a hot-reload or daemon shutdown that lands inside
+            // MIN_STABLE_CONNECTION shouldn't look like a flaky connection.
+            if context.cancel.is_cancelled() || iface_stop.is_cancelled() {
+                break;
+            }
+
             // A stream that died moments after connecting is treated as a
             // failed attempt (backoff + counts toward `max_reconnect_tries`),
             // same as an outright `connect()` failure just above — otherwise
@@ -1336,6 +1349,52 @@ mod tests {
             "expected at least one 5s backoff sleep once the storm was established, only took {:?}",
             started_at.elapsed()
         );
+    }
+
+    // Regression test for review feedback on the MIN_STABLE_CONNECTION fix
+    // above (PR #494): a deliberate shutdown request (iface_stop/
+    // context.cancel already cancelled) that lands inside the
+    // MIN_STABLE_CONNECTION window is not evidence of an unstable peer —
+    // it's the reason the stream loop just returned. Without the fix, a
+    // hot-reload or daemon shutdown shortly after connecting would show up
+    // as a spurious "reconnecting"/failed-attempt status right before
+    // going to "closed".
+    #[tokio::test]
+    async fn tcp_client_does_not_count_a_deliberate_shutdown_as_a_failed_attempt() {
+        let listener = TcpListener::bind("127.0.0.1:0").await.expect("bind listener");
+        let addr = listener.local_addr().expect("listener addr");
+
+        // Accept and hold the connection open for the task's lifetime —
+        // the disconnect in this test comes from cancelling iface_stop
+        // below, never from the peer closing its end.
+        let _accept_task = tokio::spawn(async move {
+            let mut streams = Vec::new();
+            while let Ok((stream, _)) = listener.accept().await {
+                streams.push(stream);
+            }
+        });
+
+        let mut manager = InterfaceManager::new(8);
+        let client = TcpClient::new(addr.to_string()).with_connect_timeout(Duration::from_millis(200));
+        let runtime_status = client.runtime_status_handle();
+        let context = manager.new_context(client);
+        let iface_stop = context.channel.stop.clone();
+        let task = tokio::spawn(TcpClient::spawn(context));
+
+        // Well inside MIN_STABLE_CONNECTION, and long enough for the
+        // connection to have actually been established.
+        tokio::time::sleep(Duration::from_millis(100)).await;
+        assert_eq!(runtime_status.to_json()["stream_state"].as_str(), Some("connected"));
+
+        iface_stop.cancel();
+        tokio::time::timeout(Duration::from_secs(1), task)
+            .await
+            .expect("tcp client should stop promptly once iface_stop is cancelled")
+            .expect("tcp client task should not panic");
+
+        let status = runtime_status.to_json();
+        assert_eq!(status["stream_state"].as_str(), Some("closed"));
+        assert_eq!(status["reconnect_attempts"].as_u64(), Some(0));
     }
 
     #[test]
