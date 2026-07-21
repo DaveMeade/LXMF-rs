@@ -21,6 +21,19 @@ use super::{Interface, InterfaceContext, InterfaceRxSender, InterfaceTxReceiver}
 // TCP packet tracing is kept off by default and gated by diagnostics env flags.
 const PACKET_TRACE: bool = false;
 const HDLC_KEEPALIVE_FRAME: &[u8] = &[0x7e, 0x7e];
+
+// A peer that accepts the TCP handshake and then resets/closes the
+// connection almost immediately used to bypass the reconnect backoff
+// entirely — `failed_connect_attempts` only ever incremented on an
+// outright `connect()` failure, so a connection that succeeds and then
+// dies moments later reset straight back to redialing with zero delay,
+// forever. Any stream that doesn't survive at least this long after
+// connecting is treated the same as a failed connect attempt for
+// backoff/counting purposes. Long enough that a real, working
+// connection's normal keepalive/traffic cadence never trips it; short
+// enough to catch "connected then instantly reset" within one or two
+// iterations rather than many.
+const MIN_STABLE_CONNECTION: Duration = Duration::from_secs(2);
 pub(crate) const HDLC_STREAM_EVENT_CHANNEL_CAPACITY: usize = 128;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
@@ -985,12 +998,15 @@ impl TcpClient {
             }
 
             let stream = stream.unwrap();
-            failed_connect_attempts = 0;
             runtime_status.lock().expect("tcp runtime status mutex poisoned").mark_connected();
             if let Err(err) = socket_tuning.apply_to_stream(&stream) {
                 log::warn!("failed to apply TCP socket tuning to <{}>: {}", addr, err);
             }
             let (read_stream, write_stream) = stream.into_split();
+            // `failed_connect_attempts` is NOT reset here anymore; it's
+            // only reset below once the stream has actually proven itself
+            // stable — see `MIN_STABLE_CONNECTION`'s doc comment.
+            let connected_at = Instant::now();
 
             log::info!("connected to <{}>", addr);
             if has_connected {
@@ -1045,6 +1061,45 @@ impl TcpClient {
             }
 
             log::info!("disconnected from <{}>", addr);
+
+            // A stream that died moments after connecting is treated as a
+            // failed attempt (backoff + counts toward `max_reconnect_tries`),
+            // same as an outright `connect()` failure just above — otherwise
+            // a peer that accepts the handshake and then instantly resets
+            // gets hammered with an unthrottled redial loop forever.
+            let stayed_connected_for = connected_at.elapsed();
+            if stayed_connected_for < MIN_STABLE_CONNECTION {
+                failed_connect_attempts = failed_connect_attempts.saturating_add(1);
+                runtime_status.lock().expect("tcp runtime status mutex poisoned").mark_reconnecting(format!(
+                    "connection to <{addr}> dropped after only {stayed_connected_for:?} — treating as a failed attempt"
+                ));
+                if max_reconnect_tries.is_some_and(|max_reconnect_tries| {
+                    failed_connect_attempts > max_reconnect_tries
+                }) {
+                    log::error!(
+                        "max TCP reconnect attempts reached for <{}> after {} failed attempts",
+                        addr,
+                        failed_connect_attempts
+                    );
+                    break;
+                }
+                // The first short-lived disconnect in a streak retries
+                // immediately — a single clean drop-then-reconnect (a wifi
+                // blip, the peer restarting once) shouldn't eat a 5s
+                // penalty. Only the SECOND consecutive one onward backs
+                // off — that's what distinguishes an actual storm (a
+                // misbehaving peer that never stabilizes) from a normal
+                // one-off reconnect.
+                if failed_connect_attempts > 1 {
+                    tokio::select! {
+                        _ = context.cancel.cancelled() => break,
+                        _ = iface_stop.cancelled() => break,
+                        _ = tokio::time::sleep(std::time::Duration::from_secs(5)) => {}
+                    }
+                }
+            } else {
+                failed_connect_attempts = 0;
+            }
         }
 
         runtime_status.lock().expect("tcp runtime status mutex poisoned").mark_closed();
@@ -1094,7 +1149,7 @@ impl Interface for TcpClient {
 #[cfg(test)]
 mod tests {
     use std::sync::Arc;
-    use std::time::Duration;
+    use std::time::{Duration, Instant};
 
     use super::{
         forced_bitrate_delay, prefer_ipv6_socket_addrs, run_hdlc_stream_with_runtime,
@@ -1193,6 +1248,99 @@ mod tests {
         assert_eq!(
             status["last_error"].as_str(),
             Some(format!("tcp connect failed endpoint={addr}").as_str())
+        );
+    }
+
+    // Regression test for `MIN_STABLE_CONNECTION`'s fix: a peer that
+    // completes the TCP handshake and then immediately closes the
+    // connection (rather than refusing it outright) used to bypass the
+    // reconnect backoff entirely, redialing with zero delay forever. This
+    // accepts every connection and drops it right away — simulating
+    // exactly that misbehaving-peer case — and asserts the failed-attempt
+    // counter (and therefore `max_reconnect_tries`) still applies.
+    #[tokio::test]
+    async fn tcp_client_backs_off_when_connection_dies_immediately_after_connecting() {
+        let listener = TcpListener::bind("127.0.0.1:0").await.expect("bind listener");
+        let addr = listener.local_addr().expect("listener addr");
+
+        tokio::spawn(async move {
+            loop {
+                match listener.accept().await {
+                    Ok((stream, _)) => drop(stream),
+                    Err(_) => break,
+                }
+            }
+        });
+
+        let mut manager = InterfaceManager::new(8);
+        let client = TcpClient::new(addr.to_string())
+            .with_connect_timeout(Duration::from_millis(200))
+            .with_max_reconnect_tries(Some(1));
+        let runtime_status = client.runtime_status_handle();
+        let context = manager.new_context(client);
+        let iface_stop = context.channel.stop.clone();
+        let task = tokio::spawn(TcpClient::spawn(context));
+
+        // The first short-lived disconnect retries immediately (no
+        // penalty for a one-off); `max_reconnect_tries=1` trips right on
+        // the second, before any backoff sleep would even apply — see
+        // `MIN_STABLE_CONNECTION`'s fix.
+        tokio::time::timeout(Duration::from_secs(2), task)
+            .await
+            .expect("tcp client should stop after reconnect budget")
+            .expect("tcp client task should not panic");
+        assert!(iface_stop.is_cancelled());
+        let status = runtime_status.to_json();
+        assert_eq!(status["stream_state"].as_str(), Some("closed"));
+        // Two failed attempts before `max_reconnect_tries=1` trips (count
+        // > max) — proves each connect-then-instant-close cycle
+        // incremented the same counter an outright connect() failure
+        // would have.
+        assert_eq!(status["reconnect_attempts"].as_u64(), Some(2));
+    }
+
+    // Companion to the test above: proves the backoff *sleep* itself
+    // actually engages once a storm is underway (not just that the
+    // counter increments) — the real-world bug this fixes was an
+    // unthrottled, effectively instant redial loop against a misbehaving
+    // hub.
+    #[tokio::test]
+    async fn tcp_client_actually_sleeps_once_a_reconnect_storm_is_underway() {
+        let listener = TcpListener::bind("127.0.0.1:0").await.expect("bind listener");
+        let addr = listener.local_addr().expect("listener addr");
+
+        tokio::spawn(async move {
+            loop {
+                match listener.accept().await {
+                    Ok((stream, _)) => drop(stream),
+                    Err(_) => break,
+                }
+            }
+        });
+
+        let mut manager = InterfaceManager::new(8);
+        let client = TcpClient::new(addr.to_string())
+            .with_connect_timeout(Duration::from_millis(200))
+            .with_max_reconnect_tries(Some(2));
+        let runtime_status = client.runtime_status_handle();
+        let context = manager.new_context(client);
+        let iface_stop = context.channel.stop.clone();
+        let started_at = Instant::now();
+        let task = tokio::spawn(TcpClient::spawn(context));
+
+        // Attempt 1: immediate retry (no penalty). Attempt 2: the storm is
+        // now established, so a 5s backoff sleep happens before attempt 3,
+        // which trips `max_reconnect_tries=2` (count 3 > 2) and stops.
+        tokio::time::timeout(Duration::from_secs(8), task)
+            .await
+            .expect("tcp client should stop after reconnect budget")
+            .expect("tcp client task should not panic");
+        assert!(iface_stop.is_cancelled());
+        assert_eq!(runtime_status.to_json()["reconnect_attempts"].as_u64(), Some(3));
+        assert!(
+            started_at.elapsed() >= Duration::from_secs(5),
+            "expected at least one 5s backoff sleep once the storm was established, only took {:?}",
+            started_at.elapsed()
         );
     }
 
