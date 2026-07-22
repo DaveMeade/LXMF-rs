@@ -535,6 +535,18 @@ pub(crate) async fn run_hdlc_stream_with_runtime<R, W>(
                                         &events,
                                         HdlcStreamEvent::Error { message: e.to_string() },
                                     );
+                                    // A TCP reset (rather than a graceful FIN) lands
+                                    // here, not in the `Ok(0)` arm above — which
+                                    // does call `stop.cancel()`. Without it, the tx
+                                    // task's `select!` has no branch left that will
+                                    // ever fire when there's no watchdog configured
+                                    // and nothing queued to send, so it parks on
+                                    // `tx_channel.recv()` forever and this function's
+                                    // `tx_task.await` (below) never returns — meaning
+                                    // the MIN_STABLE_CONNECTION backoff check in
+                                    // tcp_client's caller never gets reached for
+                                    // exactly the reset case it was added for.
+                                    stop.cancel();
                                     break;
                                 }
                             }
@@ -1801,5 +1813,64 @@ mod tests {
 
         assert!(iface_stop.is_cancelled());
         assert_eq!(reconnected_iface, iface_address);
+    }
+
+    /// Returns `Err` (a TCP reset, not a graceful FIN) on its very first
+    /// poll — the case the existing reconnect tests above don't cover,
+    /// since dropping one end of a real/duplex stream surfaces as `Ok(0)`.
+    struct ResetOnceStream;
+
+    impl tokio::io::AsyncRead for ResetOnceStream {
+        fn poll_read(
+            self: std::pin::Pin<&mut Self>,
+            _cx: &mut std::task::Context<'_>,
+            _buf: &mut tokio::io::ReadBuf<'_>,
+        ) -> std::task::Poll<std::io::Result<()>> {
+            std::task::Poll::Ready(Err(std::io::Error::new(
+                std::io::ErrorKind::ConnectionReset,
+                "simulated reset",
+            )))
+        }
+    }
+
+    #[tokio::test]
+    async fn read_error_cancels_stop_so_the_tx_task_does_not_hang_forever() {
+        // The exact scenario the P1 review on PR #494 flagged: no watchdog
+        // configured and nothing queued to send means the tx task's only
+        // live `select!` branches are `cancel`/`iface_stop`/`stop` — if the
+        // rx task's read-error arm doesn't cancel `stop`, tx_task.await
+        // (and so this whole function) never returns.
+        let cancel = CancellationToken::new();
+        let iface_stop = CancellationToken::new();
+        let (rx_channel, _rx_messages) = tokio::sync::mpsc::channel(1);
+        let (_tx_sender, tx_receiver) = tokio::sync::mpsc::channel(1);
+        let (event_tx, mut event_rx) =
+            tokio::sync::mpsc::channel(HDLC_STREAM_EVENT_CHANNEL_CAPACITY);
+
+        let handle = tokio::spawn(run_hdlc_stream_with_runtime(
+            "test".to_string(),
+            AddressHash::new([0x47; 16]),
+            256,
+            cancel,
+            iface_stop,
+            rx_channel,
+            Arc::new(tokio::sync::Mutex::new(tx_receiver)),
+            ResetOnceStream,
+            tokio::io::sink(),
+            HdlcStreamRuntime::new().with_events(event_tx),
+        ));
+
+        tokio::time::timeout(Duration::from_secs(2), handle)
+            .await
+            .expect("run_hdlc_stream_with_runtime hung — tx task never saw stop cancelled")
+            .expect("hdlc stream task panicked");
+
+        let mut saw_error_event = false;
+        while let Ok(event) = event_rx.try_recv() {
+            if matches!(event, HdlcStreamEvent::Error { .. }) {
+                saw_error_event = true;
+            }
+        }
+        assert!(saw_error_event, "expected an Error event from the simulated reset");
     }
 }
