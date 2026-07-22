@@ -8,6 +8,69 @@ use crate::destination::link::LinkWatchdogAction;
 const MIN_LINKS_CHECK_DELAY: Duration = Duration::from_millis(10);
 const PATH_REQUEST_MI: Duration = Duration::from_secs(20);
 
+/// Reference Reticulum increments a packet's hop count unconditionally on
+/// every single receipt, on every interface (`Transport.inbound()`,
+/// `packet.hops += 1`, immediately after decode) — this crate never did, so
+/// every stored hop count was one lower than what a reference client or
+/// `rnsd` itself computes for the same path. Confirmed via a live `rnpath`
+/// check on a live node against a destination reachable in one hop: `rnsd`'s
+/// own path table said `hops=1`, matching this crate's, while a separate wire
+/// capture of a reference client's own log for a *different* destination
+/// said "1 hops away" where this crate stored 0 for the same destination.
+/// `hash()` deliberately excludes hops (see `Packet::hash`), so this doesn't
+/// disturb duplicate detection. `saturating_add` rather than wrapping,
+/// matching the header's hop count never being meant to overflow past its
+/// practical (u8) ceiling.
+fn apply_receive_hop_increment(packet: &mut Packet) {
+    packet.header.hops = packet.header.hops.saturating_add(1);
+}
+
+#[cfg(test)]
+mod receive_hop_increment_tests {
+    use super::*;
+    use crate::packet::Header;
+
+    fn test_packet(hops: u8) -> Packet {
+        Packet {
+            header: Header { hops, ..Default::default() },
+            ifac: None,
+            destination: AddressHash::new_empty(),
+            transport: None,
+            context: PacketContext::None,
+            data: PacketDataBuffer::new(),
+        }
+    }
+
+    #[test]
+    fn increments_a_freshly_originated_packet_to_one_real_hop() {
+        let mut packet = test_packet(0);
+        apply_receive_hop_increment(&mut packet);
+        assert_eq!(packet.header.hops, 1);
+    }
+
+    #[test]
+    fn increments_an_already_relayed_packet_by_exactly_one() {
+        let mut packet = test_packet(3);
+        apply_receive_hop_increment(&mut packet);
+        assert_eq!(packet.header.hops, 4);
+    }
+
+    #[test]
+    fn saturates_instead_of_wrapping_at_the_u8_ceiling() {
+        let mut packet = test_packet(u8::MAX);
+        apply_receive_hop_increment(&mut packet);
+        assert_eq!(packet.header.hops, u8::MAX);
+    }
+
+    #[test]
+    fn does_not_change_the_packet_hash() {
+        let mut packet = test_packet(0);
+        let hash_before = packet.hash();
+        apply_receive_hop_increment(&mut packet);
+        assert_eq!(packet.hash(), hash_before);
+    }
+}
+
 include!("jobs_parts/link_table_cleanup.rs");
 
 #[allow(dead_code)]
@@ -256,7 +319,8 @@ pub(super) async fn manage_transport(
                             );
                         }
 
-                        let packet = message.packet;
+                        let mut packet = message.packet;
+                        apply_receive_hop_increment(&mut packet);
 
                         let mut handler = handler_arc.lock().await;
 

@@ -118,8 +118,15 @@ mod tests {
         assert_eq!(decision.packet.transport, Some(next_hop));
     }
 
+    // Confirmed via a byte-for-byte wire capture of a reference client's own
+    // successful LinkRequest against a live destination with this exact
+    // path-table shape (hops=1, received_from = a relay's hash, not the
+    // destination's own): it sent a plain Type1 LinkRequest and it worked.
+    // Reference Reticulum's own `Transport.outbound()` (confirmed by direct
+    // reading) only demotes hops==1 to Type2 when the local instance is
+    // itself behind a shared instance — `received_from` never factors in.
     #[test]
-    fn outbound_one_hop_transport_promotes_to_type2_transport() {
+    fn outbound_one_hop_via_relay_still_uses_type1() {
         let destination = AddressHash::new_from_hash(&Hash::new_from_slice(b"destination"));
         let iface = AddressHash::new_from_hash(&Hash::new_from_slice(b"iface"));
         let transport_hop = AddressHash::new_from_hash(&Hash::new_from_slice(b"transport_hop"));
@@ -136,16 +143,44 @@ mod tests {
         let decision = route_outbound_packet(&table, &packet, false);
 
         assert_eq!(decision.next_iface, Some(iface));
-        assert_eq!(decision.packet.header.header_type, HeaderType::Type2);
-        assert_eq!(decision.packet.header.propagation_type, PropagationType::Transport);
-        assert_eq!(decision.packet.transport, Some(transport_hop));
+        assert_eq!(decision.packet.header.header_type, HeaderType::Type1);
+        assert_eq!(decision.packet.header.propagation_type, PropagationType::Broadcast);
+        assert_eq!(decision.packet.transport, None);
+    }
+
+    #[test]
+    fn outbound_zero_hop_stays_type1_even_behind_shared_instance() {
+        let destination = AddressHash::new_from_hash(&Hash::new_from_slice(b"destination"));
+        let iface = AddressHash::new_from_hash(&Hash::new_from_slice(b"iface"));
+        let transport_hop = AddressHash::new_from_hash(&Hash::new_from_slice(b"transport_hop"));
+        let table = path_table_with_route(destination, transport_hop, 0, iface);
+        let packet = packet_for_route(
+            destination,
+            HeaderType::Type1,
+            PropagationType::Broadcast,
+            PacketType::LinkRequest,
+            0,
+            None,
+        );
+
+        // Even connected_to_shared_instance=true doesn't demote a genuinely
+        // zero-hop destination — only hops==1 does, per the real rule.
+        let decision = route_outbound_packet(&table, &packet, true);
+
+        assert_eq!(decision.next_iface, Some(iface));
+        assert_eq!(decision.packet.header.header_type, HeaderType::Type1);
+        assert_eq!(decision.packet.transport, None);
     }
 
     #[test]
     fn inbound_direct_hop_strips_transport_and_preserves_hops() {
         let destination = AddressHash::new_from_hash(&Hash::new_from_slice(b"destination"));
         let iface = AddressHash::new_from_hash(&Hash::new_from_slice(b"iface"));
-        let table = path_table_with_route(destination, destination, 1, iface);
+        // Genuinely direct (zero real hops) is `hops == 0` under the
+        // corrected semantics — see `route_inbound_packet`'s own doc
+        // comment. Was `1` before inbound packets were fixed to increment
+        // hops on receipt.
+        let table = path_table_with_route(destination, destination, 0, iface);
         let packet = packet_for_route(
             destination,
             HeaderType::Type2,
@@ -168,7 +203,8 @@ mod tests {
     fn inbound_direct_hop_type1_stays_direct() {
         let destination = AddressHash::new_from_hash(&Hash::new_from_slice(b"destination"));
         let iface = AddressHash::new_from_hash(&Hash::new_from_slice(b"iface"));
-        let table = path_table_with_route(destination, destination, 1, iface);
+        // Direct is hops==0 now — see the sibling test above.
+        let table = path_table_with_route(destination, destination, 0, iface);
         let packet = packet_for_route(
             destination,
             HeaderType::Type1,
