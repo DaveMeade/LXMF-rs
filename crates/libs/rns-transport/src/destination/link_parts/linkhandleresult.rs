@@ -39,6 +39,16 @@ pub struct Link {
     derived_key: DerivedKey,
     session_cipher: Option<CachedFernet>,
     signalling: Option<[u8; LINK_MTU_SIZE]>,
+    /// Cipher mode this Link is currently requesting outbound (irrelevant
+    /// for an inbound/`new_from_request` Link, which only ever accepts or
+    /// silently ignores whatever the initiator proposed) — see
+    /// `LinkMode`'s doc comment for why this needs to be able to change
+    /// across retries at all.
+    outbound_mode: LinkMode,
+    /// How many `request()` calls have gone out at `outbound_mode` since
+    /// it last changed — once this passes `MODE_FALLBACK_ATTEMPTS`,
+    /// `request()` flips to the other mode and resets this.
+    outbound_mode_attempts: u8,
     status: LinkStatus,
     request_time: Instant,
     rtt: Duration,

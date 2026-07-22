@@ -66,6 +66,69 @@
         );
     }
 
+    // Outbound-side counterpart to `inbound_link_request_clamps_peer_mtu_
+    // to_supported_packet_capacity` above, which only ever exercised the
+    // receiving half — `Link::request()` never wrote the signalling
+    // suffix at all before this.
+    fn decode_signalling(request: &Packet) -> (u32, u32) {
+        let data = request.data.as_slice();
+        let signalling = &data[data.len() - LINK_MTU_SIZE..];
+        let value = ((signalling[0] as u32) << 16) | ((signalling[1] as u32) << 8) | signalling[2] as u32;
+        let mode_bits = (value & LINK_MODE_MASK) >> 21;
+        let mtu = value & LINK_MTU_MASK;
+        (mode_bits, mtu)
+    }
+
+    fn test_link() -> Link {
+        let identity = *PrivateIdentity::new_from_rand(OsRng).as_identity();
+        let destination =
+            DestinationDesc { identity, address_hash: identity.address_hash, name: DestinationName::new("lxmf", "delivery") };
+        let (tx, _) = tokio::sync::broadcast::channel(4);
+        Link::new(destination, tx)
+    }
+
+    #[test]
+    fn outbound_link_request_defaults_to_aes_256_cbc_and_the_advertised_mtu() {
+        let mut link = test_link();
+        let request = link.request();
+
+        assert_eq!(request.data.len(), PUBLIC_KEY_LENGTH * 2 + LINK_MTU_SIZE);
+        let (mode_bits, mtu) = decode_signalling(&request);
+        assert_eq!(mode_bits, LinkMode::DEFAULT.mode_bits());
+        assert_eq!(LinkMode::DEFAULT, LinkMode::Aes256Cbc);
+        assert_eq!(mtu, LINK_ADVERTISED_MTU);
+    }
+
+    #[test]
+    fn outbound_link_request_falls_back_to_the_other_mode_after_repeated_timeouts() {
+        let mut link = test_link();
+
+        // The watchdog's own repeat-request cadence calls `request()`
+        // again on every retry — simulate exactly that, with no
+        // successful Proof in between (LinkStatus stays Pending). The Nth
+        // call is the one that increments the counter PAST the threshold
+        // and flips within that same call, so exactly
+        // `MODE_FALLBACK_ATTEMPTS` calls stay on the default mode before
+        // the very next one flips.
+        for _ in 0..MODE_FALLBACK_ATTEMPTS {
+            let (mode_bits, _) = decode_signalling(&link.request());
+            assert_eq!(mode_bits, LinkMode::Aes256Cbc.mode_bits(), "should stay on the default mode until the threshold is exceeded");
+        }
+        let (mode_bits, _) = decode_signalling(&link.request());
+        assert_eq!(mode_bits, LinkMode::Aes128Cbc.mode_bits(), "should fall back once MODE_FALLBACK_ATTEMPTS is exceeded");
+
+        // And it round-trips back, the same way, if the fallback mode also
+        // doesn't get a Proof in time — there being only two known modes,
+        // repeated exhaustion just alternates between them forever, which
+        // is exactly what "try both, keep trying both" should do.
+        for _ in 0..MODE_FALLBACK_ATTEMPTS {
+            let (mode_bits, _) = decode_signalling(&link.request());
+            assert_eq!(mode_bits, LinkMode::Aes128Cbc.mode_bits());
+        }
+        let (mode_bits, _) = decode_signalling(&link.request());
+        assert_eq!(mode_bits, LinkMode::Aes256Cbc.mode_bits(), "should fall back to the original mode again after another full round");
+    }
+
     #[test]
     fn link_handshake_roundtrip_encrypts_and_decrypts() {
         let signer = PrivateIdentity::new_from_rand(OsRng);
