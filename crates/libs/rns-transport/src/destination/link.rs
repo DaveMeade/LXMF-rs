@@ -1,5 +1,7 @@
 include!("link_parts/module_prelude.rs");
 
+include!("link_parts/link_mode.rs");
+
 include!("link/payload.rs");
 
 include!("link/id.rs");

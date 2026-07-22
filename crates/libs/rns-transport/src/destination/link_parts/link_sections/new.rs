@@ -13,8 +13,6 @@ impl Link {
             derived_key: DerivedKey::new_empty(),
             session_cipher: None,
             signalling: None,
-            outbound_mode: LinkMode::default(),
-            outbound_mode_attempts: 0,
             status: LinkStatus::Pending,
             request_time: Instant::now(),
             rtt: Duration::from_secs(0),
@@ -83,8 +81,6 @@ impl Link {
             derived_key: DerivedKey::new_empty(),
             session_cipher: None,
             signalling,
-            outbound_mode: LinkMode::default(),
-            outbound_mode_attempts: 0,
             status: LinkStatus::Pending,
             request_time: Instant::now(),
             rtt: Duration::from_secs(0),
@@ -133,29 +129,16 @@ impl Link {
         // (`LINK_MTU_SIZE`/`clamp_link_signalling`) but this method never
         // wrote at all — every outbound request signalled cipher mode `0`
         // by accident of the field being entirely absent, not by choice.
-        // See `LinkMode`'s own doc comment for how the two known values
-        // were confirmed.
-        //
-        // There is no wire-visible negotiation response for a rejected
-        // mode: a destination that has the requested mode disabled just
-        // silently drops the request (no counter-offer packet, no error
-        // back to the initiator), so the only way to recover is trying the
-        // other mode on a later retry. The existing repeat-request
-        // watchdog already calls this method repeatedly until the Link
-        // activates or the caller's own timeout gives up — this just
-        // tracks how many of those repeats have happened at the current
-        // mode and swaps once that count passes `MODE_FALLBACK_ATTEMPTS`,
-        // so an exhaustive attempt across both known modes happens
-        // automatically within the existing retry cadence, no new state
-        // machine needed.
-        self.outbound_mode_attempts += 1;
-        if self.outbound_mode_attempts > MODE_FALLBACK_ATTEMPTS {
-            self.outbound_mode = self.outbound_mode.fallback();
-            self.outbound_mode_attempts = 0;
-            log::debug!("link({}): falling back to outbound mode {:?}", self.id, self.outbound_mode);
-        }
+        // `LinkMode::DEFAULT` is always the one mode this build can
+        // actually use (see its own doc comment for why there's no
+        // fallback to try instead), and `RETICULUM_COMPAT_MTU` is the same
+        // conservative ceiling this crate already clamps an *incoming*
+        // signalled value to — advertising a larger value here was
+        // confirmed live to make single-packet Request/Response traffic
+        // fail against at least one real destination, even after the Link
+        // itself activates successfully.
         let mtu_value =
-            (LINK_ADVERTISED_MTU & LINK_MTU_MASK) | ((self.outbound_mode.mode_bits() << 21) & LINK_MODE_MASK);
+            (RETICULUM_COMPAT_MTU & LINK_MTU_MASK) | ((LinkMode::DEFAULT.mode_bits() << 21) & LINK_MODE_MASK);
         packet_data.safe_write(&[
             ((mtu_value >> 16) & 0xFF) as u8,
             ((mtu_value >> 8) & 0xFF) as u8,
