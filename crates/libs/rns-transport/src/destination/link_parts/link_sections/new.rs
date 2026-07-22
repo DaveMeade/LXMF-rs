@@ -124,6 +124,26 @@ impl Link {
 
         packet_data.safe_write(self.priv_identity.as_identity().public_key.as_bytes());
         packet_data.safe_write(self.priv_identity.as_identity().verifying_key.as_bytes());
+        // Pack the 3-byte MTU/mode signalling suffix that `new_from_request`
+        // above already knows how to parse on receipt
+        // (`LINK_MTU_SIZE`/`clamp_link_signalling`) but this method never
+        // wrote at all — every outbound request signalled cipher mode `0`
+        // by accident of the field being entirely absent, not by choice.
+        // `LinkMode::DEFAULT` is always the one mode this build can
+        // actually use (see its own doc comment for why there's no
+        // fallback to try instead), and `RETICULUM_COMPAT_MTU` is the same
+        // conservative ceiling this crate already clamps an *incoming*
+        // signalled value to — advertising a larger value here was
+        // confirmed live to make single-packet Request/Response traffic
+        // fail against at least one real destination, even after the Link
+        // itself activates successfully.
+        let mtu_value =
+            (RETICULUM_COMPAT_MTU & LINK_MTU_MASK) | ((LinkMode::DEFAULT.mode_bits() << 21) & LINK_MODE_MASK);
+        packet_data.safe_write(&[
+            ((mtu_value >> 16) & 0xFF) as u8,
+            ((mtu_value >> 8) & 0xFF) as u8,
+            (mtu_value & 0xFF) as u8,
+        ]);
 
         let packet = Packet {
             header: Header { packet_type: PacketType::LinkRequest, ..Default::default() },
