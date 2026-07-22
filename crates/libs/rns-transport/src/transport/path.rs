@@ -83,10 +83,18 @@ pub(super) fn route_outbound_packet(
         return RouteDecision { packet: original_packet.clone(), next_iface: None };
     };
 
-    if entry.hops <= 1
-        && entry.received_from == original_packet.destination
-        && !connected_to_shared_instance
-    {
+    // Direct (Type1) addressing only requires that the destination is
+    // within one hop — it does not additionally require that its path was
+    // learned via a direct announce (`received_from == destination`).
+    // Confirmed via a byte-for-byte wire capture of a real NomadNet
+    // client's own successful LinkRequest: its path table recorded this
+    // exact shape (hops=1, received_from = the upstream hub's identity,
+    // not the destination's own hash — i.e. learned via a PathResponse,
+    // not a direct announce) and it still sent a plain Type1 LinkRequest,
+    // successfully. With exactly one physically-attached interface, there
+    // is no ambiguous next hop for Type2's explicit transport field to
+    // disambiguate, so `received_from` doesn't factor into this decision.
+    if entry.hops <= 1 && !connected_to_shared_instance {
         return RouteDecision { packet: original_packet.clone(), next_iface: Some(entry.iface) };
     }
 

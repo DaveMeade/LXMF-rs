@@ -118,8 +118,17 @@ mod tests {
         assert_eq!(decision.packet.transport, Some(next_hop));
     }
 
+    // Confirmed via a byte-for-byte wire capture of a real NomadNet
+    // client's own successful LinkRequest against a real destination with
+    // this exact path-table shape (hops=1, received_from = the upstream
+    // hub's identity, not the destination's own hash — i.e. learned via a
+    // PathResponse, not a direct announce): it sent a plain Type1
+    // LinkRequest and it worked. With exactly one physically-attached
+    // interface there is no ambiguous next hop for Type2's explicit
+    // transport field to disambiguate, so `received_from` doesn't factor
+    // into this decision.
     #[test]
-    fn outbound_one_hop_transport_promotes_to_type2_transport() {
+    fn outbound_one_hop_via_relay_still_uses_type1() {
         let destination = AddressHash::new_from_hash(&Hash::new_from_slice(b"destination"));
         let iface = AddressHash::new_from_hash(&Hash::new_from_slice(b"iface"));
         let transport_hop = AddressHash::new_from_hash(&Hash::new_from_slice(b"transport_hop"));
@@ -136,9 +145,9 @@ mod tests {
         let decision = route_outbound_packet(&table, &packet, false);
 
         assert_eq!(decision.next_iface, Some(iface));
-        assert_eq!(decision.packet.header.header_type, HeaderType::Type2);
-        assert_eq!(decision.packet.header.propagation_type, PropagationType::Transport);
-        assert_eq!(decision.packet.transport, Some(transport_hop));
+        assert_eq!(decision.packet.header.header_type, HeaderType::Type1);
+        assert_eq!(decision.packet.header.propagation_type, PropagationType::Broadcast);
+        assert_eq!(decision.packet.transport, None);
     }
 
     #[test]
