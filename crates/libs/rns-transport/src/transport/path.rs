@@ -20,7 +20,14 @@ pub(super) fn route_inbound_packet(
         return RouteDecision { packet: original_packet.clone(), next_iface: None };
     };
 
-    let is_direct_hop = entry.hops <= 1 && entry.received_from == lookup;
+    // Now that inbound packets are correctly incremented on receipt (see
+    // `transport/jobs.rs`'s `apply_receive_hop_increment`), a genuinely
+    // direct (zero real hops away) destination is `entry.hops == 0` —
+    // matching reference Reticulum's own `for_local_client` criterion
+    // (`Transport.py`, `Transport.path_table[dest][IDX_PT_HOPS] == 0`),
+    // confirmed by direct reading. `received_from` doesn't factor into it at
+    // all in the reference implementation.
+    let is_direct_hop = entry.hops == 0;
     let packet = if is_direct_hop {
         Packet {
             header: Header {
@@ -83,10 +90,30 @@ pub(super) fn route_outbound_packet(
         return RouteDecision { packet: original_packet.clone(), next_iface: None };
     };
 
-    if entry.hops <= 1
-        && entry.received_from == original_packet.destination
-        && !connected_to_shared_instance
-    {
+    // Matches reference Reticulum's own `Transport.outbound()` exactly
+    // (confirmed by direct reading):
+    //
+    //   if hops > 1: Type2
+    //   elif hops == 1 and connected_to_shared_instance: Type2
+    //   else: Type1
+    //
+    // No `received_from` check anywhere in the reference rule — that
+    // condition (previously required here) happened to work for
+    // destinations whose path was learned via a direct announce but broke
+    // anything learned via a relayed/PathResponse announce instead, which is
+    // the overwhelmingly common case for anything reached through a
+    // Transport hub. This only became provably correct once inbound packets
+    // were fixed to increment hops on receipt (see `transport/jobs.rs`) —
+    // reference Reticulum's own `for_local_client`/outbound rules assume
+    // hops faithfully reflects real distance, which this crate's own hops
+    // previously didn't.
+    let type1_eligible = match entry.hops {
+        0 => true,
+        1 => !connected_to_shared_instance,
+        _ => false,
+    };
+
+    if type1_eligible {
         return RouteDecision { packet: original_packet.clone(), next_iface: Some(entry.iface) };
     }
 
