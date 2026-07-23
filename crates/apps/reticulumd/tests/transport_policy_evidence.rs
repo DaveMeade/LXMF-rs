@@ -335,7 +335,11 @@ async fn roaming_same_iface_known_path_request_is_suppressed_at_transport_bounda
     ));
     assert_eq!(full_response.packet.destination, destination);
     assert_eq!(full_response.packet.context, PacketContext::PathResponse);
-    assert_eq!(full_response.packet.header.hops, 2);
+    // The fed announce is fixtured at hops=2, but receipt now correctly
+    // increments hops by 1 (matching reference Reticulum's own
+    // Transport.inbound()), so the path this transport actually learned —
+    // and echoes back in its cached PathResponse — is hops=3.
+    assert_eq!(full_response.packet.header.hops, 3);
     assert_eq!(full_response.packet.data.as_slice(), cached_announce_data.as_slice());
 
     let roaming_transport = retransmitting_transport("transport-roaming-same-iface-path-response");
@@ -392,7 +396,8 @@ async fn roaming_diff_iface_known_path_response_waits_extra_grace_at_transport_b
     ));
     assert_eq!(response.packet.destination, destination);
     assert_eq!(response.packet.context, PacketContext::PathResponse);
-    assert_eq!(response.packet.header.hops, 2);
+    // See the sibling test above — hops=2 fixtured, +1 on receipt -> 3.
+    assert_eq!(response.packet.header.hops, 3);
     assert_eq!(response.packet.data.as_slice(), cached_announce_data.as_slice());
 }
 
@@ -433,7 +438,8 @@ async fn known_path_response_precedes_due_ordinary_announce_at_transport_boundar
     ));
     assert_eq!(first.packet.destination, destination);
     assert_eq!(first.packet.context, PacketContext::PathResponse);
-    assert_eq!(first.packet.header.hops, 2);
+    // See the first test in this file — hops=2 fixtured, +1 on receipt -> 3.
+    assert_eq!(first.packet.header.hops, 3);
     assert_eq!(first.packet.data.as_slice(), cached_announce_data.as_slice());
 
     let second = recv_tx(&mut requesting_iface, "ordinary announce after path response").await;
