@@ -188,7 +188,14 @@ fn bootstrap_restores_python_path_table_for_path_lookup_rpc() {
     assert_eq!(result["status"].as_str(), Some("found"));
     assert_eq!(result["next_hop"].as_str(), Some(destination_hex.as_str()));
     assert_eq!(result["interface"].as_str(), Some(expected_iface_hex.as_str()));
-    assert_eq!(result["hops"].as_u64(), Some(0));
+    // The seed announce arrives via the transport's interface channel
+    // (`iface_channel.rx_channel.send`, simulating real receipt on an
+    // interface), so under the corrected hop-counting fix (every packet
+    // increments hops by 1 on receipt, matching reference Reticulum's own
+    // Transport.inbound()) this destination is genuinely one real hop away
+    // — was `Some(0)` before that fix, when receipt never incremented hops
+    // at all.
+    assert_eq!(result["hops"].as_u64(), Some(1));
 
     let request = context
         .daemon
