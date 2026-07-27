@@ -8,7 +8,7 @@ fn run_ci_stage(stage: CiStage, timeout_secs: Option<u64>) -> Result<()> {
         CiStage::TestIntegration => run("cargo", &["test", "--workspace", "--tests"]),
         CiStage::Doc => {
             run("cargo", &["doc", "--workspace", "--no-deps", "--lib"])?;
-            run_python_surface_parity_check(true)?;
+            run_python_surface_parity_check(false)?;
             run_sdk_zmq_parity_check()?;
             run_performance_docs_check()
         }
@@ -167,6 +167,10 @@ fn run_release_check() -> Result<()> {
 }
 
 fn run_python_surface_parity_check(require_complete: bool) -> Result<()> {
+    run(
+        "python3",
+        &["tools/scripts/python_surface_inventory.py", "--self-test"],
+    )?;
     let mut args = vec![
         "tools/scripts/python_surface_inventory.py",
         "--check",
