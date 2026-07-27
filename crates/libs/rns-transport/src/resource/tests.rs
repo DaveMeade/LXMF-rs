@@ -42,6 +42,93 @@ mod tests {
     }
 
     #[test]
+    fn resource_sender_auto_compresses_a_compressible_payload_and_round_trips_through_the_receiver() {
+        let signer = PrivateIdentity::new_from_rand(OsRng);
+        let identity = *signer.as_identity();
+        let destination = DestinationDesc {
+            identity,
+            address_hash: identity.address_hash,
+            name: DestinationName::new("lxmf", "resource"),
+        };
+        let (tx, _) = tokio::sync::broadcast::channel(4);
+        let mut outbound = Link::new(destination, tx.clone());
+        let request = outbound.request();
+        let mut inbound =
+            Link::new_from_request(&request, signer.sign_key().clone(), destination, tx)
+                .expect("link request should parse");
+        let iface = AddressHash::new_from_rand(OsRng);
+        assert!(matches!(
+            outbound.handle_packet(&inbound.prove(), iface),
+            LinkHandleResult::Activated
+        ));
+
+        // Highly compressible: the same short phrase repeated many times —
+        // this is the real-world shape this fix targets (LXMF message
+        // text), not an adversarial edge case.
+        let payload = b"the quick brown fox jumps over the lazy dog ".repeat(500);
+
+        let sender = ResourceSender::new_with_options_mtu(
+            &outbound,
+            payload.clone(),
+            None,
+            None,
+            false,
+            DEFAULT_RESOURCE_INTERFACE_MTU,
+        )
+        .expect("resource sender");
+
+        // The actual wire bytes (post-compression, post-encryption,
+        // chunked) must be well under the original payload size — the
+        // real, end-to-end proof that compression is genuinely wired in,
+        // not just that a flag gets set somewhere.
+        let wire_size: usize = sender.parts.iter().map(|part| part.len()).sum();
+        assert!(
+            wire_size < payload.len(),
+            "wire_size ({wire_size}) should be well under the original payload size ({})",
+            payload.len()
+        );
+
+        // The advertisement itself is link-encrypted (unlike Resource-
+        // context parts, which carry their own separate encryption) — the
+        // real Transport receive pipeline decrypts it before ever handing
+        // it to `ResourceManager`, so this test does the same via the
+        // existing `decrypt_advertisement` helper, then re-packs the
+        // decrypted struct into a plain packet the manager can consume,
+        // exactly mirroring what production code does one layer up.
+        let decrypted_advertisement = decrypt_advertisement(&outbound, &sender.advertisement_packet());
+        assert!(decrypted_advertisement.compressed(), "a highly compressible payload must actually get compressed");
+        // The logical/decompressed size the receiver is told to expect
+        // must still be the ORIGINAL payload length, not the compressed
+        // wire size — a content identity, not a wire-format one (see this
+        // fix's own doc comment in `sender.rs`).
+        assert_eq!(decrypted_advertisement.data_size, payload.len() as u64);
+
+        let mut manager = ResourceManager::new_with_config(Duration::from_secs(1), 1);
+        let plain_adv_packet = resource_packet(
+            PacketContext::ResourceAdvrtisement,
+            &decrypted_advertisement.pack().expect("re-pack advertisement"),
+            *inbound.id(),
+        );
+        let request_packets = manager.handle_packet(&plain_adv_packet, &mut inbound);
+        assert_eq!(request_packets.len(), 1);
+
+        for part in &sender.parts {
+            let part_packet = resource_packet(PacketContext::Resource, part, *inbound.id());
+            manager.handle_packet(&part_packet, &mut inbound);
+        }
+
+        let events = manager.drain_events();
+        let complete = events
+            .into_iter()
+            .find_map(|event| match event.kind {
+                ResourceEventKind::Complete(complete) => Some(complete),
+                _ => None,
+            })
+            .expect("resource should complete");
+        assert_eq!(complete.data, payload, "decompressed data must round-trip to the original uncompressed payload");
+    }
+
+    #[test]
     fn resource_status_predicates_make_transfer_fsm_edges_explicit() {
         for status in [
             ResourceStatus::None,

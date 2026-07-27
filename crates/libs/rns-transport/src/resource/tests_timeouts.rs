@@ -276,7 +276,12 @@ fn resource_manager_times_out_transferring_sender_after_retry_budget() {
     link.request();
 
     let mut manager = ResourceManager::new_with_config(Duration::from_secs(1), 1);
-    let payload = vec![0x42; PACKET_MDU + 32];
+    // Random, not a repeated byte — this test relies on the payload
+    // splitting into exactly 2 parts (`PACKET_MDU + 32`); a uniform-byte
+    // payload this size auto-compresses down to a single part, changing
+    // the sender's status transitions this test asserts on.
+    let mut payload = vec![0u8; PACKET_MDU + 32];
+    OsRng.fill_bytes(&mut payload);
     let (resource_hash, _) = manager.start_send(&link, payload, None).expect("start sender");
     manager.confirm_outbound_dispatch(resource_hash, true);
 

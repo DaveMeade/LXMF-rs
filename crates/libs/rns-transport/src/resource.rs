@@ -1,8 +1,10 @@
 use std::collections::{HashMap, VecDeque};
-use std::io::Read;
+use std::io::{Read, Write};
 use tokio::time::{Duration, Instant};
 
 use bzip2::read::BzDecoder;
+use bzip2::write::BzEncoder;
+use bzip2::Compression;
 use rand_core::{OsRng, RngCore};
 use serde::{Deserialize, Serialize};
 use serde_bytes::ByteBuf;

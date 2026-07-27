@@ -28,7 +28,7 @@ use crate::resource::{
     ResourceAdvertisement, ResourceEventKind, ResourceProof, ResourceRequest, MAPHASH_LEN,
 };
 
-use rand_core::OsRng;
+use rand_core::{OsRng, RngCore};
 
 use std::sync::Mutex as StdMutex;
 

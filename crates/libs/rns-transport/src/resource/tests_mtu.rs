@@ -19,9 +19,16 @@ fn resource_sender_preserves_default_packet_mdu_for_large_links() {
         LinkHandleResult::Activated
     ));
 
+    // Random, not a repeated byte — a uniform-byte payload this size is
+    // trivially bz2-compressible (auto-compression now runs on every
+    // outbound Resource), which would shrink this well below one full
+    // MDU-sized part and defeat what this test actually checks: that a
+    // payload of exactly this LENGTH is chunked at `PACKET_MDU`.
+    let mut payload = vec![0u8; PACKET_MDU + 1];
+    OsRng.fill_bytes(&mut payload);
     let sender = ResourceSender::new_with_options_mtu(
         &outbound,
-        vec![0x42; PACKET_MDU + 1],
+        payload,
         None,
         None,
         false,
@@ -55,9 +62,14 @@ fn resource_sender_constrains_parts_and_hash_updates_to_interface_mtu() {
         LinkHandleResult::Activated
     ));
 
+    // Random, not a repeated byte — see the sibling test's identical
+    // comment above for why (auto-compression would otherwise defeat the
+    // length-based chunk-count assertions below).
+    let mut payload = vec![0u8; PACKET_MDU * 8];
+    OsRng.fill_bytes(&mut payload);
     let mut sender = ResourceSender::new_with_options_mtu(
         &outbound,
-        vec![0x42; PACKET_MDU * 8],
+        payload,
         None,
         None,
         false,
