@@ -48,8 +48,13 @@ fn resource_manager_link_close_allows_later_resource_on_new_link() {
     first_link.request();
 
     let mut manager = ResourceManager::new_with_config(Duration::from_secs(1), 2);
-    let (first_hash, _) =
-        manager.start_send(&first_link, vec![0x11; PACKET_MDU + 24], None).expect("first send");
+    // Random, not a repeated byte — see `resource_manager_times_out_
+    // transferring_sender_after_retry_budget`'s identical comment: this
+    // test depends on the payload splitting into 2 parts, which
+    // auto-compression would otherwise collapse into 1.
+    let mut first_payload = vec![0u8; PACKET_MDU + 24];
+    OsRng.fill_bytes(&mut first_payload);
+    let (first_hash, _) = manager.start_send(&first_link, first_payload, None).expect("first send");
     manager.confirm_outbound_dispatch(first_hash, true);
 
     let adv = ResourceAdvertisement {
@@ -75,8 +80,9 @@ fn resource_manager_link_close_allows_later_resource_on_new_link() {
 
     let mut second_link = Link::new(destination, tx);
     second_link.request();
-    let (second_hash, _) =
-        manager.start_send(&second_link, vec![0x22; PACKET_MDU + 24], None).expect("second send");
+    let mut second_payload = vec![0u8; PACKET_MDU + 24];
+    OsRng.fill_bytes(&mut second_payload);
+    let (second_hash, _) = manager.start_send(&second_link, second_payload, None).expect("second send");
     manager.confirm_outbound_dispatch(second_hash, true);
 
     assert!(!manager.outgoing.contains_key(&first_hash));

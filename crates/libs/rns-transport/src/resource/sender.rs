@@ -128,8 +128,38 @@ impl ResourceSender {
         proof_hasher.update(resource_hash.as_slice());
         let expected_proof = Hash::new(copy_hash(&proof_hasher.finalize())?);
 
+        // Auto-compress before encrypting/chunking, matching real RNS's own
+        // `Resource.__init__` exactly (`auto_compress=True` by default):
+        // attempt bz2 only below `AUTO_COMPRESS_MAX_SIZE` (pointless CPU
+        // otherwise, on something already too large to ever transfer as one
+        // Resource), and only actually USE the compressed form if it's
+        // genuinely smaller — a small/already-dense payload can grow under
+        // bz2's own framing overhead. `resource_hash`/`expected_proof`/
+        // `data_size` above are deliberately computed from `combined`
+        // (the uncompressed logical content) either way, never from the
+        // compressed bytes — this is a content identity, not a wire-format
+        // one, exactly mirroring the reference (`self.hash = RNS.Identity.
+        // full_hash(data+self.random_hash)`, computed from the pre-
+        // compression `data`, confirmed by reading `RNS/Resource.py`
+        // directly). The receive side already understands `FLAG_COMPRESSED`
+        // and decompresses back to exactly this same `combined` before
+        // parsing metadata/data — this was the one half of that round trip
+        // never previously exercised on send.
+        let compressed_candidate = if combined.len() as u64 <= AUTO_COMPRESS_MAX_SIZE as u64 {
+            let mut encoder = BzEncoder::new(Vec::new(), Compression::best());
+            encoder
+                .write_all(&combined)
+                .and_then(|_| encoder.finish())
+                .ok()
+                .filter(|compressed| compressed.len() < combined.len())
+        } else {
+            None
+        };
+        let compressed = compressed_candidate.is_some();
+        let transfer_payload = compressed_candidate.unwrap_or(combined);
+
         let mut prefix = random_bytes::<RANDOM_HASH_SIZE>().to_vec();
-        prefix.extend_from_slice(&combined);
+        prefix.extend_from_slice(&transfer_payload);
 
         let mut cipher_buf = vec![0u8; prefix.len() + 128];
         let cipher = link.encrypt(&prefix, &mut cipher_buf).map_err(|_| RnsError::CryptoError)?;
@@ -165,6 +195,9 @@ impl ResourceSender {
                 }
                 if total_segments > 1 {
                     flags |= FLAG_SPLIT;
+                }
+                if compressed {
+                    flags |= FLAG_COMPRESSED;
                 }
                 flags
             },
