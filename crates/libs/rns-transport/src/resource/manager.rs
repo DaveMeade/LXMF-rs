@@ -12,24 +12,6 @@ pub struct ResourceManager {
 }
 
 impl ResourceManager {
-    pub fn confirm_outbound_dispatch(&mut self, resource_hash: Hash, sent: bool) {
-        let Some(mut sender) = self.pending_outgoing.remove(&resource_hash) else {
-            return;
-        };
-
-        if sent {
-            sender.mark_advertised(self.retry_limit);
-            self.outgoing.insert(resource_hash, sender);
-        } else {
-            self.outgoing_segment_chains.remove(&sender.original_hash);
-            self.events.push(ResourceEvent {
-                hash: resource_hash,
-                link_id: sender.link_id,
-                kind: ResourceEventKind::OutboundFailed,
-            });
-        }
-    }
-
     pub fn cancel_outgoing(
         &mut self,
         resource_hash: Hash,
@@ -216,6 +198,11 @@ impl ResourceManager {
             advertisement.compressed(),
             advertisement.encrypted()
         );
+        // Enforce the inbound limits before any receiver state is created
+        // (issue #514) — see advertisement_limits.rs.
+        if advertisement_exceeds_inbound_limits(&advertisement, link.id()) {
+            return;
+        }
         if advertisement.total_segments > 1 {
             let expected_segment = self
                 .incoming_segments
