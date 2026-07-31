@@ -293,13 +293,23 @@ pub(super) async fn manage_transport(
     let cancel = handler_arc.lock().await.cancel.clone();
     let transport_enabled = handler_arc.lock().await.config.transport_enabled;
 
-    let _packet_task = {
+    // Worker supervision (issue #525): every worker handle is retained in
+    // this set. The loop at the end of this function fails loudly and
+    // cancels the remaining workers if any worker exits before shutdown,
+    // so a panicked or silently returned worker can no longer degrade the
+    // transport invisibly. Each worker returns its name on exit, and the
+    // id-to-name map keeps failures attributable even when a panic means
+    // no value comes back (review follow-up on #539).
+    let mut workers = WorkerSet::new();
+    let mut worker_names = WorkerNames::new();
+
+    {
         let handler_arc = handler_arc.clone();
         let cancel = cancel.clone();
 
         log::trace!("tp({}): start packet task", handler_arc.lock().await.config.name);
 
-        tokio::spawn(async move {
+        spawn_named_worker(&mut workers, &mut worker_names, "packet", async move {
             loop {
                 let mut rx_receiver = rx_receiver.lock().await;
 
@@ -394,14 +404,14 @@ pub(super) async fn manage_transport(
                     }
                 };
             }
-        })
-    };
+        });
+    }
 
     {
         let handler = handler_arc.clone();
         let cancel = cancel.clone();
 
-        tokio::spawn(async move {
+        spawn_named_worker(&mut workers, &mut worker_names, "link-check", async move {
             loop {
                 if cancel.is_cancelled() {
                     break;
@@ -424,7 +434,7 @@ pub(super) async fn manage_transport(
         let handler = handler_arc.clone();
         let cancel = cancel.clone();
 
-        tokio::spawn(async move {
+        spawn_named_worker(&mut workers, &mut worker_names, "iface-cleanup", async move {
             loop {
                 if cancel.is_cancelled() {
                     break;
@@ -446,7 +456,7 @@ pub(super) async fn manage_transport(
         let handler = handler_arc.clone();
         let cancel = cancel.clone();
 
-        tokio::spawn(async move {
+        spawn_named_worker(&mut workers, &mut worker_names, "packet-cache-cleanup", async move {
             loop {
                 if cancel.is_cancelled() {
                     break;
@@ -476,7 +486,7 @@ pub(super) async fn manage_transport(
         let handler = handler_arc.clone();
         let cancel = cancel.clone();
 
-        tokio::spawn(async move {
+        spawn_named_worker(&mut workers, &mut worker_names, "announce-retransmit", async move {
             loop {
                 if cancel.is_cancelled() {
                     break;
@@ -510,7 +520,7 @@ pub(super) async fn manage_transport(
             handler_arc.lock().await.config.resource_retry_interval_secs.max(1),
         );
 
-        tokio::spawn(async move {
+        spawn_named_worker(&mut workers, &mut worker_names, "resource-retry", async move {
             loop {
                 if cancel.is_cancelled() {
                     break;
@@ -547,6 +557,60 @@ pub(super) async fn manage_transport(
                 }
             }
         });
+    }
+
+    // Supervision loop (issue #525) — extracted so the failure semantics
+    // are directly testable: normal shutdown cancels every worker and
+    // drains this set quietly; any worker that exits while the transport
+    // is still running cancels the rest and is logged with its name and
+    // failure.
+    supervise_workers(&mut workers, &worker_names, &cancel).await;
+}
+
+type WorkerSet = tokio::task::JoinSet<()>;
+type WorkerNames = std::collections::HashMap<tokio::task::Id, &'static str>;
+
+/// Spawns a named transport worker, recording the task id so failures
+/// (including panics, which return no value) stay attributable to the
+/// worker that caused them.
+fn spawn_named_worker<F>(
+    workers: &mut WorkerSet,
+    worker_names: &mut WorkerNames,
+    name: &'static str,
+    future: F,
+) where
+    F: std::future::Future<Output = ()> + Send + 'static,
+{
+    worker_names.insert(workers.spawn(future).id(), name);
+}
+
+async fn supervise_workers(
+    workers: &mut WorkerSet,
+    worker_names: &WorkerNames,
+    cancel: &tokio_util::sync::CancellationToken,
+) {
+    while let Some(result) = workers.join_next_with_id().await {
+        match result {
+            Ok((id, ())) => {
+                if !cancel.is_cancelled() {
+                    let name = worker_names.get(&id).copied().unwrap_or("<unnamed>");
+                    log::error!(
+                        "tp: transport worker '{name}' exited before shutdown; cancelling remaining workers"
+                    );
+                    cancel.cancel();
+                }
+            }
+            Err(err) => {
+                // JoinError carries no return value, but it does carry
+                // the failed task id — look the worker name up so panics
+                // stay attributable (review follow-up on #539).
+                let name = worker_names.get(&err.id()).copied().unwrap_or("<unnamed>");
+                log::error!(
+                    "tp: transport worker '{name}' failed ({err}); cancelling remaining workers"
+                );
+                cancel.cancel();
+            }
+        }
     }
 }
 
