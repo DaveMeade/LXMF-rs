@@ -330,6 +330,42 @@ mod identify_packet_tests {
         assert!(outbound.last_inbound.is_none());
     }
 
+    /// A request sent as a single packet arrives as one, and the id the
+    /// responder derives is the one the requester can compute.
+    ///
+    /// That second half is the whole subtlety. A resource-borne request
+    /// carries an id the requester chose; a packet-borne one does not, and
+    /// the responder takes it from the packet hash instead. A requester
+    /// that assumed its own id would be echoed back would correlate against
+    /// a value the responder never saw, and every response would look
+    /// unsolicited.
+    #[tokio::test]
+    async fn a_request_packet_round_trips_and_its_id_is_derived_from_the_packet_hash() {
+        let (outbound, mut inbound, iface, mut rx) = linked_pair();
+
+        let request = b"\x93\xcb\x00\x00\x00\x00\x00\x00\x00\x00\xc4\x04path\xc0";
+        let packet = outbound.request_packet(request).expect("a request packet can be built");
+        assert_eq!(packet.context, PacketContext::Request);
+        let mut expected_id = [0u8; ADDRESS_HASH_SIZE];
+        expected_id.copy_from_slice(&packet.hash().to_bytes()[..ADDRESS_HASH_SIZE]);
+
+        inbound.handle_packet(&packet, iface);
+
+        let event = rx.try_recv().expect("the request is posted to the link's event stream");
+        match event.event {
+            LinkEvent::Data(payload) => {
+                assert_eq!(payload.as_slice(), request, "the request must survive the round trip byte for byte");
+                assert_eq!(payload.context(), PacketContext::Request);
+                assert_eq!(
+                    payload.request_id(),
+                    Some(expected_id),
+                    "the responder derives the id from the packet hash — a requester has to use the same value"
+                );
+            }
+            _ => panic!("expected the request to arrive as LinkEvent::Data"),
+        }
+    }
+
     /// A response sent as a single packet has to arrive as one — decrypted,
     /// tagged `Response`, and byte-identical to what was handed in.
     ///
