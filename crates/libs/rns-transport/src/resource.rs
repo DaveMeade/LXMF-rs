@@ -89,14 +89,19 @@ pub const DEFAULT_RESOURCE_RETRY_INTERVAL_SECS: u64 = 2;
 pub const DEFAULT_RESOURCE_MAX_RETRIES: u8 = 16;
 const DEFAULT_RESOURCE_MAX_ADV_RETRIES: u8 = 4;
 
-pub(crate) fn resource_packet_mdu_for_mtu(interface_mtu: usize) -> Result<usize, RnsError> {
-    if interface_mtu >= DEFAULT_RESOURCE_INTERFACE_MTU {
-        return Ok(PACKET_MDU);
-    }
-    interface_mtu
+/// Fragment payload size for a link of `link_mtu`.
+///
+/// This used to return `PACKET_MDU` (464) for *any* MTU at or above the
+/// legacy 500, so a larger MTU could only ever make fragments smaller (for
+/// LoRa), never bigger — pinning every transfer to 464-byte fragments even
+/// on a gigabit TCP path. The reference derives it the same way this now
+/// does (`RNS/Resource.py`: `sdu = link.mtu - HEADER_MAXSIZE - IFAC_MIN_SIZE`),
+/// which is what lets it move ~8 KB fragments over a link that negotiated
+/// 8192 instead of ~17x as many 464-byte ones.
+pub(crate) fn resource_packet_mdu_for_mtu(link_mtu: usize) -> Result<usize, RnsError> {
+    link_mtu
         .checked_sub(HEADER_MAXSIZE + IFAC_MIN_SIZE)
         .filter(|mdu| *mdu > 0)
-        .map(|mdu| mdu.min(PACKET_MDU))
         .ok_or(RnsError::InvalidArgument)
 }
 
