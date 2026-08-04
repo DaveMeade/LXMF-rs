@@ -57,13 +57,50 @@
         let mut inbound =
             Link::new_from_request(&request, signer.sign_key().clone(), destination, tx)
                 .expect("link request should parse");
-        assert_eq!(inbound.signalling, Some([0x20, 0x01, 0xF4]));
+        // 0x202000 -> mode bits 0x20, MTU 8192. Honoured, not clamped: this
+        // build can now carry it, and clamping it to 500 was what pinned
+        // every resource fragment to 464 bytes regardless of the link.
+        assert_eq!(inbound.signalling, Some([0x20, 0x20, 0x00]));
+        assert_eq!(inbound.link_mtu(), 8192, "the negotiated value has to be readable back out");
 
+        // The proof echoes the same value, so the initiator learns it too.
         let proof = inbound.prove();
         assert_eq!(
             &proof.data.as_slice()[SIGNATURE_LENGTH + PUBLIC_KEY_LENGTH..],
-            &[0x20, 0x01, 0xF4]
+            &[0x20, 0x20, 0x00]
         );
+    }
+
+    /// A peer may still not talk us above what this build can carry.
+    #[test]
+    fn inbound_link_request_still_clamps_an_mtu_above_our_ceiling() {
+        let requester = PrivateIdentity::new_from_rand(OsRng);
+        let signer = PrivateIdentity::new_from_rand(OsRng);
+        let identity = *signer.as_identity();
+        let destination = DestinationDesc {
+            identity,
+            address_hash: identity.address_hash,
+            name: DestinationName::new("lxmf", "delivery"),
+        };
+        let (tx, _) = tokio::sync::broadcast::channel(4);
+        let mut data = PacketDataBuffer::new();
+        data.safe_write(requester.as_identity().public_key.as_bytes());
+        data.safe_write(requester.as_identity().verifying_key.as_bytes());
+        // Mode bits 0x20 plus the largest MTU the 21-bit field can express.
+        data.safe_write(&[0x3F, 0xFF, 0xFF]);
+        let request = Packet {
+            header: Header { packet_type: PacketType::LinkRequest, ..Default::default() },
+            ifac: None,
+            destination: destination.address_hash,
+            transport: None,
+            context: PacketContext::None,
+            data,
+        };
+
+        let inbound = Link::new_from_request(&request, signer.sign_key().clone(), destination, tx)
+            .expect("link request should parse");
+
+        assert_eq!(inbound.link_mtu(), 262_144, "clamped to what this build will actually carry");
     }
 
     // Outbound-side counterpart to `inbound_link_request_clamps_peer_mtu_

@@ -1,5 +1,4 @@
 use std::{
-    cmp::min,
     collections::{HashMap, VecDeque},
     panic::{catch_unwind, AssertUnwindSafe},
     time::{Duration, Instant},
@@ -36,7 +35,28 @@ const LINK_MTU_MASK: u32 = 0x1F_FFFF;
 
 const LINK_MODE_MASK: u32 = 0xE0_0000;
 
-const RETICULUM_COMPAT_MTU: u32 = (PACKET_MDU + 2 + 1 + ADDRESS_HASH_SIZE * 2 + 1) as u32;
+/// What a peer that signalled nothing at all is assumed to support, and the
+/// floor for anything it did signal. This is Reticulum's original fixed MTU
+/// and is a property of the *protocol's history*, not of this build — it
+/// must not move when the ceiling below does.
+pub(crate) const LEGACY_RETICULUM_MTU: usize = PACKET_MDU + 2 + 1 + ADDRESS_HASH_SIZE * 2 + 1;
+
+/// The largest MTU this build will advertise, or accept from a peer.
+///
+/// An outgoing link request is additionally clamped to the next hop's own
+/// interface MTU before it goes out (`transport/path.rs`), so in practice
+/// the *interface* decides and this is only a backstop — matching the
+/// reference, which signals `next_hop_interface_hw_mtu`. The value matches
+/// `TCPInterface.HW_MTU` in the reference, and `TcpClient::DEFAULT_MTU`
+/// here.
+///
+/// Raising this was tried once before, in #498, and broke single-packet
+/// Request/Response against a real destination. The reason is now fixed
+/// rather than avoided: the decrypt buffers and `LinkPayload` were a fixed
+/// 464 bytes and silently truncated anything larger, so a peer that honoured
+/// the bigger MTU got its replies dropped. Both are sized from the actual
+/// payload now, and resource fragments derive from the negotiated MTU.
+const RETICULUM_COMPAT_MTU: u32 = 262_144;
 
 const KEEPALIVE_MAX_RTT: f32 = 1.75;
 

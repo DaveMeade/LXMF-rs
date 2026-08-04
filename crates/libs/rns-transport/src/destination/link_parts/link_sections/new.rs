@@ -259,7 +259,12 @@ impl Link {
                     return LinkHandleResult::None;
                 }
 
-                let mut buffer = [0u8; PACKET_MDU];
+                // Sized from the ciphertext, not from a fixed 464-byte
+                // array: decrypted output is never larger than what came
+                // in, and once a link negotiates a bigger MTU a single
+                // data packet legitimately exceeds `PACKET_MDU`. The
+                // fixed buffer made those decrypts fail silently.
+                let mut buffer = vec![0u8; packet.data.as_slice().len().max(PACKET_MDU)];
                 if let Ok(plain_text) = self.decrypt(packet.data.as_slice(), &mut buffer[..]) {
                     self.note_inbound(packet.context);
                     log::trace!("link({}): data {}B", self.id, plain_text.len());
@@ -270,7 +275,12 @@ impl Link {
                 return LinkHandleResult::None;
             }
             PacketContext::LinkIdentify => {
-                let mut buffer = [0u8; PACKET_MDU];
+                // Sized from the ciphertext, not from a fixed 464-byte
+                // array: decrypted output is never larger than what came
+                // in, and once a link negotiates a bigger MTU a single
+                // data packet legitimately exceeds `PACKET_MDU`. The
+                // fixed buffer made those decrypts fail silently.
+                let mut buffer = vec![0u8; packet.data.as_slice().len().max(PACKET_MDU)];
                 if let Ok(plain_text) = self.decrypt(packet.data.as_slice(), &mut buffer[..]) {
                     if let Some(identity) = parse_link_identify_payload(plain_text, &self.id) {
                         self.note_inbound(packet.context);
@@ -283,7 +293,12 @@ impl Link {
                 }
             }
             PacketContext::None | PacketContext::Request | PacketContext::Response => {
-                let mut buffer = [0u8; PACKET_MDU];
+                // Sized from the ciphertext, not from a fixed 464-byte
+                // array: decrypted output is never larger than what came
+                // in, and once a link negotiates a bigger MTU a single
+                // data packet legitimately exceeds `PACKET_MDU`. The
+                // fixed buffer made those decrypts fail silently.
+                let mut buffer = vec![0u8; packet.data.as_slice().len().max(PACKET_MDU)];
                 if let Ok(plain_text) = self.decrypt(packet.data.as_slice(), &mut buffer[..]) {
                     self.note_inbound(packet.context);
                     log::trace!("link({}): data {}B", self.id, plain_text.len());
@@ -324,7 +339,12 @@ impl Link {
                 }
             }
             PacketContext::LinkClose => {
-                let mut buffer = [0u8; PACKET_MDU];
+                // Sized from the ciphertext, not from a fixed 464-byte
+                // array: decrypted output is never larger than what came
+                // in, and once a link negotiates a bigger MTU a single
+                // data packet legitimately exceeds `PACKET_MDU`. The
+                // fixed buffer made those decrypts fail silently.
+                let mut buffer = vec![0u8; packet.data.as_slice().len().max(PACKET_MDU)];
                 match self.decrypt(packet.data.as_slice(), &mut buffer[..]) {
                     Ok(plain_text) if plain_text == self.id.as_slice() => {
                         self.note_inbound(packet.context);
@@ -344,7 +364,12 @@ impl Link {
                 return LinkHandleResult::None;
             }
             PacketContext::LinkRTT => {
-                let mut buffer = [0u8; PACKET_MDU];
+                // Sized from the ciphertext, not from a fixed 464-byte
+                // array: decrypted output is never larger than what came
+                // in, and once a link negotiates a bigger MTU a single
+                // data packet legitimately exceeds `PACKET_MDU`. The
+                // fixed buffer made those decrypts fail silently.
+                let mut buffer = vec![0u8; packet.data.as_slice().len().max(PACKET_MDU)];
                 if let Ok(plain_text) = self.decrypt(packet.data.as_slice(), &mut buffer[..]) {
                     let mut cursor = std::io::Cursor::new(plain_text);
                     if let Ok(peer_rtt) = rmp::decode::read_f32(&mut cursor) {
@@ -418,6 +443,23 @@ impl Link {
                         validate_link_request_proof_packet(&self.destination, &self.id, packet)
                     {
                         log::debug!("link({}): has been proved", self.id);
+
+                        // The proof carries the responder's own MTU
+                        // signalling, and until now it was read only to
+                        // verify the signature over it and then dropped —
+                        // so an initiator never learned what the far end
+                        // could actually carry, and every size it derived
+                        // came from its own interface instead. Capture it
+                        // (clamped on the way in, like an inbound request's)
+                        // so `link_mtu()` reports the negotiated value.
+                        const MTU_PROOF_LEN: usize =
+                            SIGNATURE_LENGTH + PUBLIC_KEY_LENGTH + LINK_MTU_SIZE;
+                        if packet.data.len() >= MTU_PROOF_LEN {
+                            let start = SIGNATURE_LENGTH + PUBLIC_KEY_LENGTH;
+                            let mut bytes = [0u8; LINK_MTU_SIZE];
+                            bytes.copy_from_slice(&packet.data.as_slice()[start..start + LINK_MTU_SIZE]);
+                            self.signalling = Some(clamp_link_signalling(bytes));
+                        }
 
                         self.handshake(identity);
                         self.ingress_iface.get_or_insert(iface);

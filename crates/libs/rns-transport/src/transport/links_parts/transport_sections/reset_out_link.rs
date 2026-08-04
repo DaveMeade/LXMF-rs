@@ -138,6 +138,9 @@ impl Transport {
         let interface_mtu = self.resource_mtu_for_iface(iface).await;
         let mut handler = self.handler.lock().await;
         let link_guard = link.lock().await;
+        // See `resource_wire.rs`: the negotiated link MTU, not the local
+        // interface alone, is what a fragment has to fit through.
+        let interface_mtu = interface_mtu.min(link_guard.link_mtu());
         let (resource_hash, packet) = handler.resource_manager.start_send_with_mtu(
             &link_guard,
             data,
@@ -176,6 +179,9 @@ impl Transport {
         let interface_mtu = self.resource_mtu_for_iface(iface).await;
         let mut handler = self.handler.lock().await;
         let link_guard = link.lock().await;
+        // See `resource_wire.rs`: the negotiated link MTU, not the local
+        // interface alone, is what a fragment has to fit through.
+        let interface_mtu = interface_mtu.min(link_guard.link_mtu());
         let (resource_hash, packet) = handler.resource_manager.start_send_with_options_mtu(
             &link_guard,
             data,
@@ -215,6 +221,9 @@ impl Transport {
         let interface_mtu = self.resource_mtu_for_iface(iface).await;
         let mut handler = self.handler.lock().await;
         let link_guard = link.lock().await;
+        // See `resource_wire.rs`: the negotiated link MTU, not the local
+        // interface alone, is what a fragment has to fit through.
+        let interface_mtu = interface_mtu.min(link_guard.link_mtu());
         let (resource_hash, packet) = handler.resource_manager.start_send_with_options_mtu(
             &link_guard,
             data,
