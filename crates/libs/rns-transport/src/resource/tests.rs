@@ -6,6 +6,11 @@ mod tests {
     use crate::identity::PrivateIdentity;
     use rand_core::OsRng;
 
+    /// Inter-part arrival interval used by the request tests. Small enough
+    /// that `part_timeout`'s grace floor dominates, so a test that wants a
+    /// timeout has to advance the clock past it deliberately.
+    const TEST_ARRIVAL_INTERVAL: Duration = Duration::from_millis(1);
+
     #[test]
     fn resource_sender_rejects_oversized_metadata() {
         let signer = PrivateIdentity::new_from_rand(OsRng);
@@ -594,7 +599,7 @@ mod tests {
         let segment_len = 74;
         let (mut receiver, _) = multi_segment_receiver(600, segment_len);
 
-        let request = receiver.build_request(Instant::now(), Duration::from_millis(50));
+        let request = receiver.build_request(Instant::now(), Duration::from_millis(50), TEST_ARRIVAL_INTERVAL, RequestTrigger::Immediate);
 
         assert!(
             !request.hashmap_exhausted,
@@ -615,7 +620,7 @@ mod tests {
         // Nothing received yet, so the window is [0, WINDOW) and segment
         // zero maps only its first two slots — the state a large transfer
         // is in from its very first request.
-        let first = receiver.build_request(now, Duration::from_millis(50));
+        let first = receiver.build_request(now, Duration::from_millis(50), TEST_ARRIVAL_INTERVAL, RequestTrigger::Immediate);
         assert!(first.hashmap_exhausted, "the next fragment is unmapped, so the map has to be asked for");
         assert_eq!(
             first.last_map_hash,
@@ -623,7 +628,7 @@ mod tests {
             "the sender matches this against its own parts and cancels the transfer if it is not a segment boundary"
         );
 
-        let second = receiver.build_request(now, Duration::from_millis(50));
+        let second = receiver.build_request(now, Duration::from_millis(50), TEST_ARRIVAL_INTERVAL, RequestTrigger::Immediate);
         assert!(!second.hashmap_exhausted, "asking twice for the same segment is what walks the sender's window off");
         assert!(second.requested_hashes.is_empty(), "…and there is nothing else to ask for either");
 
@@ -638,7 +643,7 @@ mod tests {
             hashmap: segment_bytes,
         });
 
-        let third = receiver.build_request(now, Duration::from_millis(50));
+        let third = receiver.build_request(now, Duration::from_millis(50), TEST_ARRIVAL_INTERVAL, RequestTrigger::Immediate);
         assert_eq!(
             third.requested_hashes,
             map_hashes[segment_len..segment_len * 2].to_vec(),
@@ -661,7 +666,7 @@ mod tests {
         let mut now = Instant::now();
         let rtt = Duration::from_millis(50);
 
-        assert_eq!(receiver.build_request(now, rtt).requested_hashes.len(), WINDOW, "the first round is the starting window");
+        assert_eq!(receiver.build_request(now, rtt, TEST_ARRIVAL_INTERVAL, RequestTrigger::Immediate).requested_hashes.len(), WINDOW, "the first round is the starting window");
 
         // Complete round after round, delivering exactly what was asked for.
         let mut delivered = 0usize;
@@ -676,7 +681,7 @@ mod tests {
             receiver.consecutive_completed_height = delivered;
             receiver.note_round_complete(now);
             now += rtt;
-            sizes.push(receiver.build_request(now, rtt).requested_hashes.len());
+            sizes.push(receiver.build_request(now, rtt, TEST_ARRIVAL_INTERVAL, RequestTrigger::Immediate).requested_hashes.len());
         }
 
         assert!(
@@ -736,10 +741,10 @@ mod tests {
         let opened = receiver.window;
         assert!(opened > WINDOW_MIN, "precondition: the window has room to close");
 
-        receiver.build_request(now, rtt);
+        receiver.build_request(now, rtt, TEST_ARRIVAL_INTERVAL, RequestTrigger::Immediate);
         // Every fragment just requested times out together.
         let much_later = now + rtt * 100;
-        receiver.build_request(much_later, rtt);
+        receiver.build_request(much_later, rtt, TEST_ARRIVAL_INTERVAL, RequestTrigger::Immediate);
 
         assert_eq!(receiver.window, opened - 1, "one failed round, one step back — not one per fragment");
         assert!(receiver.window >= WINDOW_MIN);
@@ -784,13 +789,13 @@ mod tests {
         let now = Instant::now();
         let rtt = Duration::from_millis(50);
 
-        assert!(receiver.build_request(now, rtt).hashmap_exhausted);
+        assert!(receiver.build_request(now, rtt, TEST_ARRIVAL_INTERVAL, RequestTrigger::Immediate).hashmap_exhausted);
         receiver.mark_request();
 
-        let still_waiting = receiver.build_request(now + Duration::from_millis(10), rtt);
+        let still_waiting = receiver.build_request(now + Duration::from_millis(10), rtt, TEST_ARRIVAL_INTERVAL, RequestTrigger::Immediate);
         assert!(!still_waiting.hashmap_exhausted, "a reply is still plausibly in flight");
 
-        let gave_up = receiver.build_request(now + hashmap_update_wait(rtt) + Duration::from_secs(1), rtt);
+        let gave_up = receiver.build_request(now + hashmap_update_wait(rtt) + Duration::from_secs(1), rtt, TEST_ARRIVAL_INTERVAL, RequestTrigger::Immediate);
         assert!(gave_up.hashmap_exhausted, "the update never came — ask again rather than wait forever");
     }
 
@@ -1135,6 +1140,7 @@ mod tests {
     include!("tests_retry_failures.rs");
     include!("tests_split_assembly.rs");
     include!("tests_split_metadata.rs");
+    include!("tests_window_rounds.rs");
     include!("tests_timeouts.rs");
     include!("tests_timeouts_lifecycle.rs");
 

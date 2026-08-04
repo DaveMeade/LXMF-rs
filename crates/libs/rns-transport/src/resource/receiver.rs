@@ -59,20 +59,6 @@ struct ResourceReceiver {
     /// arrived by then — the two inputs to the round's measured rate.
     round_started_at: Instant,
     round_start_bytes: u64,
-    /// Fragments received since the window last changed size.
-    ///
-    /// This receiver refills the window continuously rather than draining
-    /// it — `build_request` tops it back up on every part — so "the round
-    /// finished" cannot mean "nothing is in flight", which with a full
-    /// pipeline essentially never happens. Measured against a real node it
-    /// happened often enough to reach a window of 42 and then effectively
-    /// stopped, because the larger the window the rarer a full drain is:
-    /// growth throttled itself exactly when it mattered most.
-    ///
-    /// A window's worth of fragments arriving without a loss is the same
-    /// success the reference's drained round represents, and it is one this
-    /// implementation can actually observe.
-    fragments_since_window_change: usize,
     /// Set when a hashmap update has been asked for and not yet received.
     ///
     /// While set, no further request is built. Without this gate a receiver
@@ -174,7 +160,6 @@ impl ResourceReceiver {
             very_slow_rate_rounds: 0,
             round_started_at: now,
             round_start_bytes: 0,
-            fragments_since_window_change: 0,
             waiting_for_hashmap_update: false,
         };
         // Advertisement hashmaps always contain resource hashmap segment zero.

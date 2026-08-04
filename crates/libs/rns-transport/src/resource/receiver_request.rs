@@ -19,30 +19,51 @@ fn hashmap_update_wait(rtt: Duration) -> Duration {
     rtt.saturating_mul(FACTOR).max(FLOOR)
 }
 
+/// Why a fragment request is being built.
+///
+/// Only the trigger differs between these; what gets asked for is the same
+/// window either way. The reference tops the window up on an advertisement,
+/// on a hashmap update and on a watchdog retry, but on the receive path only
+/// once the round has drained (`elif self.outstanding_parts == 0:`,
+/// `RNS/Resource.py`).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) enum RequestTrigger {
+    /// An advertisement, a hashmap update, or a retry: fill the window now.
+    Immediate,
+    /// A fragment just arrived. Asking again before the round has drained
+    /// would carry the single slot that fragment just vacated — which is one
+    /// request packet and one round trip per fragment, and is what made the
+    /// window ladder above meaningless in bandwidth terms however high it
+    /// climbed.
+    PartReceived,
+}
+
 impl ResourceReceiver {
-    /// Every fragment asked for in the last round has arrived: widen the
-    /// window by one, and measure the link while we have a clean interval
-    /// to measure over.
+    /// One more fragment landed. The round is over when everything asked for
+    /// has arrived — the reference's `outstanding_parts == 0`.
     ///
-    /// The reference does this at exactly the same point — after a part
-    /// lands and `outstanding_parts` reaches zero (`RNS/Resource.py`).
-    /// Growing by one per successful round rather than by a ratio is
-    /// deliberate: it is what the reference does, and a resource transfer
-    /// is short enough that a slow-start curve would spend most of the
-    /// transfer still ramping.
-    /// One more fragment landed. A full window's worth without a loss is
-    /// this implementation's equivalent of the reference's drained round —
-    /// see `fragments_since_window_change` for why the drain itself is not
-    /// observable here.
+    /// An earlier version of this counted a window's worth of fragments
+    /// instead, because with the window topped up on every arriving part the
+    /// pipeline never drained and this condition never fired. That was a
+    /// workaround for the refill strategy, not for the reference's design;
+    /// now that `build_request` asks for a whole window per round, the drain
+    /// is observable and is what the ladder should key on.
     fn note_fragment_received(&mut self, now: Instant) {
-        self.fragments_since_window_change += 1;
-        if self.fragments_since_window_change >= self.window {
+        if self.in_flight_set.is_empty() {
             self.note_round_complete(now);
         }
     }
 
+    /// Every fragment asked for in the last round has arrived: widen the
+    /// window by one, and measure the link while we have a clean interval to
+    /// measure over.
+    ///
+    /// The reference does this at exactly the same point — after a part lands
+    /// and `outstanding_parts` reaches zero (`RNS/Resource.py`). Growing by
+    /// one per successful round rather than by a ratio is deliberate: it is
+    /// what the reference does, and a resource transfer is short enough that
+    /// a slow-start curve would spend most of the transfer still ramping.
     fn note_round_complete(&mut self, now: Instant) {
-        self.fragments_since_window_change = 0;
         if self.window < self.window_max {
             self.window += 1;
             // Once the window has pulled far enough ahead of its floor, the
@@ -87,55 +108,101 @@ impl ResourceReceiver {
     /// not immediately climb back to a size this link has just shown it
     /// cannot sustain. Mirrors the reference's retry path.
     fn note_fragments_lost(&mut self) {
-        self.fragments_since_window_change = 0;
         if self.window > self.window_min {
             self.window -= 1;
             if self.window_max > self.window_min {
                 self.window_max -= 1;
-                if self.window_max - self.window > WINDOW_FLEXIBILITY - 1 {
+                // `saturating_sub`, not `-`: a window carried over from a
+                // previous resource on this link can legitimately start above
+                // `window_max` (see the restore in `manager.rs`), and the
+                // reference reaches the same comparison with a negative value
+                // where Rust would underflow and panic.
+                if self.window_max.saturating_sub(self.window) > WINDOW_FLEXIBILITY - 1 {
                     self.window_max -= 1;
                 }
             }
         }
     }
 
-    fn build_request(&mut self, now: Instant, rtt: Duration) -> ResourceRequest {
-        // TODO: the loss threshold (2×rtt) and EWMA alpha (7/8) are intuition-based
-        // and have not been formally tuned or proven. On links with high jitter the
-        // 2×rtt multiplier may be too tight (causing spurious re-requests); on links
-        // with asymmetric delay it may be too loose. The EWMA alpha controls how
-        // quickly the estimate tracks changes — a higher alpha (closer to 1) gives
-        // more weight to history and reacts more slowly to sudden changes. Both
-        // values should be validated against real-world Reticulum traffic traces.
-        let loss_threshold = rtt.saturating_mul(2);
+    /// How long to wait, with no part arriving at all, before treating the
+    /// outstanding window as lost.
+    ///
+    /// This is an *idle* timer, not a per-fragment one, and it is measured
+    /// from the last part that arrived rather than from when each fragment
+    /// was asked for. That is the reference's shape (`RNS/Resource.py`'s
+    /// watchdog: `last_activity + part_timeout_factor * expected_tof_remaining
+    /// + RETRY_GRACE_TIME`).
+    ///
+    /// Two properties of that shape are load-bearing:
+    ///
+    /// * it **scales with the outstanding window**, because a sender serves
+    ///   fragments in sequence — the tail of a window of 60 cannot arrive
+    ///   within the same budget as the tail of a window of 4. A threshold
+    ///   that is constant in window size makes a large window declare its own
+    ///   tail lost on a perfect link, and every such "loss" ratchets the
+    ///   ceiling down permanently.
+    /// * it has an **absolute floor**. On a fast link the measured interval
+    ///   is a fraction of a millisecond, and any purely rate-derived budget
+    ///   collapses toward zero. The reference floors it at `RETRY_GRACE_TIME`
+    ///   for the same reason `hashmap_update_wait` above has a floor.
+    fn part_timeout(&self, rtt: Duration, arrival_interval: Duration) -> Duration {
+        /// `PART_TIMEOUT_FACTOR_AFTER_RTT` in the reference.
+        const FACTOR: u32 = 2;
+        /// `RETRY_GRACE_TIME` in the reference.
+        const GRACE: Duration = Duration::from_millis(250);
+        let outstanding = self.in_flight_set.len().max(1) as u32;
+        arrival_interval
+            .saturating_mul(outstanding)
+            .max(rtt)
+            .saturating_mul(FACTOR)
+            .saturating_add(GRACE)
+    }
 
-        // One shrink per round of losses, not one per fragment. A window of
-        // four that times out wholesale is a single failed round — shrinking
-        // four times would collapse straight to the floor and throw away
-        // everything the link had proven. The reference shrinks once per
-        // retry for the same reason.
+    fn build_request(
+        &mut self,
+        now: Instant,
+        rtt: Duration,
+        arrival_interval: Duration,
+        trigger: RequestTrigger,
+    ) -> ResourceRequest {
+        // Prune fragments that have already landed. The queue is in send
+        // order, so received entries collect at the front.
+        while let Some(&(_, idx)) = self.in_flight_queue.front() {
+            if self.parts[idx].is_some() {
+                self.in_flight_set.remove(&idx);
+                self.in_flight_queue.pop_front();
+            } else {
+                break;
+            }
+        }
+
+        // One shrink per failed round, not one per fragment. A window that
+        // times out wholesale is a single failed round — shrinking once per
+        // fragment would collapse straight to the floor and throw away
+        // everything the link had proven.
         let mut lost_this_round = false;
 
-        // Drain the front of in_flight_queue (front = oldest, since we append in time order).
-        // Received entries are lazily pruned; entries older than 2×rtt are declared lost
-        // and pushed to the front of request_queue for priority re-request.
-        loop {
-            match self.in_flight_queue.front() {
-                None => break,
-                Some(&(sent_at, idx)) => {
-                    if self.parts[idx].is_some() {
-                        self.in_flight_set.remove(&idx);
-                        self.in_flight_queue.pop_front();
-                    } else if now.duration_since(sent_at) > loss_threshold {
-                        self.in_flight_set.remove(&idx);
-                        self.in_flight_queue.pop_front();
-                        self.request_queue.push_front(idx);
-                        lost_this_round = true;
-                    } else {
-                        break;
-                    }
-                }
+        // Nothing has arrived for the whole idle budget: give up on the
+        // entire outstanding set at once and re-queue it, as the reference's
+        // watchdog does. Declaring fragments lost individually, on a timer
+        // that did not scale with the window, is what generated the
+        // loss events that walked the window ladder into its floor.
+        if !self.in_flight_set.is_empty()
+            && now.duration_since(self.last_progress) > self.part_timeout(rtt, arrival_interval)
+        {
+            // Re-queue in ascending index order so the re-request stays as
+            // close to the sender's serving anchor as possible: a reference
+            // sender only serves parts at or above
+            // `receiver_min_consecutive_height` and silently drops anything
+            // below it, so the oldest gap is the one that must go first.
+            let mut lost: Vec<usize> = self.in_flight_queue.iter().map(|&(_, idx)| idx).collect();
+            lost.sort_unstable();
+            for idx in lost.into_iter().rev() {
+                self.request_queue.push_front(idx);
             }
+            self.in_flight_queue.clear();
+            self.in_flight_set.clear();
+            lost_this_round = true;
         }
 
         if lost_this_round {
@@ -194,9 +261,25 @@ impl ResourceReceiver {
             self.waiting_for_hashmap_update = true;
         }
 
-        // Fill available window slots. Lost fragments are at the front of request_queue
+        // Fill the window. Lost fragments are at the front of request_queue
         // (pushed there above) so they get priority over new fragments.
-        let window_space = self.window.saturating_sub(self.in_flight_set.len());
+        //
+        // Whether a request should be built at all is the *caller's*
+        // decision, and it is where the batching lives: the reference tops
+        // the window up on an advertisement, on a hashmap update and on a
+        // watchdog retry, but on the receive path only when the round has
+        // drained (`elif self.outstanding_parts == 0:`, `RNS/Resource.py`).
+        // Rebuilding on every arriving part instead is what made
+        // `window - in_flight` almost always 1 — measured over a real
+        // transfer, 15,689 of 16,919 requests carried a single hash for
+        // 39,809 fragments, one request packet and one round trip each.
+        let window_space = if trigger == RequestTrigger::PartReceived
+            && !self.in_flight_set.is_empty()
+        {
+            0
+        } else {
+            self.window.saturating_sub(self.in_flight_set.len())
+        };
         let mut requested = Vec::new();
         while requested.len() < window_space {
             match self.request_queue.pop_front() {
