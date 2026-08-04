@@ -46,6 +46,12 @@ parity, resource-limit, propagation-stamp, transport-worker, and crypto-safety
 fixes that landed after v0.9.6. This release makes no new broad parity claim;
 it records the behavior now present on the exact release commit.
 
+Resource-layer wire fidelity now includes outbound bz2 auto-compression
+matching `Resource.__init__`'s default, completing the existing inbound
+decompression path. This is a row-level increment recorded in
+`docs/status/reticulum-parity-matrix.md`; no capability status in the table
+above changes.
+
 Split-resource receive now strips the metadata block from the first segment
 only, matching `Resource.py`'s own asymmetry between the metadata flag (set on
 every segment, so the receiver can size the whole transfer) and the
