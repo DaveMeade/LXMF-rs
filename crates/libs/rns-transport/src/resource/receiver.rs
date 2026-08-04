@@ -275,7 +275,14 @@ impl ResourceReceiver {
                 payload = decompressed;
             }
 
-            let (metadata, data_payload) = if self.has_metadata && payload.len() >= 3 {
+            // Only the *first* segment of a split resource carries the metadata
+            // block. A sender flags every segment as metadata-bearing so the
+            // receiver can account for those bytes in `total_data_size`, but it
+            // prefixes the 3-byte-length block to segment 1 alone. Stripping it
+            // from later segments reads three bytes of payload as a length and
+            // silently deletes that many bytes of real data.
+            let carries_metadata_block = self.has_metadata && self.segment_index == 1;
+            let (metadata, data_payload) = if carries_metadata_block && payload.len() >= 3 {
                 let size = ((payload[0] as usize) << 16)
                     | ((payload[1] as usize) << 8)
                     | payload[2] as usize;
