@@ -647,6 +647,105 @@ mod tests {
         assert!(!third.hashmap_exhausted, "and the window they fill is mapped again");
     }
 
+    /// The window opens as rounds succeed, instead of sitting at four for
+    /// the whole transfer.
+    ///
+    /// Four fragments per round is the reference's *starting* window; it
+    /// grows toward `WINDOW_MAX_SLOW` and, on a link measured fast enough,
+    /// to `WINDOW_MAX_FAST`. Holding it at four caps throughput at four
+    /// fragments per round trip no matter how good the link is — on a
+    /// 2260-fragment resource that is 565 sequential round trips.
+    #[test]
+    fn the_request_window_opens_as_rounds_succeed() {
+        let (mut receiver, map_hashes) = multi_segment_receiver(600, 600);
+        let mut now = Instant::now();
+        let rtt = Duration::from_millis(50);
+
+        assert_eq!(receiver.build_request(now, rtt).requested_hashes.len(), WINDOW, "the first round is the starting window");
+
+        // Complete round after round, delivering exactly what was asked for.
+        let mut delivered = 0usize;
+        let mut sizes = Vec::new();
+        for _ in 0..6 {
+            while delivered < receiver.consecutive_completed_height + receiver.window {
+                receiver.parts[delivered] = Some(b"body".to_vec());
+                receiver.received += 1;
+                receiver.in_flight_set.remove(&delivered);
+                delivered += 1;
+            }
+            receiver.consecutive_completed_height = delivered;
+            receiver.note_round_complete(now);
+            now += rtt;
+            sizes.push(receiver.build_request(now, rtt).requested_hashes.len());
+        }
+
+        assert!(
+            sizes.windows(2).all(|pair| pair[1] >= pair[0]),
+            "a window that shrinks on success would be worse than a fixed one: {sizes:?}"
+        );
+        assert!(sizes.last().unwrap() > &WINDOW, "six clean rounds must buy more than the starting window: {sizes:?}");
+        assert!(
+            sizes.iter().all(|size| *size <= WINDOW_MAX_SLOW),
+            "…but not past the slow ceiling until the link measures fast: {sizes:?}"
+        );
+        let _ = map_hashes;
+    }
+
+    /// …and closes again when fragments go missing, once per round rather
+    /// than once per fragment.
+    ///
+    /// A window of four that times out wholesale is one failed round. Four
+    /// separate shrinks would collapse straight to the floor and discard
+    /// everything the link had proven.
+    #[test]
+    fn a_round_of_losses_narrows_the_window_once() {
+        let (mut receiver, _) = multi_segment_receiver(600, 600);
+        let now = Instant::now();
+        let rtt = Duration::from_millis(50);
+
+        // Open the window up first, so there is room to shrink.
+        for _ in 0..5 {
+            receiver.note_round_complete(now);
+        }
+        let opened = receiver.window;
+        assert!(opened > WINDOW_MIN, "precondition: the window has room to close");
+
+        receiver.build_request(now, rtt);
+        // Every fragment just requested times out together.
+        let much_later = now + rtt * 100;
+        receiver.build_request(much_later, rtt);
+
+        assert_eq!(receiver.window, opened - 1, "one failed round, one step back — not one per fragment");
+        assert!(receiver.window >= WINDOW_MIN);
+    }
+
+    /// The fast ceiling exists, is reached only by sustained measurement,
+    /// and stops exactly where the sender's serving window assumes it will.
+    #[test]
+    fn a_sustained_fast_link_unlocks_the_fast_ceiling_and_no_further() {
+        let (mut receiver, _) = multi_segment_receiver(600, 600);
+        let mut now = Instant::now();
+
+        // Rounds that move plenty of data in very little time.
+        for _ in 0..FAST_RATE_THRESHOLD {
+            receiver.received_bytes += 100_000;
+            now += Duration::from_millis(10);
+            receiver.note_round_complete(now);
+        }
+        assert_eq!(receiver.window_max, WINDOW_MAX_FAST, "sustained fast rounds unlock the fast ceiling");
+
+        for _ in 0..500 {
+            now += Duration::from_millis(10);
+            receiver.received_bytes += 100_000;
+            receiver.note_round_complete(now);
+        }
+        assert_eq!(
+            receiver.window, WINDOW_MAX_FAST,
+            "the window stops at the sender's own WINDOW_MAX — asking past it means asking for fragments \
+             a reference sender has already stopped serving"
+        );
+    }
+
     /// A lost hashmap update must not park the transfer forever.
     ///
     /// It would, and silently: `retry_count` only advances when a request is

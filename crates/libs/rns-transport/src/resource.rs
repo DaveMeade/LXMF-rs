@@ -17,7 +17,46 @@ use crate::hash::{AddressHash, Hash, ADDRESS_HASH_SIZE, HASH_SIZE};
 use crate::packet::DestinationType;
 use crate::packet::{Header, Packet, PacketContext, PacketDataBuffer, PacketType, PACKET_MDU};
 
+/// Fragments requested per round at the start of a transfer.
+///
+/// This is the *initial* window, not a fixed one — it grows toward
+/// [`WINDOW_MAX_SLOW`] as rounds complete and further to [`WINDOW_MAX_FAST`]
+/// on a link measured fast enough to justify it, and shrinks again on a
+/// timeout. The whole ladder is the reference's (`RNS/Resource.py`).
 pub const WINDOW: usize = 4;
+/// The window never shrinks below this, however bad the link gets.
+pub const WINDOW_MIN: usize = 2;
+/// The ceiling a transfer starts with, before the link has been measured.
+pub const WINDOW_MAX_SLOW: usize = 10;
+/// The ceiling adopted after [`VERY_SLOW_RATE_THRESHOLD`] consecutive rounds
+/// below [`RATE_VERY_SLOW`] — asking for more than this on such a link just
+/// builds a queue of fragments that time out.
+pub const WINDOW_MAX_VERY_SLOW: usize = 4;
+/// The ceiling adopted after [`FAST_RATE_THRESHOLD`] consecutive rounds above
+/// [`RATE_FAST`].
+///
+/// **Also the global maximum, and that is load-bearing.** A sending peer
+/// keeps its serving window anchored `WINDOW_MAX` fragments behind the
+/// hashmap frontier (`receiver_min_consecutive_height = max(part_index - 1 -
+/// WINDOW_MAX, 0)`, `RNS/Resource.py`), so a receiver that asked for more
+/// than this in one round would be asking for fragments the sender has
+/// already stopped serving — and it drops them silently. Raising this
+/// without the sender agreeing re-creates the stall it was raised to fix.
+pub const WINDOW_MAX_FAST: usize = 75;
+/// How far the window and its floor may drift apart. Once the gap exceeds
+/// this, growing the window also raises the floor, so a link that has proven
+/// itself does not fall all the way back on a single timeout.
+pub const WINDOW_FLEXIBILITY: usize = 4;
+/// Consecutive fast rounds required before the fast ceiling is unlocked.
+/// Defined relative to the slow ceiling exactly as the reference does, so
+/// the two cannot drift apart.
+pub const FAST_RATE_THRESHOLD: u32 = (WINDOW_MAX_SLOW - WINDOW - 2) as u32;
+/// Consecutive very-slow rounds required before the window is capped down.
+pub const VERY_SLOW_RATE_THRESHOLD: u32 = 2;
+/// 50 kbit/s, in bytes per second — above this a link is treated as fast.
+pub const RATE_FAST: f64 = (50 * 1000) as f64 / 8.0;
+/// 2 kbit/s, in bytes per second — below this a link is treated as very slow.
+pub const RATE_VERY_SLOW: f64 = (2 * 1000) as f64 / 8.0;
 pub const MAPHASH_LEN: usize = 4;
 pub const RANDOM_HASH_SIZE: usize = 4;
 pub const ADVERTISEMENT_OVERHEAD: usize = 134;
