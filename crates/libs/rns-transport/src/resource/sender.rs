@@ -147,11 +147,25 @@ impl ResourceSender {
         // never previously exercised on send.
         let compressed_candidate = if combined.len() as u64 <= AUTO_COMPRESS_MAX_SIZE as u64 {
             let mut encoder = BzEncoder::new(Vec::new(), Compression::best());
-            encoder
-                .write_all(&combined)
-                .and_then(|_| encoder.finish())
-                .ok()
-                .filter(|compressed| compressed.len() < combined.len())
+            match encoder.write_all(&combined).and_then(|_| encoder.finish()) {
+                Ok(compressed) => {
+                    // Not shrinking is ordinary — already-compressed payloads
+                    // do it constantly — so that case stays quiet.
+                    Some(compressed).filter(|compressed| compressed.len() < combined.len())
+                }
+                Err(error) => {
+                    // A genuine encoder failure is not the same thing, and
+                    // collapsing both into `None` hides it completely. Sending
+                    // uncompressed is still the right fallback — the reference
+                    // treats compression as opportunistic and a receiver reads
+                    // the flag, not the intent — but this should never happen
+                    // and is worth saying so.
+                    log::warn!(
+                        "resource outbound: bz2 compression failed, sending uncompressed ({error})"
+                    );
+                    None
+                }
+            }
         } else {
             None
         };
