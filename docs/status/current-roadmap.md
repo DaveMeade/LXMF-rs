@@ -167,6 +167,17 @@ Scoped release evidence is split as follows:
   behavior are the strongest RNS areas.
 - Link establishment, proof validation, interface binding, watchdog timing,
   teardown, receipts, and resource lifecycle have active regression coverage.
+- Resource fragment requests now scope hashmap exhaustion to the current
+  request window and gate on an outstanding update, matching
+  `Resource.request_next`/`waiting_for_hmu`. Before this, a receiver signalled
+  exhaustion on every round for any resource larger than one hashmap segment,
+  which walks the Python sender's `receiver_min_consecutive_height` serving
+  window past the fragments being requested; measured against a real NomadNet
+  node, a 46 MB transfer stopped after 8 of 2260 fragments and timed out,
+  where it now completes segment after segment. `RNS/Resource.py` is
+  reclassified `partial` on the back of this: `WINDOW` is still a fixed 4
+  where Python grows it 4→10→75, so throughput remains below parity even
+  though transfers complete.
 - Cached remote path responses now keep the cached announce payload while
   stamping the direct response packet as `PATH_RESPONSE`, aligning another
   Python announce/path discovery edge policy.

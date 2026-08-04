@@ -31,6 +31,29 @@ struct ResourceReceiver {
     in_flight_set: HashMap<usize, Instant>,
     /// RTT sample from the most recently matched received part; read once by the manager.
     last_rtt_sample: Option<Duration>,
+    /// Number of fragments completed contiguously from index 0 — so this is
+    /// also the index of the next fragment the transfer actually needs.
+    /// Mirrors `Resource.consecutive_completed_height` in the reference
+    /// implementation, which bases its request window on the same point
+    /// (`RNS/Resource.py`, `request_next`).
+    consecutive_completed_height: usize,
+    /// Number of hashmap slots filled so far. The map fills contiguously
+    /// from zero (segment zero arrives on the advertisement, later segments
+    /// in order), so `hashmap[hashmap_height - 1]` is the last hash we know
+    /// — which is exactly what the reference sends as `last_map_hash`
+    /// (`RNS/Resource.py`, `hashmap_update`/`request_next`).
+    hashmap_height: usize,
+    /// Set when a hashmap update has been asked for and not yet received.
+    ///
+    /// While set, no further request is built. Without this gate a receiver
+    /// keeps re-requesting the map at link RTT, and each of those requests
+    /// walks the reference *sender*'s serving window forward by a full
+    /// hashmap segment (`receiver_min_consecutive_height`,
+    /// `RNS/Resource.py`) while the fragment frontier advances by at most
+    /// `WINDOW` — so within a few rounds every fragment the receiver asks
+    /// for falls outside the window the sender will serve, and is dropped
+    /// with no error on either side.
+    waiting_for_hashmap_update: bool,
 }
 
 #[derive(Debug, Clone)]
@@ -112,6 +135,9 @@ impl ResourceReceiver {
             in_flight_queue: VecDeque::new(),
             in_flight_set: HashMap::new(),
             last_rtt_sample: None,
+            consecutive_completed_height: 0,
+            hashmap_height: 0,
+            waiting_for_hashmap_update: false,
         };
         // Advertisement hashmaps always contain resource hashmap segment zero.
         // `segment_index` identifies a split resource segment, not a hashmap
@@ -129,77 +155,9 @@ impl ResourceReceiver {
             let idx = segment * self.hashmap_segment_len + i;
             if idx < self.hashmap.len() && self.hashmap[idx].is_none() {
                 self.hashmap[idx] = Some(entry);
+                self.hashmap_height += 1;
                 self.request_queue.push_back(idx);
             }
-        }
-    }
-
-    fn build_request(&mut self, now: Instant, rtt: Duration) -> ResourceRequest {
-        // TODO: the loss threshold (2×rtt) and EWMA alpha (7/8) are intuition-based
-        // and have not been formally tuned or proven. On links with high jitter the
-        // 2×rtt multiplier may be too tight (causing spurious re-requests); on links
-        // with asymmetric delay it may be too loose. The EWMA alpha controls how
-        // quickly the estimate tracks changes — a higher alpha (closer to 1) gives
-        // more weight to history and reacts more slowly to sudden changes. Both
-        // values should be validated against real-world Reticulum traffic traces.
-        let loss_threshold = rtt.saturating_mul(2);
-
-        // Drain the front of in_flight_queue (front = oldest, since we append in time order).
-        // Received entries are lazily pruned; entries older than 2×rtt are declared lost
-        // and pushed to the front of request_queue for priority re-request.
-        loop {
-            match self.in_flight_queue.front() {
-                None => break,
-                Some(&(sent_at, idx)) => {
-                    if self.parts[idx].is_some() {
-                        self.in_flight_set.remove(&idx);
-                        self.in_flight_queue.pop_front();
-                    } else if now.duration_since(sent_at) > loss_threshold {
-                        self.in_flight_set.remove(&idx);
-                        self.in_flight_queue.pop_front();
-                        self.request_queue.push_front(idx);
-                    } else {
-                        break;
-                    }
-                }
-            }
-        }
-
-        // Detect hashmap exhaustion: scan for the first None entry.
-        let mut last_known = None;
-        let mut hashmap_exhausted = false;
-        for entry in &self.hashmap {
-            match entry {
-                Some(h) => last_known = Some(*h),
-                None => { hashmap_exhausted = true; break; }
-            }
-        }
-
-        // Fill available window slots. Lost fragments are at the front of request_queue
-        // (pushed there above) so they get priority over new fragments.
-        let window_space = WINDOW.saturating_sub(self.in_flight_set.len());
-        let mut requested = Vec::new();
-        while requested.len() < window_space {
-            match self.request_queue.pop_front() {
-                None => break,
-                Some(idx) => {
-                    if self.parts[idx].is_none() && !self.in_flight_set.contains_key(&idx) {
-                        if let Some(hash) = self.hashmap[idx] {
-                            requested.push(hash);
-                            self.in_flight_set.insert(idx, now);
-                            self.in_flight_queue.push_back((now, idx));
-                        }
-                    }
-                    // Received or already in-flight — skip.
-                }
-            }
-        }
-
-        ResourceRequest {
-            hashmap_exhausted,
-            last_map_hash: if hashmap_exhausted { last_known } else { None },
-            resource_hash: self.resource_hash,
-            requested_hashes: requested,
         }
     }
 
@@ -208,6 +166,7 @@ impl ResourceReceiver {
             return;
         }
         self.apply_hashmap_segment(update.segment as usize, &update.hashmap);
+        self.waiting_for_hashmap_update = false;
     }
 
     fn handle_part(&mut self, part: &[u8], link: &Link) -> PartOutcome {
@@ -226,6 +185,13 @@ impl ResourceReceiver {
             // Measure RTT: if this fragment was in-flight, record how long it took.
             if let Some(sent_at) = self.in_flight_set.remove(&index) {
                 self.last_rtt_sample = Some(now.duration_since(sent_at));
+            }
+            // Amortised O(1) across the transfer: each fragment moves this
+            // forward at most once.
+            while self.consecutive_completed_height < self.parts.len()
+                && self.parts[self.consecutive_completed_height].is_some()
+            {
+                self.consecutive_completed_height += 1;
             }
         }
 

@@ -411,6 +411,7 @@ impl ResourceProof {
 
 include!("resource/sender.rs");
 include!("resource/receiver.rs");
+include!("resource/receiver_request.rs");
 include!("resource/manager_start.rs");
 include!("resource/manager_segments.rs");
 include!("resource/advertisement_limits.rs");
