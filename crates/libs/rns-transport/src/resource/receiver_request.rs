@@ -20,6 +20,72 @@ fn hashmap_update_wait(rtt: Duration) -> Duration {
 }
 
 impl ResourceReceiver {
+    /// Every fragment asked for in the last round has arrived: widen the
+    /// window by one, and measure the link while we have a clean interval
+    /// to measure over.
+    ///
+    /// The reference does this at exactly the same point — after a part
+    /// lands and `outstanding_parts` reaches zero (`RNS/Resource.py`).
+    /// Growing by one per successful round rather than by a ratio is
+    /// deliberate: it is what the reference does, and a resource transfer
+    /// is short enough that a slow-start curve would spend most of the
+    /// transfer still ramping.
+    fn note_round_complete(&mut self, now: Instant) {
+        if self.window < self.window_max {
+            self.window += 1;
+            // Once the window has pulled far enough ahead of its floor, the
+            // floor follows. A link that has proven itself over many rounds
+            // should not fall all the way back to two on one timeout.
+            if self.window - self.window_min > WINDOW_FLEXIBILITY - 1 {
+                self.window_min += 1;
+            }
+        }
+
+        let elapsed = now.duration_since(self.round_started_at).as_secs_f64();
+        let transferred = self.received_bytes.saturating_sub(self.round_start_bytes);
+        self.round_started_at = now;
+        self.round_start_bytes = self.received_bytes;
+        if elapsed <= 0.0 {
+            return;
+        }
+
+        let rate = transferred as f64 / elapsed;
+        if rate > RATE_FAST && self.fast_rate_rounds < FAST_RATE_THRESHOLD {
+            self.fast_rate_rounds += 1;
+            if self.fast_rate_rounds == FAST_RATE_THRESHOLD {
+                self.window_max = WINDOW_MAX_FAST;
+            }
+        }
+        // `fast_rate_rounds == 0` guard, from the reference: a link that has
+        // ever measured fast is never demoted to the very-slow ceiling on a
+        // single bad interval.
+        if self.fast_rate_rounds == 0
+            && rate < RATE_VERY_SLOW
+            && self.very_slow_rate_rounds < VERY_SLOW_RATE_THRESHOLD
+        {
+            self.very_slow_rate_rounds += 1;
+            if self.very_slow_rate_rounds == VERY_SLOW_RATE_THRESHOLD {
+                self.window_max = WINDOW_MAX_VERY_SLOW;
+            }
+        }
+    }
+
+    /// Fragments were asked for and never arrived: narrow the window, and
+    /// pull the ceiling down with it so the next few successful rounds do
+    /// not immediately climb back to a size this link has just shown it
+    /// cannot sustain. Mirrors the reference's retry path.
+    fn note_fragments_lost(&mut self) {
+        if self.window > self.window_min {
+            self.window -= 1;
+            if self.window_max > self.window_min {
+                self.window_max -= 1;
+                if self.window_max - self.window > WINDOW_FLEXIBILITY - 1 {
+                    self.window_max -= 1;
+                }
+            }
+        }
+    }
+
     fn build_request(&mut self, now: Instant, rtt: Duration) -> ResourceRequest {
         // TODO: the loss threshold (2×rtt) and EWMA alpha (7/8) are intuition-based
         // and have not been formally tuned or proven. On links with high jitter the
@@ -29,6 +95,13 @@ impl ResourceReceiver {
         // more weight to history and reacts more slowly to sudden changes. Both
         // values should be validated against real-world Reticulum traffic traces.
         let loss_threshold = rtt.saturating_mul(2);
+
+        // One shrink per round of losses, not one per fragment. A window of
+        // four that times out wholesale is a single failed round — shrinking
+        // four times would collapse straight to the floor and throw away
+        // everything the link had proven. The reference shrinks once per
+        // retry for the same reason.
+        let mut lost_this_round = false;
 
         // Drain the front of in_flight_queue (front = oldest, since we append in time order).
         // Received entries are lazily pruned; entries older than 2×rtt are declared lost
@@ -44,11 +117,16 @@ impl ResourceReceiver {
                         self.in_flight_set.remove(&idx);
                         self.in_flight_queue.pop_front();
                         self.request_queue.push_front(idx);
+                        lost_this_round = true;
                     } else {
                         break;
                     }
                 }
             }
+        }
+
+        if lost_this_round {
+            self.note_fragments_lost();
         }
 
         // A hashmap update is outstanding, so there is nothing to ask for
@@ -85,7 +163,7 @@ impl ResourceReceiver {
         // into a map re-request. The reference scans exactly
         // `parts[consecutive_completed_height + 1 ..][..window]`
         // (`RNS/Resource.py`, `request_next`).
-        let scan_end = self.consecutive_completed_height.saturating_add(WINDOW).min(self.parts.len());
+        let scan_end = self.consecutive_completed_height.saturating_add(self.window).min(self.parts.len());
         let mut hashmap_exhausted = false;
         for idx in self.consecutive_completed_height..scan_end {
             if self.parts[idx].is_none() && self.hashmap[idx].is_none() {
@@ -105,7 +183,7 @@ impl ResourceReceiver {
 
         // Fill available window slots. Lost fragments are at the front of request_queue
         // (pushed there above) so they get priority over new fragments.
-        let window_space = WINDOW.saturating_sub(self.in_flight_set.len());
+        let window_space = self.window.saturating_sub(self.in_flight_set.len());
         let mut requested = Vec::new();
         while requested.len() < window_space {
             match self.request_queue.pop_front() {
@@ -123,13 +201,21 @@ impl ResourceReceiver {
             }
         }
 
+        // A round is the interval between asking for fragments and having
+        // them all arrive, so the clock starts when the request does — and
+        // only when there is something in it to wait for.
+        if !requested.is_empty() {
+            self.round_started_at = now;
+            self.round_start_bytes = self.received_bytes;
+        }
+
         // Logged here rather than at the call sites: the manager builds
         // requests from three places and only the advertisement one was
         // logged, so every round after the first was invisible. Diagnosing
         // the stall this function now fixes meant reading raw packet
         // contexts to infer what the receiver had asked for.
         log::debug!(
-            "[resource-diag] request_built hash={} link={} requested={} exhausted={} in_flight={} consecutive={}/{} mapped={}",
+            "[resource-diag] request_built hash={} link={} requested={} exhausted={} in_flight={} consecutive={}/{} mapped={} window={}/{}",
             self.resource_hash,
             self.link_id,
             requested.len(),
@@ -137,7 +223,9 @@ impl ResourceReceiver {
             self.in_flight_set.len(),
             self.consecutive_completed_height,
             self.parts.len(),
-            self.hashmap_height
+            self.hashmap_height,
+            self.window,
+            self.window_max
         );
 
         ResourceRequest {
