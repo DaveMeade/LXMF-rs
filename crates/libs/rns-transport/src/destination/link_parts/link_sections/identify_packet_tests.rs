@@ -329,4 +329,37 @@ mod identify_packet_tests {
         assert!(outbound.stale_since.is_some());
         assert!(outbound.last_inbound.is_none());
     }
+
+    /// A response sent as a single packet has to arrive as one — decrypted,
+    /// tagged `Response`, and byte-identical to what was handed in.
+    ///
+    /// The receive half already handled `PacketContext::Response`; without a
+    /// constructor beside `data_packet`/`identify_packet` there was no way
+    /// to produce one, so every reply had to become a resource transfer even
+    /// when it fit in a packet. This drives both halves across a real linked
+    /// pair rather than asserting on the built packet's fields, so it fails
+    /// if either side stops agreeing about the context.
+    #[tokio::test]
+    async fn a_response_packet_round_trips_across_a_link() {
+        let (outbound, mut inbound, iface, mut rx) = linked_pair();
+
+        // The `[request_id, response]` envelope real Reticulum packs — its
+        // contents are the application's business, but the transport has to
+        // carry them unchanged.
+        let envelope = b"\x92\xc4\x04abcd\xc4\x05hello";
+        let packet = outbound.response_packet(envelope).expect("a response packet can be built");
+        assert_eq!(packet.context, PacketContext::Response);
+
+        inbound.handle_packet(&packet, iface);
+
+        let event = rx.try_recv().expect("the response is posted to the link's event stream");
+        match event.event {
+            LinkEvent::Data(payload) => {
+                assert_eq!(payload.as_slice(), envelope, "the envelope must survive the round trip byte for byte");
+                assert_eq!(payload.context(), PacketContext::Response, "…and still be recognisable as a response");
+            }
+            _ => panic!("expected the response to arrive as LinkEvent::Data"),
+        }
+    }
+
 }
