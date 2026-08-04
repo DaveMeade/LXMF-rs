@@ -604,6 +604,32 @@ mod tests {
         let _ = map_hashes;
     }
 
+    /// Growth has to survive a pipeline that never empties.
+    ///
+    /// This receiver refills the window on every part rather than draining
+    /// it, so a "nothing in flight" trigger starves itself: the bigger the
+    /// window, the rarer a full drain, and growth stops exactly where it
+    /// matters. Measured against a real node that ceiling was 42 against an
+    /// allowed 75 — with 97% of rounds showing the window completely full,
+    /// so the window, not the link, was the limit.
+    #[test]
+    fn the_window_keeps_growing_while_the_pipeline_stays_full() {
+        let (mut receiver, _) = multi_segment_receiver(4000, 4000);
+        let mut now = Instant::now();
+
+        // Deliver fragments steadily, never letting the window drain.
+        for _ in 0..3000 {
+            now += Duration::from_millis(1);
+            receiver.received_bytes += 464;
+            receiver.note_fragment_received(now);
+        }
+
+        assert_eq!(
+            receiver.window, WINDOW_MAX_FAST,
+            "a steadily-delivering link must reach the ceiling, not stall below it"
+        );
+    }
+
     /// …and closes again when fragments go missing, once per round rather
     /// than once per fragment.
     ///

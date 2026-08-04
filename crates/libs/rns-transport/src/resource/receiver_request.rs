@@ -30,7 +30,19 @@ impl ResourceReceiver {
     /// deliberate: it is what the reference does, and a resource transfer
     /// is short enough that a slow-start curve would spend most of the
     /// transfer still ramping.
+    /// One more fragment landed. A full window's worth without a loss is
+    /// this implementation's equivalent of the reference's drained round —
+    /// see `fragments_since_window_change` for why the drain itself is not
+    /// observable here.
+    fn note_fragment_received(&mut self, now: Instant) {
+        self.fragments_since_window_change += 1;
+        if self.fragments_since_window_change >= self.window {
+            self.note_round_complete(now);
+        }
+    }
+
     fn note_round_complete(&mut self, now: Instant) {
+        self.fragments_since_window_change = 0;
         if self.window < self.window_max {
             self.window += 1;
             // Once the window has pulled far enough ahead of its floor, the
@@ -75,6 +87,7 @@ impl ResourceReceiver {
     /// not immediately climb back to a size this link has just shown it
     /// cannot sustain. Mirrors the reference's retry path.
     fn note_fragments_lost(&mut self) {
+        self.fragments_since_window_change = 0;
         if self.window > self.window_min {
             self.window -= 1;
             if self.window_max > self.window_min {
