@@ -414,5 +414,6 @@ include!("resource/manager_start.rs");
 include!("resource/manager_segments.rs");
 include!("resource/advertisement_limits.rs");
 include!("resource/manager.rs");
+include!("resource/manager_polling.rs");
 include!("resource/utils.rs");
 include!("resource/tests.rs");
