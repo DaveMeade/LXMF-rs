@@ -125,13 +125,24 @@ pub(crate) fn ewma(old: Duration, sample: Duration) -> Duration {
 }
 
 /// Per-link adaptive statistics used to decide when to re-request lost fragments.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Copy)]
 pub(crate) struct LinkStats {
     /// EWMA of round-trip time (request → part arrival).
     pub(crate) rtt: Duration,
     /// EWMA of inter-arrival interval between consecutive received parts.
     pub(crate) arrival_interval: Duration,
     pub(crate) last_arrival: Option<Instant>,
+    /// The window the most recent inbound resource on this link finished on.
+    ///
+    /// The reference keeps the same thing on the Link itself
+    /// (`Link.resource_concluded` stores `resource.window`, and a new inbound
+    /// Resource restores it: `previous_window = resource.link
+    /// .get_last_resource_window()`, `RNS/Resource.py`). Without it every
+    /// resource re-learns a link the previous one just measured — and a file
+    /// large enough to be split is many resources, not one. A 46 MB transfer
+    /// arrives as 45 segments, so the ladder was restarting from `WINDOW`
+    /// forty-five times and spending most of each segment climbing.
+    pub(crate) last_window: Option<usize>,
 }
 
 impl LinkStats {
@@ -140,6 +151,7 @@ impl LinkStats {
             rtt: Duration::from_millis(500),
             arrival_interval: Duration::from_millis(100),
             last_arrival: None,
+            last_window: None,
         }
     }
 
@@ -453,5 +465,6 @@ include!("resource/manager_start.rs");
 include!("resource/manager_segments.rs");
 include!("resource/advertisement_limits.rs");
 include!("resource/manager.rs");
+include!("resource/manager_polling.rs");
 include!("resource/utils.rs");
 include!("resource/tests.rs");
