@@ -4,6 +4,33 @@
 // not a privacy one.
 
 impl Link {
+    /// Build a request packet (context = `Request`) carrying `data`.
+    ///
+    /// The mirror of [`Self::response_packet`], and missing for the same
+    /// reason. Real Reticulum makes the same size-based choice on the way
+    /// out (`RNS/Link.py`, `request`):
+    ///
+    /// ```text
+    /// packed_request = umsgpack.packb([time, path_hash, data])
+    /// if len(packed_request) <= self.mdu:
+    ///     RNS.Packet(self, packed_request, RNS.Packet.DATA,
+    ///                context = RNS.Packet.REQUEST).send()
+    /// else:
+    ///     request_resource = RNS.Resource(packed_request, self, ...)
+    /// ```
+    ///
+    /// **The two branches identify the request differently, and a caller
+    /// has to know it.** Sent as a resource, the request id is the
+    /// requester's own `truncated_hash(packed_request)`. Sent as a packet,
+    /// there is no such field on the wire — the responder derives the id
+    /// from the packet's hash (`handle_packet`, below, takes the first
+    /// [`ADDRESS_HASH_SIZE`] bytes of it), so a requester correlating the
+    /// response must use `packet.hash()` from the packet this returns
+    /// rather than an id of its own choosing.
+    pub fn request_packet(&self, data: &[u8]) -> Result<Packet, RnsError> {
+        self.packet_with_context(data, PacketContext::Request)
+    }
+
     /// Build a response packet (context = `Response`) carrying `data`.
     ///
     /// Real Reticulum answers a request with a single packet whenever the
