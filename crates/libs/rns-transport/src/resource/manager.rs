@@ -324,7 +324,21 @@ impl ResourceManager {
                 PacketContext::ResourceRequest,
                 &request.encode(),
             ) {
-                Ok(packet) => responses.push(packet),
+                Ok(packet) => {
+                    receiver.mark_active_request();
+                    // This request is a send like any other, so it has to
+                    // refresh the timestamp the exhaustion gate measures
+                    // against. A hashmap update can arrive and still leave the
+                    // next fragments unmapped — small hashmap segments, or a
+                    // window that has grown past one segment — in which case
+                    // this dispatches *another* hashmap request. Leaving
+                    // `last_request` pointing at the previous one makes the
+                    // wait look already expired, so the very next part to
+                    // arrive emits a duplicate, which walks a reference
+                    // sender's serving window forward: exactly the stall this
+                    // gate exists to prevent.
+                    responses.push(packet)
+                }
                 Err(_) => {
                     log::warn!("failed to build request packet");
                 }
@@ -394,8 +408,7 @@ impl ResourceManager {
                     let rtt = stats.rtt;
                     let request = receiver.build_request(now, rtt);
                     if !request.requested_hashes.is_empty() || request.hashmap_exhausted {
-                        receiver.mark_active_request();
-                        request_packet = match build_link_packet(
+                            request_packet = match build_link_packet(
                             link,
                             PacketType::Data,
                             PacketContext::ResourceRequest,

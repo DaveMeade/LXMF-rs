@@ -921,6 +921,7 @@ mod tests {
 
     include!("tests_mtu.rs");
     include!("tests_retry_failures.rs");
+    include!("tests_hashmap_gate.rs");
     include!("tests_timeouts.rs");
     include!("tests_timeouts_lifecycle.rs");
 
