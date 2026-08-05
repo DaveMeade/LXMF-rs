@@ -9,10 +9,9 @@ impl ResourceManager {
         let mut failed = Vec::new();
         for (hash, receiver) in self.incoming.iter_mut() {
             if receiver.retry_due(now, self.retry_interval, self.retry_limit) {
-                let rtt = self.link_stats.get(&receiver.link_id)
-                    .map(|s| s.rtt)
-                    .unwrap_or(LinkStats::new().rtt);
-                let request = receiver.build_request(now, rtt);
+                let stats =
+                    self.link_stats.get(&receiver.link_id).copied().unwrap_or_else(LinkStats::new);
+                let request = receiver.build_request(now, stats.rtt, stats.arrival_interval, RequestTrigger::Immediate);
                 if !request.requested_hashes.is_empty() || request.hashmap_exhausted {
                     receiver.mark_request();
                     requests.push((receiver.link_id, request));

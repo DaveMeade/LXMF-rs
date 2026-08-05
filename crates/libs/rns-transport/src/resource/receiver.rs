@@ -43,6 +43,22 @@ struct ResourceReceiver {
     /// — which is exactly what the reference sends as `last_map_hash`
     /// (`RNS/Resource.py`, `hashmap_update`/`request_next`).
     hashmap_height: usize,
+    /// Fragments requested per round, right now. Starts at [`WINDOW`] and
+    /// moves between `window_min` and `window_max` as the link proves
+    /// itself — see `note_round_complete`/`note_fragments_lost`.
+    window: usize,
+    window_min: usize,
+    window_max: usize,
+    /// Consecutive rounds measured above [`RATE_FAST`] / below
+    /// [`RATE_VERY_SLOW`]. Latched: once the fast ceiling is unlocked the
+    /// very-slow path is never taken, matching the reference's
+    /// `fast_rate_rounds == 0` guard.
+    fast_rate_rounds: u32,
+    very_slow_rate_rounds: u32,
+    /// When the current round's request went out, and how many bytes had
+    /// arrived by then — the two inputs to the round's measured rate.
+    round_started_at: Instant,
+    round_start_bytes: u64,
     /// Set when a hashmap update has been asked for and not yet received.
     ///
     /// While set, no further request is built. Without this gate a receiver
@@ -137,6 +153,13 @@ impl ResourceReceiver {
             last_rtt_sample: None,
             consecutive_completed_height: 0,
             hashmap_height: 0,
+            window: WINDOW,
+            window_min: WINDOW_MIN,
+            window_max: WINDOW_MAX_SLOW,
+            fast_rate_rounds: 0,
+            very_slow_rate_rounds: 0,
+            round_started_at: now,
+            round_start_bytes: 0,
             waiting_for_hashmap_update: false,
         };
         // Advertisement hashmaps always contain resource hashmap segment zero.
@@ -193,6 +216,7 @@ impl ResourceReceiver {
             {
                 self.consecutive_completed_height += 1;
             }
+            self.note_fragment_received(now);
         }
 
         if self.received == self.parts.len() && !self.parts.is_empty() {

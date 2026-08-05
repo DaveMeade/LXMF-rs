@@ -188,8 +188,23 @@ impl ResourceManager {
             return;
         };
         let adv_now = Instant::now();
-        let rtt = self.link_stats.entry(*link.id()).or_insert_with(LinkStats::new).rtt;
-        let request = receiver.build_request(adv_now, rtt);
+        let stats = *self.link_stats.entry(*link.id()).or_insert_with(LinkStats::new);
+        // Start where the last resource on this link finished rather than at
+        // WINDOW, so a split transfer does not re-learn the same link once per
+        // segment.
+        //
+        // Deliberately *not* clamped to `window_max`. The reference restores
+        // only `window` and leaves the ceiling at its default
+        // (`RNS/Resource.py`), which means a carried window may legitimately
+        // start above it: the ceiling gates *growth*, and a link that has
+        // already demonstrated a window of 24 should not be made to re-climb
+        // to 10 before it can use it. Growth simply stays disabled until a
+        // loss brings the window back under the ceiling — which is the
+        // intended reading of "this link has proven this much".
+        if let Some(previous) = stats.last_window {
+            receiver.window = previous.max(receiver.window_min);
+        }
+        let request = receiver.build_request(adv_now, stats.rtt, stats.arrival_interval, RequestTrigger::Immediate);
         log::debug!(
             "[resource-diag] request_parts hash={} requested={} exhausted={}",
             resource_hash,
@@ -252,10 +267,9 @@ impl ResourceManager {
         if let Some(receiver) = self.incoming.get_mut(&update.resource_hash) {
             receiver.handle_hash_update(&update);
             let update_now = Instant::now();
-            let rtt = self.link_stats.get(&receiver.link_id)
-                .map(|s| s.rtt)
-                .unwrap_or(LinkStats::new().rtt);
-            let request = receiver.build_request(update_now, rtt);
+            let stats =
+                self.link_stats.get(&receiver.link_id).copied().unwrap_or_else(LinkStats::new);
+            let request = receiver.build_request(update_now, stats.rtt, stats.arrival_interval, RequestTrigger::Immediate);
             match build_link_packet(
                 link,
                 PacketType::Data,
@@ -343,8 +357,19 @@ impl ResourceManager {
                         });
                     }
 
-                    let rtt = stats.rtt;
-                    let request = receiver.build_request(now, rtt);
+                    // Only ask again once the round has drained — the
+                    // reference's `elif self.outstanding_parts == 0:` on the
+                    // receive path (`RNS/Resource.py`). Rebuilding on every
+                    // arriving part sends one request per fragment, since
+                    // there is only ever the one slot just vacated to fill.
+                    //
+                    // `build_request` still runs, because it also owns the
+                    // idle-timeout check and the hashmap-exhaustion signal,
+                    // and both must keep working while a round is in flight.
+                    // It simply finds no room in the window and returns
+                    // nothing to send.
+                    let (rtt, arrival_interval) = (stats.rtt, stats.arrival_interval);
+                    let request = receiver.build_request(now, rtt, arrival_interval, RequestTrigger::PartReceived);
                     if !request.requested_hashes.is_empty() || request.hashmap_exhausted {
                             request_packet = match build_link_packet(
                             link,
@@ -385,10 +410,15 @@ impl ResourceManager {
             return;
         }
         if let Some(hash) = completed {
-            self.incoming.remove(&hash);
+            let concluded_window = self.incoming.remove(&hash).map(|receiver| receiver.window);
             // Same TODO as the failed path above.
             if let Some(stats) = self.link_stats.get_mut(link.id()) {
                 stats.last_arrival = None;
+                // Hand the window this resource earned to the next one on the
+                // same link, as `Link.resource_concluded` does in the
+                // reference. Only on success: a window that ended in failure
+                // is not evidence of what the link can carry.
+                stats.last_window = concluded_window;
             }
             if let Some(payload) = payload {
                 self.finish_inbound_payload(hash, *link.id(), payload);

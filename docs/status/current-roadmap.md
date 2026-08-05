@@ -175,9 +175,20 @@ Scoped release evidence is split as follows:
   window past the fragments being requested; measured against a real NomadNet
   node, a 46 MB transfer stopped after 8 of 2260 fragments and timed out,
   where it now completes segment after segment. `RNS/Resource.py` is
-  reclassified `partial` on the back of this: `WINDOW` is still a fixed 4
-  where Python grows it 4→10→75, so throughput remains below parity even
-  though transfers complete.
+  reclassified `partial` on the back of this.
+- Resource fragment scheduling is now adaptive on Python's own ladder: the
+  window grows per clean round and shrinks per failed one, with a ceiling
+  that steps between the slow, very-slow and fast maxima on measured rate.
+  Measured against a real NomadNet node, the same 46 MB fetch runs at 234
+  fragments/s where a fixed window of 4 managed 84.
+- `Link::request_packet`/`response_packet` complete the request/response
+  pair: the receive half already decrypted both contexts, but nothing could
+  build either, so a peer had to send every request and every reply as a
+  resource transfer even when the packed form fits a single packet. Python
+  chooses per message (`Link.request`/`handle_request`); the choice is the
+  caller's here, and the crate now exposes both options. Note the id
+  asymmetry — a packet-borne request has no id field, so the responder
+  derives one from the packet hash.
 - Cached remote path responses now keep the cached announce payload while
   stamping the direct response packet as `PATH_RESPONSE`, aligning another
   Python announce/path discovery edge policy.

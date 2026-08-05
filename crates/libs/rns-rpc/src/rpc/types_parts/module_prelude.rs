@@ -192,6 +192,14 @@ pub struct DeliveryPolicy {
     pub prioritised_destinations: Vec<String>,
 }
 
+pub const DEFAULT_MESSAGE_STORAGE_LIMIT_MB: u64 = 256;
+pub const DEFAULT_PEER_ENTRY_LIMIT: u64 = 1_000_000;
+pub const DEFAULT_PEER_ENTRY_LIMIT_PER_PEER: u64 = 1_024;
+pub const DEFAULT_PEER_ENTRY_TTL_SECS: u64 = 7 * 24 * 60 * 60;
+pub const DEFAULT_COMPLETED_PEER_ENTRY_TTL_SECS: u64 = 30 * 24 * 60 * 60;
+pub const DEFAULT_MAX_PROPAGATION_PEERS: u32 = 512;
+pub const DEFAULT_STORAGE_MAINTENANCE_INTERVAL_SECS: u64 = 5 * 60;
+
 #[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
 pub struct PropagationState {
     pub enabled: bool,
@@ -203,8 +211,20 @@ pub struct PropagationState {
     pub target_cost: u32,
     #[serde(default = "default_propagation_stamp_cost_flexibility")]
     pub stamp_cost_flexibility: u32,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[serde(default = "default_message_storage_limit_mb", skip_serializing_if = "Option::is_none")]
     pub message_storage_limit_mb: Option<u64>,
+    #[serde(default = "default_peer_entry_limit")]
+    pub peer_entry_limit: u64,
+    #[serde(default = "default_peer_entry_limit_per_peer")]
+    pub peer_entry_limit_per_peer: u64,
+    #[serde(default = "default_peer_entry_ttl_secs")]
+    pub peer_entry_ttl_secs: u64,
+    #[serde(default = "default_completed_peer_entry_ttl_secs")]
+    pub completed_peer_entry_ttl_secs: u64,
+    #[serde(default = "default_max_propagation_peers")]
+    pub max_propagation_peers: u32,
+    #[serde(default = "default_storage_maintenance_interval_secs")]
+    pub storage_maintenance_interval_secs: u64,
     #[serde(default = "default_delivery_transfer_limit")]
     pub delivery_limit: u32,
     #[serde(default = "default_propagation_transfer_limit")]
@@ -267,7 +287,13 @@ impl Default for PropagationState {
             store_root: None,
             target_cost: 0,
             stamp_cost_flexibility: default_propagation_stamp_cost_flexibility(),
-            message_storage_limit_mb: None,
+            message_storage_limit_mb: default_message_storage_limit_mb(),
+            peer_entry_limit: default_peer_entry_limit(),
+            peer_entry_limit_per_peer: default_peer_entry_limit_per_peer(),
+            peer_entry_ttl_secs: default_peer_entry_ttl_secs(),
+            completed_peer_entry_ttl_secs: default_completed_peer_entry_ttl_secs(),
+            max_propagation_peers: default_max_propagation_peers(),
+            storage_maintenance_interval_secs: default_storage_maintenance_interval_secs(),
             delivery_limit: default_delivery_transfer_limit(),
             propagation_limit: default_propagation_transfer_limit(),
             sync_limit: default_propagation_sync_limit(),
@@ -403,80 +429,4 @@ impl RpcLatencyHistogram {
             "buckets": buckets,
         })
     }
-}
-
-#[derive(Debug, Clone, Default)]
-struct RpcMetrics {
-    http_requests_total: u64,
-    http_request_errors_total: u64,
-    rpc_requests_total: u64,
-    rpc_errors_total: u64,
-    sdk_send_total: u64,
-    sdk_send_success_total: u64,
-    sdk_send_error_total: u64,
-    sdk_poll_total: u64,
-    sdk_poll_events_total: u64,
-    sdk_poll_batches_with_gap_total: u64,
-    sdk_cancel_total: u64,
-    sdk_cancel_accepted_total: u64,
-    sdk_cancel_too_late_total: u64,
-    sdk_cancel_not_found_total: u64,
-    sdk_cancel_already_terminal_total: u64,
-    sdk_event_drops_total: u64,
-    sdk_event_sink_publish_total: u64,
-    sdk_event_sink_error_total: u64,
-    sdk_event_sink_skipped_total: u64,
-    sdk_auth_failures_total: u64,
-    ble_connect_failures_total: u64,
-    ble_chunk_retries_total: u64,
-    ble_nacks_total: u64,
-    ble_tx_queue_timeout_total: u64,
-    attachment_upload_offset_reject_total: u64,
-    attachment_upload_checksum_mismatch_total: u64,
-    capture_success_total: u64,
-    capture_failure_total: u64,
-    http_requests_by_route: BTreeMap<String, u64>,
-    rpc_requests_by_method: BTreeMap<String, u64>,
-    rpc_errors_by_method: BTreeMap<String, u64>,
-    sdk_event_sink_publish_by_kind: BTreeMap<String, u64>,
-    sdk_event_sink_errors_by_kind: BTreeMap<String, u64>,
-    ble_connect_failures_by_iface: BTreeMap<String, u64>,
-    ble_chunk_retries_by_iface_reason: BTreeMap<String, u64>,
-    ble_nacks_by_iface: BTreeMap<String, u64>,
-    ble_tx_queue_timeout_by_iface: BTreeMap<String, u64>,
-    attachment_upload_offset_reject_by_code: BTreeMap<String, u64>,
-    capture_success_by_camera_id: BTreeMap<String, u64>,
-    capture_failure_by_camera_reason: BTreeMap<String, u64>,
-    sdk_send_latency_ms: RpcLatencyHistogram,
-    sdk_poll_latency_ms: RpcLatencyHistogram,
-    sdk_auth_latency_ms: RpcLatencyHistogram,
-    sdk_send_store_write_ns_total: u64,
-    sdk_send_store_write_ops_total: u64,
-    sdk_send_delivery_schedule_ns_total: u64,
-    sdk_send_delivery_schedule_ops_total: u64,
-    sdk_send_event_publish_ns_total: u64,
-    sdk_send_event_publish_ops_total: u64,
-    daemon_status_lock_wait_ns_total: u64,
-    daemon_status_snapshot_wait_ns_total: u64,
-    daemon_status_message_count_wait_ns_total: u64,
-    daemon_status_calls_total: u64,
-    sdk_poll_event_log_lock_wait_ns_total: u64,
-    sdk_poll_event_log_lock_ops_total: u64,
-}
-
-enum EventSinkCommand {
-    Publish {
-        sink: Arc<dyn EventSinkBridge>,
-        sink_kind: String,
-        envelope: RpcEventSinkEnvelope,
-    },
-    #[cfg(test)]
-    Flush {
-        reply: mpsc::Sender<()>,
-    },
-}
-
-struct OutboundDeliveryCommand {
-    record: MessageRecord,
-    options: OutboundDeliveryOptions,
 }

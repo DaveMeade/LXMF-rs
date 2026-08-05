@@ -6,6 +6,11 @@ mod tests {
     use crate::identity::PrivateIdentity;
     use rand_core::OsRng;
 
+    /// Inter-part arrival interval used by the request tests. Small enough
+    /// that `part_timeout`'s grace floor dominates, so a test that wants a
+    /// timeout has to advance the clock past it deliberately.
+    const TEST_ARRIVAL_INTERVAL: Duration = Duration::from_millis(1);
+
     #[test]
     fn resource_sender_rejects_oversized_metadata() {
         let signer = PrivateIdentity::new_from_rand(OsRng);
@@ -507,7 +512,7 @@ mod tests {
         let segment_len = 74;
         let (mut receiver, _) = multi_segment_receiver(600, segment_len);
 
-        let request = receiver.build_request(Instant::now(), Duration::from_millis(50));
+        let request = receiver.build_request(Instant::now(), Duration::from_millis(50), TEST_ARRIVAL_INTERVAL, RequestTrigger::Immediate);
 
         assert!(
             !request.hashmap_exhausted,
@@ -528,7 +533,7 @@ mod tests {
         // Nothing received yet, so the window is [0, WINDOW) and segment
         // zero maps only its first two slots — the state a large transfer
         // is in from its very first request.
-        let first = receiver.build_request(now, Duration::from_millis(50));
+        let first = receiver.build_request(now, Duration::from_millis(50), TEST_ARRIVAL_INTERVAL, RequestTrigger::Immediate);
         assert!(first.hashmap_exhausted, "the next fragment is unmapped, so the map has to be asked for");
         assert_eq!(
             first.last_map_hash,
@@ -536,7 +541,7 @@ mod tests {
             "the sender matches this against its own parts and cancels the transfer if it is not a segment boundary"
         );
 
-        let second = receiver.build_request(now, Duration::from_millis(50));
+        let second = receiver.build_request(now, Duration::from_millis(50), TEST_ARRIVAL_INTERVAL, RequestTrigger::Immediate);
         assert!(!second.hashmap_exhausted, "asking twice for the same segment is what walks the sender's window off");
         assert!(second.requested_hashes.is_empty(), "…and there is nothing else to ask for either");
 
@@ -551,13 +556,138 @@ mod tests {
             hashmap: segment_bytes,
         });
 
-        let third = receiver.build_request(now, Duration::from_millis(50));
+        let third = receiver.build_request(now, Duration::from_millis(50), TEST_ARRIVAL_INTERVAL, RequestTrigger::Immediate);
         assert_eq!(
             third.requested_hashes,
             map_hashes[segment_len..segment_len * 2].to_vec(),
             "the newly mapped fragments are requested straight away"
         );
         assert!(!third.hashmap_exhausted, "and the window they fill is mapped again");
+    }
+
+    /// The window opens as rounds succeed, instead of sitting at four for
+    /// the whole transfer.
+    ///
+    /// Four fragments per round is the reference's *starting* window; it
+    /// grows toward `WINDOW_MAX_SLOW` and, on a link measured fast enough,
+    /// to `WINDOW_MAX_FAST`. Holding it at four caps throughput at four
+    /// fragments per round trip no matter how good the link is — on a
+    /// 2260-fragment resource that is 565 sequential round trips.
+    #[test]
+    fn the_request_window_opens_as_rounds_succeed() {
+        let (mut receiver, map_hashes) = multi_segment_receiver(600, 600);
+        let mut now = Instant::now();
+        let rtt = Duration::from_millis(50);
+
+        assert_eq!(receiver.build_request(now, rtt, TEST_ARRIVAL_INTERVAL, RequestTrigger::Immediate).requested_hashes.len(), WINDOW, "the first round is the starting window");
+
+        // Complete round after round, delivering exactly what was asked for.
+        let mut delivered = 0usize;
+        let mut sizes = Vec::new();
+        for _ in 0..6 {
+            while delivered < receiver.consecutive_completed_height + receiver.window {
+                receiver.parts[delivered] = Some(b"body".to_vec());
+                receiver.received += 1;
+                receiver.in_flight_set.remove(&delivered);
+                delivered += 1;
+            }
+            receiver.consecutive_completed_height = delivered;
+            receiver.note_round_complete(now);
+            now += rtt;
+            sizes.push(receiver.build_request(now, rtt, TEST_ARRIVAL_INTERVAL, RequestTrigger::Immediate).requested_hashes.len());
+        }
+
+        assert!(
+            sizes.windows(2).all(|pair| pair[1] >= pair[0]),
+            "a window that shrinks on success would be worse than a fixed one: {sizes:?}"
+        );
+        assert!(sizes.last().unwrap() > &WINDOW, "six clean rounds must buy more than the starting window: {sizes:?}");
+        assert!(
+            sizes.iter().all(|size| *size <= WINDOW_MAX_SLOW),
+            "…but not past the slow ceiling until the link measures fast: {sizes:?}"
+        );
+        let _ = map_hashes;
+    }
+
+    /// Growth has to survive a pipeline that never empties.
+    ///
+    /// This receiver refills the window on every part rather than draining
+    /// it, so a "nothing in flight" trigger starves itself: the bigger the
+    /// window, the rarer a full drain, and growth stops exactly where it
+    /// matters. Measured against a real node that ceiling was 42 against an
+    /// allowed 75 — with 97% of rounds showing the window completely full,
+    /// so the window, not the link, was the limit.
+    #[test]
+    fn the_window_keeps_growing_while_the_pipeline_stays_full() {
+        let (mut receiver, _) = multi_segment_receiver(4000, 4000);
+        let mut now = Instant::now();
+
+        // Deliver fragments steadily, never letting the window drain.
+        for _ in 0..3000 {
+            now += Duration::from_millis(1);
+            receiver.received_bytes += 464;
+            receiver.note_fragment_received(now);
+        }
+
+        assert_eq!(
+            receiver.window, WINDOW_MAX_FAST,
+            "a steadily-delivering link must reach the ceiling, not stall below it"
+        );
+    }
+
+    /// …and closes again when fragments go missing, once per round rather
+    /// than once per fragment.
+    ///
+    /// A window of four that times out wholesale is one failed round. Four
+    /// separate shrinks would collapse straight to the floor and discard
+    /// everything the link had proven.
+    #[test]
+    fn a_round_of_losses_narrows_the_window_once() {
+        let (mut receiver, _) = multi_segment_receiver(600, 600);
+        let now = Instant::now();
+        let rtt = Duration::from_millis(50);
+
+        // Open the window up first, so there is room to shrink.
+        for _ in 0..5 {
+            receiver.note_round_complete(now);
+        }
+        let opened = receiver.window;
+        assert!(opened > WINDOW_MIN, "precondition: the window has room to close");
+
+        receiver.build_request(now, rtt, TEST_ARRIVAL_INTERVAL, RequestTrigger::Immediate);
+        // Every fragment just requested times out together.
+        let much_later = now + rtt * 100;
+        receiver.build_request(much_later, rtt, TEST_ARRIVAL_INTERVAL, RequestTrigger::Immediate);
+
+        assert_eq!(receiver.window, opened - 1, "one failed round, one step back — not one per fragment");
+        assert!(receiver.window >= WINDOW_MIN);
+    }
+
+    /// The fast ceiling exists, is reached only by sustained measurement,
+    /// and stops exactly where the sender's serving window assumes it will.
+    #[test]
+    fn a_sustained_fast_link_unlocks_the_fast_ceiling_and_no_further() {
+        let (mut receiver, _) = multi_segment_receiver(600, 600);
+        let mut now = Instant::now();
+
+        // Rounds that move plenty of data in very little time.
+        for _ in 0..FAST_RATE_THRESHOLD {
+            receiver.received_bytes += 100_000;
+            now += Duration::from_millis(10);
+            receiver.note_round_complete(now);
+        }
+        assert_eq!(receiver.window_max, WINDOW_MAX_FAST, "sustained fast rounds unlock the fast ceiling");
+
+        for _ in 0..500 {
+            now += Duration::from_millis(10);
+            receiver.received_bytes += 100_000;
+            receiver.note_round_complete(now);
+        }
+        assert_eq!(
+            receiver.window, WINDOW_MAX_FAST,
+            "the window stops at the sender's own WINDOW_MAX — asking past it means asking for fragments \
+             a reference sender has already stopped serving"
+        );
     }
 
     /// A lost hashmap update must not park the transfer forever.
@@ -572,13 +702,13 @@ mod tests {
         let now = Instant::now();
         let rtt = Duration::from_millis(50);
 
-        assert!(receiver.build_request(now, rtt).hashmap_exhausted);
+        assert!(receiver.build_request(now, rtt, TEST_ARRIVAL_INTERVAL, RequestTrigger::Immediate).hashmap_exhausted);
         receiver.mark_request();
 
-        let still_waiting = receiver.build_request(now + Duration::from_millis(10), rtt);
+        let still_waiting = receiver.build_request(now + Duration::from_millis(10), rtt, TEST_ARRIVAL_INTERVAL, RequestTrigger::Immediate);
         assert!(!still_waiting.hashmap_exhausted, "a reply is still plausibly in flight");
 
-        let gave_up = receiver.build_request(now + hashmap_update_wait(rtt) + Duration::from_secs(1), rtt);
+        let gave_up = receiver.build_request(now + hashmap_update_wait(rtt) + Duration::from_secs(1), rtt, TEST_ARRIVAL_INTERVAL, RequestTrigger::Immediate);
         assert!(gave_up.hashmap_exhausted, "the update never came — ask again rather than wait forever");
     }
 
@@ -922,6 +1052,8 @@ mod tests {
     include!("tests_mtu.rs");
     include!("tests_retry_failures.rs");
     include!("tests_hashmap_gate.rs");
+    include!("tests_window_rounds.rs");
+    include!("tests_split_assembly.rs");
     include!("tests_timeouts.rs");
     include!("tests_timeouts_lifecycle.rs");
 
