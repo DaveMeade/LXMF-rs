@@ -136,19 +136,20 @@ impl Transport {
             link_guard.ingress_iface()
         };
         let interface_mtu = self.resource_mtu_for_iface(iface).await;
+        // Prepared before the handler lock is taken, not under it. Building the
+        // advertisement compresses, encrypts and chunks the payload, which on a
+        // large send is a long time to hold a mutex every other link, announce
+        // and packet on this node also needs.
+        let prepared = {
+            let link_guard = link.lock().await;
+            // See `resource_wire.rs`: the negotiated link MTU, not the local
+            // interface alone, is what a fragment has to fit through.
+            let interface_mtu = interface_mtu.min(link_guard.link_mtu());
+            ResourceManager::prepare_send(&link_guard, data, metadata, None, false, interface_mtu)?
+        };
         let mut handler = self.handler.lock().await;
-        let link_guard = link.lock().await;
-        // See `resource_wire.rs`: the negotiated link MTU, not the local
-        // interface alone, is what a fragment has to fit through.
-        let interface_mtu = interface_mtu.min(link_guard.link_mtu());
-        let (resource_hash, packet) = handler.resource_manager.start_send_with_mtu(
-            &link_guard,
-            data,
-            metadata,
-            interface_mtu,
-        )?;
+        let (resource_hash, packet) = handler.resource_manager.track_prepared(prepared);
         observe_resource(resource_hash);
-        drop(link_guard);
         drop(handler);
         let outcome = self.send_link_packet_on_bound_iface(&link, packet).await;
         let mut handler = self.handler.lock().await;
@@ -177,20 +178,23 @@ impl Transport {
             link_guard.ingress_iface()
         };
         let interface_mtu = self.resource_mtu_for_iface(iface).await;
+        // See `send_resource_observed`: prepared off the handler lock.
+        let prepared = {
+            let link_guard = link.lock().await;
+            // See `resource_wire.rs`: the negotiated link MTU, not the local
+            // interface alone, is what a fragment has to fit through.
+            let interface_mtu = interface_mtu.min(link_guard.link_mtu());
+            ResourceManager::prepare_send(
+                &link_guard,
+                data,
+                metadata,
+                Some(request_id),
+                true,
+                interface_mtu,
+            )?
+        };
         let mut handler = self.handler.lock().await;
-        let link_guard = link.lock().await;
-        // See `resource_wire.rs`: the negotiated link MTU, not the local
-        // interface alone, is what a fragment has to fit through.
-        let interface_mtu = interface_mtu.min(link_guard.link_mtu());
-        let (resource_hash, packet) = handler.resource_manager.start_send_with_options_mtu(
-            &link_guard,
-            data,
-            metadata,
-            Some(request_id),
-            true,
-            interface_mtu,
-        )?;
-        drop(link_guard);
+        let (resource_hash, packet) = handler.resource_manager.track_prepared(prepared);
         drop(handler);
         let outcome = self.send_link_packet_on_bound_iface(&link, packet).await;
         let mut handler = self.handler.lock().await;
@@ -219,20 +223,23 @@ impl Transport {
             link_guard.ingress_iface()
         };
         let interface_mtu = self.resource_mtu_for_iface(iface).await;
+        // See `send_resource_observed`: prepared off the handler lock.
+        let prepared = {
+            let link_guard = link.lock().await;
+            // See `resource_wire.rs`: the negotiated link MTU, not the local
+            // interface alone, is what a fragment has to fit through.
+            let interface_mtu = interface_mtu.min(link_guard.link_mtu());
+            ResourceManager::prepare_send(
+                &link_guard,
+                data,
+                metadata,
+                Some(request_id),
+                false,
+                interface_mtu,
+            )?
+        };
         let mut handler = self.handler.lock().await;
-        let link_guard = link.lock().await;
-        // See `resource_wire.rs`: the negotiated link MTU, not the local
-        // interface alone, is what a fragment has to fit through.
-        let interface_mtu = interface_mtu.min(link_guard.link_mtu());
-        let (resource_hash, packet) = handler.resource_manager.start_send_with_options_mtu(
-            &link_guard,
-            data,
-            metadata,
-            Some(request_id),
-            false,
-            interface_mtu,
-        )?;
-        drop(link_guard);
+        let (resource_hash, packet) = handler.resource_manager.track_prepared(prepared);
         drop(handler);
         let outcome = self.send_link_packet_on_bound_iface(&link, packet).await;
         let mut handler = self.handler.lock().await;
