@@ -1,3 +1,64 @@
+/// The not-yet-built tail of an outbound split resource.
+///
+/// This used to be a `VecDeque<ResourceSender>` filled by `start_send`, which
+/// meant one bz2 + AES + SHA-256 pass over the *entire* payload, and chunking
+/// it into every fragment it would ever need, before the first advertisement
+/// could be returned. `start_send` runs with the transport handler mutex held,
+/// so on a 46 MB send that was a full second of global lock before any byte
+/// moved (2.5 s once outbound compression was added), and ~100k live `Vec<u8>`
+/// fragments retained for the life of the transfer.
+///
+/// The reference does not do that either: `RNS/Resource.py`'s `advertise()`
+/// prepares exactly one segment ahead, on a daemon thread, off the send path.
+/// Holding the inputs instead of the outputs is the single-threaded equivalent
+/// — segment n+1 is built when segment n's proof arrives, at which point the
+/// transfer is idle anyway waiting to advertise it.
+///
+/// `data` + `offset` rather than a drained buffer, so each segment costs the
+/// same one `to_vec()` copy it always did.
+#[derive(Debug)]
+struct PendingSegments {
+    link_id: AddressHash,
+    data: Vec<u8>,
+    offset: usize,
+    /// The segment `build_next` will produce, counting from 1. Past
+    /// `total_segments` the chain is exhausted.
+    next_segment_index: u32,
+    total_segments: u32,
+    total_size: u64,
+    request_id: Option<Vec<u8>>,
+    is_response: bool,
+    interface_mtu: usize,
+    original_hash: Hash,
+}
+
+impl PendingSegments {
+    /// Builds the next segment, or `None` once every segment has been built.
+    fn build_next(&mut self, link: &Link) -> Option<Result<ResourceSender, RnsError>> {
+        if self.next_segment_index > self.total_segments {
+            return None;
+        }
+        let end = self.offset.saturating_add(MAX_EFFICIENT_SIZE).min(self.data.len());
+        let sender = ResourceSender::new_segment_with_options_mtu(
+            link,
+            self.data[self.offset..end].to_vec(),
+            None,
+            self.request_id.clone(),
+            self.is_response,
+            self.interface_mtu,
+            Some(self.original_hash),
+            self.next_segment_index,
+            self.total_segments,
+            Some(self.total_size),
+        );
+        if sender.is_ok() {
+            self.offset = end;
+            self.next_segment_index = self.next_segment_index.saturating_add(1);
+        }
+        Some(sender)
+    }
+}
+
 #[derive(Debug)]
 struct InboundSegmentAssembly {
     link_id: AddressHash,
