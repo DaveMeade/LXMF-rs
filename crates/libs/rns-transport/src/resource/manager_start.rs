@@ -92,6 +92,28 @@ impl ResourceManager {
         is_response: bool,
         interface_mtu: usize,
     ) -> Result<(Hash, Packet), RnsError> {
+        let prepared =
+            Self::prepare_send(link, data, metadata, request_id, is_response, interface_mtu)?;
+        Ok(self.track_prepared(prepared))
+    }
+
+    /// Everything a send needs done *before* the manager is touched.
+    ///
+    /// Deliberately an associated function: it takes no `&self` and no
+    /// `&mut self`, which is what lets a caller run it without holding the
+    /// transport handler lock. All of the expensive work lives here —
+    /// compression, encryption, chunking, hashing — while [`track_prepared`]
+    /// is a pair of map inserts.
+    ///
+    /// [`track_prepared`]: ResourceManager::track_prepared
+    pub fn prepare_send(
+        link: &Link,
+        data: Vec<u8>,
+        metadata: Option<Vec<u8>>,
+        request_id: Option<Vec<u8>>,
+        is_response: bool,
+        interface_mtu: usize,
+    ) -> Result<PreparedSend, RnsError> {
         let metadata_size = metadata
             .as_ref()
             .map(|value| value.len().saturating_add(3))
@@ -106,7 +128,7 @@ impl ResourceManager {
                 is_response,
                 interface_mtu,
             )?;
-            return self.track_sender(sender);
+            return Ok(PreparedSend { first: sender, pending: None });
         }
         if metadata_size >= MAX_EFFICIENT_SIZE || total_size > AUTO_COMPRESS_MAX_SIZE {
             return Err(RnsError::InvalidArgument);
@@ -129,9 +151,8 @@ impl ResourceManager {
         let original_hash = first.original_hash;
         // Only segment 1 is built here. The rest are built as each preceding
         // segment's proof arrives — see `PendingSegments`.
-        self.outgoing_segment_chains.insert(
-            original_hash,
-            PendingSegments {
+        Ok(PreparedSend {
+            pending: Some(PendingSegments {
                 link_id: first.link_id,
                 data,
                 offset: first_data_len,
@@ -142,15 +163,27 @@ impl ResourceManager {
                 is_response,
                 interface_mtu,
                 original_hash,
-            },
-        );
-        self.track_sender(first)
+            }),
+            first,
+        })
     }
 
-    fn track_sender(&mut self, sender: ResourceSender) -> Result<(Hash, Packet), RnsError> {
-        let resource_hash = sender.resource_hash;
-        let packet = sender.advertisement_packet();
-        self.pending_outgoing.insert(resource_hash, sender);
-        Ok((resource_hash, packet))
+    /// Takes ownership of a [`prepare_send`] result and returns the
+    /// advertisement to dispatch.
+    ///
+    /// Cheap by construction — two map inserts and a clone of an
+    /// already-built packet — so it is safe to call with the handler lock
+    /// held.
+    ///
+    /// [`prepare_send`]: ResourceManager::prepare_send
+    pub fn track_prepared(&mut self, prepared: PreparedSend) -> (Hash, Packet) {
+        let PreparedSend { first, pending } = prepared;
+        if let Some(pending) = pending {
+            self.outgoing_segment_chains.insert(pending.original_hash, pending);
+        }
+        let resource_hash = first.resource_hash;
+        let packet = first.advertisement_packet();
+        self.pending_outgoing.insert(resource_hash, first);
+        (resource_hash, packet)
     }
 }
