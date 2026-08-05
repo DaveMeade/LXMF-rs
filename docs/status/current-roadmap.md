@@ -46,6 +46,13 @@ parity, resource-limit, propagation-stamp, transport-worker, and crypto-safety
 fixes that landed after v0.9.6. This release makes no new broad parity claim;
 it records the behavior now present on the exact release commit.
 
+Split-resource receive now strips the metadata block from the first segment
+only, matching `Resource.py`'s own asymmetry between the metadata flag (set on
+every segment, so the receiver can size the whole transfer) and the
+length-delimited block itself (prefixed to segment 1 alone). This is a
+row-level increment recorded in `docs/status/reticulum-parity-matrix.md`; no
+capability status in the table above changes.
+
 Local release readiness is **passing**. Workspace metadata is aligned to
 `0.9.7`, the complete `cargo xtask release-check` passes, and binary E2E smoke
 passes. This release explicitly accepts the documented partial
