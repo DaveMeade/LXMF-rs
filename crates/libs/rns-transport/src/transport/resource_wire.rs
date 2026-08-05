@@ -84,12 +84,18 @@ pub(super) async fn handle_link_resource_packet<'a>(
         Err(_) => return true,
     };
     let response_iface = link.ingress_iface().unwrap_or(iface);
+    // The smaller of what this node's interface can carry and what the link
+    // actually negotiated. The interface alone is not enough: it describes
+    // the first hop, while a resource fragment has to survive the whole
+    // path, and the negotiated value is the only number that knows about
+    // the far end.
     let interface_mtu = handler
         .iface_manager
         .lock()
         .await
         .mtu(&response_iface)
-        .unwrap_or(crate::resource::DEFAULT_RESOURCE_INTERFACE_MTU);
+        .unwrap_or(crate::resource::DEFAULT_RESOURCE_INTERFACE_MTU)
+        .min(link.link_mtu());
     let mut responses = std::mem::take(&mut handler.resource_response_packets);
     handler.resource_manager.handle_packet_into_with_mtu(
         &packet_for_manager,
