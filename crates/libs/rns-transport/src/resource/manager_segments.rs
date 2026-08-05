@@ -12,6 +12,32 @@ struct InboundSegmentAssembly {
 }
 
 impl ResourceManager {
+    /// Abandon a partially assembled split resource and tell the caller why.
+    ///
+    /// Every path that drops an assembly has to come through here. Returning
+    /// quietly instead leaves whoever is awaiting the resource blocked until
+    /// its own timeout expires, with nothing on either side saying the transfer
+    /// is already dead (issue #369).
+    fn fail_inbound_segments(&mut self, original_hash: Hash, reason: &str) {
+        let Some(assembly) = self.incoming_segments.remove(&original_hash) else {
+            return;
+        };
+        log::warn!("split resource assembly failed hash={original_hash} reason={reason}");
+        self.events.push(ResourceEvent {
+            hash: original_hash,
+            link_id: assembly.link_id,
+            kind: ResourceEventKind::InboundFailed(ResourceFailure {
+                reason: reason.to_string(),
+                progress: ResourceProgress {
+                    received_bytes: assembly.data.len() as u64,
+                    total_bytes: assembly.total_data_size,
+                    received_parts: assembly.next_segment.saturating_sub(1) as usize,
+                    total_parts: assembly.total_segments as usize,
+                },
+            }),
+        });
+    }
+
     pub fn confirm_outbound_dispatch(&mut self, resource_hash: Hash, sent: bool) {
         let Some(mut sender) = self.pending_outgoing.remove(&resource_hash) else {
             return;
@@ -66,6 +92,9 @@ impl ResourceManager {
                 is_request: payload.is_request,
                 is_response: payload.is_response,
             });
+        // Deliberately a drop rather than a failure: issue #520 established that
+        // an out-of-order segment must leave the assembly intact so the transfer
+        // resumes when the expected segment arrives.
         if assembly.link_id != link_id
             || assembly.total_segments != segment.total_segments
             || assembly.total_data_size != segment.total_data_size
@@ -91,13 +120,7 @@ impl ResourceManager {
             .saturating_add(metadata_size)
             > assembly.total_data_size as usize
         {
-            log::warn!(
-                "discarding oversized split resource segment original_hash={} segment={}/{}",
-                segment.original_hash,
-                segment.segment_index,
-                segment.total_segments
-            );
-            self.incoming_segments.remove(&segment.original_hash);
+            self.fail_inbound_segments(segment.original_hash, "oversized_segment");
             return;
         }
         assembly.data.extend_from_slice(&payload.data);
@@ -109,19 +132,17 @@ impl ResourceManager {
         });
 
         if segment.segment_index == segment.total_segments {
+            let Some(assembly) = self.incoming_segments.get(&segment.original_hash) else {
+                return;
+            };
+            let assembled_size = assembly.data.len().saturating_add(
+                assembly.metadata.as_ref().map(|metadata| metadata.len() + 3).unwrap_or(0),
+            ) as u64;
+            if assembled_size != assembly.total_data_size {
+                self.fail_inbound_segments(segment.original_hash, "assembled_size_mismatch");
+                return;
+            }
             if let Some(assembly) = self.incoming_segments.remove(&segment.original_hash) {
-                let assembled_size = assembly.data.len().saturating_add(
-                    assembly.metadata.as_ref().map(|metadata| metadata.len() + 3).unwrap_or(0),
-                ) as u64;
-                if assembled_size != assembly.total_data_size {
-                    log::warn!(
-                        "discarding split resource with inconsistent size original_hash={} expected={} assembled={}",
-                        segment.original_hash,
-                        assembly.total_data_size,
-                        assembled_size
-                    );
-                    return;
-                }
                 self.events.push(ResourceEvent {
                     hash: segment.original_hash,
                     link_id,
