@@ -1,3 +1,26 @@
+/// The MTU a peer signalled, decoded back out of the stored suffix.
+///
+/// The signalling bytes are kept verbatim (already clamped on receipt) so
+/// that the negotiated value can be recovered here rather than being
+/// recomputed from whatever the local interface happens to be. Those are
+/// different numbers: the local interface bounds what *we* can carry, the
+/// negotiated value bounds what the *path* can carry, and it is the latter
+/// that must size anything put on the wire.
+///
+/// `None` means the peer sent no suffix at all — an older peer, or one that
+/// never signalled — in which case the legacy Reticulum MTU is the only
+/// safe assumption.
+pub(crate) fn link_signalled_mtu(signalling: Option<[u8; LINK_MTU_SIZE]>) -> usize {
+    let Some(bytes) = signalling else {
+        return LEGACY_RETICULUM_MTU;
+    };
+    let value = ((bytes[0] as u32) << 16) | ((bytes[1] as u32) << 8) | bytes[2] as u32;
+    let mtu = (value & LINK_MTU_MASK) as usize;
+    // A peer that signals something absurdly small would otherwise make
+    // every derived size underflow; the legacy MTU is the floor.
+    mtu.max(LEGACY_RETICULUM_MTU)
+}
+
 fn clamp_link_signalling(bytes: [u8; LINK_MTU_SIZE]) -> [u8; LINK_MTU_SIZE] {
     let value = ((bytes[0] as u32) << 16) | ((bytes[1] as u32) << 8) | bytes[2] as u32;
     let mode = value & LINK_MODE_MASK;

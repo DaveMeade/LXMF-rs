@@ -1,6 +1,19 @@
+/// A decrypted link payload.
+///
+/// The buffer is heap-allocated rather than a fixed `[u8; PACKET_MDU]`
+/// because a link's MTU is negotiated, not constant: once a peer signals a
+/// larger one, a single data packet can legitimately carry far more than
+/// 464 bytes. The fixed array silently `min()`-truncated anything larger —
+/// so a correctly-sized Response from a peer that had agreed a bigger MTU
+/// arrived as its first 464 bytes and failed to parse, with no error
+/// anywhere. That is the failure #498 hit when it advertised 8192.
+///
+/// It also removes a latent panic: `new_from_vec` set `len` from the input
+/// while copying only what fitted, so `as_slice()` on an oversized payload
+/// indexed past the end of the array.
 #[derive(Clone)]
 pub struct LinkPayload {
-    buffer: [u8; PACKET_MDU],
+    buffer: Vec<u8>,
     len: usize,
     context: PacketContext,
     request_id: Option<[u8; ADDRESS_HASH_SIZE]>,
@@ -8,7 +21,7 @@ pub struct LinkPayload {
 
 impl LinkPayload {
     pub fn new() -> Self {
-        Self { buffer: [0u8; PACKET_MDU], len: 0, context: PacketContext::None, request_id: None }
+        Self { buffer: Vec::new(), len: 0, context: PacketContext::None, request_id: None }
     }
 
     pub fn new_from_slice(data: &[u8]) -> Self {
@@ -16,11 +29,7 @@ impl LinkPayload {
     }
 
     pub fn new_from_slice_with_context(data: &[u8], context: PacketContext) -> Self {
-        let mut buffer = [0u8; PACKET_MDU];
-        let len = min(data.len(), buffer.len());
-        buffer[..len].copy_from_slice(&data[..len]);
-
-        Self { buffer, len, context, request_id: None }
+        Self { buffer: data.to_vec(), len: data.len(), context, request_id: None }
     }
 
     pub fn new_from_slice_with_context_and_request_id(
@@ -34,11 +43,7 @@ impl LinkPayload {
     }
 
     pub fn new_from_vec(data: &[u8]) -> Self {
-        let mut buffer = [0u8; PACKET_MDU];
-        let copy_len = min(buffer.len(), data.len());
-        buffer[..copy_len].copy_from_slice(&data[..copy_len]);
-
-        Self { buffer, len: data.len(), context: PacketContext::None, request_id: None }
+        Self { buffer: data.to_vec(), len: data.len(), context: PacketContext::None, request_id: None }
     }
 
     pub fn len(&self) -> usize {

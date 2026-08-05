@@ -259,7 +259,12 @@ impl Link {
                     return LinkHandleResult::None;
                 }
 
-                let mut buffer = [0u8; PACKET_MDU];
+                // Sized from the ciphertext, not from a fixed 464-byte
+                // array: decrypted output is never larger than what came
+                // in, and once a link negotiates a bigger MTU a single
+                // data packet legitimately exceeds `PACKET_MDU`. The
+                // fixed buffer made those decrypts fail silently.
+                let mut buffer = vec![0u8; packet.data.as_slice().len().max(PACKET_MDU)];
                 if let Ok(plain_text) = self.decrypt(packet.data.as_slice(), &mut buffer[..]) {
                     self.note_inbound(packet.context);
                     log::trace!("link({}): data {}B", self.id, plain_text.len());
@@ -270,7 +275,12 @@ impl Link {
                 return LinkHandleResult::None;
             }
             PacketContext::LinkIdentify => {
-                let mut buffer = [0u8; PACKET_MDU];
+                // Sized from the ciphertext, not from a fixed 464-byte
+                // array: decrypted output is never larger than what came
+                // in, and once a link negotiates a bigger MTU a single
+                // data packet legitimately exceeds `PACKET_MDU`. The
+                // fixed buffer made those decrypts fail silently.
+                let mut buffer = vec![0u8; packet.data.as_slice().len().max(PACKET_MDU)];
                 if let Ok(plain_text) = self.decrypt(packet.data.as_slice(), &mut buffer[..]) {
                     if let Some(identity) = parse_link_identify_payload(plain_text, &self.id) {
                         self.note_inbound(packet.context);
@@ -283,7 +293,12 @@ impl Link {
                 }
             }
             PacketContext::None | PacketContext::Request | PacketContext::Response => {
-                let mut buffer = [0u8; PACKET_MDU];
+                // Sized from the ciphertext, not from a fixed 464-byte
+                // array: decrypted output is never larger than what came
+                // in, and once a link negotiates a bigger MTU a single
+                // data packet legitimately exceeds `PACKET_MDU`. The
+                // fixed buffer made those decrypts fail silently.
+                let mut buffer = vec![0u8; packet.data.as_slice().len().max(PACKET_MDU)];
                 if let Ok(plain_text) = self.decrypt(packet.data.as_slice(), &mut buffer[..]) {
                     self.note_inbound(packet.context);
                     log::trace!("link({}): data {}B", self.id, plain_text.len());
@@ -324,7 +339,12 @@ impl Link {
                 }
             }
             PacketContext::LinkClose => {
-                let mut buffer = [0u8; PACKET_MDU];
+                // Sized from the ciphertext, not from a fixed 464-byte
+                // array: decrypted output is never larger than what came
+                // in, and once a link negotiates a bigger MTU a single
+                // data packet legitimately exceeds `PACKET_MDU`. The
+                // fixed buffer made those decrypts fail silently.
+                let mut buffer = vec![0u8; packet.data.as_slice().len().max(PACKET_MDU)];
                 match self.decrypt(packet.data.as_slice(), &mut buffer[..]) {
                     Ok(plain_text) if plain_text == self.id.as_slice() => {
                         self.note_inbound(packet.context);
@@ -344,7 +364,12 @@ impl Link {
                 return LinkHandleResult::None;
             }
             PacketContext::LinkRTT => {
-                let mut buffer = [0u8; PACKET_MDU];
+                // Sized from the ciphertext, not from a fixed 464-byte
+                // array: decrypted output is never larger than what came
+                // in, and once a link negotiates a bigger MTU a single
+                // data packet legitimately exceeds `PACKET_MDU`. The
+                // fixed buffer made those decrypts fail silently.
+                let mut buffer = vec![0u8; packet.data.as_slice().len().max(PACKET_MDU)];
                 if let Ok(plain_text) = self.decrypt(packet.data.as_slice(), &mut buffer[..]) {
                     let mut cursor = std::io::Cursor::new(plain_text);
                     if let Ok(peer_rtt) = rmp::decode::read_f32(&mut cursor) {
@@ -399,47 +424,7 @@ impl Link {
 
         match packet.header.packet_type {
             PacketType::Data => return self.handle_data_packet(packet),
-            PacketType::Proof => {
-                if self.status == LinkStatus::Active && packet.context == PacketContext::LinkProof {
-                    if let Ok(hash) = self.validate_packet_proof(packet) {
-                        self.note_inbound(packet.context);
-                        if let Some(pending) = self.channel_pending.remove(&hash) {
-                            self.channel_states
-                                .insert(pending.sequence, ChannelMessageState::Delivered);
-                            self.note_channel_delivery();
-                        }
-                        return LinkHandleResult::None;
-                    }
-                }
-                if self.status == LinkStatus::Pending
-                    && packet.context == PacketContext::LinkRequestProof
-                {
-                    if let Ok(identity) =
-                        validate_link_request_proof_packet(&self.destination, &self.id, packet)
-                    {
-                        log::debug!("link({}): has been proved", self.id);
-
-                        self.handshake(identity);
-                        self.ingress_iface.get_or_insert(iface);
-
-                        self.status = LinkStatus::Active;
-                        self.rtt = self.request_time.elapsed();
-                        self.activated_at = Some(Instant::now());
-                        self.last_proof = self.activated_at;
-                        self.stale_since = None;
-                        self.update_keepalive_timing();
-                        self.refresh_channel_flow_control();
-
-                        log::debug!("link({}): activated", self.id);
-
-                        self.post_event(LinkEvent::Activated);
-
-                        return LinkHandleResult::Activated;
-                    } else {
-                        log::warn!("link({}): proof is not valid", self.id);
-                    }
-                }
-            }
+            PacketType::Proof => return self.handle_proof_packet(packet, iface),
             _ => {}
         }
 

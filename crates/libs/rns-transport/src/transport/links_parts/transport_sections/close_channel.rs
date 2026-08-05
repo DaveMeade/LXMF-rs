@@ -33,6 +33,7 @@ impl Transport {
         let (resource_hash, packet) = {
             let mut handler = self.handler.lock().await;
             let link_guard = link.lock().await;
+            let interface_mtu = interface_mtu.min(link_guard.link_mtu());
             handler.resource_manager.start_send_with_mtu(
                 &link_guard,
                 data,
