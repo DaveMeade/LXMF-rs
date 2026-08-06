@@ -230,3 +230,99 @@ fn removing_a_link_drops_its_unbuilt_segments() {
     assert!(manager.outgoing_segment_chains.is_empty());
     assert!(manager.has_no_outbound_state());
 }
+
+/// A peer cancelling mid-transfer has to drop the unbuilt tail too.
+///
+/// The trap is that a cancel names the **segment** in flight, not the split
+/// resource: from segment two onwards its hash is nothing like `original_hash`,
+/// which is what the tail is keyed by. Removing only the sender therefore looks
+/// like a clean cancel while leaving the entire remaining payload alive until
+/// the link closes — and a link that is being reused rather than torn down may
+/// not close for a long time.
+#[test]
+fn a_remote_cancel_drops_the_unbuilt_tail() {
+    let signer = PrivateIdentity::new_from_rand(OsRng);
+    let identity = *signer.as_identity();
+    let destination = DestinationDesc {
+        identity,
+        address_hash: identity.address_hash,
+        name: DestinationName::new("lxmf", "resource"),
+    };
+    let (tx, _) = tokio::sync::broadcast::channel(1);
+    let mut link = Link::new(destination, tx);
+    let mut manager = ResourceManager::new_with_config(Duration::from_secs(1), 2);
+    let data = vec![0x5a; (MAX_EFFICIENT_SIZE * 3) + 17];
+
+    let (original_hash, _) =
+        manager.start_send(&link, data, None).expect("start split resource");
+    manager.confirm_outbound_dispatch(original_hash, true);
+
+    // Advance to segment two, so the cancel names a hash that is *not* the key
+    // the tail is stored under. Cancelling segment one would pass even with the
+    // bug, since there `original_hash` is the sender's own hash.
+    let expected_proof =
+        manager.outgoing.get(&original_hash).expect("first sender").expected_proof;
+    let proof = ResourceProof { resource_hash: original_hash, proof: expected_proof };
+    let packets = manager.handle_packet(
+        &resource_packet(PacketContext::ResourceProof, &proof.encode(), *link.id()),
+        &mut link,
+    );
+    let second = decrypt_advertisement(&link, &packets[0]);
+    assert_eq!(second.segment_index, 2);
+    assert_ne!(second.hash, original_hash, "the test is only meaningful if these differ");
+    assert_eq!(
+        manager.outgoing_segment_chains.get(&original_hash).expect("tail").next_segment_index,
+        3
+    );
+
+    // We are the initiator, so a cancel from the peer is a receiver cancel.
+    manager.handle_packet(
+        &resource_packet(
+            PacketContext::ResourceReceiverCancel,
+            second.hash.as_slice(),
+            *link.id(),
+        ),
+        &mut link,
+    );
+
+    assert!(
+        !manager.outgoing_segment_chains.contains_key(&original_hash),
+        "a cancelled split send must not keep holding the rest of the payload"
+    );
+    assert!(manager.has_no_outbound_state());
+}
+
+/// The same cancel, arriving before the first advertisement has been confirmed
+/// as dispatched — the sender is still in `pending_outgoing` rather than
+/// `outgoing`, which is the other branch `cancel_into` has to clear the tail
+/// from.
+#[test]
+fn a_remote_cancel_before_dispatch_drops_the_unbuilt_tail() {
+    let signer = PrivateIdentity::new_from_rand(OsRng);
+    let identity = *signer.as_identity();
+    let destination = DestinationDesc {
+        identity,
+        address_hash: identity.address_hash,
+        name: DestinationName::new("lxmf", "resource"),
+    };
+    let (tx, _) = tokio::sync::broadcast::channel(1);
+    let mut link = Link::new(destination, tx);
+    let mut manager = ResourceManager::new_with_config(Duration::from_secs(1), 2);
+    let data = vec![0x5a; MAX_EFFICIENT_SIZE + 257];
+
+    let (original_hash, _) =
+        manager.start_send(&link, data, None).expect("start split resource");
+    assert!(manager.outgoing_segment_chains.contains_key(&original_hash));
+
+    manager.handle_packet(
+        &resource_packet(
+            PacketContext::ResourceReceiverCancel,
+            original_hash.as_slice(),
+            *link.id(),
+        ),
+        &mut link,
+    );
+
+    assert!(manager.outgoing_segment_chains.is_empty());
+    assert!(manager.has_no_outbound_state());
+}

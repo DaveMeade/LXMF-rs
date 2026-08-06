@@ -432,12 +432,22 @@ impl ResourceManager {
         }
     }
 
+    /// A cancel names the *segment* that is in flight, not the split resource
+    /// it belongs to — `cancel_outgoing` builds the packet from the active
+    /// segment's own hash, and so does the reference. Dropping the sender is
+    /// therefore not enough: the unbuilt tail is keyed by `original_hash`, so
+    /// it would go on holding the caller's whole payload until the link closed.
     fn cancel_into(&mut self, packet: &Packet, _responses: &mut Vec<Packet>) {
-        if let Ok(hash_bytes) = copy_hash(packet.data.as_slice()) {
-            let hash = Hash::new(hash_bytes);
-            self.incoming.remove(&hash);
-            self.pending_outgoing.remove(&hash);
-            self.outgoing.remove(&hash);
+        let Ok(hash_bytes) = copy_hash(packet.data.as_slice()) else {
+            return;
+        };
+        let hash = Hash::new(hash_bytes);
+        self.incoming.remove(&hash);
+        // Removed from both, as before: a hash lives in exactly one of these,
+        // but which one depends on whether dispatch has been confirmed yet.
+        let cancelled = self.pending_outgoing.remove(&hash);
+        if let Some(sender) = self.outgoing.remove(&hash).or(cancelled) {
+            self.outgoing_segment_chains.remove(&sender.original_hash);
         }
     }
 }
