@@ -127,25 +127,23 @@ impl ResourceManager {
             Some(total_size as u64),
         )?;
         let original_hash = first.original_hash;
-        let mut remaining = VecDeque::new();
-        let mut offset = first_data_len;
-        for segment_index in 2..=total_segments {
-            let end = offset.saturating_add(MAX_EFFICIENT_SIZE).min(data.len());
-            remaining.push_back(ResourceSender::new_segment_with_options_mtu(
-                link,
-                data[offset..end].to_vec(),
-                None,
-                request_id.clone(),
+        // Only segment 1 is built here. The rest are built as each preceding
+        // segment's proof arrives — see `PendingSegments`.
+        self.outgoing_segment_chains.insert(
+            original_hash,
+            PendingSegments {
+                link_id: first.link_id,
+                data,
+                offset: first_data_len,
+                next_segment_index: 2,
+                total_segments,
+                total_size: total_size as u64,
+                request_id,
                 is_response,
                 interface_mtu,
-                Some(original_hash),
-                segment_index,
-                total_segments,
-                Some(total_size as u64),
-            )?);
-            offset = end;
-        }
-        self.outgoing_segment_chains.insert(original_hash, remaining);
+                original_hash,
+            },
+        );
         self.track_sender(first)
     }
 
