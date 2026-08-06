@@ -30,17 +30,16 @@ impl Transport {
     ) -> Result<Hash, RnsError> {
         let link = self.find_in_link(link_id).await.ok_or(RnsError::InvalidArgument)?;
         let interface_mtu = self.resource_mtu_for_iface(Some(iface)).await;
-        let (resource_hash, packet) = {
-            let mut handler = self.handler.lock().await;
+        // See `reset_out_link.rs::send_resource_observed`: the build is done
+        // before the handler lock is taken, so a large payload does not hold
+        // every other link and announce on this node behind it.
+        let prepared = {
             let link_guard = link.lock().await;
             let interface_mtu = interface_mtu.min(link_guard.link_mtu());
-            handler.resource_manager.start_send_with_mtu(
-                &link_guard,
-                data,
-                metadata,
-                interface_mtu,
-            )?
+            ResourceManager::prepare_send(&link_guard, data, metadata, None, false, interface_mtu)?
         };
+        let (resource_hash, packet) =
+            self.handler.lock().await.resource_manager.track_prepared(prepared);
         let dispatch = self
             .handler
             .lock()

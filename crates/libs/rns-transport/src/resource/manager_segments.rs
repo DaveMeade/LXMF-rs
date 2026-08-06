@@ -1,3 +1,16 @@
+/// A send that has been fully built but not yet handed to the manager.
+///
+/// Exists so the expensive half of starting a resource send can happen without
+/// the transport handler lock: `ResourceManager::prepare_send` produces one of
+/// these from a `&Link` alone, and `track_prepared` files it away. The
+/// advertisement packet is already built and encrypted by this point, so
+/// filing it needs no link at all.
+#[derive(Debug)]
+pub struct PreparedSend {
+    first: ResourceSender,
+    pending: Option<PendingSegments>,
+}
+
 /// The not-yet-built tail of an outbound split resource.
 ///
 /// This used to be a `VecDeque<ResourceSender>` filled by `start_send`, which
