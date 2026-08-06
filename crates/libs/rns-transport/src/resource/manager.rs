@@ -2,7 +2,7 @@
 pub struct ResourceManager {
     pending_outgoing: HashMap<Hash, ResourceSender>,
     outgoing: HashMap<Hash, ResourceSender>,
-    outgoing_segment_chains: HashMap<Hash, VecDeque<ResourceSender>>,
+    outgoing_segment_chains: HashMap<Hash, PendingSegments>,
     incoming: HashMap<Hash, ResourceReceiver>,
     incoming_segments: HashMap<Hash, InboundSegmentAssembly>,
     events: Vec<ResourceEvent>,
@@ -55,8 +55,9 @@ impl ResourceManager {
     pub fn remove_link_state(&mut self, link_id: AddressHash) {
         self.pending_outgoing.retain(|_, sender| sender.link_id != link_id);
         self.outgoing.retain(|_, sender| sender.link_id != link_id);
-        self.outgoing_segment_chains
-            .retain(|_, senders| senders.front().is_none_or(|sender| sender.link_id != link_id));
+        // Was `senders.front().is_none_or(..)`, which also leaked: a chain
+        // drained to empty matched no link and so was retained forever.
+        self.outgoing_segment_chains.retain(|_, pending| pending.link_id != link_id);
         self.incoming.retain(|_, receiver| receiver.link_id != link_id);
         self.incoming_segments.retain(|_, assembly| assembly.link_id != link_id);
         self.link_stats.remove(&link_id);
@@ -103,7 +104,7 @@ impl ResourceManager {
                 self.handle_hash_update_into(packet, link, responses)
             }
             PacketContext::Resource => self.handle_resource_part_into(packet, link, responses),
-            PacketContext::ResourceProof => self.handle_proof_into(packet, responses),
+            PacketContext::ResourceProof => self.handle_proof_into(packet, link, responses),
             PacketContext::ResourceInitiatorCancel | PacketContext::ResourceReceiverCancel => {
                 self.cancel_into(packet, responses)
             }
@@ -431,45 +432,22 @@ impl ResourceManager {
         }
     }
 
-    fn handle_proof_into(&mut self, packet: &Packet, responses: &mut Vec<Packet>) {
-        let Ok(proof) = ResourceProof::decode(packet.data.as_slice()) else {
+    /// A cancel names the *segment* that is in flight, not the split resource
+    /// it belongs to — `cancel_outgoing` builds the packet from the active
+    /// segment's own hash, and so does the reference. Dropping the sender is
+    /// therefore not enough: the unbuilt tail is keyed by `original_hash`, so
+    /// it would go on holding the caller's whole payload until the link closed.
+    fn cancel_into(&mut self, packet: &Packet, _responses: &mut Vec<Packet>) {
+        let Ok(hash_bytes) = copy_hash(packet.data.as_slice()) else {
             return;
         };
-        if self
-            .outgoing
-            .get_mut(&proof.resource_hash)
-            .is_some_and(|sender| sender.handle_proof(&proof))
-        {
-            if let Some(sender) = self.outgoing.remove(&proof.resource_hash) {
-                if sender.segment_index < sender.total_segments {
-                    let next = self
-                        .outgoing_segment_chains
-                        .get_mut(&sender.original_hash)
-                        .and_then(VecDeque::pop_front);
-                    if let Some(mut next) = next {
-                        let advertisement = next.advertisement_packet();
-                        next.mark_advertised(self.retry_limit);
-                        self.outgoing.insert(next.resource_hash, next);
-                        responses.push(advertisement);
-                        return;
-                    }
-                }
-                self.outgoing_segment_chains.remove(&sender.original_hash);
-                self.events.push(ResourceEvent {
-                    hash: sender.original_hash,
-                    link_id: packet.destination,
-                    kind: ResourceEventKind::OutboundComplete,
-                });
-            }
-        }
-    }
-
-    fn cancel_into(&mut self, packet: &Packet, _responses: &mut Vec<Packet>) {
-        if let Ok(hash_bytes) = copy_hash(packet.data.as_slice()) {
-            let hash = Hash::new(hash_bytes);
-            self.incoming.remove(&hash);
-            self.pending_outgoing.remove(&hash);
-            self.outgoing.remove(&hash);
+        let hash = Hash::new(hash_bytes);
+        self.incoming.remove(&hash);
+        // Removed from both, as before: a hash lives in exactly one of these,
+        // but which one depends on whether dispatch has been confirmed yet.
+        let cancelled = self.pending_outgoing.remove(&hash);
+        if let Some(sender) = self.outgoing.remove(&hash).or(cancelled) {
+            self.outgoing_segment_chains.remove(&sender.original_hash);
         }
     }
 }
