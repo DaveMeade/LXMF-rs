@@ -1055,6 +1055,7 @@ mod tests {
     include!("tests_window_rounds.rs");
     include!("tests_split_assembly.rs");
     include!("tests_split_lazy.rs");
+    include!("tests_split_metadata.rs");
     include!("tests_timeouts.rs");
     include!("tests_timeouts_lifecycle.rs");
 
