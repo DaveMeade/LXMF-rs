@@ -420,9 +420,14 @@ async fn resource_request_responses_fit_bound_iface_mtu() {
         let link = Arc::new(Mutex::new(outbound));
         guard.out_links.insert(destination.address_hash, link.clone());
         let link_guard = link.lock().await;
+        // Random, not a repeated byte — this test's whole point is
+        // multiple constrained-MTU parts, which auto-compression would
+        // otherwise collapse a uniform-byte payload down below.
+        let mut payload = vec![0u8; PACKET_MDU * 2];
+        OsRng.fill_bytes(&mut payload);
         let (resource_hash, packet) = guard
             .resource_manager
-            .start_send_with_mtu(&link_guard, vec![0x42; PACKET_MDU * 2], None, LORA_MTU)
+            .start_send_with_mtu(&link_guard, payload, None, LORA_MTU)
             .expect("start resource");
         guard.resource_manager.confirm_outbound_dispatch(resource_hash, true);
         packet
