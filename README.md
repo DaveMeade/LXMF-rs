@@ -6,8 +6,8 @@ Rust monorepo for LXMF and Reticulum with strict library/app boundaries and
 enterprise quality gates. The `0.9.8` line is a patch release over the
 usable `0.9.5` sub-1.0 daemon/product baseline, with stricter failure handling,
 receipt validation, storage migrations, typed SDK decoding, and operational
-diagnostics. It is not a compatibility layer or a complete drop-in replacement
-for every Python Reticulum/LXMF behavior.
+diagnostics. It is not (yet) a compatibility layer or a complete drop-in replacement
+for every Python Reticulum/LXMF behavior but we are damn close.
 
 ## Start Here
 
