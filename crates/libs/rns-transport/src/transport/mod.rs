@@ -176,6 +176,7 @@ pub struct TransportConfig {
     broadcast: bool,
     transport_enabled: bool,
     connected_to_shared_instance: bool,
+    local_hops_delta: u8,
     announce_cache_capacity: usize,
     announce_retry_limit: u8,
     announce_queue_len: usize,
@@ -283,6 +284,24 @@ pub(crate) struct TransportHandler {
 
     cancel: CancellationToken,
     receipt_handler: Option<Arc<dyn ReceiptHandler>>,
+}
+
+impl TransportHandler {
+    fn local_hops_delta_for_packet(&self, packet: &Packet) -> Option<u8> {
+        let local_hops_delta = self.config.local_hops_delta;
+        if self.config.connected_to_shared_instance
+            || packet.header.hops != 0
+            || local_hops_delta == 0
+            || matches!(
+                packet.header.destination_type,
+                DestinationType::Plain | DestinationType::Group
+            )
+        {
+            None
+        } else {
+            Some(local_hops_delta)
+        }
+    }
 }
 
 pub struct Transport {

@@ -37,7 +37,7 @@ use rns_rpc::InterfaceRecord;
 use rns_transport::destination::SingleInputDestination;
 use rns_transport::hash::AddressHash;
 use rns_transport::iface::tcp_client::TcpSocketTuning;
-use rns_transport::iface::tcp_server::TcpServer;
+use rns_transport::iface::tcp_server::{FastFlapPolicy, TcpServer};
 use rns_transport::transport::{RestoredReticulumPathIdentity, Transport, TransportConfig};
 use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
@@ -97,6 +97,7 @@ pub(super) struct TransportStartupInput<'a> {
         tokio::sync::mpsc::Sender<reticulum_daemon::receipt_bridge::ReceiptEvent>,
     pub(super) propagation_control_enabled: bool,
     pub(super) propagation_announce_config: PropagationNodeAnnounceConfig,
+    pub(super) local_hops_delta: bool,
 }
 
 fn spawn_stream_reconnect_tunnel_synthesizer(
@@ -128,13 +129,33 @@ fn build_selected_tcp_server_adapter(
         server = server.with_client_forced_bitrate(bitrate_bps);
     }
     if selected_tcp_server.kind == "backbone" {
+        let fast_flap_policy = selected_fast_flap_policy(selected_tcp_server);
         server = server
             .with_client_socket_tuning(TcpSocketTuning::backbone())
-            .with_backbone_client_liveness();
+            .with_backbone_client_liveness()
+            .with_fast_flapping(
+                fast_flap_policy.enabled,
+                fast_flap_policy.threshold,
+                fast_flap_policy.grace,
+                fast_flap_policy.expiry,
+            );
     } else if selected_tcp_server.kind == "tcp_server" && selected_tcp_server.i2p_tunneled {
         server = server.with_client_socket_tuning(TcpSocketTuning::i2p_tunneled());
     }
     server
+}
+
+fn selected_fast_flap_policy(selected_tcp_server: &TcpServerSelection) -> FastFlapPolicy {
+    FastFlapPolicy {
+        enabled: selected_tcp_server.block_fast_flapping.unwrap_or(true),
+        threshold: std::time::Duration::from_secs_f64(
+            selected_tcp_server.fast_flapping_threshold.unwrap_or(20.0).max(0.0),
+        ),
+        grace: selected_tcp_server.fast_flapping_grace.unwrap_or(5),
+        expiry: std::time::Duration::from_secs_f64(
+            selected_tcp_server.fast_flapping_block_time.unwrap_or(12.0 * 60.0).max(0.0) * 60.0,
+        ),
+    }
 }
 
 pub(super) async fn start_transport_and_interfaces(
@@ -153,6 +174,7 @@ pub(super) async fn start_transport_and_interfaces(
         receipt_tx,
         propagation_control_enabled,
         propagation_announce_config,
+        local_hops_delta,
     } = input;
 
     for record in &mut configured_interfaces {
@@ -216,6 +238,7 @@ pub(super) async fn start_transport_and_interfaces(
             rns_transport::identity_bridge::to_transport_private_identity(identity);
         let mut config = TransportConfig::new("daemon", &transport_identity, true);
         config.set_transport_enabled(reticulum_transport_enabled(daemon_config));
+        config.set_local_hops_delta(if local_hops_delta { 1 } else { 0 });
         let mut transport_instance = Transport::new(config);
         transport_instance
             .set_receipt_handler(Box::new(ReceiptBridge::new(receipt_map, receipt_tx.clone())))

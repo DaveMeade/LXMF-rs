@@ -287,6 +287,7 @@ pub(super) async fn startup_configured_interfaces(
                     LocalUnixStartup::Active => startup_successes += 1,
                     LocalUnixStartup::Attached(client_iface) => {
                         startup_successes += 1;
+                        iface_manager.lock().await.set_shared_instance(client_iface, true);
                         tunnel_synth_ifaces.push(client_iface);
                         connected_to_shared_instance = true;
                     }
@@ -307,6 +308,7 @@ pub(super) async fn startup_configured_interfaces(
                 {
                     LocalUnixStartup::Attached(client_iface) => {
                         startup_successes += 1;
+                        iface_manager.lock().await.set_shared_instance(client_iface, true);
                         tunnel_synth_ifaces.push(client_iface);
                         connected_to_shared_instance = true;
                     }
@@ -328,6 +330,7 @@ pub(super) async fn startup_configured_interfaces(
                     .await
                     {
                         startup_successes += 1;
+                        iface_manager.lock().await.set_shared_instance(client_iface, true);
                         tunnel_synth_ifaces.push(client_iface);
                         connected_to_shared_instance = true;
                     }
@@ -348,6 +351,7 @@ pub(super) async fn startup_configured_interfaces(
                         LocalTcpSidecarStartup::Active => startup_successes += 1,
                         LocalTcpSidecarStartup::Attached(client_iface) => {
                             startup_successes += 1;
+                            iface_manager.lock().await.set_shared_instance(client_iface, true);
                             tunnel_synth_ifaces.push(client_iface);
                             connected_to_shared_instance = true;
                         }
@@ -386,6 +390,7 @@ pub(super) async fn startup_configured_interfaces(
                 .await
                 {
                     startup_successes += 1;
+                    iface_manager.lock().await.set_shared_instance(client_iface, true);
                     tunnel_synth_ifaces.push(client_iface);
                     connected_to_shared_instance = true;
                 }
@@ -3292,6 +3297,7 @@ interfaces = [
             rpc_unix: None,
             #[cfg(feature = "zmq-pipeline-rpc")]
             zmq_rpc_command: None,
+            #[cfg(feature = "zmq-pipeline-rpc")]
             zmq_rpc_endpoint: None,
         }
     }
