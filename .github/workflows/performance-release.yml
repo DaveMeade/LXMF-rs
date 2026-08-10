@@ -10,7 +10,7 @@ on:
       release_tag:
         description: Release tag/label for the generated dataset and asset
         required: true
-        default: v0.9.9-rc.4
+        default: v0.9.9-rc.5
   push:
     tags:
       - v*

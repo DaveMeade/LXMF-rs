@@ -61,7 +61,8 @@ are kept in Git history instead of the live documentation tree.
 - `docs/runbooks/release-readiness.md`: release gate checklist
 - `docs/runbooks/logging-and-diagnostics.md`: operator logging knobs and
   contributor failure-visibility rules
-- `docs/release-notes-v0.9.9-rc.4.md`: current release-candidate notes
+- `docs/release-notes-v0.9.9-rc.5.md`: current release-candidate notes
+- `docs/release-notes-v0.9.9-rc.4.md`: superseded candidate notes
 - `docs/release-notes-v0.9.9-rc.3.md`: superseded candidate notes
 - `docs/release-notes-v0.9.9-rc.2.md`: superseded candidate notes
 - `docs/release-notes-v0.9.9-rc.1.md`: superseded candidate notes
