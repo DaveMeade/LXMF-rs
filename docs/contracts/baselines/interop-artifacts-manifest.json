@@ -14,7 +14,7 @@
     {
       "path": "docs/contracts/baselines/schema-client-generation-baseline.json",
       "bytes": 373,
-      "sha256": "4251c2f9b04ca184bd4bee691df76d59d2a004460e4e6bbdf0ca194ef435c89b"
+      "sha256": "3ecf32bf55707a0acc0122e6bbee5045630f1c89cf38f11c1cf337951985a727"
     },
     {
       "path": "docs/contracts/ble-camera-wire-v1.md",
@@ -83,8 +83,8 @@
     },
     {
       "path": "docs/contracts/native-embedded-lockfile.toml",
-      "bytes": 792,
-      "sha256": "fd38f0cc4959ec6edaeee052c9f4250c65fa8d5ff971236c2989921a98a14265"
+      "bytes": 783,
+      "sha256": "ecef9a1009810caf35c9274d42fb795c77ac7237b7da7355cce414741b9e3e69"
     },
     {
       "path": "docs/contracts/native-embedded-node-config-v1.md",
@@ -1409,7 +1409,7 @@
     {
       "path": "docs/fixtures/sdk-v2/rpc/sdk_negotiate_v2.response.valid.json",
       "bytes": 2359,
-      "sha256": "16197b6ed942ab92352e2b779eed4788df98cccc1b3fd3324838bbd533e4e2c4"
+      "sha256": "abda3d19d9df6214cece1d6de9c75a07fa30b538de8e8e3bec3109acbdb3d82e"
     },
     {
       "path": "docs/fixtures/sdk-v2/rpc/sdk_poll_events_v2.request.invalid.json",

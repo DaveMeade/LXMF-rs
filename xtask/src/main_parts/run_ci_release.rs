@@ -4,10 +4,10 @@ pub(super) fn run_release_check() -> Result<()> {
     run_pr_core_ci()?;
     run_correctness_check()?;
     run("cargo", &["doc", "--workspace", "--no-deps", "--lib"])?;
-    // v0.9.8 explicitly ships with documented partial Python/RNS parity. The
-    // inventory remains a required consistency/evidence check, but release
-    // promotion must not require every mapped surface row to be complete.
-    run_python_surface_parity_check(false)?;
+    // The v0.9.9 release candidate is the RNS 1.4.2 software-parity release.
+    // The inventory gate enforces the exact 1,811-entry target rather than
+    // accepting a merely well-formed or partially mapped manifest.
+    run_python_surface_parity_check(true)?;
     run_sdk_zmq_parity_check()?;
     run_performance_docs_check()?;
     run_sdk_docs_check()?;

@@ -14,7 +14,7 @@ impl MessagesStore {
     fn spawn_outbound_write_worker(
         write_state: Arc<WriteState>,
         rx: mpsc::Receiver<OutboundWriteCommand>,
-    ) {
+    ) -> std::thread::JoinHandle<()> {
         std::thread::Builder::new()
             .name("messages-outbound-writer".to_string())
             .spawn(move || {
@@ -22,7 +22,7 @@ impl MessagesStore {
                     Self::handle_outbound_write_command(write_state.as_ref(), command);
                 }
             })
-            .expect("spawn messages outbound writer");
+            .expect("spawn messages outbound writer")
     }
 
     fn handle_outbound_write_command(write_state: &WriteState, command: OutboundWriteCommand) {
@@ -149,6 +149,19 @@ impl MessagesStore {
                 ),
                 "upsert_ticket_last_delivery",
             ),
+        }
+    }
+}
+
+impl Drop for MessagesStore {
+    fn drop(&mut self) {
+        let (replacement_tx, _replacement_rx) = mpsc::channel();
+        drop(std::mem::replace(&mut self.outbound_write_tx, replacement_tx));
+
+        if let Some(writer_thread) = self.writer_thread.take() {
+            if let Err(error) = writer_thread.join() {
+                log::error!("[messages-store] outbound writer thread panicked: {error:?}");
+            }
         }
     }
 }

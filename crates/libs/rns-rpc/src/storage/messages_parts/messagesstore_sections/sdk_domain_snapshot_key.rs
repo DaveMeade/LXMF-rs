@@ -30,6 +30,7 @@ impl MessagesStore {
         let store = Self {
             write_state: write_state.clone(),
             outbound_write_tx,
+            writer_thread: Some(Self::spawn_outbound_write_worker(write_state, outbound_write_rx)),
             read_conn: None,
             read_lock_wait_ns_total: AtomicU64::new(0),
             read_ops_total: AtomicU64::new(0),
@@ -37,7 +38,6 @@ impl MessagesStore {
         store.configure_connection()?;
         store.init_schema()?;
         store.refresh_message_count_cache()?;
-        Self::spawn_outbound_write_worker(write_state, outbound_write_rx);
         Ok(store)
     }
 
@@ -57,6 +57,7 @@ impl MessagesStore {
         let store = Self {
             write_state: write_state.clone(),
             outbound_write_tx,
+            writer_thread: Some(Self::spawn_outbound_write_worker(write_state, outbound_write_rx)),
             read_conn: Some(Mutex::new(read_conn)),
             read_lock_wait_ns_total: AtomicU64::new(0),
             read_ops_total: AtomicU64::new(0),
@@ -64,7 +65,6 @@ impl MessagesStore {
         store.configure_connection()?;
         store.init_schema()?;
         store.refresh_message_count_cache()?;
-        Self::spawn_outbound_write_worker(write_state, outbound_write_rx);
         Ok(store)
     }
 

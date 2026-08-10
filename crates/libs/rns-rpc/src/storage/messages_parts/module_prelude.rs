@@ -5,6 +5,7 @@ use serde_json::Value as JsonValue;
 use std::sync::atomic::{AtomicU64, Ordering};
 
 use std::sync::{mpsc, Arc, Mutex};
+use std::thread::JoinHandle;
 
 #[derive(Debug, Clone, PartialEq, serde::Serialize)]
 pub struct MessageRecord {
@@ -42,6 +43,7 @@ pub struct AnnounceRecord {
 pub struct MessagesStore {
     write_state: Arc<WriteState>,
     outbound_write_tx: mpsc::Sender<OutboundWriteCommand>,
+    writer_thread: Option<JoinHandle<()>>,
     read_conn: Option<Mutex<Connection>>,
     read_lock_wait_ns_total: AtomicU64,
     read_ops_total: AtomicU64,

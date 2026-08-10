@@ -10,7 +10,8 @@ Parity is recorded on two independent axes:
 
 - implementation: `complete`, `partial`, or `not-applicable`;
 - evidence: one or more of `unit`, `simulated`, `pinned-python`,
-  `prepared-host`, or `hardware-unverified`.
+  `cross-implementation`, `prepared-host`, `third-party-client`, `hardware`,
+  `public-network`, or `hardware-unverified`.
 
 Workspace paths are used for navigation. `crates/libs/lxmf-core` publishes as
 `lxmf-wire`; `crates/libs/rns-rpc` publishes as `reticulum-rs-rpc`.
@@ -21,10 +22,10 @@ cursor-replaying events, and the `LxmfSdkRouter`/`LxmfSdkPropagation` extension
 traits. Row-level transport classification is generated in
 `docs/status/sdk-zmq-parity.json`.
 
-For the v0.9.8 release boundary, all seven tracked LXMF module rows remain
-`complete`; the release carries the existing typed SDK, delivery, propagation,
-receipt, cancellation, and stamp evidence without broadening the matrix beyond
-the named software scenarios.
+The historical v0.9.8 record retains its release boundary. Current `main` and
+`v0.9.9-rc.1` keep all seven tracked LXMF module rows `complete` for their
+named software scenarios, with hardware, public-network, and third-party-client
+evidence tracked independently.
 
 ## Module Matrix
 

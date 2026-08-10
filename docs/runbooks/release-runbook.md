@@ -24,7 +24,7 @@
 ## Steps
 1. Run local quality gates (`cargo xtask release-check`).
 2. Run binary smoke tests (`cargo run -p rns-tools --bin rnx -- e2e --timeout-secs 20`).
-3. Tag release with a signed git tag (`git tag -s`).
+3. Tag release with an annotated tag, signing it when a release key is configured (`git tag -a` or `git tag -s`).
 4. Push tag and confirm release artifacts.
 
 ## Checklist

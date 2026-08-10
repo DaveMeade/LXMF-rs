@@ -38,13 +38,33 @@ The project is best described by capability level:
 | Full Python software surface parity | achieved | The strict inventory reports 1,810 complete, 0 partial, and 1 provenance-backed not-applicable entry. |
 | ZeroMQ SDK-access parity | achieved in v0.9.5 implementation | Generated classification and daemon-operation inventory live in `sdk-zmq-parity.json`; release evidence must still pass all gates. |
 
-## v0.9.8 Release Candidate
+## v0.9.9-rc.1 Release Candidate
 
-v0.9.8 is a patch release over the published v0.9.7 baseline. The reviewed
-candidate starts at `9f12fb4e` and carries the merged resource-transfer, MTU,
-propagation, SDK deadline, lock-scope, metadata, cancellation, and compression
-fixes. This release makes no new broad parity claim; it records the behavior
-now present on the exact release commit.
+The current candidate is `v0.9.9-rc.1`, with workspace and publishable crate
+version `0.9.9`. It is the RNS 1.4.2 software-parity prerelease: the pinned
+Reticulum reference is `b48b96e61676504e0a4e527b33b9a0b4495c6872`, the pinned
+LXMF reference is `727830cefda83d9c6e3982b48675425f3f988f9c`, and the generated
+strict inventory target is 1,811 total, 1,810 complete, zero partial, and one
+not-applicable entry.
+
+This RC reconciles the maintained matrices and release metadata with the
+implementation already present on `main`, then exercises the exact local and
+tag-triggered release gates. The seven tracked LXMF rows and the generated RNS
+callable inventory are complete on the software axis. Physical RNode/RNodeMulti,
+Weave, VR-N76, BLE, serial-radio, public-I2P/public-Reticulum, and
+third-party-client evidence remains separately tracked and does not become a
+hidden implementation partial.
+
+Candidate notes are in `docs/release-notes-v0.9.9-rc.1.md`; the exact gate,
+artifact, signing, OCI, and performance record is in
+`docs/status/v0.9.9-release-candidate.md`.
+
+## v0.9.8 Historical Release
+
+v0.9.8 is the published stable release over the v0.9.7 baseline. Its release
+notes and candidate ledger remain historical records of the exact v0.9.8
+boundary, including its original resource-transfer, MTU, propagation, SDK
+deadline, lock-scope, metadata, cancellation, and compression evidence.
 
 Resource-layer wire fidelity now includes outbound bz2 auto-compression
 matching `Resource.__init__`'s default, completing the existing inbound
@@ -59,16 +79,9 @@ length-delimited block itself (prefixed to segment 1 alone). This is a
 row-level increment recorded in `docs/status/reticulum-parity-matrix.md`; no
 capability status in the table above changes.
 
-Local release readiness is **PASS locally; hosted validation pending**. The
-validated candidate commit is `0c494a53c08141a0cbb9829278006f888af25c5c`.
-Workspace metadata is aligned to `0.9.8`; this release explicitly accepts the
-documented complete
-Python/RNS inventory (1,810 complete, 0 partial, and one
-provenance-backed not-applicable); the release gate checks inventory
-consistency without requiring 100% completion. Hosted CI and pinned-Python
-interoperability are required on the exact candidate commit.
-Release-candidate notes live in `docs/release-notes-v0.9.8.md`; the evidence
-ledger is `docs/status/v0.9.8-release-candidate.md`.
+The v0.9.8 release record is not the active gate for this RC. Its historical
+candidate notes live in `docs/release-notes-v0.9.8.md`; its evidence ledger is
+`docs/status/v0.9.8-release-candidate.md`.
 
 ## v0.9.6 Stabilization Baseline
 
@@ -1529,30 +1542,41 @@ Scoped release evidence is split as follows:
 
 ## Remaining Release Blockers
 
-The v0.9.8 candidate base is `9f12fb4e`. The release policy now requires the
-complete pinned Python/RNS inventory; promotion remains gated by an exact
-reviewed commit, the complete local release gate, hosted CI, and pinned-Python
-interoperability. The exact candidate currently has a reproducible blocker in
-three resource-backed Python channel request/response cases; no RC or final
-publication is authorized until those tests pass on the pinned workflow.
-Physical
-radio/BLE/serial devices, public I2P, public networks, and
-Sideband/MeshChatX/Columba claims remain separate optional evidence tracks and
-do not block this software release.
+For `v0.9.9-rc.1`, the generated software inventory has no partial or unmapped
+implementation entries. Publication is gated by the exact reviewed commit and
+the following release evidence:
+
+- the complete local release gate, including the exact inventory target;
+- hosted CI, security, documentation, and release-scorecard checks;
+- pinned-Python interoperability on the exact tagged commit;
+- successful tag-triggered release and performance workflows;
+- verified release assets, checksums, SBOMs, provenance, OCI publication, and
+  optional signing outcomes.
+
+Physical RNode/RNodeMulti, Weave, VR-N76, BLE, serial-radio, public I2P,
+public Reticulum networks, and Sideband/MeshChatX/Columba or other
+third-party-client claims remain separate deferred evidence tracks. They do not
+block this software RC. Final stable `v0.9.9` publication is explicitly outside
+this candidate task.
 
 ## Active Execution Order
 
-1. Commit and push the passing post-`v0.9.7` candidate tree for hosted CI and pinned-Python interop.
-2. Publish `v0.9.8-rc.1` from that SHA with simulation and bundle artifacts.
-3. Promote that exact SHA to `v0.9.8`, repair `origin/release`, publish packages and platform bundles,
-   and verify remote tags, registries, checksums, and support wording.
+1. Reconcile the matrices, release metadata, version files, and exact parity
+   inventory for `v0.9.9-rc.1`.
+2. Run the focused and full local release gates, then commit the reviewed tree.
+3. Tag and push `v0.9.9-rc.1`; inspect the release, pinned-Python, security, and
+   performance workflows on that immutable SHA.
+4. Verify artifacts, checksums, attestations, OCI state, and the performance
+   dashboard; record the result in the RC ledger.
+5. Recommend readiness for the prerelease only; defer stable promotion until a
+   separate decision and evidence review.
 
 ## Verification Baseline
 
 - Primary CI: `.github/workflows/ci.yml`
 - Pinned Python interop: `.github/workflows/verify.yml` (repository-native `cargo xtask hil` controller)
-- Reference revisions are declared in the interop workflow rather than copied
-  into status prose.
+- Reference revisions are declared in `.github/workflows/verify.yml` and the
+  repository-owned HIL case definitions rather than copied into status prose.
 - Current run status belongs in GitHub Actions, not in this maintained document.
 - A passing Python-reference workflow proves only the scenarios it executes.
 

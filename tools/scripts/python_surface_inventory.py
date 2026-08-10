@@ -25,6 +25,12 @@ VALID_EVIDENCE = {
     "prepared-host",
     "hardware-unverified",
 }
+EXPECTED_RELEASE_SUMMARY = {
+    "total": 1811,
+    "complete": 1810,
+    "partial": 0,
+    "not-applicable": 1,
+}
 
 
 @dataclass(frozen=True)
@@ -246,6 +252,19 @@ def validate_inventory(payload: dict[str, Any], require_complete: bool) -> list[
             errors.append(f"{item_id}: missing evidence mapping")
         if require_complete and implementation == "partial":
             errors.append(f"{item_id}: partial implementation is not release-complete")
+    if require_complete:
+        summary = payload.get("summary")
+        if not isinstance(summary, dict):
+            errors.append("release inventory is missing a summary")
+        else:
+            actual = {
+                key: summary.get(key, 0) for key in EXPECTED_RELEASE_SUMMARY
+            }
+            if actual != EXPECTED_RELEASE_SUMMARY:
+                errors.append(
+                    "release inventory counts differ from the RNS 1.4.2 target: "
+                    f"expected {EXPECTED_RELEASE_SUMMARY}, got {actual}"
+                )
     return errors
 
 

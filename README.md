@@ -1,43 +1,42 @@
-# LXMF-rs Monorepo
+# LXMF-rs — Reticulum and LXMF implemented in Rust
 
 [![Ask DeepWiki](https://deepwiki.com/badge.svg)](https://deepwiki.com/FreeTAKTeam/LXMF-rs)
 
-Rust monorepo for LXMF and Reticulum with strict library/app boundaries and
-enterprise quality gates. The `0.9.8` line is a patch release over the
-usable `0.9.5` sub-1.0 daemon/product baseline, with stricter failure handling,
-receipt validation, storage migrations, typed SDK decoding, and operational
-diagnostics. It is not (yet) a compatibility layer or a complete drop-in replacement
-for every Python Reticulum/LXMF behavior but we are damn close.
+Rust monorepo implementing the Reticulum networking stack and LXMF messaging
+stack, with strict library/app boundaries and enterprise quality gates. The
+`0.9.9` workspace packages are being exercised by the `v0.9.9-rc.1` prerelease,
+which targets the pinned RNS 1.4.2 software surface and keeps hardware,
+public-network, and third-party-client evidence explicitly separate.
 
 ## Start Here
 
 - Contributor workflow: `CONTRIBUTING.md`
 - Current status and execution order: `docs/status/current-roadmap.md`
-- Release notes: `docs/release-notes-v0.9.8.md`
+- Release notes: `docs/release-notes-v0.9.9-rc.1.md`
+- RC evidence ledger: `docs/status/v0.9.9-release-candidate.md`
 - Docs map and retention rules: `docs/README.md`
 - SDK guide: `docs/sdk/README.md`
 - Support policy: `docs/contracts/support-policy.md`
 
 ## Release Status
 
-Current release train: `0.9.8`. The latest published stable artifacts are
-`v0.9.7`; `v0.9.8` is being prepared from the reviewed post-`v0.9.7`
-candidate on `origin/main`.
+Latest published stable release: `v0.9.8`. Current release candidate:
+`v0.9.9-rc.1`, with workspace/package version `0.9.9`.
 
-Use `docs/release-notes-v0.9.8.md` for the candidate release summary and
-`docs/runbooks/release-readiness.md` for the release gate record. The
+Use `docs/release-notes-v0.9.9-rc.1.md` for the candidate summary and
+`docs/status/v0.9.9-release-candidate.md` for the exact release evidence. The
 repository-level parity source of truth remains
 `docs/status/current-roadmap.md`; the detailed parity supplements are
 `docs/status/reticulum-parity-matrix.md` and
 `docs/status/lxmf-parity-matrix.md`.
 
-The `0.9.8` release scope covers the Rust libraries, SDK entry points, `lxmd`,
-`reticulumd`, and `rns-tools`, plus host-native GitHub bundles for all
-implemented user-facing tools. The patch train keeps the SDK-first product
-shape while hardening authoritative return values, persistence, identity
-parsing, link delivery, and error visibility. Operational substitutability is
-materially stronger but remains bounded by the parity matrices and external
-evidence requirements.
+The RC scope covers the Rust Reticulum and LXMF libraries, SDK entry points,
+`lxmd`, `reticulumd`, and `rns-tools`, plus host-native GitHub bundles for the
+implemented user-facing tools. The strict pinned RNS inventory is 1,811 total,
+with 1,810 complete, zero partial, and one not-applicable entry. The seven
+tracked LXMF rows are complete for their software scenarios. Physical devices,
+public networks, and external-client compatibility remain separate evidence
+tracks rather than hidden implementation gaps.
 External-client compatibility claims for REM, RCH, Sideband, MeshChatX,
 Columba, or other third-party clients require separate interop gate evidence.
 
@@ -188,12 +187,12 @@ cargo run -p xtask -- architecture-checks
 cargo run -p xtask -- sdk-docs-check
 cargo run -p xtask -- sdk-migration-check
 cargo xtask release-check
-cargo xtask package-daemon-bundle --version 0.9.8
+cargo xtask package-daemon-bundle --version 0.9.9-rc.1
 cargo xtask api-diff
 cargo xtask python-impl-bench-compare
 cargo xtask python-impl-bench-compare --profile report
 cargo xtask python-impl-bench-report
-cargo xtask public-benchmark --release v0.9.8
+cargo xtask public-benchmark --release v0.9.9-rc.1
 ```
 
 For fast local iteration on one binary, prefer narrow commands:
@@ -201,7 +200,7 @@ For fast local iteration on one binary, prefer narrow commands:
 ```bash
 make check-bin PKG=lxmf-cli BIN=lxmd
 make run-bin PKG=rns-tools BIN=rnsd ARGS="--help"
-make package-daemon-bundle VERSION=0.9.8
+make package-daemon-bundle VERSION=0.9.9-rc.1
 make python-lxmd-smoke
 ```
 
@@ -251,16 +250,16 @@ workspace directory names:
 
 ```toml
 [dependencies]
-lxmf = "0.9.8"
-reticulum-rs = "0.9.8"
+lxmf = "0.9.9"
+reticulum-rs = "0.9.9"
 ```
 
 Or depend on the component crates directly:
 
 ```toml
 [dependencies]
-lxmf-sdk = "0.9.8"
-reticulum-rs-rpc = "0.9.8"
+lxmf-sdk = "0.9.9"
+reticulum-rs-rpc = "0.9.9"
 ```
 
 ## SDK Guide
@@ -275,16 +274,17 @@ reticulum-rs-rpc = "0.9.8"
 - Error handling: `docs/sdk/error-handling.md`
 - Advanced embedding: `docs/sdk/advanced-embedding.md`
 
-## Release Bundles
+## Legacy Local Release Bundles
 
 `cargo xtask package-daemon-bundle` builds the host-native `lxmd` and
 `reticulumd` binaries, generates `lxmd.example.config`, copies `README.md`, and
 writes a release archive under `target/release-bundles/`. The command emits
 `.zip` bundles on Windows and `.tar.gz` bundles on macOS/Linux.
 
-On macOS, Gatekeeper may quarantine a downloaded release bundle because the
-project does not currently ship signed/notarized binaries. If that happens,
-remove the quarantine attribute after extracting the archive:
+The local helper is separate from the tag-triggered release pipeline. Its macOS
+output is unsigned; the GitHub RC pipeline can optionally codesign its universal
+archive but does not currently notarize it. If Gatekeeper quarantines a local
+bundle, remove the quarantine attribute after extracting the archive:
 
 ```bash
 xattr -dr com.apple.quarantine /path/to/lxmf-rs-tools-<version>-macos-arm64

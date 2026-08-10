@@ -8,7 +8,7 @@ on:
   workflow_dispatch:
     inputs:
       version:
-        description: Existing release tag to build (for example v0.9.9-rc1)
+        description: Existing release tag to build (for example v0.9.9-rc.1)
         required: true
         type: string
       publish:
@@ -327,8 +327,12 @@ jobs:
       - name: Build MSI
         shell: pwsh
         run: |
+          $msiVersion = ($env:RELEASE_VERSION -split '-', 2)[0]
+          if ($msiVersion -notmatch '^\d+\.\d+\.\d+$') {
+            throw "Release version '$env:RELEASE_VERSION' does not produce a valid MSI version '$msiVersion'."
+          }
           wix build packaging/wix/main.wxs -arch x64 `
-            -d Version=$env:RELEASE_VERSION `
+            -d "Version=$msiVersion" `
             -d SourceDir="$env:GITHUB_WORKSPACE\dist\bin" `
             -o "dist\lxmf-rs_$env:RELEASE_VERSION`_x64.msi"
       - name: Sign MSI
@@ -464,6 +468,7 @@ jobs:
       contents: read
       packages: write
       id-token: write
+      attestations: write
     steps:
       - uses: actions/checkout@v4
         with:
@@ -492,16 +497,47 @@ jobs:
           registry: ghcr.io
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
+      - name: Set container image tags
+        id: container-tags
+        shell: bash
+        env:
+          RELEASE_VERSION: ${{ needs.prepare.outputs.version }}
+          PRERELEASE: ${{ needs.prepare.outputs.prerelease }}
+        run: |
+          set -euo pipefail
+          {
+            echo 'tags<<EOF'
+            echo "ghcr.io/freetakteam/lxmf-rs:${RELEASE_VERSION}"
+            if [[ "${PRERELEASE}" != "true" ]]; then
+              echo 'ghcr.io/freetakteam/lxmf-rs:latest'
+            fi
+            echo 'EOF'
+          } >> "${GITHUB_OUTPUT}"
       - name: Build and publish multi-arch image
+        id: build-image
         uses: docker/build-push-action@v6
         with:
           context: .
           file: docker/Dockerfile
           platforms: linux/amd64,linux/arm64
           push: ${{ needs.prepare.outputs.publish == 'true' }}
-          tags: |
-            ghcr.io/freetakteam/lxmf-rs:${{ needs.prepare.outputs.version }}
-            ghcr.io/freetakteam/lxmf-rs:latest
+          tags: ${{ steps.container-tags.outputs.tags }}
+      - name: Install cosign
+        if: needs.prepare.outputs.publish == 'true'
+        uses: sigstore/cosign-installer@v3
+      - name: Sign OCI image
+        if: needs.prepare.outputs.publish == 'true'
+        env:
+          COSIGN_EXPERIMENTAL: "1"
+          IMAGE: ghcr.io/freetakteam/lxmf-rs:${{ needs.prepare.outputs.version }}
+        run: cosign sign --yes "${IMAGE}"
+      - name: Attest OCI image provenance
+        if: needs.prepare.outputs.publish == 'true'
+        uses: actions/attest-build-provenance@v2
+        with:
+          subject-name: ghcr.io/freetakteam/lxmf-rs
+          subject-digest: ${{ steps.build-image.outputs.digest }}
+          push-to-registry: true
       - name: Generate container SBOM
         if: needs.prepare.outputs.publish == 'true'
         uses: anchore/sbom-action@v0
@@ -588,7 +624,7 @@ jobs:
   homebrew:
     name: Update Homebrew tap
     needs: [prepare, release]
-    if: needs.prepare.outputs.publish == 'true'
+    if: needs.prepare.outputs.publish == 'true' && needs.prepare.outputs.prerelease != 'true'
     runs-on: ubuntu-latest
     permissions:
       contents: read

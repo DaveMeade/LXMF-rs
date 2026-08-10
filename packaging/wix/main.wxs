@@ -1,10 +1,12 @@
 <Wix xmlns="http://wixtoolset.org/schemas/v4/wxs">
   <!--
     LXMF-rs MSI installer (WiX v4/v5 schema).
-    Build (see .github/workflows/release.yml):
+    Build (see .github/workflows/release.yml). WiX requires a numeric MSI
+    version, so prerelease tags use the stable numeric package version while
+    retaining the prerelease tag in the output filename:
       wix build packaging/wix/main.wxs -arch x64 \
         -d Version=0.9.9 -d SourceDir=<dir with signed .exe files> \
-        -o lxmf-rs_0.9.9_x64.msi
+        -o lxmf-rs_0.9.9-rc.1_x64.msi
   -->
   <Package Name="LXMF-rs"
            Manufacturer="FreeTAKTeam"

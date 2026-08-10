@@ -39,11 +39,11 @@ Optional longer soak:
 
 ## 4. RC tagging
 
-Use an RC tag format like `vX.Y.Z-rcN`.
+Use an RC tag format like `vX.Y.Z-rc.N`.
 
 ```bash
-git tag -a vX.Y.Z-rc1 -m "LXMF-rs vX.Y.Z-rc1"
-git push origin vX.Y.Z-rc1
+git tag -a vX.Y.Z-rc.N -m "LXMF-rs vX.Y.Z-rc.N"
+git push origin vX.Y.Z-rc.N
 ```
 
 ## 5. RC record

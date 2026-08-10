@@ -1,9 +1,8 @@
 # LXMF-rs Release Strategy
 
 This document describes the release pipeline implemented in
-`.github/workflows/release.yml`. It supersedes `release-bundles.yml`, which
-should be disabled or deleted once this workflow is adopted (both trigger on
-`v*` tags and would publish duplicate releases).
+`.github/workflows/release.yml`. The older `release-bundles.yml` workflow is
+retained as a manual-only legacy workflow and does not trigger on release tags.
 
 ## What every release ships
 
@@ -13,12 +12,12 @@ should be disabled or deleted once this workflow is adopted (both trigger on
 | Raspberry Pi | aarch64 (Pi 4/5, 64-bit OS) and armv7/armhf (32-bit OS) static builds above | `build` job |
 | Debian / RPM packages | `lxmf-rs_<ver>_{amd64,arm64,armhf}.{deb,rpm}` (nfpm) | `package-linux` job |
 | Windows | `lxmf-rs_<ver>_windows-x86_64.zip` (signed exes) + `lxmf-rs_<ver>_x64.msi` (signed MSI) | `package-windows` job |
-| macOS universal | `lxmf-rs_<ver>_macos-universal.tar.gz` (lipo universal2, optional codesign + notarization) | `macos-universal` job |
-| OCI container | `ghcr.io/freetakteam/lxmf-rs:<ver>` and `:latest`, multi-arch (amd64 + arm64) | `container` job |
+| macOS universal | `lxmf-rs_<ver>_macos-universal.tar.gz` (lipo universal2, optional codesign; notarization is not wired) | `macos-universal` job |
+| OCI container | `ghcr.io/freetakteam/lxmf-rs:<ver>` (and `:latest` for stable releases only), multi-arch (amd64 + arm64) | `container` job |
 | SBOM | CycloneDX per app crate (`sbom-reticulumd.cdx.json`, `sbom-lxmf-cli.cdx.json`, `sbom-rns-tools.cdx.json`) + `sbom-container.cdx.json` | `sbom` and `container` jobs |
 | Checksums | `SHA256SUMS.txt` + `SHA256SUMS.txt.cosign.bundle` (keyless sigstore signature) | `release` job |
 | Provenance | GitHub build-provenance attestations for every release file and for the container image | `release` and `container` jobs |
-| Homebrew | Formula update pushed to `FreeTAKTeam/homebrew-tap` | `homebrew` job |
+| Homebrew | Stable-release formula update pushed to `FreeTAKTeam/homebrew-tap` | `homebrew` job |
 
 All Linux targets are built against musl with `+crt-static`, so the shipped
 binaries are fully static (SQLite is bundled via rusqlite's `bundled` feature,
@@ -31,7 +30,7 @@ identical tools.
 
 ```
 prepare ─► build (matrix: linux-musl x3, windows, macos x2)
-    │         ├─► macos-universal (lipo, optional sign + notarize)
+    │         ├─► macos-universal (lipo, optional codesign)
     │         ├─► package-linux (nfpm → .deb/.rpm x3 arches)
     │         ├─► package-windows (sign → ZIP + WiX MSI → sign)
     │         ├─► sbom (cargo-sbom per app crate)
@@ -44,10 +43,12 @@ prepare ─► build (matrix: linux-musl x3, windows, macos x2)
 
 1. Bump `VERSION` and the crate versions (`cargo xtask` release helpers already
    exist for crates.io publishing).
-2. Tag: `git tag v0.9.9 && git push origin v0.9.9`.
+2. For this candidate, tag the reviewed commit: `git tag -a v0.9.9-rc.1 -m "LXMF-rs v0.9.9-rc.1" && git push origin v0.9.9-rc.1`.
 3. The workflow runs end to end. A manual dry run is available via
    **Actions → Release → Run workflow** (set `publish: false` to build and
    smoke-test everything without publishing).
+4. Promote only the same immutable commit to `v0.9.9` after the RC evidence
+   ledger recommends stable publication.
 
 Pre-release tags containing `-rc`, `-alpha`, `-beta`, or `preview` are
 published as GitHub pre-releases automatically.
@@ -58,7 +59,7 @@ published as GitHub pre-releases automatically.
 |---|---|---|
 | `GITHUB_TOKEN` | Release upload, ghcr push, attestations | Automatic |
 | `AZURE_TENANT_ID`, `AZURE_CLIENT_ID`, `AZURE_CLIENT_SECRET`, `AZURE_TS_ENDPOINT`, `AZURE_TS_ACCOUNT_NAME`, `AZURE_TS_CERT_PROFILE` | Windows/MSI signing via Azure Trusted Signing | Optional — builds are unsigned if absent |
-| `APPLE_CERTIFICATE_BASE64` (p12), `APPLE_CERTIFICATE_PASSWORD`, `APPLE_ID`, `APPLE_APP_PASSWORD`, `APPLE_TEAM_ID` | macOS codesign + notarization | Optional — builds are unsigned if absent |
+| `APPLE_CERTIFICATE_BASE64` (p12), `APPLE_CERTIFICATE_PASSWORD`, `APPLE_ID`, `APPLE_APP_PASSWORD`, `APPLE_TEAM_ID` | macOS codesign (notarization is not currently wired) | Optional — builds are unsigned if absent |
 | `HOMEBREW_TAP_TOKEN` | PAT with write access to `FreeTAKTeam/homebrew-tap` | Optional — tap update skipped if absent |
 
 Every optional integration degrades gracefully: the workflow notices in the log
@@ -79,13 +80,13 @@ cosign verify-blob \
   SHA256SUMS.txt
 
 # 3. Verify build provenance of any file:
-gh attestation verify lxmf-rs_0.9.9_linux-x86_64.tar.gz --owner FreeTAKTeam
+  gh attestation verify lxmf-rs_0.9.9-rc.1_linux-x86_64.tar.gz --owner FreeTAKTeam
 
 # 4. Verify the container image:
-cosign verify ghcr.io/freetakteam/lxmf-rs:0.9.9 \
+  cosign verify ghcr.io/freetakteam/lxmf-rs:0.9.9-rc.1 \
   --certificate-identity-regexp "https://github.com/FreeTAKTeam/LXMF-rs/.*" \
   --certificate-oidc-issuer https://token.actions.githubusercontent.com
-gh attestation verify oci://ghcr.io/freetakteam/lxmf-rs:0.9.9 --owner FreeTAKTeam
+  gh attestation verify oci://ghcr.io/freetakteam/lxmf-rs:0.9.9-rc.1 --owner FreeTAKTeam
 ```
 
 ## Consumer usage
