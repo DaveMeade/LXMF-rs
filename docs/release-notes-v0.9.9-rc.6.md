@@ -1,12 +1,8 @@
-# LXMF-rs v0.9.9-rc.5
+# LXMF-rs v0.9.9-rc.6
 
-> Superseded before publication by `v0.9.9-rc.6`, which refreshes the
-> interop-artifacts manifest for the hosted schema baseline.
-
-This candidate supersedes `v0.9.9-rc.4` for the same RNS 1.4.2 software parity
-scope. It carries the corrected hosted schema-client-generation baseline for
-the pinned OpenAPI Generator 7.20.0 workflow, in addition to the rc4 nFPM RPM
-metadata and WiX executable-harvesting fixes.
+This candidate supersedes `v0.9.9-rc.5` for the same RNS 1.4.2 software parity
+scope. It refreshes the interop-artifacts manifest for the hosted schema-client
+baseline, completing the linked contract checks after the rc5 baseline fix.
 
 The workspace and publishable crate version remains `0.9.9`; the prerelease
 suffix is carried by this GitHub tag. The pinned Reticulum reference is

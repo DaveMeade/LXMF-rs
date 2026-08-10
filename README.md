@@ -4,7 +4,7 @@
 
 Rust monorepo implementing the Reticulum networking stack and LXMF messaging
 stack, with strict library/app boundaries and enterprise quality gates. The
-`0.9.9` workspace packages are being exercised by the `v0.9.9-rc.5` prerelease,
+`0.9.9` workspace packages are being exercised by the `v0.9.9-rc.6` prerelease,
 which targets the pinned RNS 1.4.2 software surface and keeps hardware,
 public-network, and third-party-client evidence explicitly separate.
 
@@ -12,7 +12,7 @@ public-network, and third-party-client evidence explicitly separate.
 
 - Contributor workflow: `CONTRIBUTING.md`
 - Current status and execution order: `docs/status/current-roadmap.md`
-- Release notes: `docs/release-notes-v0.9.9-rc.5.md`
+- Release notes: `docs/release-notes-v0.9.9-rc.6.md`
 - RC evidence ledger: `docs/status/v0.9.9-release-candidate.md`
 - Docs map and retention rules: `docs/README.md`
 - SDK guide: `docs/sdk/README.md`
@@ -21,9 +21,9 @@ public-network, and third-party-client evidence explicitly separate.
 ## Release Status
 
 Latest published stable release: `v0.9.8`. Current release candidate:
-`v0.9.9-rc.5`, with workspace/package version `0.9.9`.
+`v0.9.9-rc.6`, with workspace/package version `0.9.9`.
 
-Use `docs/release-notes-v0.9.9-rc.5.md` for the candidate summary and
+Use `docs/release-notes-v0.9.9-rc.6.md` for the candidate summary and
 `docs/status/v0.9.9-release-candidate.md` for the exact release evidence. The
 repository-level parity source of truth remains
 `docs/status/current-roadmap.md`; the detailed parity supplements are
@@ -187,12 +187,12 @@ cargo run -p xtask -- architecture-checks
 cargo run -p xtask -- sdk-docs-check
 cargo run -p xtask -- sdk-migration-check
 cargo xtask release-check
-cargo xtask package-daemon-bundle --version 0.9.9-rc.5
+cargo xtask package-daemon-bundle --version 0.9.9-rc.6
 cargo xtask api-diff
 cargo xtask python-impl-bench-compare
 cargo xtask python-impl-bench-compare --profile report
 cargo xtask python-impl-bench-report
-cargo xtask public-benchmark --release v0.9.9-rc.5
+cargo xtask public-benchmark --release v0.9.9-rc.6
 ```
 
 For fast local iteration on one binary, prefer narrow commands:
@@ -200,7 +200,7 @@ For fast local iteration on one binary, prefer narrow commands:
 ```bash
 make check-bin PKG=lxmf-cli BIN=lxmd
 make run-bin PKG=rns-tools BIN=rnsd ARGS="--help"
-make package-daemon-bundle VERSION=0.9.9-rc.5
+make package-daemon-bundle VERSION=0.9.9-rc.6
 make python-lxmd-smoke
 ```
 
