@@ -39,7 +39,7 @@ slices. The generated inventory has no remaining partial or unmapped entries;
 the one not-applicable entry is the provenance-backed absent `CRNS` package.
 
 The historical v0.9.8 release record retains its own release-boundary inventory.
-Current `main` and `v0.9.9-rc.1` supersede it with this 1,810/0/1 software
+Current `main` and `v0.9.9-rc.2` supersede it with this 1,810/0/1 software
 inventory. The Rust resource sender enforces the Python
 `receiver_min_consecutive_height` serving window; collision-list regeneration
 and cross-implementation transfer evidence remain narrower follow-up concerns.

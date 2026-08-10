@@ -6,7 +6,7 @@ on:
       release_tag:
         description: Release label for the generated dataset and artifact
         required: true
-        default: v0.9.9-rc.1
+        default: v0.9.9-rc.2
 
 permissions:
   contents: read

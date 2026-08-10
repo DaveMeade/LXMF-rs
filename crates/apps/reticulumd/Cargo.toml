@@ -64,3 +64,8 @@ path = "tests/code_quality_issue_369.rs"
 btleplug = "0.12"
 futures = "0.3.31"
 uuid = "1.16.0"
+
+[target.'cfg(target_os = "linux")'.dependencies]
+# Unify btleplug's Linux dbus dependency with its vendored feature so musl
+# release builds do not try to probe a host glibc dbus installation.
+dbus = { version = "0.9.11", features = ["vendored"] }
