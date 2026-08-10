@@ -1,7 +1,7 @@
 # LXMF-rs v0.9.9-rc.1
 
-> Superseded before publication by `v0.9.9-rc.2` after the tag-triggered Linux
-> x86_64 musl build exposed a portable-release dependency configuration issue.
+> Superseded before publication by `v0.9.9-rc.3` after the tag-triggered Linux
+> musl and Intel macOS release workflow issues were corrected.
 
 This is the RNS 1.4.2 software-parity prerelease for the Rust Reticulum and
 LXMF implementations. The workspace and publishable crate version is `0.9.9`;

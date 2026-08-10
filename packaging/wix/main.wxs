@@ -6,7 +6,7 @@
     retaining the prerelease tag in the output filename:
       wix build packaging/wix/main.wxs -arch x64 \
         -d Version=0.9.9 -d SourceDir=<dir with signed .exe files> \
-        -o lxmf-rs_0.9.9-rc.2_x64.msi
+        -o lxmf-rs_0.9.9-rc.3_x64.msi
   -->
   <Package Name="LXMF-rs"
            Manufacturer="FreeTAKTeam"
