@@ -38,9 +38,9 @@ The project is best described by capability level:
 | Full Python software surface parity | achieved | The strict inventory reports 1,810 complete, 0 partial, and 1 provenance-backed not-applicable entry. |
 | ZeroMQ SDK-access parity | achieved in v0.9.5 implementation | Generated classification and daemon-operation inventory live in `sdk-zmq-parity.json`; release evidence must still pass all gates. |
 
-## v0.9.9-rc.3 Release Candidate
+## v0.9.9-rc.4 Release Candidate
 
-The current candidate is `v0.9.9-rc.3`, with workspace and publishable crate
+The current candidate is `v0.9.9-rc.4`, with workspace and publishable crate
 version `0.9.9`. It is the RNS 1.4.2 software-parity prerelease: the pinned
 Reticulum reference is `b48b96e61676504e0a4e527b33b9a0b4495c6872`, the pinned
 LXMF reference is `727830cefda83d9c6e3982b48675425f3f988f9c`, and the generated
@@ -55,7 +55,7 @@ Weave, VR-N76, BLE, serial-radio, public-I2P/public-Reticulum, and
 third-party-client evidence remains separately tracked and does not become a
 hidden implementation partial.
 
-Candidate notes are in `docs/release-notes-v0.9.9-rc.3.md`; the exact gate,
+Candidate notes are in `docs/release-notes-v0.9.9-rc.4.md`; the exact gate,
 artifact, signing, OCI, and performance record is in
 `docs/status/v0.9.9-release-candidate.md`.
 
@@ -1542,7 +1542,7 @@ Scoped release evidence is split as follows:
 
 ## Remaining Release Blockers
 
-For `v0.9.9-rc.3`, the generated software inventory has no partial or unmapped
+For `v0.9.9-rc.4`, the generated software inventory has no partial or unmapped
 implementation entries. Publication is gated by the exact reviewed commit and
 the following release evidence:
 
@@ -1562,9 +1562,9 @@ this candidate task.
 ## Active Execution Order
 
 1. Reconcile the matrices, release metadata, version files, and exact parity
-   inventory for `v0.9.9-rc.3`.
+   inventory for `v0.9.9-rc.4`.
 2. Run the focused and full local release gates, then commit the reviewed tree.
-3. Tag and push `v0.9.9-rc.3`; inspect the release, pinned-Python, security, and
+3. Tag and push `v0.9.9-rc.4`; inspect the release, pinned-Python, security, and
    performance workflows on that immutable SHA.
 4. Verify artifacts, checksums, attestations, OCI state, and the performance
    dashboard; record the result in the RC ledger.

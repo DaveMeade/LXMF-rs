@@ -21,5 +21,5 @@ contents:
 overrides:
   deb:
     depends: []
-  rpm:
-    group: Applications/Communications
+rpm:
+  group: Applications/Communications

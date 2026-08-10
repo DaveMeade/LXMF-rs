@@ -61,7 +61,7 @@ cargo xtask python-impl-bench-report
 Public release artifact:
 
 ```bash
-cargo xtask public-benchmark --release v0.9.9-rc.3
+cargo xtask public-benchmark --release v0.9.9-rc.4
 ```
 
 This command runs the full report and writes the canonical JSON, standalone

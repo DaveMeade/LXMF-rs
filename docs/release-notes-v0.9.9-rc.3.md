@@ -1,5 +1,8 @@
 # LXMF-rs v0.9.9-rc.3
 
+> Superseded before publication by `v0.9.9-rc.4`, which corrects the nFPM RPM
+> metadata schema and WiX executable harvesting used by the hosted package jobs.
+
 This candidate supersedes `v0.9.9-rc.2` for the same RNS 1.4.2 software parity
 scope. The second tag built every Linux and Windows target, but its Intel
 macOS job remained queued on the retired `macos-13` runner label. This

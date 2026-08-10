@@ -6,7 +6,7 @@
     retaining the prerelease tag in the output filename:
       wix build packaging/wix/main.wxs -arch x64 \
         -d Version=0.9.9 -d SourceDir=<dir with signed .exe files> \
-        -o lxmf-rs_0.9.9-rc.3_x64.msi
+        -o lxmf-rs_0.9.9-rc.4_x64.msi
   -->
   <Package Name="LXMF-rs"
            Manufacturer="FreeTAKTeam"
@@ -23,7 +23,7 @@
 
     <!-- WiX v4/v5 directory harvesting: one component per .exe in SourceDir. -->
     <ComponentGroup Id="ProductComponents" Directory="INSTALLFOLDER">
-      <Files Directory="$(var.SourceDir)" Include="*.exe" />
+      <Files Include="$(var.SourceDir)\*.exe" />
     </ComponentGroup>
 
     <Feature Id="Main" Title="LXMF-rs command-line tools" Level="1">
