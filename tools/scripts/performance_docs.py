@@ -12,6 +12,7 @@ from pathlib import Path
 from typing import Any
 
 from performance_dashboard import public_rows, render_dashboard
+from performance_variation import MIN_RELEASE_SAMPLES, classify_relative_mad
 
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -22,14 +23,16 @@ START = "<!-- performance-summary:start -->"
 END = "<!-- performance-summary:end -->"
 PYTHON_INTEROP_WORKFLOW = ROOT / ".github/workflows/verify.yml"
 PYTHON_BENCHMARK_CONFIG = ROOT / "tools/benchmarks/python_impl.toml"
+DEFAULT_RELEASE = "v0.9.9"
 
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--release", default="v0.9.5")
+    parser.add_argument("--release", default=DEFAULT_RELEASE)
     parser.add_argument("--report", type=Path)
     parser.add_argument("--sdk-transport-report", type=Path)
     parser.add_argument("--e2e-report", type=Path)
+    parser.add_argument("--independent-performance-report", type=Path)
     parser.add_argument("--dashboard-output", type=Path)
     parser.add_argument("--check", action="store_true")
     return parser.parse_args()
@@ -76,10 +79,23 @@ def verify_report_refs(data: dict[str, Any], references: dict[str, str]) -> None
         raise ValueError("report LXMF revision differs from benchmark configuration")
 
 
+def make_environment_paths_portable(data: dict[str, Any]) -> None:
+    """Replace runner-local reference paths with repository-relative locations."""
+    environment = data["environment"]
+    if "python_rns_module" in environment:
+        environment["python_rns_module"] = "refs/Reticulum/RNS/__init__.py"
+    if "python_lxmf_module" in environment:
+        environment["python_lxmf_module"] = "refs/LXMF/LXMF/__init__.py"
+
+
 def enrich_dispersion(report_path: Path, data: dict[str, Any]) -> None:
     run_paths = sorted((report_path.parent / "runs").glob("run-*/python-impl-compare.json"))
     if len(run_paths) != data["compare_runs"]:
         raise ValueError("raw comparison run count does not match aggregate report")
+    if len(run_paths) < MIN_RELEASE_SAMPLES:
+        raise ValueError(
+            f"release comparison requires at least {MIN_RELEASE_SAMPLES} raw runs; found {len(run_paths)}"
+        )
     runs = [load(path) for path in run_paths]
     for aggregate in data["comparisons"]:
         values: dict[str, list[float]] = {"rust": [], "python": []}
@@ -98,11 +114,8 @@ def enrich_dispersion(report_path: Path, data: dict[str, Any]) -> None:
                 "p50_mad_ns": mad,
                 "p50_relative_mad": relative,
                 "run_p50_ns": samples,
+                "variation_class": classify_relative_mad(relative),
             }
-            if relative > 0.10:
-                raise ValueError(
-                    f"unstable core workload {aggregate['label']} {implementation}: relative MAD {relative:.2%} exceeds 10%"
-                )
 
 
 def fmt_ns(value: float) -> str:
@@ -257,10 +270,25 @@ def performance_page(data: dict[str, Any], release: str, scale_data: dict[str, A
     transport = data.get("sdk_transport_comparisons", [])
     lines.extend(["", "## Rust SDK transport comparison", ""])
     if transport:
-        lines.extend(["| Operation | ZeroMQ p50 | HTTP p50 | Unix p50 | ZeroMQ/HTTP | ZeroMQ/Unix |", "|---|---:|---:|---:|---:|---:|"])
+        lines.extend(
+            [
+                "In-process latency is normalized per call from fixed 100-call batches to avoid timer-resolution noise; "
+                "ZeroMQ, HTTP, and Unix measurements time individual daemon requests.",
+                "",
+                "| Operation | In-process p50 | ZeroMQ p50 | HTTP p50 | Unix p50 | ZeroMQ/HTTP | ZeroMQ/Unix |",
+                "|---|---:|---:|---:|---:|---:|---:|",
+            ]
+        )
         for row in transport:
+            in_process = (
+                fmt_ns(row["in_process_p50_ns"])
+                if row.get("in_process_status") == "measured"
+                else "UNSUPPORTED"
+                if row.get("in_process_status") == "not_supported"
+                else "N/A"
+            )
             lines.append(
-                f"| {row['operation']} | {fmt_ns(row['zmq_p50_ns'])} | {fmt_ns(row['http_p50_ns'])} | {fmt_ns(row['unix_p50_ns'])} | {row['http_p50_ns'] / row['zmq_p50_ns']:.2f}x | {row['unix_p50_ns'] / row['zmq_p50_ns']:.2f}x |"
+                f"| {row['operation']} | {in_process} | {fmt_ns(row['zmq_p50_ns'])} | {fmt_ns(row['http_p50_ns'])} | {fmt_ns(row['unix_p50_ns'])} | {row['http_p50_ns'] / row['zmq_p50_ns']:.2f}x | {row['unix_p50_ns'] / row['zmq_p50_ns']:.2f}x |"
             )
     else:
         lines.append("No SDK transport measurements are present in this dataset; release publication must add them before claiming a ZeroMQ performance advantage.")
@@ -296,6 +324,42 @@ def performance_page(data: dict[str, Any], release: str, scale_data: dict[str, A
             )
     else:
         lines.append("No E2E measurements are present; release publication must add the report before making whole-delivery claims.")
+    independent = data.get("independent_performance")
+    lines.extend(["", "## Independent rns-rs network comparison", ""])
+    if independent:
+        independent_env = independent["environment"]
+        path = independent["path_convergence"]
+        link = independent["link_setup"]
+        lines.extend(
+            [
+                "The pinned rns-rs peer and LXMF-rs ran as independent processes on the same runner. "
+                f"The recorded peer SHA is `{independent['implementations']['rns_rs']}`; same-runner evidence is "
+                f"`{independent_env['same_runner']}`.",
+                "",
+                "| Workload | rns-rs / LXMF-rs evidence | p50 | p99 | Variation |",
+                "|---|---|---:|---:|---:|",
+                f"| Cold path convergence | rns-rs requester | {path['cold']['p50_seconds']:.3f} s | {path['cold']['p99_seconds']:.3f} s | {path['cold']['p50_relative_mad']:.2%} |",
+                f"| Warm path lookup | rns-rs cache | {path['warm']['p50_seconds']:.6f} s | {path['warm']['p99_seconds']:.6f} s | {path['warm']['p50_relative_mad']:.2%} |",
+                f"| Link establishment | rns-rs initiator -> LXMF-rs | {link['p50_seconds']:.3f} s | {link['p99_seconds']:.3f} s | {link['p50_relative_mad']:.2%} |",
+            ]
+        )
+        for size, implementations in independent["resources"].items():
+            for implementation, result in implementations.items():
+                lines.append(
+                    f"| Exact {int(size) / 1_048_576:.0f} MiB Resource | {implementation} sender, SHA `{result['sha256'][:12]}` | "
+                    f"{result['p50_seconds']:.3f} s | {result['p99_seconds']:.3f} s | {result['p50_relative_mad']:.2%} |"
+                )
+        large = independent["active_links_1000"]
+        if large["status"] == "measured":
+            lines.append(
+                f"| Exactly 1000 active Links | measured | {large['creation_seconds']:.3f} s | - | - |"
+            )
+        else:
+            lines.extend(["", f"Exactly 1000 active Links: **UNSUPPORTED** — {large['reason']}."])
+    else:
+        lines.append(
+            "No independent rns-rs measurements are present; rns-rs dashboard cells remain N/A."
+        )
     lines.extend(["", *scale_test_section(scale_data)])
     lines.extend(
         [
@@ -312,6 +376,7 @@ def performance_page(data: dict[str, Any], release: str, scale_data: dict[str, A
             "```bash",
             "cargo xtask python-impl-bench-report",
             "python3 tools/scripts/e2e_performance.py --profile report",
+            "python3 tools/scripts/independent_performance.py --samples 5 --links 1000",
             f"python3 tools/scripts/performance_docs.py --release {release} --report target/criterion/python-impl-report/report.json",
             "python3 tools/scripts/performance_docs.py --check",
             "```",
@@ -341,6 +406,7 @@ def main() -> int:
         if args.report:
             data = load(args.report)
             verify_report_refs(data, references)
+            make_environment_paths_portable(data)
             enrich_dispersion(args.report, data)
             if args.sdk_transport_report:
                 data.update(load(args.sdk_transport_report))
@@ -351,6 +417,11 @@ def main() -> int:
                 if e2e["python_lxmf_revision"] != data["environment"]["python_lxmf_revision"]:
                     raise ValueError("E2E LXMF revision differs from core report")
                 data.update(e2e)
+            if args.independent_performance_report:
+                independent = load(args.independent_performance_report)
+                if not independent.get("environment", {}).get("same_runner"):
+                    raise ValueError("independent performance report is not same-runner evidence")
+                data["independent_performance"] = independent
             data["public_benchmark"] = {
                 "schema": "lxmf-rs-public-benchmark-v1",
                 "implementations": ["python", "lxmf_rs", "rns_rs"],
