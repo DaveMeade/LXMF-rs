@@ -1,6 +1,6 @@
 # Current Roadmap Status
 
-Last reassessed: 2026-08-12
+Last reassessed: 2026-08-13
 
 This file is the repository-level source of truth for parity posture, release
 confidence, and execution order. Detailed row-level status lives in:
@@ -37,8 +37,8 @@ The project is best described by capability level:
 | Operationally substitutable | achieved against RNS 1.4.2 | The software-controlled runtime includes the focused 1.4.2 routing, policy, and `rngit` repository-service slices. |
 | Full Python software surface parity | achieved | The strict inventory reports 1,810 complete, 0 partial, and 1 provenance-backed not-applicable entry. |
 | ZeroMQ SDK-access parity | achieved in v0.9.5 implementation | Generated classification and daemon-operation inventory live in `sdk-zmq-parity.json`; release evidence must still pass all gates. |
-| Independent implementation evidence | hosted exact-SHA Actions evidence published; release attachment pending merge/tag | Pinned rns-rs and Reticulum-Go release profiles cover two-node/multi-hop behavior; rns-rs additionally covers mixed/all-Rust five-node chains, routing policy, restart, shared daemon, exact large Resources, and deterministic chaos. Explicit peer divergences remain failures owned by the peer and are allowlisted narrowly by CI. |
-| Performance evidence | five-sample workflow and regression gate passed; release attachment pending merge/tag | Exact-SHA run `31550356625` produced checksummed JSON, HTML, and 4,031-entry raw evidence. The gate passed without warnings: throughput `1.005x`, CPU `0.996x`, and peak RSS `1.072x` versus the same-runner v0.9.1 baseline. |
+| Independent implementation evidence | published for stable `v0.9.9` | Pinned rns-rs and Reticulum-Go release profiles cover two-node/multi-hop behavior; rns-rs additionally covers mixed/all-Rust five-node chains, routing policy, restart, shared daemon, exact large Resources, and deterministic chaos. Explicit peer divergences remain failures owned by the peer and are allowlisted narrowly by CI. |
+| Performance evidence | published for stable `v0.9.9` | The stable release includes checksummed JSON, HTML, and raw evidence. The five-sample regression gate passed without warnings: throughput `1.005x`, CPU `0.996x`, and peak RSS `1.072x` versus the same-runner v0.9.1 baseline. |
 
 The independent evidence axis is documented in [`docs/interop`](../interop/README.md).
 It does not promote Python parity rows, third-party clients, physical interfaces,
@@ -46,26 +46,29 @@ or public-network soak. Pull requests run the bounded rns-rs profile; nightly an
 release tiers add both peers, expanded chaos, exact 50 MiB transfers, raw logs,
 and standalone JSON/Markdown/HTML artifacts.
 
-The canonical post-rc performance dataset is
+The canonical stable performance dataset is
 [`docs/performance/v0.9.9.json`](../performance/v0.9.9.json), with the standalone
 dashboard at [`docs/performance/v0.9.9.html`](../performance/v0.9.9.html). It
 records candidate `7199c4038a3ba786abb4dfbc95cbd6cd16ed9116`, five interleaved
 comparison runs, five independent peer samples, exact 1 MiB and 50 MiB
 Resource measurements, all SDK transport surfaces, and the explicit bounded
-1000-Link unsupported result. The passing hosted workflow is
-[`31550356625`](https://github.com/FreeTAKTeam/LXMF-rs/actions/runs/31550356625).
-Final release attachment remains tag-triggered and must use the eventual tag's
-exact commit; this evidence is not attached retroactively to `v0.9.9-rc.6`.
+1000-Link unsupported result. The stable tag workflows for
+[independent interoperability](https://github.com/FreeTAKTeam/LXMF-rs/actions/runs/31595565333)
+and [performance](https://github.com/FreeTAKTeam/LXMF-rs/actions/runs/31595565193)
+passed on the immutable release commit, and their public artifacts are attached
+to the [`v0.9.9` release](https://github.com/FreeTAKTeam/LXMF-rs/releases/tag/v0.9.9).
 
-## v0.9.9 Stable Release Preparation
+## v0.9.9 Stable Release
 
-The reviewed RNS 1.4.2 parity and independent-evidence work is merged on
-`main`, and the workspace and publishable crate version is `0.9.9`. Stable
-release notes are in [`docs/release-notes-v0.9.9.md`](../release-notes-v0.9.9.md).
-The immutable `v0.9.9` tag is the final truth owner for bundle, OCI, crates.io,
-independent-interoperability, and performance publication; those outcomes must
-be verified from the tag workflows before the stable release is declared
-complete.
+`v0.9.9` is the current stable release. The immutable tag resolves to
+`51fd3beebdace78d6c7f38748c6bcfe452032559`, and its CI, Verify, Release,
+independent-interoperability, performance, leader-readiness, and crates.io
+publication workflows passed. The
+[`v0.9.9` release](https://github.com/FreeTAKTeam/LXMF-rs/releases/tag/v0.9.9)
+publishes 35 assets spanning host archives, native packages, checksums, SBOMs,
+provenance, and standalone interoperability/performance evidence. Stable
+release notes are in
+[`docs/release-notes-v0.9.9.md`](../release-notes-v0.9.9.md).
 
 The software-parity boundary remains 1,811 generated entries: 1,810 applicable
 and complete, zero partial, zero unmapped, and one provenance-backed
@@ -95,7 +98,7 @@ artifact, signing, OCI, and performance record is in
 
 ## v0.9.8 Historical Release
 
-v0.9.8 is the published stable release over the v0.9.7 baseline. Its release
+v0.9.8 is a historical stable release over the v0.9.7 baseline. Its release
 notes and candidate ledger remain historical records of the exact v0.9.8
 boundary, including its original resource-transfer, MTU, propagation, SDK
 deadline, lock-scope, metadata, cancellation, and compression evidence.
@@ -113,7 +116,7 @@ length-delimited block itself (prefixed to segment 1 alone). This is a
 row-level increment recorded in `docs/status/reticulum-parity-matrix.md`; no
 capability status in the table above changes.
 
-The v0.9.8 release record is not the active gate for this RC. Its historical
+The v0.9.8 release record is not the active stable-release record. Its historical
 candidate notes live in `docs/release-notes-v0.9.8.md`; its evidence ledger is
 `docs/status/v0.9.8-release-candidate.md`.
 
@@ -1574,36 +1577,29 @@ Scoped release evidence is split as follows:
   route, extending scoped daemon path-request dispatch/result evidence beyond
   local Rust-only mesh smokes.
 
-## Remaining Release Blockers
+## Current Release State
 
-For `v0.9.9-rc.6`, the generated software inventory has no partial or unmapped
-implementation entries. Publication is gated by the exact reviewed commit and
-the following release evidence:
-
-- the complete local release gate, including the exact inventory target;
-- hosted CI, security, documentation, and release-scorecard checks;
-- pinned-Python interoperability on the exact tagged commit;
-- successful tag-triggered release and performance workflows;
-- verified release assets, checksums, SBOMs, provenance, OCI publication, and
-  optional signing outcomes.
+Stable `v0.9.9` publication is complete. The exact tag workflows, 35 release
+assets, checksums, SBOMs, provenance, OCI publication, independent
+interoperability reports, performance reports, and crates.io packages were
+published for the immutable release commit.
 
 Physical RNode/RNodeMulti, Weave, VR-N76, BLE, serial-radio, public I2P,
 public Reticulum networks, and Sideband/MeshChatX/Columba or other
 third-party-client claims remain separate deferred evidence tracks. They do not
-block this software RC. Final stable `v0.9.9` publication is explicitly outside
-this candidate task.
+downgrade the completed software inventory and must not be described as
+validated without their own evidence.
 
 ## Active Execution Order
 
-1. Reconcile the matrices, release metadata, version files, and exact parity
-   inventory for `v0.9.9-rc.6`.
-2. Run the focused and full local release gates, then commit the reviewed tree.
-3. Tag and push `v0.9.9-rc.6`; inspect the release, pinned-Python, security, and
-   performance workflows on that immutable SHA.
-4. Verify artifacts, checksums, attestations, OCI state, and the performance
-   dashboard; record the result in the RC ledger.
-5. Recommend readiness for the prerelease only; defer stable promotion until a
-   separate decision and evidence review.
+1. Keep the generated RNS 1.4.2 inventory and both parity matrices at zero
+   partial or unmapped software entries as maintenance changes land.
+2. Preserve exact-SHA Python-reference, independent-interoperability, and
+   performance evidence for release-facing changes.
+3. Treat physical hardware, public-network operation, and third-party clients
+   as separate evidence programs for the v1.0 boundary.
+4. Use the maintained release-readiness and release runbooks for the next
+   version instead of reopening the historical rc.6 checklist.
 
 ## Verification Baseline
 

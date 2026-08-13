@@ -1,93 +1,113 @@
 # Documentation Map
 
-Not every file under `docs/` serves the same purpose. Some files are maintained
-guidance, while others are contracts, fixtures, schemas, or generated baselines
-consumed by tests and tooling.
+The documentation tree contains maintained guidance, public contracts,
+generated baselines, and historical release records. Use this page to choose
+the current source of truth instead of relying on similarly named historical
+documents.
 
-## Source-of-Truth Docs
+## Start here
 
-These are the first places to update when behavior changes:
+- [Getting started](getting-started.md): install, build, run, and validate the
+  project.
+- [Workspace and package guide](project-layout.md): active crates, binaries,
+  embedded surfaces, and dependency boundaries.
+- [Current roadmap](status/current-roadmap.md): repository-wide parity posture,
+  release confidence, evidence boundaries, and execution order.
+- [SDK integration guide](sdk/README.md): supported application integration
+  path.
+- [Checked examples](examples.md): daemon, SDK, transport, and validation
+  examples.
 
-- `docs/status/current-roadmap.md`: repository-level posture, blockers, and
-  execution order
-- `docs/status/reticulum-parity-matrix.md`: maintained Reticulum row-level
-  parity status
-- `docs/status/lxmf-parity-matrix.md`: maintained LXMF row-level parity status
-- `docs/interop/README.md`: independent implementation evidence ledger and
-  versioned reports
-- `docs/performance.md`: generated current performance methodology and results
-- `docs/status/v0.9.9-release-candidate.md`: active release-candidate
-  requirements, findings, and release evidence
-- `docs/contracts/`: public contracts, compatibility policy, support policy, API
-  behavior, and protocol-facing guarantees
-- `docs/interfaces/`: interface-specific configuration and usage guidance for
-  transport surfaces that are not primarily operator runbooks
-- `docs/sdk/`: integration guidance for embedding `lxmf-sdk`
-- `docs/runbooks/`: operator and release procedures
-- `docs/architecture/`: active architecture policy and governance docs
-- `docs/adr/`: architecture decisions that explain why major directions exist
+## Sources of truth
 
-## Code-Adjacent Artifacts
+Update these documents when their corresponding behavior changes:
 
-These are documentation-shaped files, but they are also consumed by tests,
-tooling, code generation, or CI:
+- [Current roadmap](status/current-roadmap.md): repository-level status and
+  execution order.
+- [Reticulum parity matrix](status/reticulum-parity-matrix.md): maintained
+  Reticulum row-level parity status.
+- [LXMF parity matrix](status/lxmf-parity-matrix.md): maintained LXMF row-level
+  parity status.
+- [Software parity ledger](status/software-parity-ledger.md): implementation
+  work packets and evidence ownership.
+- [Independent interoperability evidence](interop/README.md): versioned rns-rs
+  and Reticulum-Go evidence.
+- [Performance report](performance.md): current methodology and generated
+  results.
+- [v0.9.9 release notes](release-notes-v0.9.9.md): current stable release
+  summary. The historical rc.6 evidence remains in the
+  [candidate ledger](status/v0.9.9-release-candidate.md).
+- [Contracts](contracts/): public compatibility, support, API, payload, RPC,
+  and protocol guarantees.
+- [Interfaces](interfaces/): interface-specific configuration and integration
+  guidance.
+- [Runbooks](runbooks/): operator, verification, and release procedures.
+- [Architecture](architecture/): active architecture policy and governance.
+- [Architecture decisions](adr/): rationale for major design directions.
 
-- `docs/schemas/`
-- `docs/fixtures/`
-- `docs/openrpc/`
-- `docs/contracts/baselines/`
+## Integration and operation
 
-Treat changes here with the same care you would apply to source code. Do not
-delete these just because they are not linked from the root `README.md`.
+- [SDK guide](sdk/README.md)
+- [SDK quickstart](sdk/quickstart.md)
+- [API surface and stability](lxmf-rs-api.md)
+- [CLI quick reference](lxmf-cli.md)
+- [`lxmd` systemd deployment](runbooks/lxmd-systemd.md)
+- [`reticulumd` operational deployment](runbooks/reticulumd-operational-deployment.md)
+- [Logging and diagnostics](runbooks/logging-and-diagnostics.md)
+- [SDK configuration cookbook](runbooks/sdk-config-cookbook.md)
+- [Meshtastic tunnel interface](interfaces/meshtastic.md)
+- [RNode Bluetooth Classic/SPP interface](interfaces/rnode-spp.md)
 
-## Historical and Change-Management Docs
+## Contracts and architecture
 
-`docs/migrations/` contains retained cutover guidance for users crossing public
-API or architecture boundaries. Completed implementation plans and issue boards
-are kept in Git history instead of the live documentation tree.
+- [Architecture overview](architecture/overview.md)
+- [JSON and wire-field mapping](architecture/json-lxmf-fields.md)
+- [Compatibility contract](contracts/compatibility-contract.md)
+- [Compatibility matrix](contracts/compatibility-matrix.md)
+- [Third-party compatibility kit](contracts/third-party-compatibility-kit.md)
+- [Support and LTS policy](contracts/support-policy.md)
+- [Extension registry](contracts/extension-registry.md)
+- [RPC contract](contracts/rpc-contract.md)
+- [Payload contract](contracts/payload-contract.md)
 
-## Directory Guide
+## Release and evidence
 
-- `docs/status/current-roadmap.md`: current repo-wide posture and execution order
-- `docs/status/reticulum-parity-matrix.md`: current Reticulum parity rows
-- `docs/status/lxmf-parity-matrix.md`: current LXMF parity rows
-- `docs/sdk/README.md`: starting point for SDK integrators
-- `docs/examples.md`: checked commands and Rust integration examples
-- `docs/lxmf-rs-api.md`: API surface and stability summary
-- `docs/lxmf-cli.md`: operator CLI quick reference
-- `docs/interfaces/meshtastic.md`: Meshtastic tunnel configuration and library
-  integration guide
-- `docs/interfaces/rnode-spp.md`: RNode Bluetooth Classic/SPP transport
-  contract and backend guidance
-- `docs/PerformancesComparison.html`: retained historical performance snapshot;
-  use the benchmarking runbook and [the latest release dashboard](https://github.com/FreeTAKTeam/LXMF-rs/releases/latest/download/lxmf-rs-performance.html) for current measurements
-- `docs/runbooks/release-readiness.md`: release gate checklist
-- `docs/runbooks/logging-and-diagnostics.md`: operator logging knobs and
-  contributor failure-visibility rules
-- `docs/release-notes-v0.9.9-rc.6.md`: current release-candidate notes
-- `docs/release-notes-v0.9.9-rc.5.md`: superseded candidate notes
-- `docs/release-notes-v0.9.9-rc.4.md`: superseded candidate notes
-- `docs/release-notes-v0.9.9-rc.3.md`: superseded candidate notes
-- `docs/release-notes-v0.9.9-rc.2.md`: superseded candidate notes
-- `docs/release-notes-v0.9.9-rc.1.md`: superseded candidate notes
-- `docs/release-notes-v0.9.8.md` and
-  `docs/status/v0.9.8-release-candidate.md`: historical v0.9.8 release record
-- `docs/runbooks/reticulumd-operational-deployment.md`: daemon deployment,
-  probes, shutdown, and service manager examples
-- `docs/runbooks/crates-io-publish-plan.md`: crates.io naming, versioning, and publish order
-- `docs/contracts/support-policy.md`: support and lifecycle guarantees
-- `docs/architecture/overview.md`: architecture entry point
-- `docs/architecture/json-lxmf-fields.md`: JSON-to-MessagePack and field-id details
+- [Latest GitHub release](https://github.com/FreeTAKTeam/LXMF-rs/releases/latest)
+- [v0.9.9 release notes](release-notes-v0.9.9.md)
+- [Release readiness](runbooks/release-readiness.md)
+- [Release process](RELEASING.md)
+- [crates.io publication plan](runbooks/crates-io-publish-plan.md)
+- [Independent implementation evidence](interop/README.md)
+- [Current performance report](performance.md)
+- [Latest public performance dashboard](https://github.com/FreeTAKTeam/LXMF-rs/releases/latest/download/lxmf-rs-performance.html)
+- [Historical performance snapshot](PerformancesComparison.html)
 
-## Retention Rules
+## Code-adjacent artifacts
 
-- Prefer one maintained doc over several overlapping notes.
-- When you add a new canonical doc, remove the superseded one in the same PR.
-- Keep completed implementation plans in Git history rather than maintaining a
-  second status or roadmap system.
-- Keep file paths portable. Do not commit `/Users/...` or other local absolute
-  paths.
-- Link from broad entry points (`README.md`, this file, package READMEs) to the
-  current source-of-truth docs so stale notes do not become the default.
-- If you are unsure whether a file is active, search for references in code,
-  `xtask`, workflows, and other docs before deleting it.
+The following directories contain documentation-shaped files that are consumed
+by tests, code generation, or CI. Treat changes to them with the same care as
+source changes:
+
+- [`docs/schemas`](schemas/)
+- [`docs/fixtures`](fixtures/)
+- [`docs/openrpc`](openrpc/)
+- [`docs/contracts/baselines`](contracts/baselines/)
+
+## Historical and migration material
+
+[Migration guides](migrations/) are retained for users crossing public API or
+architecture boundaries. Superseded release-candidate notes and evidence
+ledgers are historical records; they do not override the current roadmap or
+stable release notes. Completed implementation plans and issue boards belong
+in Git history instead of the live documentation tree.
+
+## Retention rules
+
+- Prefer one maintained document over several overlapping notes.
+- When adding a canonical document, remove or clearly mark the superseded one
+  in the same change.
+- Keep file paths portable; do not commit machine-local absolute paths.
+- Link broad entry points to current sources of truth so historical notes do
+  not become the default.
+- Before deleting documentation, search code, workflows, `xtask`, and other
+  docs for consumers.
