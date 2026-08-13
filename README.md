@@ -12,6 +12,23 @@ LXMF-rs is a Rust implementation of the
 provides reusable libraries, a typed SDK, host daemons and command-line tools,
 plus embedded and FFI surfaces.
 
+
+<!-- performance-summary:start -->
+## Measured performance
+
+Release dataset: `v0.9.9` at `7199c4038a3ba786abb4dfbc95cbd6cd16ed9116`; Python Reticulum `b48b96e61676` and LXMF `727830cefda8`.
+
+| Matched workload | Rust p50 | Python p50 | Rust/Python |
+|---|---:|---:|---:|
+| LXMF message decode | 285 ns | 8.33 ms | 29222.35x |
+| LXMF message encode | 370 ns | 2.17 ms | 5864.16x |
+| LXMF large message decode | 455 ns | 8.31 ms | 18252.45x |
+| LXMF large message encode | 762 ns | 2.19 ms | 2869.52x |
+
+These are matched-workload comparisons. See [methodology, complete results, variability, and limitations](docs/performance.md).
+<!-- performance-summary:end -->
+
+
 ## Current status
 
 The latest stable release is
@@ -115,21 +132,6 @@ full gate and evidence boundaries.
 - [Performance methodology and results](docs/performance.md)
 - [Support and LTS policy](docs/contracts/support-policy.md)
 - [Security policy](SECURITY.md)
-
-<!-- performance-summary:start -->
-## Measured performance
-
-Release dataset: `v0.9.9` at `7199c4038a3ba786abb4dfbc95cbd6cd16ed9116`; Python Reticulum `b48b96e61676` and LXMF `727830cefda8`.
-
-| Matched workload | Rust p50 | Python p50 | Rust/Python |
-|---|---:|---:|---:|
-| LXMF message decode | 285 ns | 8.33 ms | 29222.35x |
-| LXMF message encode | 370 ns | 2.17 ms | 5864.16x |
-| LXMF large message decode | 455 ns | 8.31 ms | 18252.45x |
-| LXMF large message encode | 762 ns | 2.19 ms | 2869.52x |
-
-These are matched-workload comparisons, not a claim of whole-system superiority. See [methodology, complete results, variability, and limitations](docs/performance.md).
-<!-- performance-summary:end -->
 
 ## License
 
