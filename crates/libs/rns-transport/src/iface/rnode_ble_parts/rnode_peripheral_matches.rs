@@ -46,15 +46,15 @@ where
         self.backend.subscribe_notifications().await.map_err(|message| {
             RnodeBleKissError::Backend { operation: "subscribe_notifications", message }
         })?;
-        #[cfg(feature = "rnode-ble")]
-        self.drain_startup_notifications().await?;
+        if self.backend.drains_stale_startup_notifications() {
+            self.drain_startup_notifications().await?;
+        }
         let writes = self.session.startup_frames();
         self.write_all(writes, "startup_write").await?;
         self.connected = true;
         Ok(())
     }
 
-    #[cfg(feature = "rnode-ble")]
     pub async fn send_deferred_frames(&mut self) -> Result<(), RnodeBleKissError> {
         let writes = self.session.deferred_frames();
         self.write_all(writes, "deferred_frames_write").await
@@ -93,7 +93,22 @@ where
         prefix_frames: Vec<Vec<u8>>,
     ) -> Result<(), RnodeBleKissError> {
         let writes = self.session.shutdown_frames_with_prefix(prefix_frames);
-        self.write_all(writes, "shutdown_write").await
+        let write_result = self.write_all(writes, "shutdown_write").await;
+        let close_result = self.backend.close().await.map_err(|message| RnodeBleKissError::Backend {
+            operation: "close",
+            message,
+        });
+        self.connected = false;
+        write_result.and(close_result)
+    }
+
+    pub async fn close(&mut self) -> Result<(), RnodeBleKissError> {
+        let result = self.backend.close().await.map_err(|message| RnodeBleKissError::Backend {
+            operation: "close",
+            message,
+        });
+        self.connected = false;
+        result
     }
 
     pub async fn poll_notification(&mut self) -> Result<Vec<Vec<u8>>, RnodeBleKissError> {
@@ -103,12 +118,18 @@ where
     pub async fn poll_notification_events(
         &mut self,
     ) -> Result<RnodeBleNotification, RnodeBleKissError> {
+        Ok(self.poll_optional_notification_events().await?.unwrap_or_default())
+    }
+
+    pub(crate) async fn poll_optional_notification_events(
+        &mut self,
+    ) -> Result<Option<RnodeBleNotification>, RnodeBleKissError> {
         let Some(payload) = self.backend.next_notification().await.map_err(|message| {
             self.connected = false;
             RnodeBleKissError::Backend { operation: "next_notification", message }
         })?
         else {
-            return Ok(RnodeBleNotification::default());
+            return Ok(None);
         };
         {
             let hex: String = payload
@@ -121,7 +142,7 @@ where
         let notification = self.session.accept_notification_events(&payload)?;
         let writes = self.session.take_pending_writes();
         self.write_all(writes, "write_pending").await?;
-        Ok(notification)
+        Ok(Some(notification))
     }
 
     async fn write_all(
