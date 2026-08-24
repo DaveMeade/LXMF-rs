@@ -80,6 +80,32 @@ impl InterfaceMode {
 pub struct AnnounceBroadcastPolicy {
     pub local_destination: bool,
     pub next_hop_iface_mode: Option<InterfaceMode>,
+    /// The next-hop interface's `announces_to_internal`, mirroring the
+    /// reference's `from_interface.announces_to_internal`. `None` is the
+    /// reference default (`Interface.py`: `self.announces_to_internal =
+    /// None`); `Some(true)` lets an announce that arrived over a boundary
+    /// interface still cross onto an internal one.
+    pub next_hop_announces_to_internal: Option<bool>,
+}
+
+impl AnnounceBroadcastPolicy {
+    /// Reads the next hop's routing attributes off `manager`, mirroring the
+    /// reference's `from_interface` lookup in `Transport.py`'s announce
+    /// ladder. `next_hop` is `None` when the destination has no path on file,
+    /// which is itself one of the ladder's rungs.
+    pub fn for_next_hop(
+        manager: &InterfaceManager,
+        next_hop: Option<AddressHash>,
+        local_destination: bool,
+    ) -> Self {
+        Self {
+            local_destination,
+            next_hop_iface_mode: next_hop.and_then(|iface| manager.mode(&iface)),
+            next_hop_announces_to_internal: next_hop
+                .and_then(|iface| manager.shared_config(&iface))
+                .and_then(|config| config.announces_to_internal),
+        }
+    }
 }
 
 #[derive(Debug, Default, PartialEq, Clone)]
@@ -88,6 +114,16 @@ pub struct InterfaceSharedConfig {
     pub announce_rate_grace: Option<u64>,
     pub announce_rate_penalty: Option<u64>,
     pub bootstrap_only: Option<bool>,
+    /// Whether this interface will carry a non-local announce whose next hop
+    /// is an internal-mode interface. The reference's per-interface
+    /// `announces_from_internal` (`Interface.py`, default `True`), read in
+    /// `Transport.py`'s announce ladder. `None` means the default, `true`.
+    pub announces_from_internal: Option<bool>,
+    /// Whether an announce that arrived over *this* interface may cross onto
+    /// an internal-mode interface even when this one is a boundary. The
+    /// reference's per-interface `announces_to_internal` (`Interface.py`,
+    /// default `None`), read via `from_interface` in the same ladder.
+    pub announces_to_internal: Option<bool>,
     pub ifac_size: Option<u64>,
     pub network_name: Option<String>,
     pub passphrase: Option<String>,

@@ -83,6 +83,7 @@ impl InterfaceManager {
                             should_send = allows_announce_broadcast(
                                 &message.packet,
                                 iface.mode,
+                                iface.shared_config.announces_from_internal,
                                 announce_policy,
                             );
                         }
