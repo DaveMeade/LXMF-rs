@@ -24,6 +24,13 @@ async fn held_udp_announce_preserves_peer_source_for_unicast_route() {
         DestinationName::new("lxmf", "delivery"),
     );
     let first_announce = first_destination.announce(OsRng, None).expect("first announce");
+    assert!(super::announce::admit_announce_before_queue(
+        &first_announce,
+        &handler,
+        iface,
+        crate::iface::IfaceSource::Udp(first_peer),
+    )
+    .await);
     handle_announce(
         &first_announce,
         handler.lock().await,
@@ -55,13 +62,13 @@ async fn held_udp_announce_preserves_peer_source_for_unicast_route() {
         DestinationName::new("lxmf", "delivery"),
     );
     let held_announce = held_destination.announce(OsRng, None).expect("held announce");
-    handle_announce(
+    assert!(!super::announce::admit_announce_before_queue(
         &held_announce,
-        handler.lock().await,
+        &handler,
         iface,
         crate::iface::IfaceSource::Udp(held_peer),
     )
-    .await;
+    .await);
     assert!(matches!(
         announce_rx.try_recv(),
         Err(tokio::sync::broadcast::error::TryRecvError::Empty)
@@ -485,14 +492,4 @@ async fn resource_request_responses_fit_bound_iface_mtu() {
     }
 }
 
-fn decrypt_resource_advertisement(link: &Link, packet: &Packet) -> ResourceAdvertisement {
-    let mut buffer = PacketDataBuffer::new();
-    let plain_len = {
-        let plain = link
-            .decrypt(packet.data.as_slice(), buffer.accuire_buf_max())
-            .expect("decrypt resource advertisement");
-        plain.len()
-    };
-    buffer.resize(plain_len);
-    ResourceAdvertisement::unpack(buffer.as_slice()).expect("resource advertisement")
-}
+include!("resource_advertisement_test_helper.rs");
