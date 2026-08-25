@@ -181,14 +181,47 @@ async fn process_announce<'a>(
             handler.single_out_destinations.insert(packet.destination, destination.clone());
         }
 
-        if handler.announce_limits.should_suppress_rebroadcast(packet, &shared_config) {
+        // Reference parity (`Transport.py:2267`): an announce is only filed for
+        // retransmission on a node that will actually retransmit it.
+        //
+        //     if (transport_enabled() or is_from_local_client) and context != PATH_RESPONSE:
+        //         if rate_blocked: RNS.log("Blocking rebroadcast ...")
+        //         else:            announce_table[destination_hash] = [...]
+        //
+        // The inner rate-limit branch was already here; the outer condition was
+        // not, so `map` — which only `drain_retransmissions` prunes, and which
+        // only the retransmit worker drains, and only when `transport_enabled`
+        // — grew without bound on a passive node, one cloned `Packet` per
+        // distinct destination for the life of the process.
+        //
+        // Everything that is not queued is still cached rather than dropped.
+        // Unlike the reference, this crate rebuilds a path entry's announce
+        // packet out of the announce table when persisting the path table
+        // (`save_reticulum_path_table` -> `cached_packet_for_destination`),
+        // where the reference stores a packet hash and keeps the packet in its
+        // own on-disk cache. Dropping it outright here would persist an empty
+        // path table on exactly the nodes this guard is meant to help. The
+        // cache is the bounded half of the table (`announce_cache_capacity`),
+        // which is what it is for.
+        let from_shared_instance =
+            { handler.iface_manager.lock().await.is_shared_instance(&route_iface) };
+        let queue_for_retransmission = (handler.config.transport_enabled || from_shared_instance)
+            && packet.context != PacketContext::PathResponse;
+        let rate_blocked =
+            handler.announce_limits.should_suppress_rebroadcast(packet, &shared_config);
+
+        if rate_blocked {
             log::debug!(
                 "tp({}): suppressing announce rebroadcast for {} due to announce_rate_target",
                 handler.config.name,
                 packet.destination
             );
-        } else {
+        }
+
+        if queue_for_retransmission && !rate_blocked {
             handler.announce_table.add(packet, dest_hash, route_iface);
+        } else {
+            handler.announce_table.add_cached(packet, dest_hash, route_iface);
         }
 
         let random_blobs = handler.path_table.random_blobs_for(&packet.destination);

@@ -17,6 +17,7 @@ include!("tests_parts/roaming_path_response_suppression.rs");
 include!("tests_parts/announce_identity_drift.rs");
 
 include!("tests_parts/announce_broadcast_policy.rs");
+include!("tests_parts/announce_table_retransmission_gate.rs");
 
 include!("tests_parts/encrypted_resource_control_packet.rs");
 

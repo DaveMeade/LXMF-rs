@@ -261,6 +261,14 @@ impl AnnounceTable {
         false
     }
 
+    /// `(retransmission queue, bounded cache)` sizes. The two tiers are
+    /// private, and `packet_for_destination` cannot tell them apart, but which
+    /// one an announce lands in is the whole behaviour under test.
+    #[cfg(test)]
+    pub(crate) fn tier_sizes(&self) -> (usize, usize) {
+        (self.map.len(), self.cache.len())
+    }
+
     #[cfg(test)]
     pub(crate) fn pending_response_for_destination(
         &self,
