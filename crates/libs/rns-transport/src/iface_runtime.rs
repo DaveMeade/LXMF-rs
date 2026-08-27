@@ -26,6 +26,17 @@ fn allows_announce_broadcast(
         return true;
     };
 
+    // Reference parity: `Transport.py`'s per-interface announce ladder opens
+    // with a rung that is not mode-specific — an announce for a destination
+    // this node does not own, with no next-hop interface on file, is blocked
+    // on every outgoing interface ("Blocking announce broadcast on <iface>
+    // since next hop interface doesn't exist"). Only `Roaming` and `Boundary`
+    // block a `None` next hop below, and they do it as a side effect of
+    // matching `Some(..)`, so the other four modes let it through today.
+    if !policy.local_destination && policy.next_hop_iface_mode.is_none() {
+        return false;
+    }
+
     match outgoing_mode {
         InterfaceMode::AccessPoint => false,
         InterfaceMode::Roaming => {

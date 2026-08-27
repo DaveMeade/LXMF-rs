@@ -339,6 +339,14 @@ Scoped release evidence is split as follows:
 - Pending ordinary announce rebroadcasts now complete early when a later
   incoming transport announce proves the rebroadcast has already been passed
   onward, while retaining cached announce material for known-path responses.
+- A remote announce with no next-hop interface on file is now blocked on every
+  outgoing interface mode, matching the rung `Transport.py`'s per-interface
+  announce ladder opens with ("Blocking announce broadcast on <iface> since next
+  hop interface doesn't exist"). Only roaming and boundary rejected a missing
+  next hop before, and they did it as a side effect of matching `Some(..)`, so
+  the other four modes carried it. The rung is scoped to remote announces: a
+  destination this node owns has no next hop by definition and stays
+  announceable.
 - Transport announce rebroadcasts now have deterministic handler-boundary
   and local transport-policy evidence that the learned next-hop interface mode
   drives Python-style outgoing mode policy, including access-point suppression
