@@ -232,19 +232,6 @@ impl InterfaceManager {
         }
     }
 
-    pub fn set_shared_config(
-        &mut self,
-        address: AddressHash,
-        shared_config: InterfaceSharedConfig,
-    ) -> bool {
-        if let Some(iface) = self.ifaces.iter_mut().find(|i| i.address == address) {
-            iface.shared_config = shared_config;
-            true
-        } else {
-            false
-        }
-    }
-
     pub fn inherit_runtime_config(
         &mut self,
         source: AddressHash,

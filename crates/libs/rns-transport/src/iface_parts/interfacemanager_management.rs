@@ -82,6 +82,26 @@ impl InterfaceManager {
         }
     }
 
+    /// Also reaches the virtual children that copied this config when they were
+    /// registered. Announce policy is read off whichever interface the path
+    /// table recorded as the next hop, and for a discovered peer that is the
+    /// child, so stopping at the host would leave the peer on the old policy
+    /// until it was recreated.
+    pub fn set_shared_config(
+        &mut self,
+        address: AddressHash,
+        shared_config: InterfaceSharedConfig,
+    ) -> bool {
+        let mut updated = false;
+        for iface in &mut self.ifaces {
+            if iface.address == address || iface.parent == Some(address) {
+                iface.shared_config = shared_config.clone();
+                updated |= iface.address == address;
+            }
+        }
+        updated
+    }
+
     pub fn detach_interfaces(&mut self) -> usize {
         let detached = self.ifaces.len();
         for interface in &self.ifaces {
