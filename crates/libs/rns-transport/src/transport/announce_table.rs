@@ -75,6 +75,21 @@ impl AnnounceCache {
     }
 
     pub fn insert(&mut self, destination: AddressHash, entry: AnnounceEntry) {
+        // Refreshing a destination the cache already holds does not grow it,
+        // so it must not cost an unrelated destination its entry.
+        if let Some(existing) = self.newer.as_mut().and_then(|newer| newer.get_mut(&destination)) {
+            *existing = entry;
+            return;
+        }
+
+        // Held in the older generation instead: take it back, so that one
+        // destination does not occupy two slots while `get` reads only one.
+        if self.older.as_mut().is_some_and(|older| older.remove(&destination).is_some())
+            && self.older.as_ref().is_some_and(|older| older.is_empty())
+        {
+            self.older = None;
+        }
+
         if self.capacity > 0 && self.len() >= self.capacity {
             self.evict_one();
         }
@@ -165,6 +180,23 @@ impl AnnounceTable {
         destination: AddressHash,
         received_from: AddressHash,
     ) {
+        // Every packet lookup reads the retransmission queue first, and both
+        // `observe_passed_rebroadcast` and `drain_retransmissions` copy a
+        // queued entry over the cache when it retires. Leaving one untouched
+        // here would keep serving the announce this one supersedes, after the
+        // path table has already accepted this one. Refresh it in place: the
+        // pending rebroadcast keeps its own schedule and context, being an
+        // ordinary announce this node still owes rather than the path response
+        // that refreshed it.
+        if let Some(queued) = self.map.get_mut(&destination) {
+            let context = queued.packet.context;
+            queued.packet = announce.clone();
+            queued.packet.context = context;
+            queued.hops = announce.header.hops;
+            queued.received_from = received_from;
+            return;
+        }
+
         let entry = AnnounceEntry {
             packet: announce.clone(),
             timeout: Instant::now(),

@@ -345,6 +345,21 @@ Scoped release evidence is split as follows:
   transport-policy evidence for Python-style per-interface holding and
   lowest-hop release, so bursty unknown announce traffic on one ingress no
   longer stands in for all interfaces in the parity matrix.
+- A node that will not retransmit no longer files the announces it hears into
+  the retransmission queue, matching `Transport.py:2267`'s
+  `(transport_enabled() or is_from_local_client) and context != PATH_RESPONSE`
+  guard on the `announce_table` insert. Those announces are cached rather than
+  dropped, because this crate rebuilds a path entry's announce packet from the
+  announce table when persisting where Python stores a packet hash. A cached
+  announce that supersedes a queued one refreshes it in place, so persistence
+  and later path responses read the announce the path table accepted, and
+  refreshing a destination the cache already holds no longer evicts an
+  unrelated one. Measured against a public hub over six minutes, the queue grew
+  14 -> 317 and never decremented; it now stays at 0 while the bounded cache
+  holds the same routes. Python's local-client announce timing
+  (`retransmit_timeout = now`, `retries = PATHFINDER_R`) is not implemented, and
+  the shared-instance condition reads the receiving interface rather than
+  Python's parent-interface `is_local_client_interface`.
 - Restored Reticulum path-table announces are now cache-only lookup material at
   startup, not fresh rebroadcast work, while still serving known-path response
   requests from the restored cache.

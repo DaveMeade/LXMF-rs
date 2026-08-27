@@ -63,7 +63,7 @@ negotiation, runtime feature checks, or the separate hardware-evidence axis.
 | `RNS/Identity.py` | `crates/libs/rns-core` | complete | unit, pinned-python | Identity material, hashing, signing, encryption, recall, and key conversion. | No confirmed parity blocker. |
 | `RNS/Destination.py` | `crates/libs/rns-core`, `crates/libs/rns-transport` | complete | unit, pinned-python | Destination hashing, descriptors, announces, proof generation and validation, ratchets, known-key stability checks, and bounded request/response enforcement. Single-destination Data delivery proofs are correlated through the packet cache before identity verification. | No generated callable software gap remains; broader scenario and external-client evidence is tracked independently. |
 | `RNS/Packet.py` | `crates/libs/rns-core`, `crates/libs/rns-transport` | complete | unit, pinned-python | Framing, serialization, contexts, proofs, receipts, public post-encryption packet-hash correlation, explicit and implicit proof-destination correlation, Python-default link proof context, and header semantics. | No confirmed parity blocker. |
-| `RNS/Transport.py` | `crates/libs/rns-transport`, `crates/apps/reticulumd` | complete | unit, simulated, pinned-python | Path and announce handling, bounded four-class priority ingress, early filtering, protocol accounting, same-destination request batching, gravity-aware replacement, dynamic path rebalancing, boundary path requests, path replacement/state/await semantics, routed links/resources/receipts/tunnels, next-hop formulas, interface lifecycle, discovery and blackhole state, persistence, runtime jobs, graceful shutdown, and focused scoped-request, pacing, duplicate-suppression, MTU, restore/restart, and transport-disabled evidence. | No generated 1.5.0 callable software gap remains; multi-device, public-network, and broader scenario evidence remains separate. |
+| `RNS/Transport.py` | `crates/libs/rns-transport`, `crates/apps/reticulumd` | complete | unit, simulated, pinned-python | Path and announce handling, bounded four-class priority ingress, early filtering, protocol accounting, same-destination request batching, gravity-aware replacement, dynamic path rebalancing, boundary path requests, path replacement/state/await semantics, routed links/resources/receipts/tunnels, next-hop formulas, interface lifecycle, discovery and blackhole state, persistence, runtime jobs, graceful shutdown, and focused scoped-request, pacing, duplicate-suppression, MTU, restore/restart, transport-disabled, and announce-table-admission evidence. | No generated 1.5.0 callable software gap remains; multi-device, public-network, and broader scenario evidence remains separate. Python's local-client announce timing (immediate single retransmit) is not implemented, and the shared-instance condition reads the receiving interface rather than Python's parent-interface `is_local_client_interface`. |
 | `RNS/Link.py` | `crates/libs/rns-transport` | complete | unit, pinned-python | Establishment, proof validation, bounded request/response correlation, bound-interface enforcement for data/channel fan-out, RTT-derived liveness, protocol close, cleanup, and the focused dynamic path-rebalancing slice. | No generated callable software gap remains; cross-implementation and external-client evidence is separate. |
 | `RNS/Resource.py` | `crates/libs/rns-transport` | complete | unit, simulated, pinned-python | Bounded receive allocation, advertisement validation, retries, receiver-minimum collision-guard serving window, window-local hashmap exhaustion gating, bz2 compression, adaptive fragment scheduling, timeout/failure events, cancellation, cleanup, split-resource sequencing, ordered reassembly, per-segment metadata, and whole-resource completion. | Serving-window software contract is complete; collision-list regeneration and cross-implementation transfer evidence are narrower follow-ups. |
 | `RNS/Channel.py` | `crates/libs/rns-transport` | complete | unit, pinned-python | Channel packet handling, retry scheduling, negotiated full-link MDU, buffering, ordered receive delivery, callback ordering/short-circuit/panic containment, delivery-on-proof, timeout retry, exhaustion cleanup, and live Rust/Python channel sequence tests. | No confirmed channel parity blocker. |
@@ -448,6 +448,18 @@ reappearing tunnel cannot replace a fresher active route unless the existing
 path is expired or the tunnel path is at least as fresh under Python's
 timebase rules, with active-preservation and fresher-tunnel replacement
 evidence.
+A node that will not retransmit no longer files the announces it hears into the
+retransmission queue, matching Python's
+`(transport_enabled() or is_from_local_client) and context != PATH_RESPONSE`
+guard on the `announce_table` insert. Those announces are cached rather than
+dropped, since path-table persistence rebuilds the announce packet from the
+announce table instead of from a packet hash, and a cached announce that
+supersedes a queued one refreshes it in place so persistence and later path
+responses read the announce the path table accepted. Refreshing a destination
+the cache already holds no longer evicts an unrelated one. Python's local-client
+announce timing remains unimplemented, and the shared-instance condition reads
+the receiving interface rather than Python's parent-interface
+`is_local_client_interface`.
 
 Enabled unknown interface kinds still parse so operators can see them in daemon
 status, but daemon startup marks them as failed with explicit

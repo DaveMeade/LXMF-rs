@@ -1,5 +1,5 @@
 use super::*;
-use crate::packet::PacketContext;
+use crate::packet::{PacketContext, PacketDataBuffer};
 use rand_core::OsRng;
 use std::thread;
 use std::time::Duration as StdDuration;
@@ -303,4 +303,105 @@ fn zero_capacity_announce_cache_is_unbounded() {
     }
 
     assert_eq!(table.cache.len(), 2);
+}
+
+/// The queued entry is what every packet lookup reads first, and what
+/// `observe_passed_rebroadcast` and `drain_retransmissions` copy over the
+/// cache when it retires. A newer announce that is only cached — a
+/// `PATH_RESPONSE`, or one the rate limiter blocked — has to reach those
+/// readers too, or the node persists and answers path requests with the
+/// announce the path table has already superseded.
+#[test]
+fn a_cached_announce_refreshes_the_queued_one_it_supersedes() {
+    let mut table = AnnounceTable::new(16, 1);
+    let destination = AddressHash::new_from_rand(OsRng);
+    let first_iface = AddressHash::new_from_rand(OsRng);
+    let second_iface = AddressHash::new_from_rand(OsRng);
+    let transport_id = AddressHash::new_from_rand(OsRng);
+
+    let queued = Packet {
+        header: Header { hops: 1, ..Packet::default().header },
+        destination,
+        context: PacketContext::None,
+        data: PacketDataBuffer::new_from_slice(b"superseded-announce"),
+        ..Packet::default()
+    };
+    let superseding = Packet {
+        header: Header { hops: 2, ..Packet::default().header },
+        destination,
+        context: PacketContext::PathResponse,
+        data: PacketDataBuffer::new_from_slice(b"accepted-announce"),
+        ..Packet::default()
+    };
+
+    table.add(&queued, destination, first_iface);
+    table.add_cached(&superseding, destination, second_iface);
+
+    assert_eq!(
+        table.tier_sizes(),
+        (1, 0),
+        "the newer announce refreshes the queued entry rather than becoming a second copy of the destination"
+    );
+    let persisted =
+        table.cached_packet_for_destination(&destination).expect("packet for the accepted path");
+    assert_eq!(
+        persisted.data, superseding.data,
+        "path persistence must read the announce the path table accepted"
+    );
+    assert_eq!(
+        persisted.context,
+        PacketContext::None,
+        "the rebroadcast this node still owes is an ordinary announce, not the path response that refreshed it"
+    );
+
+    table.map.get_mut(&destination).unwrap().timeout = Instant::now() - Duration::from_millis(1);
+    let messages = table.drain_retransmissions(&transport_id);
+    assert_eq!(messages.len(), 1);
+    assert_eq!(messages[0].packet.data, superseding.data, "and it rebroadcasts the newer announce");
+    assert_eq!(messages[0].packet.header.hops, 2);
+    assert!(
+        matches!(messages[0].tx_type, TxMessageType::Broadcast(Some(iface)) if iface == second_iface),
+        "held back from the interface the accepted announce arrived on"
+    );
+
+    table.map.get_mut(&destination).unwrap().timeout = Instant::now() - Duration::from_millis(1);
+    table.drain_retransmissions(&transport_id);
+    assert_eq!(table.tier_sizes(), (0, 1), "the retired entry moves to the cache");
+    assert_eq!(
+        table.cached_packet_for_destination(&destination).expect("cached packet").data,
+        superseding.data,
+        "retiring the queue must not put the superseded announce back in the cache"
+    );
+
+    assert!(table.add_response(destination, first_iface, 2));
+    assert_eq!(
+        table.responses.get(&destination).expect("response entry inserted").packet.data,
+        superseding.data,
+        "a later path request answers with the same announce the path table holds"
+    );
+}
+
+/// Refreshing a destination the cache already holds does not grow it, so it
+/// must not cost an unrelated destination its entry — and with it the path
+/// that destination could still be persisted or answered from.
+#[test]
+fn refreshing_a_cached_destination_does_not_evict_another() {
+    let mut table = AnnounceTable::new(2, 1);
+    let received_from = AddressHash::new_from_rand(OsRng);
+    let lowest = AddressHash::new([0x01; 16]);
+    let refreshed = AddressHash::new([0x02; 16]);
+    let announce = |destination| Packet { destination, ..Packet::default() };
+
+    table.add_cached(&announce(lowest), lowest, received_from);
+    table.add_cached(&announce(refreshed), refreshed, received_from);
+    assert_eq!(table.tier_sizes(), (0, 2), "the cache is at capacity");
+
+    table.add_cached(&announce(refreshed), refreshed, received_from);
+
+    assert_eq!(table.tier_sizes(), (0, 2), "a refresh consumes no capacity");
+    assert!(table.packet_for_destination(&refreshed).is_some());
+    assert!(
+        table.packet_for_destination(&lowest).is_some(),
+        "an unrelated destination must survive its neighbour being refreshed"
+    );
 }
