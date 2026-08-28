@@ -43,6 +43,8 @@ impl InterfaceConfig {
             insert_opt_u64(&mut settings, "announce_rate_penalty", self.announce_rate_penalty);
         }
         insert_opt_bool(&mut settings, "bootstrap_only", self.bootstrap_only);
+        insert_opt_bool(&mut settings, "announces_from_internal", self.announces_from_internal);
+        insert_opt_bool(&mut settings, "announces_to_internal", self.announces_to_internal);
         insert_opt_bool(&mut settings, "ignore_config_warnings", self.ignore_config_warnings);
         insert_opt_u64(&mut settings, "ifac_size", self.ifac_size);
         insert_opt_string(&mut settings, "network_name", self.ifac_network_name());

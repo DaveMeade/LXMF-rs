@@ -191,6 +191,10 @@ pub struct InterfaceConfig {
     #[serde(default)]
     pub bootstrap_only: Option<bool>,
     #[serde(default)]
+    pub announces_from_internal: Option<bool>,
+    #[serde(default)]
+    pub announces_to_internal: Option<bool>,
+    #[serde(default)]
     pub ignore_config_warnings: Option<bool>,
     #[serde(default)]
     pub ifac_size: Option<u64>,

@@ -351,6 +351,17 @@ Scoped release evidence is split as follows:
   and local transport-policy evidence that the learned next-hop interface mode
   drives Python-style outgoing mode policy, including access-point suppression
   and roaming/boundary loop avoidance.
+- Per-interface `announces_from_internal` and `announces_to_internal` now reach
+  that decision, matching `Interface.py:122-123` and the reads at
+  `Transport.py:1417` and `Transport.py:1430`. An interface that opts out of
+  `announces_from_internal` refuses a remote announce whose next hop is an
+  internal-mode interface, and an internal-mode interface refuses one that
+  reached this node over a boundary unless that boundary sets
+  `announces_to_internal`. Both keys parse from an interface's own config and
+  arrive in `InterfaceSharedConfig` on the startup and hot-apply routes, and
+  applying shared config to a live interface reaches the virtual children
+  already registered on it, so a discovered peer carries the new policy without
+  being recreated.
 - Announce-rate target rebroadcast suppression now has harness-dispatchable
   local transport-policy evidence that rapid repeats are allowed through the
   configured grace window, then suppressed until the target interval reopens.

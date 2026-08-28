@@ -1333,3 +1333,30 @@ interfaces = [
         "unexpected parse error: {message}"
     );
 }
+
+/// The reference parses `announces_from_internal` per interface, beside
+/// `bootstrap_only` (`Reticulum.py`), and `announces_to_internal` alongside
+/// it. Both have to survive the whole operator path — TOML, settings map,
+/// then `InterfaceSharedConfig` — or the transport-side gate they drive can
+/// never be reached from a config file.
+#[test]
+fn parses_per_interface_internal_announce_flags() {
+    let input = r#"
+interfaces = [
+  { type = "TCPClientInterface", enabled = true, name = "shared-instance", target_host = "127.0.0.1", target_port = 4242, mode = "internal", announces_to_internal = true },
+  { type = "TCPClientInterface", enabled = true, name = "public-uplink", target_host = "rmap.world", target_port = 4242, announces_from_internal = false }
+]
+"#;
+    let cfg = DaemonConfig::from_toml(input).expect("parse per-interface internal announce flags");
+
+    let internal = &cfg.interfaces[0];
+    assert_eq!(internal.announces_to_internal, Some(true));
+    assert_eq!(internal.announces_from_internal, None, "unset means the reference default");
+    let settings = internal.settings_json().expect("settings");
+    assert_eq!(settings["announces_to_internal"], true);
+
+    let uplink = &cfg.interfaces[1];
+    assert_eq!(uplink.announces_from_internal, Some(false));
+    let settings = uplink.settings_json().expect("settings");
+    assert_eq!(settings["announces_from_internal"], false);
+}

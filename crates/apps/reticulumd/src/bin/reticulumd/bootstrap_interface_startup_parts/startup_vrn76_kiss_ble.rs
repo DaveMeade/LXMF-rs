@@ -338,6 +338,8 @@ fn apply_interface_runtime_config(
             announce_rate_grace: iface.announce_rate_grace,
             announce_rate_penalty: iface.announce_rate_penalty,
             bootstrap_only: iface.bootstrap_only,
+            announces_from_internal: iface.announces_from_internal,
+            announces_to_internal: iface.announces_to_internal,
             ifac_size: iface.ifac_size,
             network_name: iface.ifac_network_name().cloned(),
             passphrase: iface.ifac_passphrase().cloned(),

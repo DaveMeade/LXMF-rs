@@ -36,6 +36,8 @@ pub(crate) fn interface_record_shared_config(record: &InterfaceRecord) -> Interf
         announce_rate_grace: setting_u64(record, "announce_rate_grace"),
         announce_rate_penalty: setting_u64(record, "announce_rate_penalty"),
         bootstrap_only: setting_bool(record, "bootstrap_only"),
+        announces_from_internal: setting_bool(record, "announces_from_internal"),
+        announces_to_internal: setting_bool(record, "announces_to_internal"),
         ingress_control: setting_bool(record, "ingress_control"),
         egress_control: setting_bool(record, "egress_control"),
         ic_max_held_announces: setting_u64(record, "ic_max_held_announces"),

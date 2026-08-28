@@ -382,6 +382,7 @@ mod tests {
                 Some(AnnounceBroadcastPolicy {
                     local_destination: false,
                     next_hop_iface_mode: Some(InterfaceMode::Full),
+                    next_hop_announces_to_internal: None,
                 }),
             )
             .await;
@@ -766,6 +767,7 @@ mod tests {
                 Some(AnnounceBroadcastPolicy {
                     local_destination: false,
                     next_hop_iface_mode: Some(InterfaceMode::Boundary),
+                    next_hop_announces_to_internal: None,
                 }),
             )
             .await;
@@ -786,6 +788,7 @@ mod tests {
                 Some(AnnounceBroadcastPolicy {
                     local_destination: true,
                     next_hop_iface_mode: None,
+                    next_hop_announces_to_internal: None,
                 }),
             )
             .await;
@@ -806,6 +809,7 @@ mod tests {
                 Some(AnnounceBroadcastPolicy {
                     local_destination: false,
                     next_hop_iface_mode: Some(InterfaceMode::Roaming),
+                    next_hop_announces_to_internal: None,
                 }),
             )
             .await;
@@ -826,6 +830,7 @@ mod tests {
                 Some(AnnounceBroadcastPolicy {
                     local_destination: false,
                     next_hop_iface_mode: Some(InterfaceMode::Boundary),
+                    next_hop_announces_to_internal: None,
                 }),
             )
             .await;
@@ -833,109 +838,7 @@ mod tests {
         assert_eq!(rx.try_recv().expect("announce").packet, packet);
     }
 
-    /// A remote announce with no route on file is blocked on every mode, not just
-    /// the two whose `matches!(Some(..))` happens to reject `None`.
-    #[tokio::test]
-    async fn full_blocks_remote_announce_without_a_next_hop_interface() {
-        let mut mgr = InterfaceManager::new(16);
-        let mut rx = mgr
-            .new_channel_with_role_and_mode(16, IfaceRole::Unicast, InterfaceMode::Full)
-            .tx_channel;
-        let packet = announce_packet();
-        let trace = mgr
-            .send_with_announce_policy(
-                TxMessage { tx_type: TxMessageType::Broadcast(None), packet: packet.clone() },
-                Some(AnnounceBroadcastPolicy {
-                    local_destination: false,
-                    next_hop_iface_mode: None,
-                }),
-            )
-            .await;
-        assert_eq!(trace.sent_ifaces, 0);
-        assert!(rx.try_recv().is_err());
-    }
-
-    #[tokio::test]
-    async fn gateway_blocks_remote_announce_without_a_next_hop_interface() {
-        let mut mgr = InterfaceManager::new(16);
-        let mut rx = mgr
-            .new_channel_with_role_and_mode(16, IfaceRole::Unicast, InterfaceMode::Gateway)
-            .tx_channel;
-        let packet = announce_packet();
-        let trace = mgr
-            .send_with_announce_policy(
-                TxMessage { tx_type: TxMessageType::Broadcast(None), packet: packet.clone() },
-                Some(AnnounceBroadcastPolicy {
-                    local_destination: false,
-                    next_hop_iface_mode: None,
-                }),
-            )
-            .await;
-        assert_eq!(trace.sent_ifaces, 0);
-        assert!(rx.try_recv().is_err());
-    }
-
-    #[tokio::test]
-    async fn internal_blocks_remote_announce_without_a_next_hop_interface() {
-        let mut mgr = InterfaceManager::new(16);
-        let mut rx = mgr
-            .new_channel_with_role_and_mode(16, IfaceRole::Unicast, InterfaceMode::Internal)
-            .tx_channel;
-        let packet = announce_packet();
-        let trace = mgr
-            .send_with_announce_policy(
-                TxMessage { tx_type: TxMessageType::Broadcast(None), packet: packet.clone() },
-                Some(AnnounceBroadcastPolicy {
-                    local_destination: false,
-                    next_hop_iface_mode: None,
-                }),
-            )
-            .await;
-        assert_eq!(trace.sent_ifaces, 0);
-        assert!(rx.try_recv().is_err());
-    }
-
-    #[tokio::test]
-    async fn point_to_point_blocks_remote_announce_without_a_next_hop_interface() {
-        let mut mgr = InterfaceManager::new(16);
-        let mut rx = mgr
-            .new_channel_with_role_and_mode(16, IfaceRole::Unicast, InterfaceMode::PointToPoint)
-            .tx_channel;
-        let packet = announce_packet();
-        let trace = mgr
-            .send_with_announce_policy(
-                TxMessage { tx_type: TxMessageType::Broadcast(None), packet: packet.clone() },
-                Some(AnnounceBroadcastPolicy {
-                    local_destination: false,
-                    next_hop_iface_mode: None,
-                }),
-            )
-            .await;
-        assert_eq!(trace.sent_ifaces, 0);
-        assert!(rx.try_recv().is_err());
-    }
-
-    /// The guard is scoped to remote announces: this node's own destination has no
-    /// next hop by definition, and must still be announceable.
-    #[tokio::test]
-    async fn full_allows_local_announce_without_a_next_hop_interface() {
-        let mut mgr = InterfaceManager::new(16);
-        let mut rx = mgr
-            .new_channel_with_role_and_mode(16, IfaceRole::Unicast, InterfaceMode::Full)
-            .tx_channel;
-        let packet = announce_packet();
-        let trace = mgr
-            .send_with_announce_policy(
-                TxMessage { tx_type: TxMessageType::Broadcast(None), packet: packet.clone() },
-                Some(AnnounceBroadcastPolicy {
-                    local_destination: true,
-                    next_hop_iface_mode: None,
-                }),
-            )
-            .await;
-        assert_eq!(trace.sent_ifaces, 1);
-        assert_eq!(rx.try_recv().expect("announce").packet, packet);
-    }
+    include!("iface_tests_parts/announce_broadcast_policy.rs");
 
     #[tokio::test]
     async fn remote_announces_are_queued_and_released_by_hop_priority() {
@@ -950,6 +853,7 @@ mod tests {
                 Some(AnnounceBroadcastPolicy {
                     local_destination: false,
                     next_hop_iface_mode: Some(InterfaceMode::Full),
+                    next_hop_announces_to_internal: None,
                 }),
             )
             .await;
@@ -964,6 +868,7 @@ mod tests {
                 Some(AnnounceBroadcastPolicy {
                     local_destination: false,
                     next_hop_iface_mode: Some(InterfaceMode::Full),
+                    next_hop_announces_to_internal: None,
                 }),
             )
             .await;
@@ -973,6 +878,7 @@ mod tests {
                 Some(AnnounceBroadcastPolicy {
                     local_destination: false,
                     next_hop_iface_mode: Some(InterfaceMode::Full),
+                    next_hop_announces_to_internal: None,
                 }),
             )
             .await;

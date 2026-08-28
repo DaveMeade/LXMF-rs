@@ -197,10 +197,9 @@ impl TransportHandler {
         {
             let next_hop_iface = self.path_table.next_hop_iface(&packet.destination);
             let mut mgr = self.iface_manager.lock().await;
-            let policy = AnnounceBroadcastPolicy {
-                local_destination: self.single_in_destinations.contains_key(&packet.destination),
-                next_hop_iface_mode: next_hop_iface.and_then(|iface| mgr.mode(&iface)),
-            };
+            let local_destination = self.single_in_destinations.contains_key(&packet.destination);
+            let policy =
+                AnnounceBroadcastPolicy::for_next_hop(&mgr, next_hop_iface, local_destination);
             let dispatch = mgr.send_with_announce_policy(message, Some(policy)).await;
             if dispatch.sent_ifaces > 0 || dispatch.queued_ifaces > 0 {
                 self.note_link_packet_sent(&packet).await;
