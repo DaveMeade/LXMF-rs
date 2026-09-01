@@ -2,7 +2,7 @@ use std::future::Future;
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
 
-use tokio::time::{sleep, timeout, Instant};
+use tokio::time::{sleep, Instant};
 
 use crate::buffer::InputBuffer;
 use crate::iface::{IfaceSource, Interface, InterfaceContext, RxMessage};
@@ -12,26 +12,23 @@ use super::lora::LoraConfig;
 use super::rnode_bearer::{
     RnodeBearerBackend, RnodeBearerInfo, RnodeBearerKind, RnodeBearerKissRuntime,
 };
+pub use super::rnode_bearer_status::RnodeBearerRuntimeStatusHandle;
+use super::rnode_bearer_status::{
+    append_error_status, publish_monitor_status, set_error_status, RnodeBearerTraffic,
+};
 use super::rnode_ble::{
     rnode_ble_initial_runtime_status_json, rnode_ble_payload_writes_enabled,
     RnodeBleCommandMonitor, RnodeBleKissConfig,
 };
 
-const IO_POLL_INTERVAL: Duration = Duration::from_millis(100);
+// Platform bearers own their bounded read wait. In particular, the Android
+// backend waits on a Java notification queue in a blocking worker, so wrapping
+// that read in a shorter Tokio timeout would leave an abandoned worker that can
+// consume and discard the next notification. Keep only a small backoff for
+// backends that return `Ok(None)` immediately.
+const EMPTY_READ_BACKOFF: Duration = Duration::from_millis(10);
 const STARTUP_RESPONSE_TIMEOUT: Duration = Duration::from_secs(5);
 const DETECTION_FALLBACK_TIMEOUT: Duration = Duration::from_secs(5);
-
-#[derive(Clone)]
-pub struct RnodeBearerRuntimeStatusHandle {
-    inner: Arc<Mutex<serde_json::Value>>,
-}
-
-impl RnodeBearerRuntimeStatusHandle {
-    #[must_use]
-    pub fn to_json(&self) -> serde_json::Value {
-        self.inner.lock().unwrap_or_else(|poisoned| poisoned.into_inner()).clone()
-    }
-}
 
 /// A single RNode bearer attempt integrated with the Reticulum interface manager.
 ///
@@ -122,7 +119,22 @@ impl<B> RnodeBearerKissInterface<B> {
 
         let bearer = bearer_label(info);
         let mut monitor = RnodeBleCommandMonitor::new(lora, STARTUP_RESPONSE_TIMEOUT);
-        publish_monitor_status(&status, &monitor, &endpoint, bearer);
+        let mut traffic = RnodeBearerTraffic::default();
+        publish_monitor_status(
+            &status,
+            &monitor,
+            &endpoint,
+            bearer,
+            info.negotiated_mtu,
+            traffic,
+            runtime.io_stats(),
+        );
+        log::info!(
+            "RNode bearer opened iface={} bearer={} negotiated_mtu={:?}",
+            label,
+            bearer,
+            info.negotiated_mtu
+        );
         let mut radio_config_sent = false;
         let detection_deadline = Instant::now() + DETECTION_FALLBACK_TIMEOUT;
         let mut first_tx_at: Option<Instant> = None;
@@ -140,7 +152,7 @@ impl<B> RnodeBearerKissInterface<B> {
                     break;
                 };
                 match result {
-                    Ok(()) => monitor.accept_degraded_startup(),
+                    Ok(()) => monitor.reset_startup_deadline(STARTUP_RESPONSE_TIMEOUT),
                     Err(error) => {
                         set_error_status(
                             &status,
@@ -184,6 +196,19 @@ impl<B> RnodeBearerKissInterface<B> {
                         attempt_failed = true;
                         break;
                     }
+                    traffic.tx_packets = traffic.tx_packets.saturating_add(1);
+                    traffic.tx_bytes = traffic
+                        .tx_bytes
+                        .saturating_add(u64::try_from(raw.len()).unwrap_or(u64::MAX));
+                    let io = runtime.io_stats();
+                    log::debug!(
+                        "RNode packet handed to bearer iface={} packet_bytes={} tx_packets={} kiss_write_chunks={} kiss_write_bytes={}",
+                        label,
+                        raw.len(),
+                        traffic.tx_packets,
+                        io.write_chunks,
+                        io.write_bytes
+                    );
                     first_tx_at.get_or_insert_with(Instant::now);
                 }
             }
@@ -210,26 +235,37 @@ impl<B> RnodeBearerKissInterface<B> {
                 }
             }
 
-            let polled = tokio::select! {
-                result = timeout(IO_POLL_INTERVAL, runtime.poll()) => result,
-                () = context.cancel.cancelled() => {
-                    cancelled = true;
-                    break;
-                },
-                () = iface_stop.cancelled() => {
-                    cancelled = true;
-                    break;
-                },
+            let Some(result) =
+                run_or_cancel(runtime.poll_queue_admission(), &context.cancel, &iface_stop).await
+            else {
+                cancelled = true;
+                break;
             };
+            if let Err(error) = result {
+                set_error_status(
+                    &status,
+                    &format!("RNode queue-admission probe failed: {error:?}"),
+                );
+                break;
+            }
+
+            // `RnodeBearerBackend::read` is the single owner of the bounded
+            // wait. Do not cancel it with a shorter outer timeout: an Android
+            // JNI read continues on its blocking worker after a future is
+            // dropped, and a second read would then race it for notifications.
+            let polled = runtime.poll().await;
+            if context.cancel.is_cancelled() || iface_stop.is_cancelled() {
+                cancelled = true;
+                break;
+            }
             match polled {
-                Err(_) => {}
-                Ok(Err(error)) => {
+                Err(error) => {
                     set_error_status(&status, &format!("RNode bearer read failed: {error:?}"));
                     break;
                 }
-                Ok(Ok(None)) => {
+                Ok(None) => {
                     tokio::select! {
-                        () = sleep(IO_POLL_INTERVAL) => {}
+                        () = sleep(EMPTY_READ_BACKOFF) => {}
                         () = context.cancel.cancelled() => {
                             cancelled = true;
                             break;
@@ -240,7 +276,7 @@ impl<B> RnodeBearerKissInterface<B> {
                         }
                     }
                 }
-                Ok(Ok(Some(notification))) => {
+                Ok(Some(notification)) => {
                     if let Err(error) = monitor.accept_notification(&notification) {
                         set_error_status(&status, &error);
                         break;
@@ -266,8 +302,29 @@ impl<B> RnodeBearerKissInterface<B> {
                         }
                         monitor.reset_startup_deadline(STARTUP_RESPONSE_TIMEOUT);
                     }
-                    publish_monitor_status(&status, &monitor, &endpoint, bearer);
+                    publish_monitor_status(
+                        &status,
+                        &monitor,
+                        &endpoint,
+                        bearer,
+                        info.negotiated_mtu,
+                        traffic,
+                        runtime.io_stats(),
+                    );
                     for payload in notification.packets {
+                        traffic.rx_packets = traffic.rx_packets.saturating_add(1);
+                        traffic.rx_bytes = traffic
+                            .rx_bytes
+                            .saturating_add(u64::try_from(payload.len()).unwrap_or(u64::MAX));
+                        let io = runtime.io_stats();
+                        log::debug!(
+                            "RNode packet received from bearer iface={} packet_bytes={} rx_packets={} kiss_read_chunks={} kiss_read_bytes={}",
+                            label,
+                            payload.len(),
+                            traffic.rx_packets,
+                            io.read_chunks,
+                            io.read_bytes
+                        );
                         match Packet::deserialize(&mut InputBuffer::new(&payload)) {
                             Ok(packet) => {
                                 if rx_channel
@@ -297,7 +354,15 @@ impl<B> RnodeBearerKissInterface<B> {
                 set_error_status(&status, &error);
                 break;
             }
-            publish_monitor_status(&status, &monitor, &endpoint, bearer);
+            publish_monitor_status(
+                &status,
+                &monitor,
+                &endpoint,
+                bearer,
+                info.negotiated_mtu,
+                traffic,
+                runtime.io_stats(),
+            );
         }
 
         if cancelled || context.cancel.is_cancelled() || iface_stop.is_cancelled() {
@@ -343,28 +408,6 @@ fn bearer_label(info: RnodeBearerInfo) -> &'static str {
     }
 }
 
-fn publish_monitor_status(
-    status: &Arc<Mutex<serde_json::Value>>,
-    monitor: &RnodeBleCommandMonitor,
-    endpoint: &str,
-    bearer: &str,
-) {
-    let mut value = monitor.runtime_status_json(endpoint);
-    if let Some(object) = value.as_object_mut() {
-        object.insert("bearer".to_string(), serde_json::Value::String(bearer.to_string()));
-    }
-    *status.lock().unwrap_or_else(|poisoned| poisoned.into_inner()) = value;
-}
-
-fn set_error_status(status: &Arc<Mutex<serde_json::Value>>, error: &str) {
-    let mut guard = status.lock().unwrap_or_else(|poisoned| poisoned.into_inner());
-    let Some(object) = guard.as_object_mut() else {
-        return;
-    };
-    object.insert("online".to_string(), serde_json::Value::Bool(false));
-    object.insert("last_command_error".to_string(), serde_json::Value::String(error.to_string()));
-}
-
 async fn close_after_aborted_startup<B>(
     runtime: &mut RnodeBearerKissRuntime<B>,
     status: &Arc<Mutex<serde_json::Value>>,
@@ -379,21 +422,6 @@ async fn close_after_aborted_startup<B>(
         log::warn!("{message}");
         append_error_status(status, &message);
     }
-}
-
-fn append_error_status(status: &Arc<Mutex<serde_json::Value>>, error: &str) {
-    let mut guard = status.lock().unwrap_or_else(|poisoned| poisoned.into_inner());
-    let previous = guard
-        .get("last_command_error")
-        .and_then(serde_json::Value::as_str)
-        .filter(|value| !value.is_empty())
-        .map(str::to_owned);
-    let Some(object) = guard.as_object_mut() else {
-        return;
-    };
-    let combined = previous.map_or_else(|| error.to_string(), |value| format!("{value}; {error}"));
-    object.insert("online".to_string(), serde_json::Value::Bool(false));
-    object.insert("last_command_error".to_string(), serde_json::Value::String(combined));
 }
 
 #[cfg(test)]

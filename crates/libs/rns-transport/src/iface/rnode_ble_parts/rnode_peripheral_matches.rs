@@ -2,6 +2,7 @@ pub struct RnodeBleKissRuntime<B> {
     backend: B,
     session: RnodeBleKissSession,
     connected: bool,
+    io_stats: RnodeBleKissIoStats,
 }
 
 impl<B> RnodeBleKissRuntime<B>
@@ -10,7 +11,12 @@ where
 {
     #[must_use]
     pub fn new(backend: B, config: RnodeBleKissConfig) -> Self {
-        Self { backend, session: RnodeBleKissSession::new(config), connected: false }
+        Self {
+            backend,
+            session: RnodeBleKissSession::new(config),
+            connected: false,
+            io_stats: RnodeBleKissIoStats::default(),
+        }
     }
 
     #[must_use]
@@ -26,6 +32,11 @@ where
     #[must_use]
     pub fn status(&self) -> RnodeBleKissStatus {
         self.session.status_with_connection(self.connected)
+    }
+
+    #[must_use]
+    pub fn io_stats(&self) -> RnodeBleKissIoStats {
+        self.io_stats
     }
 
     #[must_use]
@@ -89,6 +100,11 @@ where
         self.write_all(writes, "write_management_frame").await
     }
 
+    pub async fn poll_queue_admission(&mut self) -> Result<(), RnodeBleKissError> {
+        let writes = self.session.queue_admission_probe_if_due();
+        self.write_all(writes, "write_queue_admission_probe").await
+    }
+
     pub async fn shutdown(&mut self) -> Result<(), RnodeBleKissError> {
         self.shutdown_with_prefix_frames(Vec::new()).await
     }
@@ -136,6 +152,11 @@ where
         else {
             return Ok(None);
         };
+        self.io_stats.read_chunks = self.io_stats.read_chunks.saturating_add(1);
+        self.io_stats.read_bytes = self
+            .io_stats
+            .read_bytes
+            .saturating_add(u64::try_from(payload.len()).unwrap_or(u64::MAX));
         {
             let hex: String = payload
                 .iter()
@@ -156,10 +177,16 @@ where
         operation: &'static str,
     ) -> Result<(), RnodeBleKissError> {
         for write in writes {
+            let payload_len = write.payload.len();
             self.backend.write(write).await.map_err(|message| {
                 self.connected = false;
                 RnodeBleKissError::Backend { operation, message }
             })?;
+            self.io_stats.write_chunks = self.io_stats.write_chunks.saturating_add(1);
+            self.io_stats.write_bytes = self
+                .io_stats
+                .write_bytes
+                .saturating_add(u64::try_from(payload_len).unwrap_or(u64::MAX));
         }
         Ok(())
     }
@@ -324,14 +351,7 @@ impl NativeRnodeBleKissInterface {
                 iface_address,
                 settings.peripheral_id
             );
-            // RNODE_LXMF_MIN_ATT_MTU = 173 (170 notification payload bytes + 3 ATT header)
             match runtime.negotiated_mtu() {
-                Some(mtu) if mtu < 173 => log::warn!(
-                    "RNode BLE negotiated ATT MTU {} < 173 minimum for LXMF; \
-                     expect incomplete notification payloads iface={}",
-                    mtu,
-                    label
-                ),
                 Some(mtu) => log::info!("RNode BLE negotiated ATT MTU {} iface={}", mtu, label),
                 None => log::debug!(
                     "RNode BLE negotiated ATT MTU unknown (macOS or non-native backend) iface={}",
@@ -382,7 +402,7 @@ impl NativeRnodeBleKissInterface {
                                 );
                                 reconnect_needed = true;
                             } else if let Some(mon) = command_monitor.as_mut() {
-                                mon.accept_degraded_startup();
+                                mon.reset_startup_deadline(startup_response_timeout);
                             }
                         }
                     }
@@ -490,6 +510,16 @@ impl NativeRnodeBleKissInterface {
                         }
                         first_tx_at = None;
                     }
+                }
+
+                if let Err(err) = runtime.poll_queue_admission().await {
+                    log::warn!(
+                        "RNode BLE queue-admission probe failed iface={} err={:?}",
+                        label,
+                        err
+                    );
+                    reconnect_needed = true;
+                    break;
                 }
 
                 match timeout(Duration::from_millis(100), runtime.poll_notification_events()).await

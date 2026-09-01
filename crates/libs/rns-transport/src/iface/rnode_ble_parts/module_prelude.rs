@@ -44,10 +44,13 @@ use uuid::Uuid;
 use crate::iface::kiss::KissConfig;
 
 use crate::iface::lora::{
-    LoraConfig, LoraInterface, RNodeHardwareError, RNodeProbeStatus, RNodeRadioStatus,
+    LoraConfig, LoraInterface, RNodeHardwareError, RNodeProbeStatus, RNodeRadioStatus, CMD_STAT_RX,
+    CMD_STAT_TX,
 };
 
-use crate::kiss::{encode_data_frame, KissCommand, KissDecodeError, KissFrame, KissStreamDecoder};
+use crate::kiss::{
+    encode_data_frame, KissCommand, KissDecodeError, KissFrame, KissStreamDecoder, CMD_READY,
+};
 
 pub const RNODE_BLE_SERVICE_UUID: &str = "6E400001-B5A3-F393-E0A9-E50E24DCCA9E";
 
@@ -61,7 +64,12 @@ pub const RNODE_BLE_CONNECT_TIMEOUT: Duration = Duration::from_secs(5);
 
 pub const RNODE_BLE_READ_FRAME_TIMEOUT: Duration = Duration::from_millis(1_250);
 
-const DEFAULT_ATT_NOTIFICATION_PAYLOAD_BYTES: usize = 20;
+/// Minimum delay between RNode firmware queue-admission probes.
+///
+/// RNode firmware answers `CMD_READY` with its current queue state; it does not
+/// emit a later notification when a full queue drains. Polling is therefore
+/// required while payloads are pending, but it must remain bounded.
+pub const RNODE_QUEUE_ADMISSION_POLL_INTERVAL: Duration = Duration::from_millis(100);
 
 const RNODE_BLE_STARTUP_STABILIZATION_TIMEOUT: Duration = Duration::from_secs(2);
 
@@ -131,6 +139,14 @@ pub struct RnodeBleKissStatus {
     pub interface_ready: bool,
     pub pending_payloads: usize,
     pub pending_writes: usize,
+}
+
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+pub struct RnodeBleKissIoStats {
+    pub read_chunks: u64,
+    pub read_bytes: u64,
+    pub write_chunks: u64,
+    pub write_bytes: u64,
 }
 
 #[derive(Debug, Clone, Default, PartialEq, Eq)]

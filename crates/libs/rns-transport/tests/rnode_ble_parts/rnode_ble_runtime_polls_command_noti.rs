@@ -178,13 +178,15 @@ fn rnode_ble_command_monitor_rejects_missing_startup_responses_after_deadline() 
 }
 
 #[test]
-fn rnode_ble_command_monitor_keeps_degraded_fallback_session() {
+fn rnode_ble_command_monitor_rejects_unvalidated_fallback_session() {
     let config = LoraConfig::us915_default();
     let mut monitor = RnodeBleCommandMonitor::new(config, Duration::ZERO);
 
-    monitor.accept_degraded_startup();
+    let error = monitor
+        .validate_startup_deadline()
+        .expect_err("fallback without startup responses must fail");
 
-    monitor.validate_startup_deadline().expect("fallback startup remains connected");
+    assert!(error.contains("detect"));
 }
 
 #[test]

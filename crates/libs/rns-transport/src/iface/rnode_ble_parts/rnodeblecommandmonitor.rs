@@ -23,7 +23,15 @@ impl RnodeBleCommandMonitor {
                 Err(err) => self.lora.last_command_error() == Some(err.as_str()),
             };
             match (result, fatal) {
-                (Ok(_), _) => {}
+                (Ok(_), _) => {
+                    if matches!(*command, CMD_STAT_RX | CMD_STAT_TX) && payload.len() == 4 {
+                        let value = u32::from_be_bytes([
+                            payload[0], payload[1], payload[2], payload[3],
+                        ]);
+                        let counter = if *command == CMD_STAT_RX { "stat_rx" } else { "stat_tx" };
+                        log::info!("RNode radio counter counter={counter} value={value}");
+                    }
+                }
                 (Err(err), true) => return Err(err),
                 (Err(err), false) => {
                     log::warn!(
@@ -69,11 +77,6 @@ impl RnodeBleCommandMonitor {
         self.startup_deadline = Some(Instant::now() + timeout);
     }
 
-    pub fn accept_degraded_startup(&mut self) {
-        self.startup_deadline = None;
-        self.startup_payload_writes_enabled = true;
-    }
-
     #[must_use]
     pub fn startup_validated(&self) -> bool {
         self.startup_validated
@@ -103,6 +106,10 @@ impl RnodeBleCommandMonitor {
     pub fn runtime_status_json(&self, endpoint: &str) -> serde_json::Value {
         let mut value = rnode_ble_runtime_status_json(&self.lora, endpoint);
         if let Some(object) = value.as_object_mut() {
+            object.insert(
+                "startup_validated".to_string(),
+                serde_json::Value::Bool(self.startup_validated),
+            );
             object.insert(
                 "startup_compatibility_warning".to_string(),
                 self.startup_compatibility_warning
@@ -233,6 +240,7 @@ pub struct RnodeBleKissSession {
     subscribed: bool,
     interface_ready: bool,
     last_read_at: Instant,
+    last_queue_admission_probe_at: Option<Instant>,
     pending_payloads: VecDeque<Vec<u8>>,
     pending_writes: VecDeque<RnodeBleWrite>,
 }
@@ -245,6 +253,7 @@ impl RnodeBleKissSession {
             interface_ready: !config.kiss.flow_control,
             subscribed: false,
             last_read_at: Instant::now(),
+            last_queue_admission_probe_at: None,
             pending_payloads: VecDeque::new(),
             pending_writes: VecDeque::new(),
             config,
@@ -284,6 +293,9 @@ impl RnodeBleKissSession {
     #[must_use]
     pub fn startup_frames(&mut self) -> Vec<RnodeBleWrite> {
         self.subscribed = true;
+        if self.config.kiss.flow_control {
+            self.last_queue_admission_probe_at = Some(Instant::now());
+        }
         self.config
             .kiss
             .command_frames()
@@ -327,9 +339,10 @@ impl RnodeBleKissSession {
             return Vec::new();
         }
 
-        let writes = self.kiss_writes(encode_data_frame(payload));
+        let mut writes = self.kiss_writes(encode_data_frame(payload));
         if self.config.kiss.flow_control {
             self.interface_ready = false;
+            writes.extend(self.queue_admission_probe_writes());
         }
         writes
     }
@@ -356,9 +369,10 @@ impl RnodeBleKissSession {
             return Vec::new();
         }
 
-        let writes = self.kiss_writes(encode_data_frame(&payload));
+        let mut writes = self.kiss_writes(encode_data_frame(&payload));
         if self.config.kiss.flow_control {
             self.interface_ready = false;
+            writes.extend(self.queue_admission_probe_writes());
         }
         writes
     }
@@ -386,15 +400,6 @@ impl RnodeBleKissSession {
         }
         self.last_read_at = Instant::now();
         let frames = self.decoder.push_bytes(payload)?;
-        if frames.is_empty()
-            && payload.len() == DEFAULT_ATT_NOTIFICATION_PAYLOAD_BYTES
-            && self.decoder.has_partial_frame()
-        {
-            return Err(RnodeBleKissError::Backend {
-                operation: "accept_notification_events",
-                message: "incomplete 20-byte RNode BLE notification; likely ATT MTU 23 / 20-byte notification payload. The BLE host/backend did not report a usable negotiated MTU before notifications; verify btleplug 0.12+ platform MTU support or configure a host adapter that negotiates a larger ATT MTU.".to_string(),
-            });
-        }
         let mut notification = RnodeBleNotification::default();
         for frame in frames {
             match frame {
@@ -410,8 +415,17 @@ impl RnodeBleKissSession {
                     }
                 }
                 KissFrame::Command(KissCommand::Ready) => {
-                    self.interface_ready = true;
-                    self.flush_pending_payloads();
+                    if self.config.kiss.flow_control {
+                        self.interface_ready = true;
+                        self.flush_pending_payloads();
+                    }
+                }
+                KissFrame::Command(KissCommand::Unknown(CMD_READY, payload))
+                    if payload.first().copied() == Some(0) =>
+                {
+                    if self.config.kiss.flow_control {
+                        self.interface_ready = false;
+                    }
                 }
                 KissFrame::Command(KissCommand::Unknown(command, payload)) => {
                     notification.commands.push((command, payload));
@@ -426,6 +440,20 @@ impl RnodeBleKissSession {
         self.pending_writes.drain(..).collect()
     }
 
+    #[must_use]
+    pub fn queue_admission_probe_if_due(&mut self) -> Vec<RnodeBleWrite> {
+        if !self.config.kiss.flow_control
+            || self.interface_ready
+            || self.pending_payloads.is_empty()
+            || self.last_queue_admission_probe_at.is_some_and(|last| {
+                last.elapsed() < RNODE_QUEUE_ADMISSION_POLL_INTERVAL
+            })
+        {
+            return Vec::new();
+        }
+        self.queue_admission_probe_writes()
+    }
+
     fn flush_pending_payloads(&mut self) {
         while self.interface_ready {
             let Some(payload) = self.pending_payloads.pop_front() else {
@@ -434,8 +462,15 @@ impl RnodeBleKissSession {
             self.pending_writes.extend(self.kiss_writes(encode_data_frame(&payload)));
             if self.config.kiss.flow_control {
                 self.interface_ready = false;
+                let probe_writes = self.queue_admission_probe_writes();
+                self.pending_writes.extend(probe_writes);
             }
         }
+    }
+
+    fn queue_admission_probe_writes(&mut self) -> Vec<RnodeBleWrite> {
+        self.last_queue_admission_probe_at = Some(Instant::now());
+        self.kiss_writes(crate::kiss::encode_command_frame(crate::kiss::CMD_READY, &[1]))
     }
 
     fn kiss_writes(&self, payload: Vec<u8>) -> Vec<RnodeBleWrite> {
@@ -448,28 +483,5 @@ impl RnodeBleKissSession {
                 payload: chunk.to_vec(),
             })
             .collect()
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::{RnodeBleKissConfig, RnodeBleKissError, RnodeBleKissSession};
-
-    #[test]
-    fn rnode_ble_notification_reports_likely_default_att_mtu_cap() {
-        let mut session = RnodeBleKissSession::new(RnodeBleKissConfig::default());
-        let err = session
-            .accept_notification_events(&[0x42; 20])
-            .expect_err("20-byte incomplete notification should be diagnosed");
-
-        match err {
-            RnodeBleKissError::Backend { operation, message } => {
-                assert_eq!(operation, "accept_notification_events");
-                assert!(message.contains("likely ATT MTU 23"));
-                assert!(message.contains("did not report a usable negotiated MTU"));
-                assert!(message.contains("btleplug 0.12+"));
-            }
-            other => panic!("unexpected error: {other:?}"),
-        }
     }
 }

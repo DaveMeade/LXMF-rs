@@ -5,8 +5,8 @@
 //! this crate's shared protocol runtime.
 
 use super::rnode_ble::{
-    RnodeBleBackend, RnodeBleKissConfig, RnodeBleKissError, RnodeBleKissRuntime,
-    RnodeBleKissStatus, RnodeBleNotification, RnodeBleWrite,
+    RnodeBleBackend, RnodeBleKissConfig, RnodeBleKissError, RnodeBleKissIoStats,
+    RnodeBleKissRuntime, RnodeBleKissStatus, RnodeBleNotification, RnodeBleWrite,
 };
 
 pub use super::rnode_bearer_interface::{RnodeBearerKissInterface, RnodeBearerRuntimeStatusHandle};
@@ -34,7 +34,10 @@ pub trait RnodeBearerBackend {
 
     /// Read the next available chunk.
     ///
-    /// `Ok(None)` means no bytes are currently available. A closed or failed
+    /// `Ok(None)` means no bytes are currently available. The backend owns any
+    /// bounded wait used to produce that result; callers must not wrap this
+    /// future in a shorter timeout because platform implementations may use a
+    /// blocking worker to wait for native notifications. A closed or failed
     /// transport must return `Err` so the single-attempt interface can stop.
     async fn read(&mut self) -> Result<Option<Vec<u8>>, String>;
 
@@ -125,6 +128,10 @@ where
         self.inner.send_management_frame(frame).await
     }
 
+    pub async fn poll_queue_admission(&mut self) -> Result<(), RnodeBleKissError> {
+        self.inner.poll_queue_admission().await
+    }
+
     pub async fn poll(&mut self) -> Result<Option<RnodeBleNotification>, RnodeBleKissError> {
         self.inner.poll_optional_notification_events().await
     }
@@ -147,6 +154,11 @@ where
     #[must_use]
     pub fn status(&self) -> RnodeBleKissStatus {
         self.inner.status()
+    }
+
+    #[must_use]
+    pub fn io_stats(&self) -> RnodeBleKissIoStats {
+        self.inner.io_stats()
     }
 
     #[must_use]
@@ -215,6 +227,11 @@ mod tests {
         let notification = runtime.poll().await.expect("poll").expect("notification");
         assert_eq!(notification.packets, vec![b"hello".to_vec()]);
         runtime.send_packet(b"world").await.expect("send packet");
+        let io_stats = runtime.io_stats();
+        assert_eq!(io_stats.read_chunks, 1);
+        assert_eq!(io_stats.read_bytes, 8);
+        assert!(io_stats.write_chunks > 0);
+        assert!(io_stats.write_bytes > 0);
         runtime.shutdown().await.expect("shutdown");
 
         let backend = runtime.into_backend();
