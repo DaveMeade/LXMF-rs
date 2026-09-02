@@ -23,10 +23,11 @@ mod delivery;
 mod tests;
 
 pub use delivery::{
-    generate_peering_key, generate_stamp, generate_stamp_until_cancelled, invalid_stamp_value,
-    ticket_stamp, validate_peering_key, validate_stamp, COST_TICKET,
-    PEERING_WORKBLOCK_EXPAND_ROUNDS, TICKET_EXPIRY_SECS, TICKET_GRACE_SECS, TICKET_INTERVAL_SECS,
-    TICKET_LENGTH, TICKET_RENEW_SECS, WORKBLOCK_EXPAND_ROUNDS,
+    generate_peering_key, generate_stamp, generate_stamp_until_cancelled,
+    generate_stamp_with_value_until_cancelled, invalid_stamp_value, ticket_stamp,
+    validate_peering_key, validate_stamp, COST_TICKET, PEERING_WORKBLOCK_EXPAND_ROUNDS,
+    TICKET_EXPIRY_SECS, TICKET_GRACE_SECS, TICKET_INTERVAL_SECS, TICKET_LENGTH, TICKET_RENEW_SECS,
+    WORKBLOCK_EXPAND_ROUNDS,
 };
 
 use alloc::vec::Vec;

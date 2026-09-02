@@ -62,6 +62,17 @@ pub fn generate_stamp_until_cancelled(
     stamp_cost: u32,
     cancelled: impl FnMut() -> bool,
 ) -> Option<Vec<u8>> {
+    generate_stamp_with_value_until_cancelled(message_id, stamp_cost, cancelled)
+        .map(|(stamp, _value)| stamp)
+}
+
+/// [`generate_stamp_until_cancelled`] that also returns the stamp's work
+/// value, which `LXStamper.generate_stamp` reports alongside the stamp.
+pub fn generate_stamp_with_value_until_cancelled(
+    message_id: &[u8; 32],
+    stamp_cost: u32,
+    cancelled: impl FnMut() -> bool,
+) -> Option<(Vec<u8>, u32)> {
     mine(message_id, WORKBLOCK_EXPAND_ROUNDS, stamp_cost, cancelled)
 }
 
@@ -103,6 +114,7 @@ pub fn invalid_stamp_value(stamp: Option<&[u8]>, message_id: &[u8; 32]) -> Optio
 /// key a propagation node presents to peer with another.
 pub fn generate_peering_key(peering_id: &[u8], target_cost: u32) -> Option<Vec<u8>> {
     mine(peering_id, PEERING_WORKBLOCK_EXPAND_ROUNDS, target_cost, || false)
+        .map(|(key, _value)| key)
 }
 
 /// `LXStamper.validate_peering_key`: the key's work value when it reaches
@@ -125,12 +137,13 @@ pub fn validate_peering_key(
 
 /// The search every kind shares: an 8-byte little-endian nonce, counted up
 /// until `sha256(workblock + nonce)` has `stamp_cost` leading zero bits.
+/// Returns the stamp and its value.
 fn mine(
     material: &[u8],
     expand_rounds: usize,
     stamp_cost: u32,
     mut cancelled: impl FnMut() -> bool,
-) -> Option<Vec<u8>> {
+) -> Option<(Vec<u8>, u32)> {
     if stamp_cost > MAX_STAMP_COST {
         return None;
     }
@@ -144,8 +157,9 @@ fn mine(
             return None;
         }
         let stamp = nonce.to_le_bytes();
-        if stamp_value_with_prefix(&workblock_hasher, &stamp) >= stamp_cost {
-            return Some(stamp.to_vec());
+        let value = stamp_value_with_prefix(&workblock_hasher, &stamp);
+        if value >= stamp_cost {
+            return Some((stamp.to_vec(), value));
         }
         nonce = nonce.wrapping_add(1);
         if nonce == 0 {
