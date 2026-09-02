@@ -1,4 +1,12 @@
 //! Private filesystem persistence helpers.
+//!
+//! What the crate itself uses to keep key material on disk — `FileKeyManager`
+//! and the ratchet store both write through [`atomic_write_private`] — and
+//! what a consumer persisting an identity or a ratchet file wants for the
+//! same reasons: the file is created owner-only, written whole to a
+//! randomised sibling, synced, and renamed over the target, so a crash
+//! leaves either the old file or the new one and never a partial or a
+//! world-readable copy.
 
 use rand_core::{OsRng, RngCore};
 use std::fs::{self, File, OpenOptions};
