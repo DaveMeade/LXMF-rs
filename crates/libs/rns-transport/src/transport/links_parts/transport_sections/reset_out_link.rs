@@ -18,10 +18,25 @@ impl Transport {
             }
         }
 
+        // A peer who identified over a link to one of our destinations is
+        // reachable at their own destination of the same name: Python
+        // `LXMRouter.backchannel_links`, keyed by the hash
+        // `delivery_remote_identified` derives from the identified identity.
+        // The link's own destination is ours, and never the one being asked
+        // about.
         for link in in_links {
             let link = link.lock().await;
-            if link.destination().address_hash == *destination && link.status() != LinkStatus::Closed
-            {
+            if link.status() == LinkStatus::Closed {
+                continue;
+            }
+            let Some(peer) = link.identified_peer_identity() else {
+                continue;
+            };
+            let peer_destination =
+                crate::destination::SingleOutputDestination::new(*peer, link.destination().name)
+                    .desc
+                    .address_hash;
+            if peer_destination == *destination {
                 return true;
             }
         }
