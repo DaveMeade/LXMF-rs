@@ -620,6 +620,15 @@ Scoped release evidence is split as follows:
   display/NeoPixel controls, interference-avoidance control, Wi-Fi settings,
   config save/delete, firmware-update metadata, and ROM/EEPROM read/write/wipe
   requests.
+  `LoraConfig::rom_read_frame` asks an RNode for its EEPROM and
+  `LoraConfig::parse_stored_config` now reads the answer, so a caller wanting
+  to know what a radio is already set to no longer transcribes `rnodeconf`'s
+  `ROM.ADDR_CONF_*` layout itself. This matters because the connect path
+  applies `radio_config_frames` unconditionally: without reading first, a
+  client reprograms whatever it finds. The result is a `StoredRadioConfig`
+  rather than a `LoraConfig`, keeping what a device reported distinct from what
+  a caller intends to apply, and `None` means nothing is stored or the image is
+  too short to tell rather than a default.
 - A bearer-neutral `RnodeBearerBackend` and single-attempt
   `RnodeBearerKissInterface` now let mobile platform owners provide ordered BLE
   or Bluetooth Classic byte streams while this crate retains shared KISS
