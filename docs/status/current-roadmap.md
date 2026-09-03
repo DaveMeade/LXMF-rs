@@ -839,6 +839,15 @@ Scoped release evidence is split as follows:
   fields, so direct-chat links/body text do not get JSON-stringified.
 - Delivery modes are honored by the daemon; the old claim that requested modes
   are ignored is obsolete.
+- `Transport::delivery_link_available` now answers for the peer rather than for
+  us, matching `LXMRouter.delivery_link_available`, which is true when the
+  destination has a direct link or a backchannel one. The inbound branch
+  compared each in-link's own destination, the one the peer linked to, against
+  the destination being asked about, so a peer's backchannel was never found
+  and the in-process send path never reused one. It now derives the identified
+  peer's destination of the same name as the link's and compares that. The test
+  had encoded the same misreading, counting an unidentified inbound link as
+  available for the local destination.
 - RPC daemon `lxmf.delivery` announce ingestion now wakes stored pending
   direct/default-direct and opportunistic outbound messages for the announced
   destination while leaving propagated, paper, terminal, already-sending, and
