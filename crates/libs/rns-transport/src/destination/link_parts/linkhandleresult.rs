@@ -40,7 +40,7 @@ pub struct Link {
     session_cipher: Option<CachedFernet>,
     signalling: Option<[u8; LINK_MTU_SIZE]>,
     status: LinkStatus,
-    created_at: Instant,
+    establishment_started_at: Instant,
     establishment_timeout: Duration,
     request_time: Instant,
     rtt: Duration,

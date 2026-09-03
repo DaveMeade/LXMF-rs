@@ -20,17 +20,27 @@ impl Link {
     }
 
     /// Whether a link that is still `Pending` or in `Handshake` has outlived
-    /// its establishment timeout — `RNS.Link`'s watchdog closes it then with
+    /// its establishment timeout. `RNS.Link`'s watchdog closes it then with
     /// `teardown_reason = TIMEOUT`, and a non-transport instance expires the
-    /// path it was made on. Measured from the link's creation, not from the
-    /// latest repeated request.
+    /// path it was made on.
+    ///
+    /// Measured from the start of the current attempt, which is not the same
+    /// as the latest request packet: repeating a still-pending request keeps
+    /// the clock running, since that is the retransmit this timeout exists to
+    /// bound. Only a request that starts over from a state the link had
+    /// already left, or an explicit [`Link::restart`], begins a new attempt.
     pub fn establishment_timed_out(&self, now: Instant) -> bool {
         matches!(self.status, LinkStatus::Pending | LinkStatus::Handshake)
-            && now.duration_since(self.created_at) >= self.establishment_timeout
+            && now.duration_since(self.establishment_started_at) >= self.establishment_timeout
+    }
+
+    /// Begins a new establishment attempt, restarting the timeout above.
+    fn start_establishment(&mut self) {
+        self.establishment_started_at = Instant::now();
     }
 
     #[cfg(test)]
-    pub(crate) fn set_created_at_for_test(&mut self, created_at: Instant) {
-        self.created_at = created_at;
+    pub(crate) fn set_establishment_start_for_test(&mut self, started_at: Instant) {
+        self.establishment_started_at = started_at;
     }
 }

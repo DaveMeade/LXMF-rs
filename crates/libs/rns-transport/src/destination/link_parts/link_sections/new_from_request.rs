@@ -38,7 +38,7 @@ impl Link {
             session_cipher: None,
             signalling,
             status: LinkStatus::Pending,
-            created_at: Instant::now(),
+            establishment_started_at: Instant::now(),
             establishment_timeout: DEFAULT_ESTABLISHMENT_TIMEOUT,
             request_time: Instant::now(),
             rtt: Duration::from_secs(0),

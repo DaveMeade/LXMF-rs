@@ -14,7 +14,7 @@ impl Link {
             session_cipher: None,
             signalling: None,
             status: LinkStatus::Pending,
-            created_at: Instant::now(),
+            establishment_started_at: Instant::now(),
             establishment_timeout: DEFAULT_ESTABLISHMENT_TIMEOUT,
             request_time: Instant::now(),
             rtt: Duration::from_secs(0),
@@ -56,7 +56,11 @@ impl Link {
 
     fn request_with_mtu_limit(&mut self, max_mtu: Option<usize>) -> Packet {
         if self.status != LinkStatus::Pending {
+            // Starting over from a state this link had already left, rather
+            // than repeating a request still in flight, so the establishment
+            // clock starts over with it.
             self.refresh_local_identity();
+            self.start_establishment();
         }
 
         let mut packet_data = PacketDataBuffer::new();
