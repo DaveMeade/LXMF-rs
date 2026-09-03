@@ -844,6 +844,17 @@ Scoped release evidence is split as follows:
   workblock as in `LXMessage.validate_stamp`, every generator shares the
   `MAX_STAMP_COST` fail-fast, and a byte-for-byte pinned-Python `ticket_stamp`
   vector is new evidence.
+- `lxmf-wire`'s `Message` can stamp itself. The daemon's `lxmf_bridge` did that
+  job around it, computing the message id over a throwaway `WireMessage`,
+  deriving or mining a stamp and merging the ticket field by hand, so any other
+  consumer copied the same code and the same trap: the id has to be computed
+  before the stamp is set, over the payload without it, with the timestamp
+  fixed first. `Message::message_id`, `Message::stamp_for_delivery` and
+  `Message::include_ticket` are `LXMessage.pack`'s id, `LXMessage.get_stamp`
+  and `LXMRouter.handle_outbound`'s `include_ticket` respectively, and the
+  daemon's builder uses them. Its behaviour is unchanged apart from the ticket
+  expiry being packed as the float the reference writes, which the daemon's own
+  reader and Python accept alike.
 - The typed ZeroMQ SDK send and batch-send paths now treat payload `body` as
   message content when `content` is absent, while still preserving `body` in
   fields, so direct-chat links/body text do not get JSON-stringified.
