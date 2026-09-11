@@ -34,7 +34,7 @@ evidence tracked independently.
 | `LXMF/LXMF.py` | `crates/libs/lxmf-core` | complete | unit, pinned-python | Pinned module constants, payload fields, message identity, inbound decoding, wire helpers, delivery app-data helpers, compression support detection, and propagation-node announce helper validation. | No confirmed `LXMF.py` blocker in the pinned Python reference. |
 | `LXMF/LXMessage.py` | `crates/libs/lxmf-core` | complete | unit, pinned-python | Wire, storage, propagation, paper, signatures, message IDs, binary fidelity, timestamp precision metadata, and the `pack`/`get_stamp`/`include_ticket` members that stamp a message and carry its ticket. | No confirmed base-message blocker. |
 | `LXMF/LXMPeer.py` | `crates/libs/rns-rpc`, `crates/apps/reticulumd` | complete | unit, pinned-python | Persistent peers, queue marks, offer selection, policy gates, peering keys, throttling, maintenance, source accounting, cumulative acceptance, serialized restored queue snapshots, boolean/list/numeric offer responses, transfer/retry/restart recovery, and unpeer cleanup. | No confirmed `LXMPeer.py` blocker in the pinned Python-only coverage. |
-| `LXMF/LXMRouter.py` | `crates/libs/rns-rpc`, `crates/apps/reticulumd`, `crates/apps/lxmf-cli`, `crates/libs/lxmf-sdk`, `crates/libs/lxmf-runtime` | complete | unit, simulated, pinned-python | Outbound modes and progress/cancellation, selected propagation nodes, direct/propagated resources, accepted-result Resource timeout/failure propagation with transport cancellation before retry, cleanup-failure visibility, fetch/download/sync RPCs, receipts, persistence and maintenance, propagation-node side effects, retry/failure handling, delivery policy, ticket and stamp lifecycle, peer distribution, announce metadata, delivery-link/resource callbacks, transient caches, typed router statistics, and typed message/information storage policy. `SdkBackend`, RPC, ZeroMQ, and in-process backends share the additive router-management contract. | No generated public-callable software gap remains in `LXMRouter.py`; physical/public-network and third-party-client evidence remain separate. The in-process propagated-delivery path (`lxmf-runtime` `send_propagated`) generates a real propagation stamp at the Python default target cost 16, which satisfies default-configured relays (minimum accepted 13); it does not yet honor a relay's announced stamp cost, so relays enforcing a minimum above 16 still reject these transfers until the announced `pn_stamp_cost` is plumbed into stamp generation. |
+| `LXMF/LXMRouter.py` | `crates/libs/rns-rpc`, `crates/apps/reticulumd`, `crates/apps/lxmf-cli`, `crates/libs/lxmf-sdk`, `crates/libs/lxmf-runtime` | complete | unit, simulated, pinned-python | Outbound modes and progress/cancellation, selected propagation nodes, direct/propagated resources, accepted-result Resource timeout/failure propagation with transport cancellation before retry, cleanup-failure visibility, fetch/download/sync RPCs, receipts, persistence and maintenance, propagation-node side effects, retry/failure handling, delivery policy, ticket and stamp lifecycle, peer distribution, announce metadata, delivery-link/resource callbacks, transient caches, typed router statistics, and typed message/information storage policy. `SdkBackend`, RPC, ZeroMQ, and in-process backends share the additive router-management contract. | No generated public-callable software gap remains in `LXMRouter.py`; physical/public-network and third-party-client evidence remain separate. The in-process propagated-delivery path (`lxmf-runtime` `send_propagated`) generates a real propagation stamp at the Python default target cost 16, which satisfies default-configured relays (minimum accepted 13); the daemon bridge mines at the same target when a relay's announced cost is unknown, rather than at that 13 minimum, so a relay run with no flexibility now accepts every stamp it produces rather than the roughly one in eight that cleared 16 by chance. Neither path yet honors a relay's announced stamp cost, so relays enforcing a minimum above 16 still reject these transfers until the announced `pn_stamp_cost` is plumbed into stamp generation. |
 | `LXMF/Handlers.py` | `crates/apps/reticulumd`, `crates/libs/rns-rpc` | complete | unit, simulated, pinned-python | Delivery and propagation announce handlers implement stamp-cost updates, pending direct/opportunistic wakeup, path-response handling, static-peer refresh, autopeer depth policy, peer removal, malformed announce visibility, and the router-coupled delivery/receipt/drop side effects exposed through daemon events and the typed SDK. | No confirmed software blocker in the pinned four-item public handler surface. |
 | `LXMF/LXStamper.py` | `crates/libs/lxmf-core`, `crates/libs/rns-rpc`, `crates/apps/reticulumd` | complete | unit, pinned-python | Validation, generation, ticket-derived stamps, cancellation-aware task work, background deferred worker queue ownership, retry state, cancellation, propagation-stamp pre-handoff preparation, progress metadata, and default-cost propagation stamp mining/validation in `lxmf-wire` (`stamp.rs`, ported `LXStamper` workblock HKDF) with fail-fast rejection of unattainable costs at or above 256: `COST_TICKET` is exactly 256, which a validator accepts as a ticket-paid message's worth and a miner cannot reach. Delivery stamps, ticket stamps and peering keys are library surface in `lxmf-wire` alongside the propagation ones, with the `LXMessage` ticket lifetime constants, so a consumer gets the Python behaviour without reimplementing it. | No confirmed deferred-stamp lifecycle blocker. |
 | `LXMF/Utilities/lxmd.py` | `crates/apps/lxmf-cli`, `crates/apps/reticulumd` | complete | unit, simulated, pinned-python | Canonical `lxmd` workflows, configuration, announce cadence, propagation controls, status, and daemon lifecycle map to the shared Rust daemon and CLI surfaces. | No generated public utility callable is unmapped. |
@@ -83,6 +83,19 @@ evidence tracked independently.
 - Direct delivery can reuse an identified inbound backchannel link for the
   same LXMF delivery destination, while closed or failed cached links are
   removed before normal link establishment resumes.
+  `Transport::delivery_link_available` finds that backchannel the way Python
+  keys `backchannel_links`, by the destination
+  `delivery_remote_identified` derives from the identity a peer presented over
+  the inbound link (`hash_from_name_and_identity("lxmf.delivery",
+  remote_identity)`). It compared each inbound link's own destination, which is
+  ours and not the peer's, so it could only ever match a caller asking about
+  one of its own destinations and `lxmf-runtime`'s send path never reused a
+  backchannel at all. `Transport::delivery_link` returns that link so a sender
+  can use it; `activate_link` takes an established one rather than asking
+  `Transport::link`, which searches `out_links` and would build a second link
+  to the peer. Evidence:
+  `delivery_link_returns_the_backchannel_transport_link_would_miss` pins the
+  returned link to the inbound one and the empty `out_links` entry beside it.
 - Atomic `allow_destination`, `disallow_destination`, and
   `prioritise_destination` RPC/SDK operations coexist with the broader
   Python-style authentication, allow/ignore, and priority convenience surface.
@@ -130,6 +143,16 @@ evidence tracked independently.
 ### Delivery and receipts
 
 - Direct, opportunistic, propagated, and paper modes are distinct.
+- An opportunistic packet carries the wire without its leading destination
+  hash, as `LXMessage.send` packs `self.packed[DESTINATION_LENGTH:]`: the
+  destination rides in the packet header and the receiving router prepends its
+  own hash before unpacking (`LXMRouter.delivery_packet` into
+  `LXMessage.unpack_from_bytes`). `lxmf-runtime`'s `send_opportunistic` handed
+  over the whole wire, so a receiver saw the destination twice and a message it
+  could not verify, and every opportunistic send from the in-process backend
+  was dropped silently on the far side. It strips the prefix with
+  `rns_transport::delivery::strip_destination_prefix`, as the daemon's
+  `bridge_helpers::opportunistic_payload` already did.
 - Opportunistic Single/Data delivery now generates receiver-policy-controlled
   proofs on the ingress interface; explicit proof validation requires the
   packet-cache correlation for the proved destination and rejects signatures
