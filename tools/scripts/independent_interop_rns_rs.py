@@ -39,6 +39,18 @@ def write_rns_rs_config(path: Path, rust_port: int) -> None:
     )
 
 
+def unique_free_ports(count: int) -> list[int]:
+    ports: list[int] = []
+    used: set[int] = set()
+    while len(ports) < count:
+        port = free_port()
+        if port in used:
+            continue
+        ports.append(port)
+        used.add(port)
+    return ports
+
+
 def rust_event(
     rust: RustProbe,
     predicate: Any,
@@ -185,10 +197,12 @@ def two_node_session(
     peer_binary: Path,
     session: str,
 ) -> Iterator[tuple[RustProbe, RnsRsNode, RnsRsControl, str, str]]:
-    rust_rns_port = free_port()
-    rust_control_port = free_port()
-    rns_control_port = free_port()
-    rns_interop_control_port = free_port()
+    (
+        rust_rns_port,
+        rust_control_port,
+        rns_control_port,
+        rns_interop_control_port,
+    ) = unique_free_ports(4)
     config_dir = root / "config" / f"rns-rs-{session}"
     write_rns_rs_config(config_dir / "config", rust_rns_port)
     logs = root / "logs"
@@ -212,7 +226,7 @@ def two_node_session(
     rns_process: ManagedProcess | None = None
     try:
         rust = RustProbe(rust_control_port)
-        rust_status = wait_until("LXMF-rs control", lambda: rust.call("status"), timeout=15)
+        rust_status = wait_until("LXMF-rs control", lambda: rust.call("status"), timeout=30)
         rns_process = ManagedProcess(
             f"rns-rs node ({session})",
             [
@@ -234,8 +248,8 @@ def two_node_session(
         )
         rns = RnsRsNode(rns_control_port)
         rns_control = RnsRsControl(rns_interop_control_port)
-        wait_until("rns-rs interop control", lambda: rns_control.call("health"), timeout=15)
-        wait_until("rns-rs HTTP health", lambda: rns.get("/health"), timeout=15)
+        wait_until("rns-rs interop control", lambda: rns_control.call("health"), timeout=30)
+        wait_until("rns-rs HTTP health", lambda: rns.get("/health"), timeout=30)
         rns_destination = rns.post(
             "/api/destination",
             {
