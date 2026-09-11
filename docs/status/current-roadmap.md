@@ -348,6 +348,13 @@ Scoped release evidence is split as follows:
   the stale path is expired, rediscovery requests are throttled by the
   `PATH_REQUEST_MI` window, and shared-instance clients leave rediscovery to
   the shared instance.
+- A delivery-proof receipt handler can be installed through a shared
+  `Transport`. `set_receipt_handler` took `&mut self`, which bought nothing
+  because the handler it installs lives behind the transport's own lock, and
+  cost the case that matters: a `Transport` is held as an `Arc` by the time a
+  client is ready to install one, so through `&mut self` such a transport could
+  never receive delivery proofs. It takes `&self` now, and callers that held a
+  `mut` binding only for it lose the `mut`.
 - Routed link-table proof timeouts now model Python's unresponsive-path
   exception: one-hop or topology-change routes are marked unresponsive,
   rediscovery requests avoid the ingress interface, and equal-timebase
@@ -620,6 +627,26 @@ Scoped release evidence is split as follows:
   display/NeoPixel controls, interference-avoidance control, Wi-Fi settings,
   config save/delete, firmware-update metadata, and ROM/EEPROM read/write/wipe
   requests.
+  `LoraConfig::rom_read_frame` asks an RNode for its EEPROM and
+  `LoraConfig::parse_stored_config` now reads the answer, so a caller wanting
+  to know what a radio is already set to no longer transcribes `rnodeconf`'s
+  `ROM.ADDR_CONF_*` layout itself. This matters because the connect path
+  applies `radio_config_frames` unconditionally: without reading first, a
+  client reprograms whatever it finds. The result is a `StoredRadioConfig`
+  rather than a `LoraConfig`, keeping what a device reported distinct from what
+  a caller intends to apply. `Ok(None)` is a complete image whose sentinel says
+  nothing is stored; a short read is `StoredConfigError::TruncatedImage`, since
+  a caller that cannot tell the two apart is one that may reprogram a radio
+  because a serial read was cut short.
+  The reply reaches that parser on the supported bearers rather than only for a
+  caller owning its own transport: `record_command_response` records a
+  `CMD_ROM_READ` payload, `LoraInterface::stored_config` and the management
+  handle return the parse, `runtime_status_json` carries it as a state name, and
+  the daemon's `stored_config` command plus `rnodeconf-rs stored-config` read it
+  back. That command queues no frame, because `rom_read` is what asks and the
+  answer arrives on the stream later. The BLE and RNodeMulti bearers answer
+  `Unsupported`; each owns its own monitor and would need the same slot threaded
+  out of it.
 - A bearer-neutral `RnodeBearerBackend` and single-attempt
   `RnodeBearerKissInterface` now let mobile platform owners provide ordered BLE
   or Bluetooth Classic byte streams while this crate retains shared KISS
@@ -834,6 +861,16 @@ Scoped release evidence is split as follows:
   `lxmf-wire`, including delivery app-data display-name and stamp-cost parsing,
   compression support defaults, and propagation-node announce name/cost
   validation with both Python-style boolean and typed Rust diagnostic paths.
+- The pinned Python delivery-stamp and ticket surface is exposed there too.
+  `reticulumd::lxmf_stamps` held `generate_stamp`, `validate_stamp` with
+  tickets, `ticket_stamp`, `COST_TICKET`, `TICKET_LENGTH`, the peering-key pair
+  and the cancellable generators, so a library consumer wanting Python-parity
+  delivery stamps or tickets had to reimplement them; they now live in
+  `lxmf-wire::stamp` with the `LXMessage` ticket lifetime constants beside
+  them, and the daemon re-exports the same names. Ticket checking precedes the
+  workblock as in `LXMessage.validate_stamp`, every generator shares the
+  `MAX_STAMP_COST` fail-fast, and a byte-for-byte pinned-Python `ticket_stamp`
+  vector is new evidence.
 - The typed ZeroMQ SDK send and batch-send paths now treat payload `body` as
   message content when `content` is absent, while still preserving `body` in
   fields, so direct-chat links/body text do not get JSON-stringified.
@@ -857,6 +894,15 @@ Scoped release evidence is split as follows:
   cannot accept a link that second one never activates, and a send that would
   have gone out as a single opportunistic packet timed out instead. The daemon
   path has done this since `DirectBackchannelLinks::active_link`.
+- In-process opportunistic sends reach the far side. `LXMessage.send` packs
+  `self.packed[DESTINATION_LENGTH:]` into an opportunistic packet because the
+  destination rides in the packet header and the receiving router prepends its
+  own hash before unpacking; `lxmf-runtime`'s `send_opportunistic` handed the
+  whole wire to `data_packet`, so a receiver saw the destination hash twice and
+  a message it could not verify, and every such send was dropped silently. It
+  strips the prefix with `rns_transport::delivery::strip_destination_prefix`,
+  the same helper the daemon uses, and a test pins the packet data to the wire
+  without its leading destination.
 - RPC daemon `lxmf.delivery` announce ingestion now wakes stored pending
   direct/default-direct and opportunistic outbound messages for the announced
   destination while leaving propagated, paper, terminal, already-sending, and
@@ -875,6 +921,17 @@ Scoped release evidence is split as follows:
   announced stamp cost (`pn_stamp_cost_from_app_data`) is not yet plumbed
   into stamp generation, so relays enforcing a minimum above 16 still
   reject this path.
+- The daemon bridge now mines propagation stamps at that same Python target
+  when the relay's announced cost is unknown. It used 13, which is
+  `PROPAGATION_COST - PROPAGATION_COST_FLEX`: the minimum a default relay
+  accepts, which is the relay's leniency and not the sender's target. A search
+  stops at the first nonce reaching its target, so mining to 13 yields 13, 14,
+  15, 16 and up, and roughly one in eight clears 16 by chance: a relay run with
+  no flexibility rejected most of what the daemon produced, not all of it. It
+  takes `lxmf-wire::stamp::DEFAULT_PROPAGATION_STAMP_COST` instead of its own
+  literal, and a unit test pins the two together and to
+  `LXMRouter.PROPAGATION_COST`. The announced-cost gap above is unchanged and
+  applies to both paths.
 - Direct and propagated resource sends support receipt-state separation,
   timeout/failure propagation, and active resource cancellation. In-process
   accepted-result Resources use the backend transfer bound, and every failed
