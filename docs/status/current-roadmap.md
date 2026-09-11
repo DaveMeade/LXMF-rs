@@ -355,15 +355,6 @@ Scoped release evidence is split as follows:
   client is ready to install one, so through `&mut self` such a transport could
   never receive delivery proofs. It takes `&self` now, and callers that held a
   `mut` binding only for it lose the `mut`.
-- `Link::request_packet` and `Link::identify_packet` took already-packed bytes
-  and nothing in the library packed them, so `reticulumd` carried its own
-  builders and every other client of the crate wrote the same two functions.
-  `Link::request_payload`, `Link::identify_payload` and
-  `unpack_response_envelope` now build and read them beside the packet
-  constructors, including the non-obvious Python rule that a request body is
-  packed as its own msgpack type rather than as a byte string because
-  `Link.handle_request` passes `unpacked_request[2]` through untouched. The
-  daemon's builders delegate to them.
 - Routed link-table proof timeouts now model Python's unresponsive-path
   exception: one-hop or topology-change routes are marked unresponsive,
   rediscovery requests avoid the ingress interface, and equal-timebase
@@ -850,11 +841,30 @@ Scoped release evidence is split as follows:
   `lxmf-wire`, including delivery app-data display-name and stamp-cost parsing,
   compression support defaults, and propagation-node announce name/cost
   validation with both Python-style boolean and typed Rust diagnostic paths.
+- The pinned Python delivery-stamp and ticket surface is exposed there too.
+  `reticulumd::lxmf_stamps` held `generate_stamp`, `validate_stamp` with
+  tickets, `ticket_stamp`, `COST_TICKET`, `TICKET_LENGTH`, the peering-key pair
+  and the cancellable generators, so a library consumer wanting Python-parity
+  delivery stamps or tickets had to reimplement them; they now live in
+  `lxmf-wire::stamp` with the `LXMessage` ticket lifetime constants beside
+  them, and the daemon re-exports the same names. Ticket checking precedes the
+  workblock as in `LXMessage.validate_stamp`, every generator shares the
+  `MAX_STAMP_COST` fail-fast, and a byte-for-byte pinned-Python `ticket_stamp`
+  vector is new evidence.
 - The typed ZeroMQ SDK send and batch-send paths now treat payload `body` as
   message content when `content` is absent, while still preserving `body` in
   fields, so direct-chat links/body text do not get JSON-stringified.
 - Delivery modes are honored by the daemon; the old claim that requested modes
   are ignored is obsolete.
+- In-process opportunistic sends reach the far side. `LXMessage.send` packs
+  `self.packed[DESTINATION_LENGTH:]` into an opportunistic packet because the
+  destination rides in the packet header and the receiving router prepends its
+  own hash before unpacking; `lxmf-runtime`'s `send_opportunistic` handed the
+  whole wire to `data_packet`, so a receiver saw the destination hash twice and
+  a message it could not verify, and every such send was dropped silently. It
+  strips the prefix with `rns_transport::delivery::strip_destination_prefix`,
+  the same helper the daemon uses, and a test pins the packet data to the wire
+  without its leading destination.
 - RPC daemon `lxmf.delivery` announce ingestion now wakes stored pending
   direct/default-direct and opportunistic outbound messages for the announced
   destination while leaving propagated, paper, terminal, already-sending, and
@@ -873,6 +883,17 @@ Scoped release evidence is split as follows:
   announced stamp cost (`pn_stamp_cost_from_app_data`) is not yet plumbed
   into stamp generation, so relays enforcing a minimum above 16 still
   reject this path.
+- The daemon bridge now mines propagation stamps at that same Python target
+  when the relay's announced cost is unknown. It used 13, which is
+  `PROPAGATION_COST - PROPAGATION_COST_FLEX`: the minimum a default relay
+  accepts, which is the relay's leniency and not the sender's target. A search
+  stops at the first nonce reaching its target, so mining to 13 yields 13, 14,
+  15, 16 and up, and roughly one in eight clears 16 by chance: a relay run with
+  no flexibility rejected most of what the daemon produced, not all of it. It
+  takes `lxmf-wire::stamp::DEFAULT_PROPAGATION_STAMP_COST` instead of its own
+  literal, and a unit test pins the two together and to
+  `LXMRouter.PROPAGATION_COST`. The announced-cost gap above is unchanged and
+  applies to both paths.
 - Direct and propagated resource sends support receipt-state separation,
   timeout/failure propagation, and active resource cancellation. In-process
   accepted-result Resources use the backend transfer bound, and every failed
