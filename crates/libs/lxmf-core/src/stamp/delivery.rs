@@ -5,7 +5,10 @@ use alloc::vec::Vec;
 
 use sha2::{Digest, Sha256};
 
-use super::{stamp_valid, stamp_value, stamp_value_with_prefix, stamp_workblock, MAX_STAMP_COST};
+use super::{
+    stamp_valid, stamp_value, stamp_value_with_prefix, stamp_workblock, MAX_MINEABLE_STAMP_COST,
+    MAX_STAMP_COST,
+};
 
 /// `LXStamper.WORKBLOCK_EXPAND_ROUNDS`: the delivery-stamp workblock.
 pub const WORKBLOCK_EXPAND_ROUNDS: usize = 3000;
@@ -51,7 +54,7 @@ pub fn ticket_stamp(ticket: &[u8], message_id: &[u8; 32]) -> Vec<u8> {
 
 /// Generates a delivery stamp reaching `stamp_cost` for `message_id`,
 /// mirroring `LXStamper.generate_stamp`. Returns `None` when `stamp_cost`
-/// exceeds [`MAX_STAMP_COST`] or the nonce space is exhausted.
+/// is unmineable or the nonce space is exhausted.
 pub fn generate_stamp(message_id: &[u8; 32], stamp_cost: u32) -> Option<Vec<u8>> {
     generate_stamp_until_cancelled(message_id, stamp_cost, || false)
 }
@@ -62,6 +65,17 @@ pub fn generate_stamp_until_cancelled(
     stamp_cost: u32,
     cancelled: impl FnMut() -> bool,
 ) -> Option<Vec<u8>> {
+    generate_stamp_with_value_until_cancelled(message_id, stamp_cost, cancelled)
+        .map(|(stamp, _value)| stamp)
+}
+
+/// [`generate_stamp_until_cancelled`] that also returns the stamp's work
+/// value, which `LXStamper.generate_stamp` reports alongside the stamp.
+pub fn generate_stamp_with_value_until_cancelled(
+    message_id: &[u8; 32],
+    stamp_cost: u32,
+    cancelled: impl FnMut() -> bool,
+) -> Option<(Vec<u8>, u32)> {
     mine(message_id, WORKBLOCK_EXPAND_ROUNDS, stamp_cost, cancelled)
 }
 
@@ -103,6 +117,7 @@ pub fn invalid_stamp_value(stamp: Option<&[u8]>, message_id: &[u8; 32]) -> Optio
 /// key a propagation node presents to peer with another.
 pub fn generate_peering_key(peering_id: &[u8], target_cost: u32) -> Option<Vec<u8>> {
     mine(peering_id, PEERING_WORKBLOCK_EXPAND_ROUNDS, target_cost, || false)
+        .map(|(key, _value)| key)
 }
 
 /// `LXStamper.validate_peering_key`: the key's work value when it reaches
@@ -125,13 +140,18 @@ pub fn validate_peering_key(
 
 /// The search every kind shares: an 8-byte little-endian nonce, counted up
 /// until `sha256(workblock + nonce)` has `stamp_cost` leading zero bits.
+/// Returns the stamp and its value.
 fn mine(
     material: &[u8],
     expand_rounds: usize,
     stamp_cost: u32,
     mut cancelled: impl FnMut() -> bool,
-) -> Option<Vec<u8>> {
-    if stamp_cost > MAX_STAMP_COST {
+) -> Option<(Vec<u8>, u32)> {
+    // `COST_TICKET` is `MAX_STAMP_COST`, and a caller reaches this with a cost
+    // a peer announced. Admitting it would spend the whole nonce space looking
+    // for an all-zero digest, so the sentinel and everything above it fail
+    // fast rather than being mined for.
+    if stamp_cost > MAX_MINEABLE_STAMP_COST {
         return None;
     }
 
@@ -144,8 +164,9 @@ fn mine(
             return None;
         }
         let stamp = nonce.to_le_bytes();
-        if stamp_value_with_prefix(&workblock_hasher, &stamp) >= stamp_cost {
-            return Some(stamp.to_vec());
+        let value = stamp_value_with_prefix(&workblock_hasher, &stamp);
+        if value >= stamp_cost {
+            return Some((stamp.to_vec(), value));
         }
         nonce = nonce.wrapping_add(1);
         if nonce == 0 {
