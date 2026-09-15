@@ -188,6 +188,47 @@
     }
 
     #[tokio::test]
+    async fn auto_peer_announce_skips_a_device_it_cannot_send_on_and_sends_the_rest() {
+        let receiver = tokio::net::UdpSocket::bind("127.0.0.1:0").await.expect("bind receiver");
+        let receiver_addr = receiver.local_addr().expect("receiver addr");
+        let sender = tokio::net::UdpSocket::bind("127.0.0.1:0").await.expect("bind sender");
+        let token = [7u8; crate::hash::HASH_SIZE];
+        let packet = |ifname: &str, destination_address: &str, destination_port: u16| AutoPeeringPacket {
+            kind: AutoPeeringPacketKind::ReverseUnicast,
+            ifname: ifname.to_string(),
+            source_link_local_address: "127.0.0.1".to_string(),
+            destination_address: destination_address.to_string(),
+            destination_port,
+            token,
+        };
+        let plan = AutoRuntimePlan {
+            config: AutoInterfaceConfig::default(),
+            platform: AutoInterfacePlatform::Other,
+            device_filter: AutoInterfaceDeviceFilter::default(),
+            candidates: Vec::new(),
+            adopted_devices: Vec::new(),
+            peering_packets: vec![
+                packet("utun0", "fe80::1", receiver_addr.port()),
+                packet("lo", &receiver_addr.ip().to_string(), receiver_addr.port()),
+            ],
+            startup_plan: empty_startup_plan(),
+        };
+
+        let count = plan
+            .send_initial_peer_announces_with_udp_socket(&sender, |ifname| {
+                Err(format!("no scope id for {ifname}"))
+            })
+            .await
+            .expect("one bad device does not fail the round");
+
+        let mut payload = [0u8; crate::hash::HASH_SIZE];
+        let (received, _) = receiver.recv_from(&mut payload).await.expect("receive datagram");
+        assert_eq!(count, 1);
+        assert_eq!(received, crate::hash::HASH_SIZE);
+        assert_eq!(payload, token);
+    }
+
+    #[tokio::test]
     async fn auto_bind_unicast_discovery_sockets_binds_loopback_listener() {
         let plan = plan_with_discovery_listener(AutoDiscoveryListenerBinding {
             ifname: "lo".to_string(),

@@ -224,6 +224,11 @@ impl AutoRuntimePlan {
     }
 
     #[allow(dead_code)]
+    // One device's failure is that device's carrier, not the interface's.
+    // Python logs "possible carrier loss" for the device and sends the rest;
+    // a tunnel interface that carries a link-local address but no multicast
+    // route (macOS `utun*`) fails every round and must not take the Wi-Fi
+    // device down with it. The echo timeout is what retires a dead device.
     async fn send_peer_announce_datagrams_with_udp_socket(
         &self,
         datagrams: &[AutoPeerAnnounceDatagram],
@@ -234,34 +239,25 @@ impl AutoRuntimePlan {
         let mut sent = 0;
         for datagram in datagrams {
             let target = datagram.socket_target();
-            let destination =
-                target.resolve_socket_addr(&mut scope_id_for_ifname).map_err(|err| {
-                    format!(
-                        "resolve {label} {}/{} target {} failed: {err}",
-                        sent + 1,
-                        datagrams.len(),
-                        target.display()
-                    )
-                })?;
-            let sent_bytes =
-                socket.send_to(&datagram.payload, destination).await.map_err(|err| {
-                    format!(
-                        "send {label} {}/{} to {} failed: {err}",
-                        sent + 1,
-                        datagrams.len(),
-                        target.display()
-                    )
-                })?;
-            if sent_bytes != datagram.payload.len() {
-                return Err(format!(
-                    "send {label} {}/{} to {} sent {sent_bytes}/{} byte(s)",
-                    sent + 1,
-                    datagrams.len(),
-                    target.display(),
-                    datagram.payload.len()
-                ));
+            let outcome = match target.resolve_socket_addr(&mut scope_id_for_ifname) {
+                Err(err) => Err(format!("resolve target {} failed: {err}", target.display())),
+                Ok(destination) => match socket.send_to(&datagram.payload, destination).await {
+                    Err(err) => Err(format!("send to {} failed: {err}", target.display())),
+                    Ok(sent_bytes) if sent_bytes != datagram.payload.len() => Err(format!(
+                        "send to {} sent {sent_bytes}/{} byte(s)",
+                        target.display(),
+                        datagram.payload.len()
+                    )),
+                    Ok(_) => Ok(()),
+                },
+            };
+            match outcome {
+                Ok(()) => sent += 1,
+                Err(reason) => log::warn!(
+                    "[auto] possible carrier loss on {}: {label} {reason}",
+                    datagram.ifname
+                ),
             }
-            sent += 1;
         }
         Ok(sent)
     }
