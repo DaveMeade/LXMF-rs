@@ -212,6 +212,36 @@
         assert_ne!(sockets[0].bind_addr.port(), 0);
     }
 
+    /// Two multicast listeners on one discovery port, as every adopted NIC
+    /// needs and as a second Reticulum instance on the host needs. The
+    /// reference sets `SO_REUSEADDR`/`SO_REUSEPORT` for exactly this.
+    #[cfg(unix)]
+    #[tokio::test]
+    async fn auto_discovery_sockets_share_the_discovery_port_like_python() {
+        let listener = |port: u16| AutoDiscoveryListenerBinding {
+            ifname: "lo".to_string(),
+            link_local_address: "127.0.0.1".to_string(),
+            unicast_bind_address: "127.0.0.1".to_string(),
+            unicast_bind_port: 0,
+            multicast_group_address: "239.255.0.1".to_string(),
+            multicast_bind_address: "239.255.0.1".to_string(),
+            multicast_bind_port: port,
+        };
+        let first = plan_with_discovery_listener(listener(0))
+            .bind_multicast_discovery_sockets(|_| panic!("IPv4 multicast bind is unscoped"))
+            .await
+            .expect("bind first multicast discovery socket");
+        let port = first[0].bind_addr.port();
+        assert_ne!(port, 0);
+
+        let second = plan_with_discovery_listener(listener(port))
+            .bind_multicast_discovery_sockets(|_| panic!("IPv4 multicast bind is unscoped"))
+            .await
+            .expect("a second listener binds the same discovery port");
+
+        assert_eq!(second[0].bind_addr.port(), port);
+    }
+
     #[tokio::test]
     async fn auto_bind_peer_data_socket_receives_typed_datagram() {
         let mut plan = plan_with_data_listener(AutoDataListenerBinding {

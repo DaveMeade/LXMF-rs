@@ -423,11 +423,14 @@ impl AutoRuntimePlan {
                         target.display_bind_addr()
                     )
                 })?;
-                let socket = tokio::net::UdpSocket::bind(bind_addr).await.map_err(|err| {
+                let std_socket = bind_reusable_udp(bind_addr).map_err(|err| {
                     format!(
                         "bind auto discovery unicast socket {} failed: {err}",
                         target.display_bind_addr()
                     )
+                })?;
+                let socket = tokio::net::UdpSocket::from_std(std_socket).map_err(|err| {
+                    format!("convert auto discovery unicast socket to tokio failed: {err}")
                 })?;
                 Ok(AutoBoundDiscoverySocket {
                     kind: target.kind,
@@ -445,7 +448,7 @@ impl AutoRuntimePlan {
                             target.display_bind_addr()
                         )
                     })?;
-                let std_socket = std::net::UdpSocket::bind(resolved.bind_addr).map_err(|err| {
+                let std_socket = bind_reusable_udp(resolved.bind_addr).map_err(|err| {
                     format!(
                         "bind auto discovery multicast socket {} failed: {err}",
                         target.display_bind_addr()
@@ -469,9 +472,6 @@ impl AutoRuntimePlan {
                             )
                         })?,
                 }
-                std_socket.set_nonblocking(true).map_err(|err| {
-                    format!("set auto discovery multicast socket nonblocking failed: {err}")
-                })?;
                 let socket = tokio::net::UdpSocket::from_std(std_socket).map_err(|err| {
                     format!("convert auto discovery multicast socket to tokio failed: {err}")
                 })?;
@@ -678,6 +678,31 @@ impl AutoRuntimePlan {
             .map(|socket| self.spawn_peer_data_receive_loop(socket, runtime.clone()))
             .collect()
     }
+}
+
+/// Binds a discovery socket the way `AutoInterface.py` does: `SO_REUSEADDR`
+/// and, where the platform has it, `SO_REUSEPORT` set before the bind.
+///
+/// Every adopted NIC's multicast listener binds the unspecified address on the
+/// same discovery port and joins its own scoped group, so the second NIC's
+/// bind fails without these. They are also what lets two Reticulum instances
+/// on one host share the discovery port. The data socket does not get them;
+/// the reference binds it plainly too, and a shared data port would hand one
+/// peer's packets to the other.
+///
+/// Non-blocking, ready for `tokio::net::UdpSocket::from_std`.
+fn bind_reusable_udp(bind_addr: SocketAddr) -> std::io::Result<std::net::UdpSocket> {
+    let socket = socket2::Socket::new(
+        socket2::Domain::for_address(bind_addr),
+        socket2::Type::DGRAM,
+        Some(socket2::Protocol::UDP),
+    )?;
+    socket.set_reuse_address(true)?;
+    #[cfg(unix)]
+    socket.set_reuse_port(true)?;
+    socket.bind(&bind_addr.into())?;
+    socket.set_nonblocking(true)?;
+    Ok(socket.into())
 }
 
 impl AutoDiscoveryListenerSupervisor {
