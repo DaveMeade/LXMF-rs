@@ -105,7 +105,7 @@
             source_link_local_address: "fe80::1111".to_string(),
             destination_address: "fe80::2222%wlan0".to_string(),
             destination_port: 29_717,
-            payload: vec![0; rns_transport::hash::HASH_SIZE],
+            payload: vec![0; crate::hash::HASH_SIZE],
         };
 
         assert_eq!(
@@ -155,8 +155,8 @@
         let receiver = tokio::net::UdpSocket::bind("127.0.0.1:0").await.expect("bind receiver");
         let receiver_addr = receiver.local_addr().expect("receiver addr");
         let sender = tokio::net::UdpSocket::bind("127.0.0.1:0").await.expect("bind sender");
-        let token = [0x42; rns_transport::hash::HASH_SIZE];
-        let plan = AutoDaemonStartupPlan {
+        let token = [0x42; crate::hash::HASH_SIZE];
+        let plan = AutoRuntimePlan {
             config: AutoInterfaceConfig::default(),
             platform: AutoInterfacePlatform::Other,
             device_filter: AutoInterfaceDeviceFilter::default(),
@@ -180,10 +180,10 @@
             .await
             .expect("send datagram");
 
-        let mut payload = [0u8; rns_transport::hash::HASH_SIZE];
+        let mut payload = [0u8; crate::hash::HASH_SIZE];
         let (received, _) = receiver.recv_from(&mut payload).await.expect("receive datagram");
         assert_eq!(count, 1);
-        assert_eq!(received, rns_transport::hash::HASH_SIZE);
+        assert_eq!(received, crate::hash::HASH_SIZE);
         assert_eq!(payload, token);
     }
 
@@ -304,7 +304,7 @@
 
         let sender = tokio::net::UdpSocket::bind("127.0.0.1:0").await.expect("bind sender");
         let source_address = sender.local_addr().expect("sender addr").ip().to_string();
-        let payload = rns_transport::iface::auto::peering_token(
+        let payload = crate::iface::auto::peering_token(
             plan.config.group_id.as_bytes(),
             &source_address,
         );
@@ -396,7 +396,7 @@
             plan.spawn_discovery_receive_loops(sockets, Arc::clone(&state), events_tx, shutdown_rx);
         let sender = tokio::net::UdpSocket::bind("127.0.0.1:0").await.expect("bind sender");
         let source_address = sender.local_addr().expect("sender addr").ip().to_string();
-        let payload = rns_transport::iface::auto::peering_token(
+        let payload = crate::iface::auto::peering_token(
             plan.config.group_id.as_bytes(),
             &source_address,
         );
@@ -412,7 +412,7 @@
                 assert_eq!(processed.source_address, source_address);
                 assert_eq!(
                     processed.event,
-                    AutoDiscoveryEvent::Peer(rns_transport::iface::auto::AutoPeerEvent::Added)
+                    AutoDiscoveryEvent::Peer(crate::iface::auto::AutoPeerEvent::Added)
                 );
             }
             other => panic!("unexpected accepted event: {other:?}"),
@@ -420,7 +420,7 @@
         assert!(state.lock().await.peer(&source_address).is_some());
 
         sender
-            .send_to(&[0; rns_transport::hash::HASH_SIZE], bind_addr)
+            .send_to(&[0; crate::hash::HASH_SIZE], bind_addr)
             .await
             .expect("send invalid discovery datagram");
         let rejected = tokio::time::timeout(std::time::Duration::from_secs(1), events_rx.recv())
@@ -471,14 +471,14 @@
             plan.spawn_discovery_receive_loops(sockets, Arc::clone(&state), events_tx, shutdown_rx);
         let sender = tokio::net::UdpSocket::bind("127.0.0.1:0").await.expect("bind sender");
         let source_address = sender.local_addr().expect("sender addr").ip().to_string();
-        let payload = rns_transport::iface::auto::peering_token(
+        let payload = crate::iface::auto::peering_token(
             plan.config.group_id.as_bytes(),
             &source_address,
         );
 
         sender.send_to(&payload, bind_addr).await.expect("send early valid discovery datagram");
         sender
-            .send_to(&[0; rns_transport::hash::HASH_SIZE], bind_addr)
+            .send_to(&[0; crate::hash::HASH_SIZE], bind_addr)
             .await
             .expect("send early invalid discovery datagram");
         assert!(
@@ -544,7 +544,7 @@
 
         let sender = tokio::net::UdpSocket::bind("127.0.0.1:0").await.expect("bind sender");
         let source_address = sender.local_addr().expect("sender addr").ip().to_string();
-        let payload = rns_transport::iface::auto::peering_token(
+        let payload = crate::iface::auto::peering_token(
             plan.config.group_id.as_bytes(),
             &source_address,
         );

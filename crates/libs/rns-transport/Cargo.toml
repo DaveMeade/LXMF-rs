@@ -37,6 +37,7 @@ thiserror.workspace = true
 log.workspace = true
 tracing.workspace = true
 hex.workspace = true
+if-addrs = "0.15.0"
 btleplug = { version = "0.12", optional = true }
 futures = { version = "0.3.31", optional = true }
 socket2 = { version = "0.5", features = ["all"] }
